@@ -1,0 +1,25 @@
+# Dataset bruto (confidencial — não versionar)
+data/
+*.zip
+*.csv
+*.xlsx
+*.json.gz
+*.db
+*.sqlite
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+
+# Node
+node_modules/
+dist/
+
+# Editor / SO
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
