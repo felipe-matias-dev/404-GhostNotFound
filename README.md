@@ -17,9 +17,8 @@ Plataforma de visão 360 da V-Energy (Rocket Lab 2026.2 · Visagio): pipeline de
 | Frente | Integrantes |
 |---|---|
 | Engenharia de Dados | Arthur Oliveira, Alysson, Gabriel |
-| Portal Web | Felipe Matias, João Euclides |
-| Inteligência Artificial | Luis Felipe Perylo, Lucas Mendes |
-| A definir | Renard |
+| Portal Web | Felipe Matias, João Euclides, Lucas Mendes |
+| Inteligência Artificial | Luis Felipe Perylo, Renard |
 
 ## Visão geral e decisões de arquitetura
 
