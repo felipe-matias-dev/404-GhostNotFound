@@ -28,6 +28,15 @@ _TODO_
 
 _TODO: passo a passo dos módulos de dados, frontend e agente._
 
+### Banco de dados
+
+Requer [Docker Desktop](https://www.docker.com/products/docker-desktop/) aberto. Na raiz:
+
+```bash
+cp .env.example .env                       # no PowerShell: Copy-Item .env.example .env
+docker compose up -d --wait                # sobe o PostgreSQL
+```
+
 ### Backend
 
 Requer Python 3.12+ e [uv](https://docs.astral.sh/uv/). Dentro da pasta `backend/`:
@@ -36,7 +45,7 @@ Requer Python 3.12+ e [uv](https://docs.astral.sh/uv/). Dentro da pasta `backend
 uv sync                                    # instala as dependências
 cp .env.example .env                       # no PowerShell: Copy-Item .env.example .env
 uv run python -m venergy_api.amostra       # gera a amostra sintética da Gold em data/gold/
-uv run python -m venergy_api.carga         # carrega data/gold/ no banco data/venergy.db
+uv run python -m venergy_api.carga         # carrega data/gold/ no schema gold do banco
 uv run uvicorn venergy_api.main:create_app --factory --reload
 ```
 

@@ -5,7 +5,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | Data | Decisão | Motivo | Quem |
 |---|---|---|---|
 | 19/10/2026 | DEC-001: arquivos de origem em `v_energy.default.landing`; `bronze` só com tabelas | Separa arquivos imutáveis de tabelas recriáveis | Arthur |
-| 19/10/2026 | DEC-002: banco local SQLite, acessado via SQLAlchemy | Roda no clone limpo sem instalar nada; modo somente leitura nativo para o agente | Felipe |
+| 19/10/2026 | DEC-002: banco local PostgreSQL em Docker, com schemas `gold` e `app` | Usuário somente leitura nativo para o agente; recarga da Gold não apaga as ordens de inspeção | Time |
 | 19/10/2026 | DEC-003: walking skeleton com amostra sintética da Gold | Integração entre camadas testada desde o início, sem depender do dataset confidencial | Time |
 | 19/10/2026 | DEC-004 (proposta): Gold entregue em CSV, um arquivo por tabela, em `data/gold/` | Um único caminho de carga, validado contra o contrato, para amostra e Gold real | Felipe |
 
@@ -20,20 +20,30 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Regras:** o pipeline nunca escreve nem apaga nada em `landing`. O caminho
   é parametrizado por widget no notebook `landing_to_bronze`.
 
-## DEC-002 · Banco local SQLite
+## DEC-002 · Banco local PostgreSQL
 
-- **Data:** 19/10/2026 · **Área:** Portal · **Autor:** Felipe
-- **Decisão:** o banco local é um arquivo SQLite em `data/venergy.db`, na raiz do
-  repositório e fora do Git. O backend acessa o banco pelo SQLAlchemy 2.0.
-- **Motivo:** funciona a partir de um clone limpo sem instalar servidor de banco,
-  a Gold é agregada e cabe bem num arquivo, e o SQLite oferece modo somente
-  leitura nativo, usado pelo agente de IA.
-- **Alternativa descartada:** PostgreSQL, que exigiria servidor ou Docker em
-  cada máquina, inclusive na da banca.
-- **Regras:** o backend lê e escreve (as ordens de inspeção vão precisar). O
-  agente de IA conecta em modo somente leitura (`?mode=ro`). Trocar de banco
-  exige só mudar `VENERGY_API_DATABASE_URL`, porque nenhuma consulta é escrita
-  no dialeto do SQLite.
+- **Data:** 19/10/2026 · **Área:** Portal, Dados e IA · **Autor:** Time (ADR-01
+  do planejamento)
+- **Decisão:** o banco local é um PostgreSQL 17 em Docker (`docker-compose.yml`
+  na raiz). O banco `venergy` tem dois schemas: `gold`, recarregável a partir dos
+  CSVs, e `app`, com os dados criados no portal (ordens de inspeção). O backend
+  acessa o banco pelo SQLAlchemy 2.0 com o driver psycopg.
+- **Motivo:** o Postgres tem usuários com permissão própria, então o agente de IA
+  ganha um usuário que só lê, exigido por Segurança da Informação. A separação
+  `gold`/`app` impede que a recarga da Gold apague o trabalho da equipe de perdas.
+- **Alternativa descartada:** SQLite, que dispensa instalação, mas não tem
+  usuários nem schemas: o somente leitura do agente dependeria só de uma opção
+  na conexão.
+- **Regras:**
+  - O agente conecta com o usuário `venergy_agent`: `SELECT` apenas no schema
+    `gold`, transações somente leitura por padrão e nenhum acesso a `app`.
+    Coberto por `backend/tests/test_agent_role.py`.
+  - O backend usa o usuário `venergy`, que lê e escreve.
+  - Os testes rodam no banco `venergy_test`, no mesmo container, e nunca tocam
+    os dados de desenvolvimento.
+  - O banco escuta só em `127.0.0.1`, na porta 5433 por padrão, para não colidir
+    com um PostgreSQL já instalado. As URLs usam `127.0.0.1`, e não `localhost`:
+    no Windows, `localhost` tenta IPv6 primeiro e a conexão fica pendurada.
 
 ## DEC-003 · Walking skeleton com amostra sintética
 
@@ -59,7 +69,8 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Decisão:** a Gold chega ao banco local como CSV, um arquivo por tabela com o
   nome da tabela (`gold_dim_uc.csv`), em UTF-8, separado por vírgula, com
   cabeçalho e booleanos como `true`/`false`. Os arquivos ficam em `data/gold/`,
-  fora do Git, e são carregados por `uv run python -m venergy_api.carga`.
+  fora do Git, e são carregados no schema `gold` do banco por
+  `uv run python -m venergy_api.carga`.
 - **Motivo:** amostra e Gold real percorrem o mesmo caminho, então trocar uma
   pela outra não muda código.
 - **Regras:** a carga valida todas as linhas contra o contrato
