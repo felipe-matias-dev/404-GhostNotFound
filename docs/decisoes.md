@@ -96,6 +96,10 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   `source_file` (de `_metadata.file_path`) e `ingestion_timestamp`.
 - **Carga:** batch, full refresh, `overwrite` do Delta com um único overwrite por
   tabela. Reexecutar sobre os mesmos arquivos não duplica nem perde linhas.
+- **Fontes e opções:** o notebook ingere uma fonte por execução (widget `fonte`).
+  As opções de leitura de cada fonte ficam no catálogo `FONTES`, versionado; conflito
+  entre o catálogo e um widget faz a execução falhar, e as opções efetivas são
+  impressas a cada execução.
 - **Sem:** limpeza, deduplicação, tipagem, regras de negócio, `ingestion_log`,
   snapshots ou histórico próprio. Isso fica para a Silver.
 - **Validação antes de gravar:** o arquivo existe, o cabeçalho foi lido sem
@@ -108,3 +112,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   "vazio" e "nulo" não se distinguem na Bronze. A contagem de linhas físicas é só
   uma conferência auxiliar, porque campos entre aspas podem conter quebras de
   linha.
+- **Evidências:** os resultados da validação (contagens, colunas, estatísticas) são
+  documentados à parte, em relatório privado fora do repositório, porque o dataset é
+  confidencial. Não há tabelas adicionais de auditoria, e os notebooks são
+  versionados sem outputs.

@@ -8,6 +8,13 @@ atendimentos.json
 *.db
 *.sqlite
 
+# Relatórios, evidências e profiling derivados do dataset (privados, nunca versionar)
+docs/bronze/
+evidencias/
+relatorio-*
+profiling/
+*.parquet
+
 # Python
 __pycache__/
 *.pyc
