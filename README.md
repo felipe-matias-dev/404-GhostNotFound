@@ -26,7 +26,22 @@ _TODO_
 
 ## Como executar localmente
 
-_TODO: passo a passo de cada módulo (dados, backend, frontend, agente)._
+_TODO: passo a passo dos módulos de dados, frontend e agente._
+
+### Backend
+
+Requer Python 3.12+ e [uv](https://docs.astral.sh/uv/). Dentro da pasta `backend/`:
+
+```bash
+uv sync                                    # instala as dependências
+cp .env.example .env                       # no PowerShell: Copy-Item .env.example .env
+uv run python -m venergy_api.amostra       # gera a amostra sintética da Gold em data/gold/
+uv run python -m venergy_api.carga         # carrega data/gold/ no banco data/venergy.db
+uv run uvicorn venergy_api.main:create_app --factory --reload
+```
+
+A API sobe em http://127.0.0.1:8000, com documentação em `/docs`. Detalhes, testes e
+como usar a Gold real em vez da amostra: [backend/README.md](backend/README.md).
 
 ## Execução do Workflow no Databricks
 
