@@ -33,8 +33,11 @@ _TODO: passo a passo dos módulos de dados, frontend e agente._
 Requer [Docker Desktop](https://www.docker.com/products/docker-desktop/) aberto. Na raiz:
 
 ```bash
+# 1. Cria o .env com as senhas do banco. Sem ele, o docker compose não sobe.
 cp .env.example .env                       # no PowerShell: Copy-Item .env.example .env
-docker compose up -d --wait                # sobe o PostgreSQL
+
+# 2. Sobe o PostgreSQL e espera ele ficar pronto
+docker compose up -d --wait
 ```
 
 ### Backend
@@ -42,11 +45,21 @@ docker compose up -d --wait                # sobe o PostgreSQL
 Requer Python 3.12+ e [uv](https://docs.astral.sh/uv/). Dentro da pasta `backend/`:
 
 ```bash
-uv sync                                    # instala as dependências
+# 3. Instala as dependências
+uv sync
+
+# 4. Cria o .env da API
 cp .env.example .env                       # no PowerShell: Copy-Item .env.example .env
-uv run python -m venergy_api.amostra       # gera a amostra sintética da Gold em data/gold/
-uv run python -m venergy_api.carga         # carrega data/gold/ no schema gold do banco
-uv run uvicorn venergy_api.main:create_app --factory --reload
+
+# 5. Gera a amostra sintética da Gold e carrega no banco
+uv run python -m venergy_api.amostra
+uv run python -m venergy_api.carga
+
+# 6. (Opcional) Roda os testes
+uv run pytest
+
+# 7. Sobe a API em http://127.0.0.1:8000 (Ctrl+C para parar)
+uv run uvicorn venergy_api.main:create_app --factory --reload --reload-dir src
 ```
 
 A API sobe em http://127.0.0.1:8000, com documentação em `/docs`. Detalhes, testes e

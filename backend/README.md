@@ -38,9 +38,12 @@ uv run python -m venergy_api.amostra
 # 6. Carrega os CSVs de data/gold/ no schema gold do banco
 uv run python -m venergy_api.carga
 
-# 7. Sobe a API em http://127.0.0.1:8000
-uv run uvicorn venergy_api.main:create_app --factory --reload
+# 7. Sobe a API em http://127.0.0.1:8000 (Ctrl+C para parar)
+uv run uvicorn venergy_api.main:create_app --factory --reload --reload-dir src
 ```
+
+O `--reload` reinicia a API quando o código muda; o `--reload-dir src` limita isso ao
+código, para que mudanças em `.venv` (como logo após o `uv sync`) não a reiniciem.
 
 Se você mudar senha ou porta no `.env` da raiz, ajuste também a URL no `.env` de `backend/`.
 

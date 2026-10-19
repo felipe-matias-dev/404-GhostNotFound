@@ -1,6 +1,6 @@
 """Ponto de entrada da API: monta a aplicação FastAPI e registra as rotas.
 
-Uso: uv run uvicorn venergy_api.main:create_app --factory --reload
+Uso: uv run uvicorn venergy_api.main:create_app --factory --reload --reload-dir src
 """
 
 from fastapi import FastAPI
