@@ -6,9 +6,13 @@ from typing import Annotated
 
 from fastapi import Depends
 from sqlalchemy import Engine, create_engine
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import DeclarativeBase, Session
 
 from venergy_api.config import get_settings
+
+
+class Base(DeclarativeBase):
+    """Classe-mãe dos modelos: registra as tabelas que o SQLAlchemy sabe criar."""
 
 
 def create_db_engine(database_url: str) -> Engine:

@@ -1,6 +1,7 @@
 """Configurações da API, lidas de variáveis de ambiente e do arquivo .env."""
 
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -11,6 +12,8 @@ class Settings(BaseSettings):
     # Sem valor padrão: se o .env estiver faltando, a API falha ao subir com uma
     # mensagem clara, em vez de criar um banco vazio num caminho inesperado.
     database_url: str
+    # Pasta onde o time de dados entrega os CSVs da Gold, um arquivo por tabela.
+    gold_dir: Path
 
 
 @lru_cache
