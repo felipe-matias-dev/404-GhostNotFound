@@ -1,0 +1,25 @@
+# Banco local do V-Energy Grid 360 (PostgreSQL). Uso: docker compose up -d
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: venergy
+      POSTGRES_USER: venergy
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no .env da raiz}
+      # Lida pelo script de inicialização para criar o usuário somente leitura do agente.
+      AGENT_DB_PASSWORD: ${AGENT_DB_PASSWORD:?defina AGENT_DB_PASSWORD no .env da raiz}
+    ports:
+      # Só localhost: o banco não fica exposto na rede. 5433 por padrão para não colidir
+      # com um PostgreSQL já instalado na máquina, que costuma ocupar a 5432.
+      - "127.0.0.1:${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./infra/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U venergy -d venergy"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata:
