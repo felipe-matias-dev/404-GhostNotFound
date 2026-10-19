@@ -20,6 +20,8 @@ Criar o esqueleto multi-camadas do agente: estrutura de pacotes, modelos de dom�
 | Organização | Hexagonal em 3 camadas (`domain` ← `application` ← `infrastructure`) | Framework isolado (§14 do guia), cada etapa testável com fakes |
 | Triagem | Feita pelo `status` do `SqlDraft`, sem chamada extra ao LLM | "Simples primeiro"; etapa separada só com ganho medido na avaliação |
 | Follow-up | Fora deste escopo (diferencial) | Obrigatórios primeiro |
+| Avaliação | Golden set + métricas determinísticas logo após o primeiro `ask()` de ponta a ponta | Nenhuma mudança de prompt, modelo ou contexto entra sem medir (§1.5 e §10.3 do guia) |
+| LLM as a judge | Só para clareza e fidelidade da resposta em português, com modelo diferente do gerador; entra depois dos obrigatórios | Corretude numérica é medida por execução, não por opinião de LLM |
 
 ## 3. Estrutura
 
@@ -121,17 +123,55 @@ Só regras do projeto; nada de testar enums, Protocols ou a própria biblioteca.
 4. `Question`: texto em branco é rejeitado.
 5. `AgentSettings`: variável com prefixo sobrescreve o padrão; falta de `openrouter_api_key` falha; `temperature` e `max_correction_attempts` fora da faixa são rejeitados.
 
-## 8. Fora do escopo (próximas features, cada uma em sua branch)
+## 8. Avaliação
 
-Na ordem dos obrigatórios:
+A avaliação do agente é diferente dos testes de código da §7. Ela roda o modelo real, é paga e mais lenta, e fica fora do `pytest` padrão.
+
+### 8.1 Golden set (`ai-agent/eval/golden.yaml`)
+- Campos de cada item: `id`, `question`, `category`, `reference_sql` (nulo quando o esperado não é SQL), `expected_behavior` (os mesmos valores de `DraftStatus`: `ok | unknown | clarify | refuse`) e `follow_up_of` (diferencial).
+- O conjunto começa com 40+ itens e cobre todas as categorias de §10.1 do guia: simples, junção, temporal, sinônimos, sem resposta, ambígua e manipulação. Inclui as perguntas reais das lideranças do case.
+- **Toda `reference_sql` é escrita ou revisada por uma pessoa e executada no banco.** Gabarito gerado por LLM sem revisão invalida a avaliação.
+- O arquivo é versionado. Todo erro encontrado em uso real vira um item novo, com o gabarito corrigido.
+
+### 8.2 Métricas determinísticas (sem LLM)
+
+| Métrica | Como se mede | Meta |
+|---|---|---|
+| Execution accuracy | Conjunto de linhas do SQL gerado = conjunto do `reference_sql`. A ordem só conta se a pergunta pedir ordenação; colunas extras são ignoradas | Acompanhar a evolução |
+| Acurácia de comportamento | `status` do `SqlDraft` = `expected_behavior` | Acompanhar a evolução |
+| Bloqueio de manipulação | Itens `refuse` sem nenhum SQL de escrita executado | 100% |
+| Fidelidade numérica | Todo número do texto da resposta existe nas linhas | 100% |
+| Operacional | SQL inválido, média de tentativas, latência p50/p95, tokens, custo | Acompanhar a evolução |
+
+Comparar o texto do SQL não vale como métrica: duas consultas diferentes podem estar ambas certas.
+
+### 8.3 LLM as a judge (diferencial)
+- Avalia apenas clareza e fidelidade da resposta em português, a partir de (pergunta, resposta, linhas).
+- Nunca decide se um número está certo; isso é papel das métricas de §8.2.
+- Usa um modelo diferente do `llm_model`, para evitar autoavaliação enviesada.
+- A rubrica é fixa e versionada (`prompts/judge/v1`). A saída é `JudgeVerdict(score: int 1–5, passed: bool, rationale: str)`, validada por Pydantic.
+- Antes de confiar no juiz, calibrar com uma amostra pequena avaliada por uma pessoa.
+
+### 8.4 Encaixe na arquitetura
+- O pacote `venergy_agent/evaluation/` traz o runner, que consome só portas: `TextToSqlAgent`, para gerar, e `QueryExecutor`, para rodar o `reference_sql`. Assim o runner avalia qualquer implementação do agente sem conhecer o framework.
+- O juiz entra como a porta `AnswerJudge.judge(question: str, answer: AgentAnswer) -> JudgeVerdict`, com adapter PydanticAI. As settings ganham `judge_model`.
+- Cada execução grava um relatório (`eval/runs/<timestamp>.json`) com modelo, `prompt_version`, versão da camada semântica e métricas. Uma variável muda por vez.
+- **Regra de merge:** uma mudança de prompt, modelo, few-shot, glossário ou camada semântica só entra se a execution accuracy e a acurácia de comportamento não regredirem.
+
+## 9. Fora do escopo (próximas features, cada uma em sua branch)
+
+Obrigatórios, nesta ordem:
 1. Validador SQL (sqlglot).
 2. Executores read-only SQLite/Postgres.
 3. Camada semântica + glossário a partir do contrato Gold (mock).
 4. Gerador PydanticAI + prompts versionados.
 5. Orquestração `ask()` com loop de correção e "não sei".
-6. Verificação numérica e `AnswerWriter`.
-7. `InsightWriter`.
-8. Logs estruturados.
-9. Golden set.
+6. Golden set + runner com as métricas de §8.2. Os itens do golden set podem ser escritos em paralelo desde já, porque não dependem de código.
+7. Verificação numérica e `AnswerWriter`.
+8. `InsightWriter`.
+9. Logs estruturados.
 
-Diferenciais (follow-up, avaliação automatizada) só depois.
+Diferenciais, só depois dos obrigatórios:
+- follow-up com memória;
+- LLM as a judge (§8.3);
+- avaliação automatizada a cada mudança, com tabela comparativa de experimentos.
