@@ -100,7 +100,7 @@ Variáveis lidas do `.env` (veja `.env.example`):
 |---|---|
 | `VENERGY_API_DATABASE_URL` | Endereço do banco. Obrigatória |
 | `VENERGY_API_GOLD_DIR` | Pasta dos CSVs da Gold. Obrigatória |
-| `VENERGY_API_CORS_ORIGINS` | Endereços do frontend autorizados a chamar a API pelo navegador. Padrão: `["http://localhost:5173"]` |
+| `VENERGY_API_CORS_ORIGINS` | Endereços do frontend autorizados a chamar a API pelo navegador. Padrão: `["http://localhost:3000"]` |
 
 Os caminhos são relativos à pasta `backend/`, de onde os comandos rodam.
 

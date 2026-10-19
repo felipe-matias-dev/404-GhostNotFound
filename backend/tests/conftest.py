@@ -14,7 +14,7 @@ from venergy_api.config import Settings
 from venergy_api.database import Base, create_db_engine, get_session
 from venergy_api.main import create_app
 
-FRONTEND_ORIGIN = "http://localhost:5173"
+FRONTEND_ORIGIN = "http://localhost:3000"
 
 # O padrão bate com o .env.example da raiz; quem mudou senha ou porta define a variável.
 TEST_DATABASE_URL = os.environ.get(
