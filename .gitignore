@@ -23,3 +23,8 @@ dist/
 .idea/
 .DS_Store
 Thumbs.db
+
+/meus-docs
+
+# Claude Code (configuração pessoal de cada integrante)
+.claude/
