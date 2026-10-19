@@ -4,6 +4,7 @@ data/
 *.csv
 *.xlsx
 *.json.gz
+atendimentos.json
 *.db
 *.sqlite
 
