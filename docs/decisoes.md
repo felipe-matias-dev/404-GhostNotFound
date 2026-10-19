@@ -14,6 +14,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | 19/10/2026 | DEC-002: banco local PostgreSQL em Docker, com schemas `gold` e `app` | Usuário somente leitura nativo para o agente; recarga da Gold não apaga as ordens de inspeção | Time |
 | 19/10/2026 | DEC-003: walking skeleton com amostra sintética da Gold | Integração entre camadas testada desde o início, sem depender do dataset confidencial | Time |
 | 19/10/2026 | DEC-004 (proposta): Gold entregue em CSV, um arquivo por tabela, em `data/gold/` | Um único caminho de carga, validado contra o contrato, para amostra e Gold real | Felipe |
+| 19/10/2026 | DEC-005: Bronze com auditoria básica (full refresh, tudo string, `ingestion_timestamp` e `source_file`) | Dados o mais próximos da origem; rastreabilidade sem log próprio de ingestão | Alisson |
 
 ## DEC-001 · Localização dos arquivos de origem (landing)
 
@@ -24,7 +25,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Motivo:** separar arquivos imutáveis de tabelas recriáveis. Com o volume
   dentro de `bronze`, um `DROP SCHEMA bronze CASCADE` apagaria os originais.
 - **Regras:** o pipeline nunca escreve nem apaga nada em `landing`. O caminho
-  é parametrizado por widget no notebook `landing_to_bronze`.
+  é parametrizado por widget no notebook `Landing_to_Bronze`.
 
 ## DEC-002 · Banco local PostgreSQL
 
@@ -85,3 +86,25 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   dados anteriores. Nem os dados brutos nem os CSVs da Gold são versionados.
 - **Em aberto:** confirmar com a organização se a Gold agregada pode ir para o
   repositório público. Até lá, não é versionada.
+
+## DEC-005 · Contrato da Bronze (auditoria básica)
+
+- **Data:** 19/10/2026 · **Área:** Dados · **Autor:** Alisson
+- **Decisão:** uma tabela Delta por fonte lógica em `v_energy.bronze.<fonte>`,
+  com o nome da fonte em snake_case, sem prefixo (ex.: `unidades_consumidoras`).
+  Colunas originais, com os nomes originais e do tipo string, mais
+  `source_file` (de `_metadata.file_path`) e `ingestion_timestamp`.
+- **Carga:** batch, full refresh, `overwrite` do Delta com um único overwrite por
+  tabela. Reexecutar sobre os mesmos arquivos não duplica nem perde linhas.
+- **Sem:** limpeza, deduplicação, tipagem, regras de negócio, `ingestion_log`,
+  snapshots ou histórico próprio. Isso fica para a Silver.
+- **Validação antes de gravar:** o arquivo existe, o cabeçalho foi lido sem
+  ambiguidade, a leitura usa `FAILFAST` (linha malformada interrompe a carga) e
+  `source_file` está consistente. Se algo falhar, a tabela anterior não é tocada.
+- **Histórico:** o `DESCRIBE HISTORY` e o time travel do Delta são recursos
+  complementares, com retenção limitada (log de 30 dias e `VACUUM` de 7 dias por
+  padrão). Não são a trilha permanente de auditoria.
+- **Limitações conhecidas:** o Spark lê campo vazio sem aspas como `NULL`, então
+  "vazio" e "nulo" não se distinguem na Bronze. A contagem de linhas físicas é só
+  uma conferência auxiliar, porque campos entre aspas podem conter quebras de
+  linha.
