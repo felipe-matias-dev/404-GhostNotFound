@@ -11,10 +11,14 @@ Portal web do V-Energy Grid 360. SPA em React + TypeScript (Vite) que consome a 
 
 ## Como rodar
 
-Requer Node 22.12+ (ou 20.19+).
+Com Docker, `docker compose up` na raiz sobe banco, API e este frontend em
+http://localhost:3000: ver o [README da raiz](../README.md#como-executar-localmente).
+`src/` é montado no container e recarrega a cada mudança.
+
+Direto na máquina, requer Node 22.12+ (ou 20.19+) e a API no ar:
 
 ```bash
-npm install
+npm ci                       # versões exatas do package-lock.json
 cp .env.example .env.local   # ajuste se o backend não estiver em localhost:8000
 npm run dev                  # http://localhost:3000
 ```

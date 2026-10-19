@@ -35,7 +35,10 @@ def engine() -> Iterator[Engine]:
         with engine.connect() as connection:
             connection.execute(text("SELECT 1"))
     except OperationalError:
-        pytest.fail("Banco de testes indisponível. Suba com: docker compose up -d", pytrace=False)
+        pytest.fail(
+            "Banco de testes indisponível. Suba com: docker compose up -d --wait db",
+            pytrace=False,
+        )
 
     # Limpa antes, para não herdar sobras de uma execução interrompida, e depois.
     Base.metadata.drop_all(engine)

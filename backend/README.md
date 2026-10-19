@@ -13,14 +13,18 @@ PostgreSQL local, que é carregado a partir de CSVs.
 
 ## Como rodar
 
+Só quer o portal no ar? `docker compose up` sobe banco, API e frontend juntos: ver o
+[README da raiz](../README.md#como-executar-localmente). Os passos abaixo rodam a API
+direto na máquina, que é o caminho para desenvolver e rodar os testes.
+
 Primeiro o banco, na **raiz do repositório**:
 
 ```bash
 # 1. Cria o .env do banco (no PowerShell: Copy-Item .env.example .env)
 cp .env.example .env
 
-# 2. Sobe o PostgreSQL e espera ele ficar pronto
-docker compose up -d --wait
+# 2. Sobe só o PostgreSQL e espera ele ficar pronto (a API roda na sua máquina, na 8000)
+docker compose up -d --wait db
 ```
 
 Depois a API, dentro da pasta **`backend/`**:
@@ -104,7 +108,7 @@ O agente de IA conecta com
 `postgresql+psycopg://venergy_agent:<AGENT_DB_PASSWORD>@127.0.0.1:5433/venergy`.
 
 Para recriar o banco do zero (apaga todos os dados): `docker compose down -v` e depois
-`docker compose up -d --wait`.
+`docker compose up -d --wait db`.
 
 ## Configuração
 
@@ -126,7 +130,7 @@ uv run ruff check .
 uv run ruff format --check .
 ```
 
-Os testes rodam no banco `venergy_test` (precisam do `docker compose up`) e não
+Os testes rodam no banco `venergy_test` (precisam do `docker compose up -d --wait db`) e não
 dependem do `.env` nem dos dados de desenvolvimento. Quem mudou senha ou porta define
 `VENERGY_API_TEST_DATABASE_URL` e `VENERGY_API_TEST_AGENT_DATABASE_URL`.
 
@@ -154,7 +158,8 @@ tests/            # pytest
 | A API não sobe e reclama de `database_url` ou `gold_dir` | Falta o `.env` de `backend/` (passo 4) |
 | `/health` responde `503` | O banco está parado (`docker compose ps`) ou a URL no `.env` de `backend/` está errada |
 | A busca de UC responde `500` | A carga ainda não rodou (passos 5 e 6) |
-| Testes param com "Banco de testes indisponível" | O banco não está no ar: `docker compose up -d --wait` |
+| Testes param com "Banco de testes indisponível" | O banco não está no ar: `docker compose up -d --wait db` |
+| A API não sobe: porta 8000 em uso | A API do `docker compose` está no ar: `docker compose stop api web` |
 | Testes param com "Usuário do agente não conecta" | O banco foi criado antes do script de inicialização atual: `docker compose down -v` |
 
 As decisões por trás desta estrutura estão em [docs/decisoes.md](../docs/decisoes.md)
