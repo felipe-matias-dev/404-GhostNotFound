@@ -16,10 +16,15 @@ class Base(DeclarativeBase):
 
 
 def create_db_engine(database_url: str) -> Engine:
-    # O FastAPI executa rotas síncronas num pool de threads, e o SQLite, por padrão,
-    # recusa uma conexão usada por uma thread diferente da que a criou.
-    connect_args = {"check_same_thread": False} if database_url.startswith("sqlite") else {}
-    return create_engine(database_url, connect_args=connect_args)
+    return create_engine(
+        database_url,
+        # Testa cada conexão antes de reaproveitá-la: se o container do banco reiniciar,
+        # a API descarta as conexões mortas em vez de devolver erro.
+        pool_pre_ping=True,
+        # Com o banco fora do ar, falha em segundos (o /health responde 503) em vez de
+        # deixar a requisição pendurada.
+        connect_args={"connect_timeout": 5},
+    )
 
 
 @lru_cache

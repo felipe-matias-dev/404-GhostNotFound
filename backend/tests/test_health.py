@@ -1,5 +1,4 @@
 from collections.abc import Callable
-from pathlib import Path
 
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine
@@ -15,11 +14,10 @@ def test_health_returns_ok_when_database_is_reachable(client: TestClient) -> Non
 
 
 def test_health_returns_503_when_database_is_unreachable(
-    tmp_path: Path, client_for: Callable[[Engine], TestClient]
+    client_for: Callable[[Engine], TestClient],
 ) -> None:
-    # O SQLite cria o arquivo, mas não a pasta: um diretório inexistente simula banco fora do ar.
-    missing_path = tmp_path / "missing-dir" / "venergy.db"
-    broken_engine = create_db_engine(f"sqlite:///{missing_path.as_posix()}")
+    # Ninguém escuta na porta 1: a conexão é recusada na hora, como um banco fora do ar.
+    broken_engine = create_db_engine("postgresql+psycopg://venergy:x@127.0.0.1:1/venergy")
 
     response = client_for(broken_engine).get("/health")
 
