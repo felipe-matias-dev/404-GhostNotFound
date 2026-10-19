@@ -11,15 +11,15 @@ import csv
 from pathlib import Path
 
 from venergy_api.config import get_settings
-from venergy_api.models import UcResumo
-from venergy_api.schemas import UcResumoSchema
+from venergy_api.models import DimUc
+from venergy_api.schemas import DimUcSchema
 
-FIELDS = list(UcResumoSchema.model_fields)
+FIELDS = list(DimUcSchema.model_fields)
 
 # Cobre todas as classes de consumo, UCs com e sem painel solar e municípios citados pelas
 # lideranças. Os códigos são fixos para que o time possa citá-los ("busque a UC 0003").
 _ROWS = [
-    # uc_id, municipio, bairro, classe, alimentador, possui_gd, consumo_medio_kwh_12m
+    # cod_uc, municipio, bairro, classe, cod_alimentador, possui_gd, consumo_medio_kwh_12m
     ("0001", "Recife", "Boa Viagem", "B1", "AL-01", False, 162.5),
     ("0002", "Recife", "Casa Amarela", "B1", "AL-02", True, 48.0),
     ("0003", "Olinda", "Casa Caiada", "B1", "AL-03", True, 95.3),
@@ -31,10 +31,10 @@ _ROWS = [
 ]
 
 # Montar pelo schema faz a própria amostra falhar se sair do contrato.
-SAMPLE_UCS = tuple(UcResumoSchema(**dict(zip(FIELDS, row, strict=True))) for row in _ROWS)
+SAMPLE_UCS = tuple(DimUcSchema(**dict(zip(FIELDS, row, strict=True))) for row in _ROWS)
 
 
-def _to_csv_row(uc: UcResumoSchema) -> dict[str, object]:
+def _to_csv_row(uc: DimUcSchema) -> dict[str, object]:
     # Booleanos em minúsculas, como o Spark exporta: "true"/"false".
     return {
         field: str(value).lower() if isinstance(value, bool) else value
@@ -44,7 +44,7 @@ def _to_csv_row(uc: UcResumoSchema) -> dict[str, object]:
 
 def write_sample(gold_dir: Path, *, force: bool) -> Path:
     """Grava a amostra em gold_dir. Sem force, nunca sobrescreve um arquivo existente."""
-    csv_path = gold_dir / f"{UcResumo.__tablename__}.csv"
+    csv_path = gold_dir / f"{DimUc.__tablename__}.csv"
     if csv_path.exists() and not force:
         raise FileExistsError(
             f"{csv_path} já existe e pode ser a Gold real. Use --force para sobrescrever."

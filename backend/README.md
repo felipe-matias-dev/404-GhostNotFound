@@ -32,14 +32,14 @@ uv run uvicorn venergy_api.main:create_app --factory --reload
 ```
 
 A documentação interativa fica em http://127.0.0.1:8000/docs. Para conferir, busque
-a UC `0003` em `GET /unidades-consumidoras/{uc_id}`.
+a UC `0003` em `GET /unidades-consumidoras/{cod_uc}`.
 
 ## Rotas
 
 | Rota | O que faz |
 |---|---|
 | `GET /health` | `200` se a API alcança o banco, `503` se não alcança |
-| `GET /unidades-consumidoras/{uc_id}` | Resumo de uma unidade consumidora, ou `404` se ela não existir |
+| `GET /unidades-consumidoras/{cod_uc}` | Resumo de uma unidade consumidora, ou `404` se ela não existir |
 
 ## Dados: amostra e Gold real
 
@@ -49,7 +49,7 @@ A API não sabe se os dados são de amostra ou reais: os dois chegam pelo mesmo 
 - **Amostra:** 8 unidades consumidoras com valores inventados, geradas pelo passo 3.
   Nada vem do dataset da V-Energy, que é confidencial.
 - **Gold real:** coloque os CSVs exportados do Databricks em `data/gold/`, um arquivo
-  por tabela (`uc_resumo.csv`), e rode a carga (passo 4) de novo.
+  por tabela (`gold_dim_uc.csv`), e rode a carga (passo 4) de novo.
 
 A carga valida cada linha contra o contrato (`src/venergy_api/schemas.py`). Se um
 arquivo estiver fora do formato, ela é cancelada, informa a linha e a coluna com

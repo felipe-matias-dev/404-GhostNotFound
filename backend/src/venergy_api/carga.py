@@ -17,8 +17,8 @@ from sqlalchemy.orm import Session
 
 from venergy_api.config import get_settings
 from venergy_api.database import Base, get_engine
-from venergy_api.models import UcResumo
-from venergy_api.schemas import UcResumoSchema
+from venergy_api.models import DimUc
+from venergy_api.schemas import DimUcSchema
 
 
 class GoldLoadError(Exception):
@@ -36,7 +36,7 @@ class GoldTable:
 
 
 # Uma entrada por tabela do contrato da Gold.
-GOLD_TABLES = (GoldTable(model=UcResumo, schema=UcResumoSchema),)
+GOLD_TABLES = (GoldTable(model=DimUc, schema=DimUcSchema),)
 
 
 def _describe(error: ValidationError) -> str:

@@ -12,11 +12,11 @@ def test_generated_sample_passes_the_gold_load(tmp_path: Path, engine: Engine) -
 
     counts = load_gold(tmp_path / "gold", engine)
 
-    assert counts == {"uc_resumo": len(SAMPLE_UCS)}
+    assert counts == {"gold_dim_uc": len(SAMPLE_UCS)}
 
 
 def test_does_not_overwrite_existing_csv_without_force(tmp_path: Path) -> None:
-    existing = tmp_path / "gold" / "uc_resumo.csv"
+    existing = tmp_path / "gold" / "gold_dim_uc.csv"
     existing.parent.mkdir()
     existing.write_text("conteúdo da Gold real", encoding="utf-8")
 

@@ -4,14 +4,14 @@ from sqlalchemy import Engine
 from sqlalchemy.orm import Session
 
 from venergy_api.database import Base
-from venergy_api.models import UcResumo
+from venergy_api.models import DimUc
 
 STORED_UC = {
-    "uc_id": "0001",
+    "cod_uc": "0001",
     "municipio": "Recife",
     "bairro": "Boa Viagem",
     "classe": "B1",
-    "alimentador": "AL-01",
+    "cod_alimentador": "AL-01",
     "possui_gd": True,
     "consumo_medio_kwh_12m": 152.4,
 }
@@ -21,7 +21,7 @@ STORED_UC = {
 def stored_uc(engine: Engine) -> None:
     Base.metadata.create_all(engine)
     with Session(engine) as session, session.begin():
-        session.add(UcResumo(**STORED_UC))
+        session.add(DimUc(**STORED_UC))
 
 
 def test_returns_the_consumer_unit_when_it_exists(client: TestClient) -> None:

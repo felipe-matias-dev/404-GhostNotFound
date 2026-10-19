@@ -57,7 +57,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Status:** proposta do Portal, a validar com o time de Dados no card
   "Contrato da Gold".
 - **Decisão:** a Gold chega ao banco local como CSV, um arquivo por tabela com o
-  nome da tabela (`uc_resumo.csv`), em UTF-8, separado por vírgula, com
+  nome da tabela (`gold_dim_uc.csv`), em UTF-8, separado por vírgula, com
   cabeçalho e booleanos como `true`/`false`. Os arquivos ficam em `data/gold/`,
   fora do Git, e são carregados por `uv run python -m venergy_api.carga`.
 - **Motivo:** amostra e Gold real percorrem o mesmo caminho, então trocar uma
