@@ -32,12 +32,12 @@ Regras:
 - `routes/` é fina: apenas `createFileRoute`, `validateSearch` (Zod) e `loader`; o `component` vem de `features/<feature>/pages` ou `pages/`.
 - Páginas leem params/search com `getRouteApi("/rota")`; não importam o `Route` do arquivo de rota.
 - Fora da feature, importe só pelo `index.ts` dela (`#/features/perdas`).
-- `api.ts` da feature usa `apiFetch` de `#/lib/api`; nunca `fetch` direto. `conversions.ts` só tem funções puras (resposta da API → modelo da tela).
+- `api.ts` da feature chama o client tipado `api` de `#/lib/api` com `unwrap` (`unwrap(api.GET("/rota/{id}", { params: { path: { id } } }))`); nunca `fetch` direto nem tipos de resposta escritos à mão: use `components["schemas"]` de `#/lib/api-schema.gen`. `conversions.ts` só tem funções puras (resposta da API → modelo da tela).
 - Dados de servidor só via TanStack Query (hooks em `features/<feature>/hooks`); após mutation, invalide as queries afetadas.
 - Filtros de tela ficam na URL (`validateSearch` com Zod 4, `.catch()` para padrão; sem `@tanstack/zod-adapter`).
 - Valores exibidos (R$, kWh, %, competência, datas) sempre via `#/lib/format`.
 - Nomes: features em camelCase (`unidadeConsumidora`); componentes de `ui/` em kebab-case (`number-input`). Imports absolutos com `#/`.
-- Não edite `src/routeTree.gen.ts`. Não existe `App.tsx`: o shell é `src/routes/__root.tsx` + `src/router.tsx`.
+- Não edite `src/routeTree.gen.ts` nem `src/lib/api-schema.gen.ts`. Este é gerado de `contracts/openapi.json` por `npm run gen:api`; quando o backend muda uma rota, exporte o contrato e rode o `gen:api` (ver `README.md#client-da-api`). Não existe `App.tsx`: o shell é `src/routes/__root.tsx` + `src/router.tsx`.
 - App é SPA (`tanstackStart({ spa: { enabled: true } })`); não use `createServerFn` nem server routes: o backend é o FastAPI.
 - Não há `engines/`, testes nem Storybook configurados. Quando entrarem: `__tests__/` na feature e `<nome>.stories.tsx` ao lado do componente em `ui/`.
 

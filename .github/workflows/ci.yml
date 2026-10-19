@@ -1,0 +1,93 @@
+# Portão de qualidade de todo PR e da main. Os hooks locais podem ser pulados com
+# --no-verify; aqui não.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Um push novo no mesmo PR cancela a execução anterior.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  hooks:
+    name: Hooks (lint, formatação, contrato OpenAPI)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Histórico inteiro para o gitleaks varrer todos os commits.
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v7
+        with:
+          version: "0.12.10"
+          enable-cache: true
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Dependências do frontend
+        run: npm ci --no-audit --no-fund
+        working-directory: frontend
+      - uses: actions/cache@v6
+        with:
+          path: ~/.cache/pre-commit
+          key: pre-commit-${{ hashFiles('.pre-commit-config.yaml') }}
+      - name: pre-commit em todos os arquivos
+        run: uvx pre-commit run --all-files --show-diff-on-failure
+      # O hook do gitleaks só olha o que está staged; no CI, o histórico inteiro.
+      - name: Segredos no histórico (gitleaks)
+        run: docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.30.1 git /repo --redact
+
+  backend:
+    name: Backend (pytest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with:
+          version: "0.12.10"
+          enable-cache: true
+      - name: Banco de testes
+        run: |
+          cp .env.example .env
+          docker compose up -d --wait db
+      - name: pytest
+        run: uv run --frozen pytest
+        working-directory: backend
+
+  frontend:
+    name: Frontend (tipos e build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - name: Checagem de tipos
+        run: npx tsc --noEmit
+      - name: Build
+        run: npm run build
+
+  docker:
+    name: Imagens Docker
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: docker compose build
+        run: |
+          cp .env.example .env
+          docker compose build

@@ -1,0 +1,211 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "V-Energy Grid 360 API",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": [
+          "saúde"
+        ],
+        "summary": "Health",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Health Health Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/unidades-consumidoras/{cod_uc}": {
+      "get": {
+        "tags": [
+          "unidades consumidoras"
+        ],
+        "summary": "Get Unidade Consumidora",
+        "operationId": "get_unidade_consumidora_unidades_consumidoras__cod_uc__get",
+        "parameters": [
+          {
+            "name": "cod_uc",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Cod Uc"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DimUcSchema"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErroSchema"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "DimUcSchema": {
+        "properties": {
+          "cod_uc": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Cod Uc"
+          },
+          "municipio": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Municipio"
+          },
+          "bairro": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Bairro"
+          },
+          "classe": {
+            "type": "string",
+            "enum": [
+              "B1",
+              "B2",
+              "B3",
+              "A4"
+            ],
+            "title": "Classe"
+          },
+          "cod_alimentador": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Cod Alimentador"
+          },
+          "possui_gd": {
+            "type": "boolean",
+            "title": "Possui Gd"
+          },
+          "consumo_medio_kwh_12m": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Consumo Medio Kwh 12M"
+          }
+        },
+        "type": "object",
+        "required": [
+          "cod_uc",
+          "municipio",
+          "bairro",
+          "classe",
+          "cod_alimentador",
+          "possui_gd",
+          "consumo_medio_kwh_12m"
+        ],
+        "title": "DimUcSchema"
+      },
+      "ErroSchema": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "ErroSchema",
+        "description": "Corpo das respostas de erro do FastAPI (HTTPException), documentado no OpenAPI."
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}

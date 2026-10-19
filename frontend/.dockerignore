@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.output/
+.tanstack/
+.nitro/
+.vinxi/
+.env
+.env.*
+!.env.example
+Dockerfile
+.dockerignore

@@ -26,44 +26,70 @@ _TODO_
 
 ## Como executar localmente
 
-_TODO: passo a passo dos módulos de dados, frontend e agente._
+_TODO: passo a passo dos módulos de dados e agente._
 
-### Banco de dados
+### Portal (banco, API e frontend) com Docker
 
-Requer [Docker Desktop](https://www.docker.com/products/docker-desktop/) aberto. Na raiz:
+Requer só o [Docker Desktop](https://www.docker.com/products/docker-desktop/) aberto. Na raiz:
 
 ```bash
-# 1. Cria o .env com as senhas do banco. Sem ele, o docker compose não sobe.
+# 1. Cria o .env com senhas e portas. Sem ele, o docker compose não sobe.
 cp .env.example .env                       # no PowerShell: Copy-Item .env.example .env
+mkdir -p data/gold                         # no PowerShell: mkdir data/gold
 
-# 2. Sobe o PostgreSQL e espera ele ficar pronto
+# 2. Sobe banco, API e frontend e espera ficarem prontos (a 1ª vez constrói as imagens)
 docker compose up -d --wait
+
+# 3. Gera a amostra sintética da Gold e carrega no banco
+docker compose run --rm api python -m venergy_api.amostra
+docker compose run --rm api python -m venergy_api.carga
 ```
 
-### Backend
+| O quê | Onde |
+|---|---|
+| Portal | http://localhost:3000 |
+| API e documentação interativa | http://127.0.0.1:8000/docs |
+| Banco | `127.0.0.1:5433`, usuário `venergy` |
 
-Requer Python 3.12+ e [uv](https://docs.astral.sh/uv/). Dentro da pasta `backend/`:
+O código de `backend/src` e `frontend/src` é montado nos containers: API e portal
+recarregam a cada mudança. Mudou dependência (`pyproject.toml`, `package.json`) ou
+`vite.config.ts`? `docker compose up -d --build`.
+
+| Comando | Para quê |
+|---|---|
+| `docker compose logs -f api web` | Acompanhar os logs |
+| `docker compose down` | Parar tudo (os dados do banco ficam) |
+| `docker compose down -v` | Parar e apagar o banco (refaz o script de `infra/postgres/init`) |
+
+O passo `mkdir` cria a pasta da Gold com o seu usuário; sem ele, no Linux, o Docker a cria
+como root e o gerador da amostra não consegue gravar.
+
+### Sem Docker para API e frontend
+
+Para rodar API e frontend direto na máquina, suba só o banco
+(`docker compose up -d --wait db`) e siga [backend/README.md](backend/README.md) e
+[frontend/README.md](frontend/README.md). É o caminho para rodar os testes do backend.
+
+## Qualidade de código
+
+Hooks de pre-commit formatam e checam cada commit: ruff (Python), Biome (frontend),
+segredos (gitleaks) e o contrato OpenAPI entre backend e frontend. Notebooks nunca são
+modificados pelos hooks, para não conflitar com o Databricks.
+Uma vez por clone, na raiz:
 
 ```bash
-# 3. Instala as dependências
-uv sync
-
-# 4. Cria o .env da API
-cp .env.example .env                       # no PowerShell: Copy-Item .env.example .env
-
-# 5. Gera a amostra sintética da Gold e carrega no banco
-uv run python -m venergy_api.amostra
-uv run python -m venergy_api.carga
-
-# 6. (Opcional) Roda os testes
-uv run pytest
-
-# 7. Sobe a API em http://127.0.0.1:8000 (Ctrl+C para parar)
-uv run uvicorn venergy_api.main:create_app --factory --reload --reload-dir src
+(cd backend && uv sync) && (cd frontend && npm ci)   # ferramentas usadas pelos hooks
+uvx pre-commit install                               # requer uv
+uvx pre-commit run --all-files                       # opcional: roda em tudo
 ```
 
-A API sobe em http://127.0.0.1:8000, com documentação em `/docs`. Detalhes, testes e
-como usar a Gold real em vez da amostra: [backend/README.md](backend/README.md).
+Se um hook corrigir arquivos, o commit para: revise, `git add` e commite de novo. O CI
+(`.github/workflows/ci.yml`) roda os mesmos hooks, os testes do backend, a checagem de
+tipos e o build do frontend e o build das imagens Docker em todo PR.
+
+O contrato da API fica em [`contracts/openapi.json`](contracts/openapi.json), gerado
+pelo FastAPI. O frontend gera dele um client tipado: ver
+[frontend/README.md](frontend/README.md#client-da-api).
 
 ## Execução do Workflow no Databricks
 

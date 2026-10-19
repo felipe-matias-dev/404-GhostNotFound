@@ -11,10 +11,14 @@ Portal web do V-Energy Grid 360. SPA em React + TypeScript (Vite) que consome a 
 
 ## Como rodar
 
-Requer Node 22.12+ (ou 20.19+).
+Com Docker, `docker compose up` na raiz sobe banco, API e este frontend em
+http://localhost:3000: ver o [README da raiz](../README.md#como-executar-localmente).
+`src/` é montado no container e recarrega a cada mudança.
+
+Direto na máquina, requer Node 22.12+ (ou 20.19+) e a API no ar:
 
 ```bash
-npm install
+npm ci                       # versões exatas do package-lock.json
 cp .env.example .env.local   # ajuste se o backend não estiver em localhost:8000
 npm run dev                  # http://localhost:3000
 ```
@@ -34,6 +38,45 @@ npm run dev                  # http://localhost:3000
 | `npm run build` | Build de produção em `dist/client` |
 | `npm run check` | Lint + formatação (Biome) |
 | `npx tsc --noEmit` | Checagem de tipos |
+| `npm run gen:api` | Regenera `src/lib/api-schema.gen.ts` a partir de `contracts/openapi.json` |
+
+## Client da API
+
+O contrato entre backend e frontend é o OpenAPI gerado pelo FastAPI, versionado em
+[`contracts/openapi.json`](../contracts/openapi.json). Dele saem os tipos de
+`src/lib/api-schema.gen.ts`, usados pelo client `api` de `src/lib/api.ts`
+([openapi-fetch](https://openapi-ts.dev/openapi-fetch/)): rota, parâmetros e resposta
+são checados na compilação.
+
+```ts
+// src/features/unidadeConsumidora/api.ts
+import { api, unwrap } from "#/lib/api";
+import type { components } from "#/lib/api-schema.gen";
+
+export type DimUc = components["schemas"]["DimUcSchema"];
+
+export function getUnidadeConsumidora(codUc: string): Promise<DimUc> {
+	return unwrap(
+		api.GET("/unidades-consumidoras/{cod_uc}", {
+			params: { path: { cod_uc: codUc } },
+		}),
+	);
+}
+```
+
+`unwrap` devolve o corpo da resposta ou lança `ApiError` (com `status` e o `body` do
+erro), que o TanStack Query entrega em `error`.
+
+Quando uma rota muda no backend:
+
+```bash
+cd backend && uv run python -m venergy_api.openapi   # atualiza contracts/openapi.json
+cd ../frontend && npm run gen:api                    # atualiza os tipos
+npx tsc --noEmit                                     # aponta as telas que quebraram
+```
+
+O hook de pre-commit e o CI rodam os dois geradores e falham se o resultado não estiver
+commitado, então contrato e tipos nunca ficam desatualizados.
 
 ## Arquitetura
 
@@ -51,7 +94,7 @@ src/
 │   ├── components/      # componentes da feature
 │   ├── hooks/           # useQuery/useMutation da feature
 │   ├── pages/           # telas da feature
-│   ├── api.ts           # chamadas ao FastAPI (via apiFetch) e query keys
+│   ├── api.ts           # chamadas ao FastAPI (client `api` + `unwrap`) e query keys
 │   ├── conversions.ts   # resposta da API → modelo da tela (funções puras)
 │   ├── types.ts         # tipos da feature
 │   └── index.ts         # API pública da feature

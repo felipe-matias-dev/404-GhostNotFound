@@ -13,14 +13,18 @@ PostgreSQL local, que é carregado a partir de CSVs.
 
 ## Como rodar
 
+Só quer o portal no ar? `docker compose up` sobe banco, API e frontend juntos: ver o
+[README da raiz](../README.md#como-executar-localmente). Os passos abaixo rodam a API
+direto na máquina, que é o caminho para desenvolver e rodar os testes.
+
 Primeiro o banco, na **raiz do repositório**:
 
 ```bash
 # 1. Cria o .env do banco (no PowerShell: Copy-Item .env.example .env)
 cp .env.example .env
 
-# 2. Sobe o PostgreSQL e espera ele ficar pronto
-docker compose up -d --wait
+# 2. Sobe só o PostgreSQL e espera ele ficar pronto (a API roda na sua máquina, na 8000)
+docker compose up -d --wait db
 ```
 
 Depois a API, dentro da pasta **`backend/`**:
@@ -57,6 +61,20 @@ a UC `0003` em `GET /unidades-consumidoras/{cod_uc}`.
 | `GET /health` | `200` se a API alcança o banco, `503` se não alcança |
 | `GET /unidades-consumidoras/{cod_uc}` | Resumo de uma unidade consumidora, ou `404` se ela não existir |
 
+## Contrato OpenAPI
+
+O frontend gera o client a partir do OpenAPI da API, versionado em
+[`contracts/openapi.json`](../contracts/openapi.json). Mudou uma rota, um parâmetro ou um
+schema de resposta? Exporte o contrato e commite junto com a mudança:
+
+```bash
+uv run python -m venergy_api.openapi
+```
+
+O export não precisa de banco nem de `.env`. O hook de pre-commit e o CI rodam esse comando
+e falham se o arquivo commitado estiver desatualizado. Declare em `responses=` os erros que
+a rota devolve (ex.: `404` com `ErroSchema`), para que o frontend também receba o erro tipado.
+
 ## Dados: amostra e Gold real
 
 A API não sabe se os dados são de amostra ou reais: os dois chegam pelo mesmo caminho
@@ -90,7 +108,7 @@ O agente de IA conecta com
 `postgresql+psycopg://venergy_agent:<AGENT_DB_PASSWORD>@127.0.0.1:5433/venergy`.
 
 Para recriar o banco do zero (apaga todos os dados): `docker compose down -v` e depois
-`docker compose up -d --wait`.
+`docker compose up -d --wait db`.
 
 ## Configuração
 
@@ -100,7 +118,7 @@ Variáveis lidas do `.env` (veja `.env.example`):
 |---|---|
 | `VENERGY_API_DATABASE_URL` | Endereço do banco. Obrigatória |
 | `VENERGY_API_GOLD_DIR` | Pasta dos CSVs da Gold. Obrigatória |
-| `VENERGY_API_CORS_ORIGINS` | Endereços do frontend autorizados a chamar a API pelo navegador. Padrão: `["http://localhost:5173"]` |
+| `VENERGY_API_CORS_ORIGINS` | Endereços do frontend autorizados a chamar a API pelo navegador. Padrão: `["http://localhost:3000"]` |
 
 Os caminhos são relativos à pasta `backend/`, de onde os comandos rodam.
 
@@ -112,7 +130,7 @@ uv run ruff check .
 uv run ruff format --check .
 ```
 
-Os testes rodam no banco `venergy_test` (precisam do `docker compose up`) e não
+Os testes rodam no banco `venergy_test` (precisam do `docker compose up -d --wait db`) e não
 dependem do `.env` nem dos dados de desenvolvimento. Quem mudou senha ou porta define
 `VENERGY_API_TEST_DATABASE_URL` e `VENERGY_API_TEST_AGENT_DATABASE_URL`.
 
@@ -127,6 +145,7 @@ src/venergy_api/
 ├── schemas.py    # contrato dos dados: validação da carga e formato das respostas
 ├── carga.py      # CSVs da Gold → banco
 ├── amostra.py    # gerador da amostra sintética
+├── openapi.py    # export do contrato para contracts/openapi.json
 └── routers/      # rotas, um arquivo por domínio
 tests/            # pytest
 ```
@@ -139,7 +158,8 @@ tests/            # pytest
 | A API não sobe e reclama de `database_url` ou `gold_dir` | Falta o `.env` de `backend/` (passo 4) |
 | `/health` responde `503` | O banco está parado (`docker compose ps`) ou a URL no `.env` de `backend/` está errada |
 | A busca de UC responde `500` | A carga ainda não rodou (passos 5 e 6) |
-| Testes param com "Banco de testes indisponível" | O banco não está no ar: `docker compose up -d --wait` |
+| Testes param com "Banco de testes indisponível" | O banco não está no ar: `docker compose up -d --wait db` |
+| A API não sobe: porta 8000 em uso | A API do `docker compose` está no ar: `docker compose stop api web` |
 | Testes param com "Usuário do agente não conecta" | O banco foi criado antes do script de inicialização atual: `docker compose down -v` |
 
 As decisões por trás desta estrutura estão em [docs/decisoes.md](../docs/decisoes.md)

@@ -14,8 +14,8 @@ class Settings(BaseSettings):
     database_url: str
     # Pasta onde o time de dados entrega os CSVs da Gold, um arquivo por tabela.
     gold_dir: Path
-    # Endereços do frontend que o navegador deixa chamar a API. O padrão é o do Vite.
-    cors_origins: list[str] = ["http://localhost:5173"]
+    # Endereços do frontend que o navegador deixa chamar a API. O padrão é o do `npm run dev`.
+    cors_origins: list[str] = ["http://localhost:3000"]
 
 
 @lru_cache

@@ -14,6 +14,9 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | 19/10/2026 | DEC-002: banco local PostgreSQL em Docker, com schemas `gold` e `app` | Usuário somente leitura nativo para o agente; recarga da Gold não apaga as ordens de inspeção | Time |
 | 19/10/2026 | DEC-003: walking skeleton com amostra sintética da Gold | Integração entre camadas testada desde o início, sem depender do dataset confidencial | Time |
 | 19/10/2026 | DEC-004 (proposta): Gold entregue em CSV, um arquivo por tabela, em `data/gold/` | Um único caminho de carga, validado contra o contrato, para amostra e Gold real | Felipe |
+| 19/10/2026 | DEC-005: contrato API → frontend em `contracts/openapi.json`, gerado pelo FastAPI; client com `openapi-typescript` + `openapi-fetch` | O front quebra na compilação quando o contrato muda; a mudança de contrato aparece no diff do PR | João Euclides |
+| 19/10/2026 | DEC-006: `docker compose up` sobe banco, API e Vite em modo de desenvolvimento | Um comando roda o portal em qualquer máquina; deploy em nuvem está fora do escopo | João Euclides |
+| 19/10/2026 | DEC-007: qualidade garantida por pre-commit local e pelo mesmo conjunto de checagens no CI | Código formatado e contrato em dia sem depender de lembrar; o CI barra quem pula o hook | João Euclides |
 
 ## DEC-001 · Localização dos arquivos de origem (landing)
 
@@ -85,3 +88,80 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   dados anteriores. Nem os dados brutos nem os CSVs da Gold são versionados.
 - **Em aberto:** confirmar com a organização se a Gold agregada pode ir para o
   repositório público. Até lá, não é versionada.
+
+## DEC-005 · Contrato OpenAPI entre API e frontend
+
+- **Data:** 19/10/2026 · **Área:** Portal · **Autor:** João Euclides
+- **Decisão:** o OpenAPI que o FastAPI gera das rotas e schemas é exportado para
+  `contracts/openapi.json` (`uv run python -m venergy_api.openapi`) e versionado. O
+  frontend gera dele os tipos (`npm run gen:api` → `src/lib/api-schema.gen.ts`, com
+  `openapi-typescript`) e chama a API pelo client tipado `api` de `src/lib/api.ts`
+  (`openapi-fetch`).
+- **Motivo:** rota, parâmetro ou campo renomeado no backend vira erro de compilação
+  no frontend, e não tela quebrada em produção. Com o arquivo versionado, o front gera
+  os tipos sem subir a API, e o revisor vê a mudança de contrato no PR.
+- **Alternativa descartada:** `@hey-api/openapi-ts`, que gera funções e hooks do
+  TanStack Query, mas nomeia as funções pelo `operationId` (o FastAPI gera
+  `get_unidade_consumidora_unidades_consumidoras__cod_uc__get`) e gera código de
+  runtime. O `openapi-fetch` só tipa pela rota e pesa cerca de 6 kB.
+- **Regras:**
+  - Rotas declaram em `responses=` os erros que devolvem (ex.: `404` com
+    `ErroSchema`), para o erro também chegar tipado.
+  - Arquivos gerados não são editados à mão. O pre-commit e o CI regeneram os dois e
+    falham se o resultado não estiver commitado.
+  - O `openapi-typescript` declara suporte só ao TypeScript 5; o `overrides` do
+    `package.json` o faz usar o TypeScript 6 do projeto. Rever quando sair versão
+    compatível.
+
+## DEC-006 · Ambiente de desenvolvimento em Docker
+
+- **Data:** 19/10/2026 · **Área:** Portal · **Autor:** João Euclides
+- **Decisão:** o `docker-compose.yml` da raiz sobe `db` (PostgreSQL), `api`
+  (uvicorn com `--reload`) e `web` (Vite), com o código montado da máquina para
+  recarregar a cada mudança. Quem prefere rodar API e frontend fora do Docker sobe só
+  o banco: `docker compose up -d --wait db`.
+- **Motivo:** história V2-12 ("subir banco, backend e frontend com um comando"),
+  inclusive para quem é de Dados ou IA e não tem Python e Node configurados. Deploy em
+  nuvem é Won't no planejamento, então não há imagem de produção (build estático,
+  nginx).
+- **Regras:**
+  - O navegador fala só com o Vite, que encaminha `/api/*` para o serviço `api`:
+    sem CORS, igual ao desenvolvimento fora do Docker.
+  - Portas só em `127.0.0.1`, configuráveis no `.env` da raiz (`API_PORT`,
+    `WEB_PORT`, `POSTGRES_PORT`).
+  - Os containers rodam sem root (UID 1000). Só `src/` de cada serviço é montado da
+    máquina: dependências (`.venv`, `node_modules`) são as da imagem, com binários para
+    Linux, e mudança em `pyproject.toml`, `package.json` ou `vite.config.ts` pede
+    `docker compose up -d --build`. Montar a pasta inteira exigiria um volume para o
+    `node_modules`, que o Docker cria como root na máquina e quebra o `npm ci` local.
+  - A detecção de mudanças usa varredura (`WATCHFILES_FORCE_POLLING`,
+    `CHOKIDAR_USEPOLLING`), porque eventos de arquivo não atravessam o volume no
+    Docker Desktop do Windows.
+
+## DEC-007 · Hooks de pre-commit e CI
+
+- **Data:** 19/10/2026 · **Área:** Todas · **Autor:** João Euclides
+- **Decisão:** `.pre-commit-config.yaml` na raiz, instalado com
+  `uvx pre-commit install`, e um workflow do GitHub Actions (`.github/workflows/ci.yml`)
+  que roda os mesmos hooks, o pytest do backend, a checagem de tipos e o build do
+  frontend e o build das imagens Docker em todo PR.
+- **Hooks:** higiene de arquivos (espaços, fim de linha LF, YAML/TOML/JSON válidos,
+  conflitos, arquivos grandes, chaves privadas), gitleaks (segredos), ruff (Python),
+  Biome (frontend) e o contrato OpenAPI (DEC-005). Mensagens de commit não são
+  validadas por hook: o padrão Conventional Commits segue como convenção do time.
+- **Motivo:** o `pre-commit` gerencia hooks de Python, Node e binários num lugar só;
+  o husky só atende Node. O hook pode ser pulado com `--no-verify`, então o CI é o
+  portão que vale.
+- **Regras:**
+  - Biome e geradores do contrato rodam com as versões do projeto (`npm ci` em
+    `frontend/`, `uv` no backend). O ruff do hook tem a mesma versão do
+    `backend/uv.lock`; ao atualizar um, atualize o outro.
+  - O ruff roda só em `.py`: notebooks do Databricks usam `spark` e `dbutils` sem
+    import, e os blocos de código dos `.md` não devem ser reformatados.
+  - Nenhum hook modifica notebooks (`.ipynb`): eles são editados e versionados pelo
+    Databricks, e reescrevê-los localmente (saídas, fim de arquivo) geraria conflito na
+    sincronização. Por isso não há nbstripout; limpar as saídas antes do commit é
+    responsabilidade de quem exporta. Hooks só de checagem (JSON válido, segredos)
+    continuam valendo para eles.
+  - `.gitattributes` força LF em todo arquivo de texto, menos nos notebooks;
+    `.editorconfig` alinha os editores com os formatadores.
