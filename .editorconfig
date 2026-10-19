@@ -1,0 +1,28 @@
+# Padrões de edição para qualquer editor (VS Code: extensão EditorConfig).
+# Os formatadores (ruff, Biome) continuam sendo a referência; isto só evita brigar com eles.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+[*.py]
+indent_size = 4
+
+# Biome formata o frontend com tabs.
+[frontend/{**.ts,**.tsx,**.js,**.jsx,**.css,**.html,biome.json}]
+indent_style = tab
+
+[*.md]
+# Dois espaços no fim da linha são quebra de linha no Markdown.
+trim_trailing_whitespace = false
+
+# Notebooks ficam como o Databricks os grava: nada de reescrever ao salvar localmente.
+[*.ipynb]
+insert_final_newline = unset
+trim_trailing_whitespace = unset
+indent_size = unset
