@@ -57,6 +57,20 @@ a UC `0003` em `GET /unidades-consumidoras/{cod_uc}`.
 | `GET /health` | `200` se a API alcança o banco, `503` se não alcança |
 | `GET /unidades-consumidoras/{cod_uc}` | Resumo de uma unidade consumidora, ou `404` se ela não existir |
 
+## Contrato OpenAPI
+
+O frontend gera o client a partir do OpenAPI da API, versionado em
+[`contracts/openapi.json`](../contracts/openapi.json). Mudou uma rota, um parâmetro ou um
+schema de resposta? Exporte o contrato e commite junto com a mudança:
+
+```bash
+uv run python -m venergy_api.openapi
+```
+
+O export não precisa de banco nem de `.env`. O hook de pre-commit e o CI rodam esse comando
+e falham se o arquivo commitado estiver desatualizado. Declare em `responses=` os erros que
+a rota devolve (ex.: `404` com `ErroSchema`), para que o frontend também receba o erro tipado.
+
 ## Dados: amostra e Gold real
 
 A API não sabe se os dados são de amostra ou reais: os dois chegam pelo mesmo caminho
@@ -127,6 +141,7 @@ src/venergy_api/
 ├── schemas.py    # contrato dos dados: validação da carga e formato das respostas
 ├── carga.py      # CSVs da Gold → banco
 ├── amostra.py    # gerador da amostra sintética
+├── openapi.py    # export do contrato para contracts/openapi.json
 └── routers/      # rotas, um arquivo por domínio
 tests/            # pytest
 ```
