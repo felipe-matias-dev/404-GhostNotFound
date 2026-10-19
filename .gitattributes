@@ -1,0 +1,3 @@
+# Scripts de shell rodam dentro de containers Linux: com fim de linha do Windows (CRLF),
+# o bash falha. Força LF mesmo para quem clona no Windows.
+*.sh text eol=lf

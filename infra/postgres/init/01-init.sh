@@ -1,0 +1,27 @@
+#!/bin/bash
+# Roda uma única vez, na primeira subida do container (volume de dados vazio).
+# Para reaplicar depois de editar: docker compose down -v && docker compose up -d
+set -euo pipefail
+
+# Usuários valem para o servidor inteiro, então são criados uma vez só.
+psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname postgres <<-SQL
+	CREATE DATABASE venergy_test OWNER "$POSTGRES_USER";
+	CREATE ROLE venergy_agent LOGIN PASSWORD '$AGENT_DB_PASSWORD';
+	-- Segunda trava: mesmo com permissão, toda transação do agente nasce somente leitura.
+	ALTER ROLE venergy_agent SET default_transaction_read_only = on;
+SQL
+
+# O banco da aplicação e o de testes têm a mesma estrutura.
+for database in "$POSTGRES_DB" venergy_test; do
+	psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$database" <<-SQL
+		-- gold: tabelas recarregáveis a partir dos CSVs. app: dados criados no portal
+		-- (ordens de inspeção), que a recarga da Gold nunca toca.
+		CREATE SCHEMA gold;
+		CREATE SCHEMA app;
+
+		-- O agente só enxerga a Gold, e só para leitura. O schema app fica fora do alcance dele.
+		GRANT CONNECT ON DATABASE "$database" TO venergy_agent;
+		GRANT USAGE ON SCHEMA gold TO venergy_agent;
+		ALTER DEFAULT PRIVILEGES IN SCHEMA gold GRANT SELECT ON TABLES TO venergy_agent;
+	SQL
+done
