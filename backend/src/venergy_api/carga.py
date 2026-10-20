@@ -73,6 +73,8 @@ def load_gold(gold_dir: Path, engine: Engine) -> dict[str, int]:
             raise GoldLoadError(f"arquivo não encontrado: {csv_path}")
         validated[table] = read_rows(csv_path, table.schema)
 
+    # Cria as tabelas que faltarem, inclusive as do schema app (ordens de inspeção). O
+    # delete abaixo só passa por GOLD_TABLES, então recarregar a Gold nunca apaga uma OI.
     Base.metadata.create_all(engine)
     # Apagar e inserir na mesma transação: rodar duas vezes não duplica, e uma falha
     # no meio desfaz tudo.
