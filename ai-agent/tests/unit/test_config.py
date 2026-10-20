@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from venergy_agent.config import AgentSettings
+from venergy_agent.config import AGENT_ENV_FILE, AgentSettings
 
 
 @pytest.fixture
@@ -37,3 +37,11 @@ def test_out_of_range_values_are_rejected(required_env, monkeypatch, name, value
 
 def test_api_key_is_not_exposed(required_env):
     assert "sk-test-123" not in repr(AgentSettings(_env_file=None))
+
+
+def test_env_file_in_current_directory_is_ignored(required_env, monkeypatch, tmp_path):
+    (tmp_path / ".env").write_text("VENERGY_AGENT_MAX_ROWS=7\n")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setitem(AgentSettings.model_config, "env_file", AGENT_ENV_FILE.with_name(".none"))
+
+    assert AgentSettings().max_rows == 200
