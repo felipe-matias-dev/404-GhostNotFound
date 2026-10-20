@@ -81,10 +81,307 @@
           }
         }
       }
+    },
+    "/ordens-inspecao": {
+      "post": {
+        "tags": [
+          "ordens de inspeção"
+        ],
+        "summary": "Criar Ordens",
+        "description": "Gera uma OI por UC, tudo ou nada: se uma UC falhar, nenhuma OI é criada.",
+        "operationId": "criar_ordens_ordens_inspecao_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CriarOrdensSchema"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OrdemSchema"
+                  },
+                  "title": "Response Criar Ordens Ordens Inspecao Post"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErroSchema"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErroSchema"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "ordens de inspeção"
+        ],
+        "summary": "Listar Ordens",
+        "description": "Lista as OIs, das mais recentes para as mais antigas, opcionalmente por status.",
+        "operationId": "listar_ordens_ordens_inspecao_get",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/StatusOrdem"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OrdemSchema"
+                  },
+                  "title": "Response Listar Ordens Ordens Inspecao Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ordens-inspecao/{ordem_id}": {
+      "get": {
+        "tags": [
+          "ordens de inspeção"
+        ],
+        "summary": "Obter Ordem",
+        "operationId": "obter_ordem_ordens_inspecao__ordem_id__get",
+        "parameters": [
+          {
+            "name": "ordem_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Ordem Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrdemDetalheSchema"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErroSchema"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "ordens de inspeção"
+        ],
+        "summary": "Atualizar Ordem",
+        "description": "Muda o status da OI (inclusive cancelar) e registra a mudança no histórico.",
+        "operationId": "atualizar_ordem_ordens_inspecao__ordem_id__patch",
+        "parameters": [
+          {
+            "name": "ordem_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Ordem Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AtualizarOrdemSchema"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrdemDetalheSchema"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErroSchema"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErroSchema"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "AtualizarOrdemSchema": {
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/StatusOrdem"
+          },
+          "resultado": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ResultadoOrdem"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "observacao": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observacao"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "AtualizarOrdemSchema",
+        "description": "Mudança de status de uma OI. Cancelar é mudar para CANCELADA."
+      },
+      "CriarOrdensSchema": {
+        "properties": {
+          "cod_ucs": {
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "type": "array",
+            "maxItems": 200,
+            "minItems": 1,
+            "title": "Cod Ucs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "cod_ucs"
+        ],
+        "title": "CriarOrdensSchema",
+        "description": "UCs escolhidas na fila de suspeitas; gera uma OI para cada uma."
+      },
       "DimUcSchema": {
         "properties": {
           "cod_uc": {
@@ -153,6 +450,47 @@
         "title": "ErroSchema",
         "description": "Corpo das respostas de erro do FastAPI (HTTPException), documentado no OpenAPI."
       },
+      "EventoSchema": {
+        "properties": {
+          "status_anterior": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StatusOrdem"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status_novo": {
+            "$ref": "#/components/schemas/StatusOrdem"
+          },
+          "observacao": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observacao"
+          },
+          "ocorrido_em": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Ocorrido Em"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status_anterior",
+          "status_novo",
+          "observacao",
+          "ocorrido_em"
+        ],
+        "title": "EventoSchema"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -165,6 +503,148 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "OrdemDetalheSchema": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "cod_uc": {
+            "type": "string",
+            "title": "Cod Uc"
+          },
+          "status": {
+            "$ref": "#/components/schemas/StatusOrdem"
+          },
+          "resultado": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ResultadoOrdem"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "observacao": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observacao"
+          },
+          "criada_em": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Criada Em"
+          },
+          "atualizada_em": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Atualizada Em"
+          },
+          "eventos": {
+            "items": {
+              "$ref": "#/components/schemas/EventoSchema"
+            },
+            "type": "array",
+            "title": "Eventos"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "cod_uc",
+          "status",
+          "resultado",
+          "observacao",
+          "criada_em",
+          "atualizada_em",
+          "eventos"
+        ],
+        "title": "OrdemDetalheSchema",
+        "description": "A OI com o histórico de mudanças de status, do mais antigo ao mais recente."
+      },
+      "OrdemSchema": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "cod_uc": {
+            "type": "string",
+            "title": "Cod Uc"
+          },
+          "status": {
+            "$ref": "#/components/schemas/StatusOrdem"
+          },
+          "resultado": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ResultadoOrdem"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "observacao": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observacao"
+          },
+          "criada_em": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Criada Em"
+          },
+          "atualizada_em": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Atualizada Em"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "cod_uc",
+          "status",
+          "resultado",
+          "observacao",
+          "criada_em",
+          "atualizada_em"
+        ],
+        "title": "OrdemSchema"
+      },
+      "ResultadoOrdem": {
+        "type": "string",
+        "enum": [
+          "IRREGULAR_CONFIRMADA",
+          "REGULAR",
+          "NAO_REALIZADA"
+        ],
+        "title": "ResultadoOrdem"
+      },
+      "StatusOrdem": {
+        "type": "string",
+        "enum": [
+          "GERADA",
+          "EM_CAMPO",
+          "CONCLUIDA",
+          "CANCELADA"
+        ],
+        "title": "StatusOrdem"
       },
       "ValidationError": {
         "properties": {

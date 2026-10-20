@@ -23,7 +23,9 @@ def build_contract() -> str:
 
 def main() -> None:
     CONTRACT_PATH.parent.mkdir(parents=True, exist_ok=True)
-    CONTRACT_PATH.write_text(build_contract(), encoding="utf-8")
+    # newline="\n": no Windows o padrão grava CRLF, o hook mixed-line-ending converte para LF
+    # e este export desfaz a conversão a cada commit. LF é o que o .gitattributes define.
+    CONTRACT_PATH.write_text(build_contract(), encoding="utf-8", newline="\n")
     print(f"Contrato OpenAPI gravado em {CONTRACT_PATH}")
 
 
