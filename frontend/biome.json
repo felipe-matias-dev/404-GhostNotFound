@@ -10,8 +10,10 @@
 		"includes": [
 			"**/src/**/*",
 			"**/.vscode/**/*",
+			"**/.storybook/**/*.ts",
 			"**/index.html",
 			"**/vite.config.ts",
+			"!**/storybook-static",
 			"!**/src/**/*.gen.ts",
 			"!**/src/styles.css"
 		]

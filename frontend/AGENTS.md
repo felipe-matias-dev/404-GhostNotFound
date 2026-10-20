@@ -39,6 +39,7 @@ Regras:
 - Nomes: features em camelCase (`unidadeConsumidora`); componentes de `ui/` em kebab-case (`number-input`). Imports absolutos com `#/`.
 - Não edite `src/routeTree.gen.ts` nem `src/lib/api-schema.gen.ts`. Este é gerado de `contracts/openapi.json` por `npm run gen:api`; quando o backend muda uma rota, exporte o contrato e rode o `gen:api` (ver `README.md#client-da-api`). Não existe `App.tsx`: o shell é `src/routes/__root.tsx` + `src/router.tsx`.
 - App é SPA (`tanstackStart({ spa: { enabled: true } })`); não use `createServerFn` nem server routes: o backend é o FastAPI.
-- Não há `engines/`, testes nem Storybook configurados. Quando entrarem: `__tests__/` na feature e `<nome>.stories.tsx` ao lado do componente em `ui/`.
+- Design system no Storybook (`npm run storybook`, http://localhost:6006): todo componente de `components/ui/` e `components/layout/` tem `<nome>.stories.tsx` ao lado, com `title` em `Componentes/` ou `Layout/`, e estados padrão/carregando/erro/vazio. Estilo só por tokens do `@theme` em `src/styles.css`. Sem biblioteca de componentes: o interior.dev é referência, e o código aproveitado vem para `ui/` adaptado aos tokens. Regras completas em `.storybook/docs/introducao.mdx`.
+- Não há `engines/` nem testes configurados. Quando entrarem: `__tests__/` na feature.
 
 Features previstas: `visaoGeral`, `receita`, `unidadeConsumidora`, `perdas`, `operacao`, `agente`, `auth`.

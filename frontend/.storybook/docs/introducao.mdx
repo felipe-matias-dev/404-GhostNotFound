@@ -1,0 +1,56 @@
+import { Meta } from "@storybook/addon-docs/blocks";
+
+<Meta title="Introdução" />
+
+# Design system — V-Energy Grid 360
+
+Catálogo dos componentes reutilizáveis do portal (backlog **V2-02**). Toda tela é montada
+com o que está aqui; componente novo entra primeiro no Storybook, depois na tela.
+
+## Seções
+
+- **Fundamentos** — `src/styles.css` (`@theme` do Tailwind): tokens de cor, tipografia,
+  espaçamento, raio, sombra e movimento.
+- **Componentes** — `src/components/ui/<nome>/`: genéricos, sem regra de negócio
+  (`kpi-card`, `data-table`, `filter-bar`…).
+- **Layout** — `src/components/layout/`: casca do app (sidebar, header, containers de página).
+
+Componentes de feature (`src/features/<feature>/components`) não entram no catálogo: eles
+compõem os de `ui/` com dados da API.
+
+## Regras
+
+- Story ao lado do componente: `src/components/ui/<nome>/<nome>.stories.tsx`, com o
+  `title` na seção certa (`Componentes/KpiCard`).
+- Estilo só por tokens do `@theme` (classes do Tailwind geradas a partir deles); nada de
+  cor ou espaçamento solto no componente.
+- Toda story cobre os estados que a tela vai usar: padrão, carregando, erro e vazio.
+- O painel **Accessibility** precisa ficar sem violações.
+- Sem biblioteca de componentes por enquanto. A referência visual e de micro-interação é o
+  [interior.dev](https://www.interior.dev/): quando um componente de lá servir, o código é
+  trazido para `ui/` e adaptado aos nossos tokens, sem virar dependência.
+
+## Modelo de story
+
+```tsx
+// src/components/ui/kpi-card/kpi-card.stories.tsx
+import type { Meta, StoryObj } from "@storybook/react-vite";
+import { KpiCard } from "./kpi-card";
+
+const meta = {
+	title: "Componentes/KpiCard",
+	component: KpiCard,
+	tags: ["autodocs"],
+} satisfies Meta<typeof KpiCard>;
+
+export default meta;
+type Story = StoryObj<typeof meta>;
+
+export const Padrao: Story = { args: { titulo: "Receita", valor: 1250000 } };
+export const Carregando: Story = { args: { ...Padrao.args, carregando: true } };
+```
+
+## Previstos (V2-02)
+
+`KpiCard` (valor + variação vs período), `DataTable` (ordenação/paginação), `SeriesChart`,
+`WaterfallChart`, `FilterBar` e os estados de loading/erro/vazio.

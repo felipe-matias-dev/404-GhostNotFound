@@ -4,6 +4,7 @@ dist/
 .tanstack/
 .nitro/
 .vinxi/
+storybook-static/
 .env
 .env.*
 !.env.example

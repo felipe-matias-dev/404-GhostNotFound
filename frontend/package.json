@@ -12,7 +12,9 @@
     "format": "biome format",
     "lint": "biome lint",
     "check": "biome check",
-    "gen:api": "openapi-typescript ../contracts/openapi.json --output src/lib/api-schema.gen.ts"
+    "gen:api": "openapi-typescript ../contracts/openapi.json --output src/lib/api-schema.gen.ts",
+    "storybook": "storybook dev --port 6006",
+    "build-storybook": "storybook build"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.18",
@@ -35,6 +37,9 @@
   "devDependencies": {
     "@biomejs/biome": "2.4.5",
     "@rolldown/plugin-babel": "^0.2.3",
+    "@storybook/addon-a11y": "10.6.3",
+    "@storybook/addon-docs": "10.6.3",
+    "@storybook/react-vite": "10.6.3",
     "@tanstack/devtools-vite": "0.8.5",
     "@tanstack/intent": "^0.5.6",
     "@types/node": "^22.10.2",
@@ -43,6 +48,7 @@
     "@vitejs/plugin-react": "^6.0.1",
     "babel-plugin-react-compiler": "^1.0.0",
     "openapi-typescript": "^7.13.0",
+    "storybook": "10.6.3",
     "typescript": "^6.0.2",
     "vite": "^8.0.0"
   },
