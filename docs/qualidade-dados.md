@@ -55,3 +55,26 @@ Problemas encontrados no profiling dos arquivos da landing, com a decisão de tr
 **Coerência validada:** toda irregularidade confirmada tem tipo e kWh maior que zero; todo caso sem irregularidade não tem tipo e tem kWh zero.
 
 **Ponto para o time:** as inspeções são o gabarito do score de suspeita (ADR-05). Na base, 871 de 1.389 inspeções confirmaram irregularidade.
+
+
+## medidores
+
+**Resumo:** 51.812 linhas no arquivo → **51.299 medidores únicos** após o tratamento. Sem órfãos de `id_uc`: cobre 45.000 das 45.200 UCs do cadastro (todas com exatamente 1 medidor `ATIVO`; 200 UCs do cadastro não possuem medidor).
+
+| Etapa | Linhas |
+|---|---|
+| Arquivo original | 51.812 |
+| (−) cópias exatas | 513 |
+| **= Medidores na Silver** | **51.299** |
+
+| ID | Coluna | Problema | Evidência | Decisão |
+|---|---|---|---|---|
+| MED-01 | (linha) | Cópias exatas do mesmo registro | 513 linhas | Descartar, manter 1 (`id_medidor` passa a ser único) |
+| MED-02 | `modelo` | Espaços sobrando no início/fim | 3.109 linhas no bruto (3.078 nas únicas); 81 variações para 9 modelos | Tratar: remover espaços |
+| MED-03 | `tipo` | 10 grafias para 3 categorias (variações de caixa, acento, hífen e `smart meter`) | 5.354 linhas no bruto (5.297 nas únicas) fora do padrão | Tratar: padronizar para `ELETRONICO`, `ELETROMECANICO` e `SMART` |
+| MED-04 | `data_instalacao` | 4 formatos: `AAAA-MM-DD`, `DD/MM/AAAA`, `DD.MM.AAAA` e `MM-DD-AAAA` (padrão americano) | 3.728 linhas no bruto (3.694 nas únicas) fora de `AAAA-MM-DD` | Tratar: converter conforme o formato de cada linha. Formatos confirmados pelos valores acima de 12 |
+| MED-05 | `data_retirada` | Data sentinela `9999-12-31` usada como nulo disfarçado em medidores ativos | 13.649 linhas no bruto (13.500 nas únicas), todas com `status = ATIVO` | Tratar: converter `9999-12-31` para nulo |
+| MED-06 | `data_ultima_manutencao` | Coluna 100% vazia | 100% das linhas | Documentar; manter como `date` nula na Silver |
+
+**Coerência validada:** após `MED-05`, 100% dos medidores `ATIVO` (45.000) têm `data_retirada` nula e 100% dos `RETIRADO` (6.299) têm `data_retirada` válida (`>= data_instalacao`), sem sobreposição de datas entre medidores da mesma UC. A relação `modelo` × `tipo` é 100% determinística (`CG-500`, `EM-1200`, `EM-1400` = `ELETROMECANICO`; `EL-2200`, `EL-3000`, `NX-700` = `ELETRONICO`; `IQ-900`, `SM-4100`, `SM-4500` = `SMART`).
+
