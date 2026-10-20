@@ -91,3 +91,17 @@ Problemas encontrados no profiling dos arquivos da landing, com a decisão de tr
 **Sem problemas:** `data_conexao` (100% em `AAAA-MM-DD`), `modalidade` (3 categorias padronizadas: `GERACAO NA PROPRIA UC`, `AUTOCONSUMO REMOTO`, `GERACAO COMPARTILHADA`) e `energia_injetada_kwh_media_mensal` (100% numérica positiva com ponto decimal).
 
 
+## ocorrencias_rede
+
+**Resumo:** 180.000 ocorrências únicas (`id_ocorrencia` único), sem duplicatas e sem órfãos de `id_uc` (41.512 UCs atingidas em 122 alimentadores).
+
+| ID | Coluna | Problema | Evidência | Decisão |
+|---|---|---|---|---|
+| OCO-01 | `causa` | Ausência escrita de várias formas (vazio: 1.356, `-`: 1.363, `N/A`: 1.341, `NULL`: 1.340), além da categoria `NAO IDENTIFICADA` (26.328) | 5.400 linhas (3,0%) sem causa informada | Tratar + Flag: converter vazio/`-`/`N/A`/`NULL` para nulo e sinalizar com `flag_causa_ausente` |
+| OCO-02 | `duracao_min` | Sufixo textual `" min"` concatenado ao valor (ex.: `"23 min"`) | 16.200 linhas (9,0%) | Tratar: remover `" min"` e converter para `decimal` |
+| OCO-03 | `data_abertura`, `data_encerramento` | Registradas com data e hora (`AAAA-MM-DD HH:MM:SS`) | 180.000 linhas | Documentar; converter para `timestamp` para preservar o cálculo de duração |
+
+**Coerência validada:** após `OCO-02`, 100% das 180.000 linhas têm `data_encerramento > data_abertura` e `duracao_min` exatamente igual à diferença em minutos entre encerramento e abertura (de 5 a 2.880 min). `tipo` possui 5 categorias padronizadas (`FALTA DE ENERGIA`, `DANO EM EQUIPAMENTO`, `OSCILACAO`, `SOBRECARGA`, `FIO PARTIDO`).
+
+
+
