@@ -78,3 +78,16 @@ Problemas encontrados no profiling dos arquivos da landing, com a decisão de tr
 
 **Coerência validada:** após `MED-05`, 100% dos medidores `ATIVO` (45.000) têm `data_retirada` nula e 100% dos `RETIRADO` (6.299) têm `data_retirada` válida (`>= data_instalacao`), sem sobreposição de datas entre medidores da mesma UC. A relação `modelo` × `tipo` é 100% determinística (`CG-500`, `EM-1200`, `EM-1400` = `ELETROMECANICO`; `EL-2200`, `EL-3000`, `NX-700` = `ELETRONICO`; `IQ-900`, `SM-4100`, `SM-4500` = `SMART`).
 
+
+## geracao_distribuida
+
+**Resumo:** 3.510 linhas no arquivo → **3.510 registros** na Silver. Sem duplicatas (`1 linha por id_uc`) e sem órfãos no cadastro.
+
+| ID | Coluna | Problema | Evidência | Decisão |
+|---|---|---|---|---|
+| GD-01 | `potencia_kwp` | Vírgula como separador decimal | 316 linhas | Tratar: trocar vírgula por ponto e converter para `decimal` |
+| GD-02 | `potencia_kwp` | Potência ~1.000× acima da faixa normal (`3.049,99` a `8.994,91`, compatíveis com registro em `Wp` em vez de `kWp`), gerando razão `energia_injetada / potencia < 0,35` em UCs residenciais (33) e comerciais (2) | 35 linhas (`potencia_kwp > 500`, contra `1,5` a `75,0` kWp nas demais 3.475 UCs) | Flag: manter o registro e sinalizar com `flag_potencia_anomala` |
+
+**Sem problemas:** `data_conexao` (100% em `AAAA-MM-DD`), `modalidade` (3 categorias padronizadas: `GERACAO NA PROPRIA UC`, `AUTOCONSUMO REMOTO`, `GERACAO COMPARTILHADA`) e `energia_injetada_kwh_media_mensal` (100% numérica positiva com ponto decimal).
+
+
