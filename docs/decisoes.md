@@ -90,16 +90,28 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 ## DEC-005 · Contrato da Bronze (auditoria básica)
 
 - **Data:** 19/10/2026 · **Área:** Dados · **Autor:** Alisson
-- **Decisão:** uma tabela Delta por fonte lógica em `v_energy.bronze.<fonte>`,
-  com o nome da fonte em snake_case, sem prefixo (ex.: `unidades_consumidoras`).
+- **Decisão:** cada fonte lógica gera ao menos uma tabela Delta em
+  `v_energy.bronze.<fonte>`, com o nome em snake_case e sem prefixo (ex.:
+  `unidades_consumidoras`). Uma fonte pode gerar mais de uma tabela quando seus
+  componentes têm estruturas próprias: `inspecoes.xlsx` gera uma tabela por aba
+  (`inspecoes_ago_set`, `inspecoes_out_nov` e `inspecoes_dez`), e `leituras/` reúne
+  seus arquivos anuais em uma só.
   Colunas originais, com os nomes originais e do tipo string, mais
   `source_file` (de `_metadata.file_path`) e `ingestion_timestamp`.
 - **Carga:** batch, full refresh, `overwrite` do Delta com um único overwrite por
   tabela. Reexecutar sobre os mesmos arquivos não duplica nem perde linhas.
-- **Fontes e opções:** o notebook ingere uma fonte por execução (widget `fonte`).
-  As opções de leitura de cada fonte ficam no catálogo `FONTES`, versionado; conflito
-  entre o catálogo e um widget faz a execução falhar, e as opções efetivas são
-  impressas a cada execução.
+- **Execução:** um único notebook com uma seção por fonte; `Run All` processa todas em
+  sequência. O widget `gravar` (padrão `nao`) é o único interruptor de escrita: sem ele,
+  o notebook só valida e confere tabelas existentes. Uma fonte com falha é marcada e não
+  é gravada, e o resumo final falha se houver fonte com falha, pendente ou sem
+  idempotência comprovada. As opções de leitura ficam no código da fonte, versionadas,
+  e são impressas a cada execução.
+- **Formatos:** CSV com `FAILFAST` e tudo string. Uma pasta com vários CSVs (`leituras/`)
+  vira uma tabela só se todos os arquivos tiverem o mesmo conjunto de colunas, unidos por
+  nome. JSON preserva structs e arrays, com valores primitivos como string
+  (`primitivesAsString`), conferido contra uma releitura independente do arquivo. XLSX é
+  lido com o leitor nativo `format("excel")` do Databricks, uma tabela por aba, e conferido
+  célula a célula contra a leitura do XML da planilha; divergência reprova a aba.
 - **Sem:** limpeza, deduplicação, tipagem, regras de negócio, `ingestion_log`,
   snapshots ou histórico próprio. Isso fica para a Silver.
 - **Validação antes de gravar:** o arquivo existe, o cabeçalho foi lido sem
