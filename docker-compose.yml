@@ -1,4 +1,6 @@
-# Banco local do V-Energy Grid 360 (PostgreSQL). Uso: docker compose up -d
+# Ambiente local do V-Energy Grid 360: banco, API e frontend. Na raiz, com o .env criado:
+#   tudo:          docker compose up -d --wait   (portal em http://localhost:3000)
+#   só o banco:    docker compose up -d --wait db   (para rodar API e frontend fora do Docker)
 services:
   db:
     image: postgres:17-alpine
@@ -20,6 +22,46 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+
+  api:
+    build: ./backend
+    # --reload reinicia a API a cada mudança em src/, montado da sua máquina logo abaixo.
+    command: uvicorn venergy_api.main:create_app --factory --host 0.0.0.0 --port 8000 --reload --reload-dir src
+    environment:
+      # Na rede do compose, o banco é o serviço db na porta padrão do PostgreSQL.
+      VENERGY_API_DATABASE_URL: postgresql+psycopg://venergy:${POSTGRES_PASSWORD}@db:5432/venergy
+      VENERGY_API_GOLD_DIR: /data/gold
+      # Detecção de mudanças por varredura: eventos do sistema de arquivos não atravessam
+      # o volume no Docker Desktop do Windows.
+      WATCHFILES_FORCE_POLLING: "true"
+    ports:
+      - "127.0.0.1:${API_PORT:-8000}:8000"
+    volumes:
+      - ./backend/src:/app/src
+      # CSVs da Gold (data/gold/), lidos pela carga e escritos pelo gerador da amostra.
+      - ./data:/data
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    build: ./frontend
+    environment:
+      # O proxy /api do Vite encaminha para a API pela rede do compose: o navegador fala só
+      # com o Vite, sem CORS.
+      API_PROXY_TARGET: http://api:8000
+      # Mesmo motivo do WATCHFILES_FORCE_POLLING da API.
+      CHOKIDAR_USEPOLLING: "true"
+      CHOKIDAR_INTERVAL: "300"
+    ports:
+      - "127.0.0.1:${WEB_PORT:-3000}:3000"
+    volumes:
+      # Só src/: o node_modules é o da imagem (binários para Linux), nunca o da sua máquina.
+      # Mudou package.json ou vite.config.ts? docker compose up -d --build web
+      - ./frontend/src:/app/src
+    depends_on:
+      api:
+        condition: service_healthy
 
 volumes:
   pgdata:

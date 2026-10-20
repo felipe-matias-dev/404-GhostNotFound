@@ -21,6 +21,8 @@ __pycache__/
 .venv/
 venv/
 .env
+.ruff_cache/
+.pytest_cache/
 
 # Node
 node_modules/

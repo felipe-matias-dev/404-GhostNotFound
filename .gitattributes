@@ -1,3 +1,14 @@
-# Scripts de shell rodam dentro de containers Linux: com fim de linha do Windows (CRLF),
-# o bash falha. Força LF mesmo para quem clona no Windows.
+# Fim de linha LF em todo arquivo de texto, mesmo para quem clona no Windows: scripts de
+# shell rodam dentro de containers Linux (com CRLF o bash falha) e os diffs não mudam
+# de linha inteira por causa do editor.
+* text=auto eol=lf
 *.sh text eol=lf
+# Notebooks ficam byte a byte como o Databricks os grava.
+*.ipynb -text
+
+# Gerados: o GitHub recolhe o diff deles no PR. O contrato (contracts/openapi.json) fica de
+# fora de propósito, porque é ele que o revisor precisa ler.
+frontend/src/routeTree.gen.ts linguist-generated
+frontend/src/lib/api-schema.gen.ts linguist-generated
+frontend/package-lock.json linguist-generated
+backend/uv.lock linguist-generated

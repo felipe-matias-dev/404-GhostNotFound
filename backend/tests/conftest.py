@@ -14,7 +14,7 @@ from venergy_api.config import Settings
 from venergy_api.database import Base, create_db_engine, get_session
 from venergy_api.main import create_app
 
-FRONTEND_ORIGIN = "http://localhost:5173"
+FRONTEND_ORIGIN = "http://localhost:3000"
 
 # O padrão bate com o .env.example da raiz; quem mudou senha ou porta define a variável.
 TEST_DATABASE_URL = os.environ.get(
@@ -35,7 +35,10 @@ def engine() -> Iterator[Engine]:
         with engine.connect() as connection:
             connection.execute(text("SELECT 1"))
     except OperationalError:
-        pytest.fail("Banco de testes indisponível. Suba com: docker compose up -d", pytrace=False)
+        pytest.fail(
+            "Banco de testes indisponível. Suba com: docker compose up -d --wait db",
+            pytrace=False,
+        )
 
     # Limpa antes, para não herdar sobras de uma execução interrompida, e depois.
     Base.metadata.drop_all(engine)

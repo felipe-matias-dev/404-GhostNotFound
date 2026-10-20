@@ -18,3 +18,9 @@ class DimUcSchema(BaseModel):
     cod_alimentador: RequiredText
     possui_gd: bool
     consumo_medio_kwh_12m: float = Field(ge=0)
+
+
+class ErroSchema(BaseModel):
+    """Corpo das respostas de erro do FastAPI (HTTPException), documentado no OpenAPI."""
+
+    detail: str
