@@ -54,7 +54,7 @@ tables:
     primary_key: [cod_uc]
     context: Relacionamento
     consumers: [UC 360, agente, filtros]
-    owner: Dados (Alisson, Arthur e Gabriel)
+    owner: Dados
     columns:
       cod_uc:                {type: text,     nullable: false, status: confirmada}
       municipio:             {type: text,     nullable: false, status: confirmada}
@@ -75,7 +75,7 @@ tables:
       - {columns: [cod_uc], references: gold_dim_uc.cod_uc}
     context: Receita
     consumers: [KPIs, tela Receita, UC 360, agente]
-    owner: Dados (Alisson, Arthur e Gabriel)
+    owner: Dados
     columns:
       cod_uc:              {type: text,       nullable: false, status: proposta}
       competencia:         {type: text,       nullable: false, status: proposta, pattern: '^\d{4}-(0[1-9]|1[0-2])$'}
@@ -91,7 +91,7 @@ tables:
     primary_key: a_confirmar
     context: Receita
     consumers: [tela Receita, insight, diagnóstico]
-    owner: Dados (Alisson, Arthur e Gabriel)
+    owner: Dados
     columns:
       periodo_base:   {type: text,  nullable: false, status: a_confirmar, note: "definição de período base em aberto (ver open_questions)"}
       periodo_atual:  {type: text,  nullable: false, status: a_confirmar}
@@ -110,7 +110,7 @@ tables:
     primary_key: [competencia]
     context: [Receita, Rede, Atendimento]
     consumers: [dashboard executivo, GET /receita/mensal]
-    owner: Dados (Alisson, Arthur e Gabriel)
+    owner: Dados
     columns:
       competencia:       {type: text,       nullable: false, status: proposta, pattern: '^\d{4}-(0[1-9]|1[0-2])$'}
       kwh_faturado:      {type: energy_kwh, nullable: false, status: proposta}
@@ -126,7 +126,7 @@ tables:
     primary_key: [cod_alimentador, competencia]
     context: Continuidade
     consumers: [tela DEC/FEC, agente]
-    owner: Dados (Alisson, Arthur e Gabriel)
+    owner: Dados
     columns:
       cod_alimentador:     {type: text,    nullable: false, status: proposta}
       competencia:         {type: text,    nullable: false, status: proposta, pattern: '^\d{4}-(0[1-9]|1[0-2])$'}
@@ -144,7 +144,7 @@ tables:
       - {columns: [cod_uc], references: gold_dim_uc.cod_uc}
     context: Continuidade
     consumers: [UC 360]
-    owner: Dados (Alisson, Arthur e Gabriel)
+    owner: Dados
     columns:
       cod_uc: {type: text, nullable: false, status: proposta}
       # demais colunas dependem da Silver de ocorrências
@@ -157,7 +157,7 @@ tables:
       - {columns: [cod_uc], references: gold_dim_uc.cod_uc}
     context: Relacionamento
     consumers: [UC 360, agente]
-    owner: Dados (Alisson, Arthur e Gabriel)
+    owner: Dados
     columns:
       cod_uc: {type: text, nullable: false, status: proposta}
       # demais colunas dependem da Silver de atendimentos (JSON achatado)
@@ -170,7 +170,7 @@ tables:
       - {columns: [cod_uc], references: gold_dim_uc.cod_uc}
     context: Relacionamento
     consumers: [UC 360, score de suspeita]
-    owner: Dados (Alisson, Arthur e Gabriel)
+    owner: Dados
     columns:
       cod_uc: {type: text, nullable: false, status: proposta}
       # demais colunas dependem da Silver de medidores (medidor vigente e idade)
@@ -183,7 +183,7 @@ tables:
       - {columns: [cod_uc], references: gold_dim_uc.cod_uc}
     context: Perdas
     consumers: [tela Perdas, ordens de inspeção]
-    owner: Dados (Alisson, Arthur e Gabriel)
+    owner: Dados
     columns:
       cod_uc:              {type: text,       nullable: false, status: proposta}
       score_suspeita:      {type: ratio,      nullable: false, status: proposta}
@@ -194,7 +194,7 @@ tables:
 # Gold nunca altera.
 
 open_questions:
-  - "Cada integrante de Dados constrói a sua versão da Gold a partir da Silver; as três são validadas em conjunto contra este contrato antes de publicar a Gold única."
+  - "Dados (Alisson, Arthur e Gabriel) faz três cópias independentes da transformação Silver -> Gold, todas contra este contrato; as três são comparadas entre si antes de definir a Gold que será exportada."
   - "Definição de período base: primeiros 12 meses da base ou ano-calendário? Muda gold_receita_decomposicao."
   - "Chave e colunas de gold_interrupcoes_uc, gold_atendimentos_uc e gold_medidor_uc dependem da Silver."
   - "Precisão numérica (energy_kwh, money) e normalização de município/bairro dependem da Silver."
