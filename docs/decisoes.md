@@ -14,7 +14,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | 19/10/2026 | DEC-002: banco local PostgreSQL em Docker, com schemas `gold` e `app` | Usuário somente leitura nativo para o agente; recarga da Gold não apaga as ordens de inspeção | Time |
 | 19/10/2026 | DEC-003: walking skeleton com amostra sintética da Gold | Integração entre camadas testada desde o início, sem depender do dataset confidencial | Time |
 | 19/10/2026 | DEC-004 (proposta): Gold entregue em CSV, um arquivo por tabela, em `data/gold/` | Um único caminho de carga, validado contra o contrato, para amostra e Gold real | Felipe |
-| 19/10/2026 | DEC-005: Bronze com auditoria básica (full refresh, tudo string, `ingestion_timestamp` e `source_file`) | Dados o mais próximos da origem; rastreabilidade sem log próprio de ingestão | Alisson |
+| 19/10/2026 | DEC-008: Bronze com auditoria básica (full refresh, tudo string, `ingestion_timestamp` e `source_file`) | Dados o mais próximos da origem; rastreabilidade sem log próprio de ingestão | Alisson |
 
 ## DEC-001 · Localização dos arquivos de origem (landing)
 
@@ -87,7 +87,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Em aberto:** confirmar com a organização se a Gold agregada pode ir para o
   repositório público. Até lá, não é versionada.
 
-## DEC-005 · Contrato da Bronze (auditoria básica)
+## DEC-008 · Contrato da Bronze (auditoria básica)
 
 - **Data:** 19/10/2026 · **Área:** Dados · **Autor:** Alisson
 - **Decisão:** cada fonte lógica gera ao menos uma tabela Delta em
