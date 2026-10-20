@@ -36,3 +36,22 @@ Problemas encontrados no profiling dos arquivos da landing, com a decisão de tr
 **Pontos para o time:**
 - `cpf_cnpj` e `nome_titular` são dados pessoais. Decidir se a Gold mascara esses campos antes do portal e do agente de IA.
 - Teste de qualidade sugerido para a Silver: `COUNT(*) = COUNT(DISTINCT id_uc) = 45.200`.
+
+
+## inspecoes (3 abas)
+
+**Resumo:** 1.389 inspeções nas tabelas `inspecoes_ago_set` (511), `inspecoes_out_nov` (495) e `inspecoes_dez` (383). Sem duplicatas de `id_inspecao`, sem órfãos (todo `id_uc` existe no cadastro) e cada UC aparece em uma só inspeção.
+
+| ID | Coluna | Problema | Evidência | Decisão |
+|---|---|---|---|---|
+| INSP-01 | `resultado` | 8 grafias para 3 valores (variações de caixa; `CONFIRMADA` sozinho) | 168 linhas fora do padrão | Tratar: padronizar para `IRREGULARIDADE CONFIRMADA` / `SEM IRREGULARIDADE` |
+| INSP-02 | `resultado` | Valor `NADA CONSTA`, fora do padrão | 22 linhas; todas sem tipo e com kWh zero, igual a `SEM IRREGULARIDADE` | Tratar como `SEM IRREGULARIDADE` + flag de origem |
+| INSP-03 | `tipo_irregularidade` | Ausência escrita de várias formas (vazio, `-`, `N/A`, `NULL`) | 518 linhas, exatamente as sem irregularidade | Tratar: converter para nulo |
+| INSP-04 | `data` | 4 formatos: `AAAA-MM-DD`, `DD.MM.AAAA`, `DD/MM/AAAA` e `MM-DD-AAAA` (padrão americano) | 133 linhas fora de `AAAA-MM-DD` | Tratar: converter conforme o formato de cada linha. Formatos confirmados pelos valores acima de 12 |
+| INSP-05 | `data` × aba | Inspeções de agosto a novembro lançadas na aba `dez` | 107 linhas | Flag: vale a `data`; a aba fica só como origem |
+| INSP-06 | `inspetor` | Espaços sobrando no início/fim | 83 linhas | Tratar: remover espaços |
+| INSP-07 | `kwh_recuperado` | Vírgula como separador decimal | 125 linhas | Tratar: trocar vírgula por ponto e converter para número |
+
+**Coerência validada:** toda irregularidade confirmada tem tipo e kWh maior que zero; todo caso sem irregularidade não tem tipo e tem kWh zero.
+
+**Ponto para o time:** as inspeções são o gabarito do score de suspeita (ADR-05). Na base, 871 de 1.389 inspeções confirmaram irregularidade.
