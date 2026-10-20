@@ -2,7 +2,7 @@
 
 Agente Text-to-SQL em Python, integrado ao backend FastAPI, consultando o banco local alimentado pelas tabelas Gold. Também gera os insights exibidos nas telas do portal.
 
-Esta etapa cobre só o esqueleto: contratos de domínio, portas e configuração. Os adapters (LLM, validador, banco e camada semântica) entram em seguida. O spec completo está em [docs/specs/2026-10-19-architecture-design.md](docs/specs/2026-10-19-architecture-design.md).
+Esta etapa cobre o esqueleto (contratos de domínio, portas e configuração) e o validador SQL. Os demais adapters (LLM, banco e camada semântica) entram em seguida. O spec completo está em [docs/specs/2026-10-19-architecture-design.md](docs/specs/2026-10-19-architecture-design.md), e o guia de boas práticas em [docs/contexto-agente-text-to-sql.md](docs/contexto-agente-text-to-sql.md).
 
 ## Arquitetura
 
@@ -10,7 +10,7 @@ Hexagonal, em três camadas:
 
 - `domain/`: modelos imutáveis (perguntas, rascunhos de SQL, camada semântica, respostas). Não importa nada do projeto e não faz I/O.
 - `application/`: portas (`typing.Protocol`) que os adapters implementam. Importa só `domain`.
-- `infrastructure/`: adapters das portas. Ainda vazio.
+- `infrastructure/`: adapters das portas. Por enquanto, o validador SQL (`sqlglot`).
 
 ## Como rodar
 

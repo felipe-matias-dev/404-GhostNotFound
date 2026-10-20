@@ -7,7 +7,7 @@ Plataforma da distribuidora V-Energy: pipeline de dados (Databricks), portal web
 - `data-engineering/`: notebooks Bronze, Silver e Gold e o Workflow (Databricks).
 - `backend/`: API FastAPI (`src/venergy_api`), com SQLAlchemy 2.0 e psycopg.
 - `frontend/`: React + TypeScript (Vite). Ver `frontend/AGENTS.md` e `frontend/README.md`.
-- `ai-agent/`: agente Text-to-SQL (`src/venergy_agent`). Ainda sem código: o trabalho segue o spec e o plano em `ai-agent/docs/`.
+- `ai-agent/`: agente Text-to-SQL (`src/venergy_agent`): contratos de domínio, portas, configuração e validador SQL. Spec, plano e guia de boas práticas em `ai-agent/docs/`.
 - `infra/postgres/init/`: script que cria os schemas `gold` e `app` e o usuário somente leitura do agente.
 - `docs/`: decisões, dicionário de dados e diagnóstico da receita.
 
@@ -31,12 +31,9 @@ Banco local (na raiz): `docker compose up -d`. Precisa do `.env` copiado de `.en
 
 ## Agente Text-to-SQL
 
-- Usa o usuário `venergy_agent`, que só lê o schema `gold` e nunca acessa `app`. Nunca use as credenciais do backend no agente.
-- O agente consulta só as views `sem_*` (allowlist). Toda consulta passa pelo validador antes de executar.
-- Requisito central: se não souber, diz que não sabe. Resposta inventada é falha crítica.
-- Todo número na resposta vem do resultado de uma consulta. O LLM não faz aritmética.
-- Mudança de prompt, modelo ou camada semântica só entra se o golden set não regredir.
-- Guia de boas práticas: `contexto-agente-text-to-sql.md` (na pasta de contexto do projeto).
+Contexto do GenAI para todos os times (contrato com o backend, o que o agente precisa da Gold, regras de segurança):
+
+@ai-agent/CLAUDE.md
 
 ## Ordens de inspeção e schemas
 
