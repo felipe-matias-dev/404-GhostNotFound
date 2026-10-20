@@ -60,6 +60,14 @@ a UC `0003` em `GET /unidades-consumidoras/{cod_uc}`.
 |---|---|
 | `GET /health` | `200` se a API alcança o banco, `503` se não alcança |
 | `GET /unidades-consumidoras/{cod_uc}` | Resumo de uma unidade consumidora, ou `404` se ela não existir |
+| `POST /ordens-inspecao` | Gera uma ordem de inspeção por UC (`{"cod_ucs": [...]}`), tudo ou nada: `404` se uma UC não existir, `409` se já tiver ordem ativa |
+| `GET /ordens-inspecao?status=` | Lista as ordens, das mais recentes para as mais antigas, opcionalmente por status |
+| `GET /ordens-inspecao/{id}` | Uma ordem com o histórico de mudanças de status |
+| `PATCH /ordens-inspecao/{id}` | Muda o status (`EM_CAMPO`, `CONCLUIDA` com `resultado`, `CANCELADA`), com `observacao` opcional: `409` se a mudança não for permitida |
+
+As regras das ordens (status, resultado, uma ordem ativa por UC) estão na
+[DEC-009](../docs/decisoes.md#dec-009--modelo-das-ordens-de-inspeção). As tabelas do schema
+`app` são criadas pela carga (passo 6), que nunca apaga o que está nelas.
 
 ## Contrato OpenAPI
 
@@ -142,6 +150,7 @@ src/venergy_api/
 ├── config.py     # configurações lidas do .env
 ├── database.py   # conexão com o banco e sessão por requisição
 ├── models.py     # tabelas do banco
+├── ordens.py     # regras das ordens de inspeção (máquina de estados), sem banco
 ├── schemas.py    # contrato dos dados: validação da carga e formato das respostas
 ├── carga.py      # CSVs da Gold → banco
 ├── amostra.py    # gerador da amostra sintética
