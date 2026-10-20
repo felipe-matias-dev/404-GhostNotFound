@@ -1,10 +1,17 @@
-"""Contrato dos dados: o formato que a Gold entrega e que a API devolve."""
+"""Contrato dos dados: o formato que a Gold entrega e que a API recebe e devolve."""
 
+from datetime import datetime
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
+
+from venergy_api.ordens import ResultadoOrdem, StatusOrdem
 
 RequiredText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+
+# Teto por pedido na ordem da capacidade mensal da equipe de campo (~200 inspeções):
+# acima disso é engano de seleção, e o limite evita um pedido gigante travar o banco.
+MAX_ORDENS_POR_PEDIDO = 200
 
 
 class DimUcSchema(BaseModel):
@@ -18,6 +25,48 @@ class DimUcSchema(BaseModel):
     cod_alimentador: RequiredText
     possui_gd: bool
     consumo_medio_kwh_12m: float = Field(ge=0)
+
+
+class CriarOrdensSchema(BaseModel):
+    """UCs escolhidas na fila de suspeitas; gera uma OI para cada uma."""
+
+    cod_ucs: list[RequiredText] = Field(min_length=1, max_length=MAX_ORDENS_POR_PEDIDO)
+
+    @field_validator("cod_ucs")
+    @classmethod
+    def sem_repetidas(cls, cod_ucs: list[str]) -> list[str]:
+        # Repetir a UC no mesmo pedido geraria duas OIs ativas para ela: recusa já na entrada.
+        repetidas = sorted({cod for cod in cod_ucs if cod_ucs.count(cod) > 1})
+        if repetidas:
+            raise ValueError(f"UCs repetidas no pedido: {', '.join(repetidas)}")
+        return cod_ucs
+
+
+class OrdemSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    cod_uc: str
+    status: StatusOrdem
+    resultado: ResultadoOrdem | None
+    observacao: str | None
+    criada_em: datetime
+    atualizada_em: datetime
+
+
+class EventoSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    status_anterior: StatusOrdem | None
+    status_novo: StatusOrdem
+    observacao: str | None
+    ocorrido_em: datetime
+
+
+class OrdemDetalheSchema(OrdemSchema):
+    """A OI com o histórico de mudanças de status, do mais antigo ao mais recente."""
+
+    eventos: list[EventoSchema]
 
 
 class ErroSchema(BaseModel):

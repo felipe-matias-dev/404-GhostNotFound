@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from venergy_api.config import Settings, get_settings
-from venergy_api.routers import health, unidades
+from venergy_api.routers import health, ordens, unidades
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -24,4 +24,5 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     app.include_router(health.router)
     app.include_router(unidades.router)
+    app.include_router(ordens.router)
     return app
