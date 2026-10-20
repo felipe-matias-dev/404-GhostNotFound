@@ -8,7 +8,7 @@ ALLOWED = frozenset({"sem_uc", "sem_faturamento_mensal"})
 
 @pytest.fixture
 def validator():
-    return SqlglotValidator(dialect="postgres", max_rows=200)
+    return SqlglotValidator(dialect="postgres", max_rows=200, allowed_schema="gold")
 
 
 @pytest.mark.parametrize(
@@ -39,11 +39,65 @@ def validator():
         "",
         "   ",
         "SELEC * FROM sem_uc",
+        "SELECT * FROM gold_dim_uc WHERE EXISTS "
+        "(WITH gold_dim_uc AS (SELECT 1) SELECT 1 FROM gold_dim_uc)",
+        "SELECT query_to_xml('select * from gold.gold_dim_uc', true, true, '')",
+        "SELECT table_to_xml('gold.gold_dim_uc', true, true, '')",
+        "SELECT * FROM sem_uc, LATERAL query_to_xml('select 1', true, true, '') x",
+        "SELECT current_setting('search_path')",
+        "SELECT version()",
+        "SELECT current_user",
+        "SELECT current_database()",
+        "SELECT current_schema",
+        "SELECT current_catalog",
+        "SELECT session_user",
+        "SELECT * FROM sem_uc FOR UPDATE",
+        "SELECT * FROM sem_uc FOR SHARE",
+        "SELECT * INTO sem_uc FROM sem_faturamento_mensal",
     ],
 )
 def test_rejects_unsafe_or_invalid_sql(validator, sql):
     with pytest.raises(SqlRejected):
         validator.validate(sql, ALLOWED)
+
+
+def test_fetch_first_is_rejected_asking_for_limit(validator):
+    with pytest.raises(SqlRejected, match="FETCH.*LIMIT"):
+        validator.validate("SELECT cod_uc FROM sem_uc FETCH FIRST 5000 ROWS ONLY", ALLOWED)
+
+
+def test_accepts_common_date_and_text_functions(validator):
+    query = validator.validate(
+        "SELECT date_trunc('month', f.competencia), extract(year FROM f.competencia), "
+        "to_char(f.competencia, 'YYYY-MM'), round(avg(f.kwh), 2), lower(f.cod_uc) "
+        "FROM sem_faturamento_mensal f GROUP BY 1, 2, 3, 5",
+        ALLOWED,
+    )
+
+    assert query.views == frozenset({"sem_faturamento_mensal"})
+
+
+def test_unquoted_identifiers_are_case_folded_like_postgres(validator):
+    query = validator.validate("SELECT COD_UC FROM GOLD.SEM_UC", ALLOWED)
+
+    assert query.views == frozenset({"sem_uc"})
+
+
+def test_views_are_qualified_with_the_allowed_schema_but_ctes_are_not(validator):
+    query = validator.validate(
+        "WITH base AS (SELECT cod_uc FROM sem_uc) SELECT b.cod_uc FROM base b", ALLOWED
+    )
+
+    assert "FROM gold.sem_uc" in query.sql
+    assert "FROM base AS b" in query.sql
+
+
+def test_only_the_configured_schema_is_allowed():
+    validator = SqlglotValidator(dialect="postgres", max_rows=200, allowed_schema="semantic")
+
+    assert validator.validate("SELECT 1 FROM semantic.sem_uc", ALLOWED).views == {"sem_uc"}
+    with pytest.raises(SqlRejected):
+        validator.validate("SELECT 1 FROM gold.sem_uc", ALLOWED)
 
 
 def test_accepts_single_select_on_allowed_view(validator):
