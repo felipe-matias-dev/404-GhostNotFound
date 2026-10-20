@@ -105,6 +105,7 @@ def test_accepts_single_select_on_allowed_view(validator):
 
     assert query.views == frozenset({"sem_uc"})
     assert query.applied_limit == 200
+    assert query.limit_imposed is True
     assert query.sql.upper().endswith("LIMIT 200")
 
 
@@ -150,6 +151,7 @@ def test_existing_limit_within_maximum_is_kept(validator):
     query = validator.validate("SELECT cod_uc FROM sem_uc LIMIT 10", ALLOWED)
 
     assert query.applied_limit == 10
+    assert query.limit_imposed is False
     assert query.sql.upper().endswith("LIMIT 10")
 
 
@@ -157,4 +159,5 @@ def test_limit_above_maximum_is_reduced(validator):
     query = validator.validate("SELECT cod_uc FROM sem_uc LIMIT 5000", ALLOWED)
 
     assert query.applied_limit == 200
+    assert query.limit_imposed is True
     assert query.sql.upper().endswith("LIMIT 200")

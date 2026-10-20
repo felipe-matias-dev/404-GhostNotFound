@@ -51,6 +51,7 @@ class ValidatedQuery(BaseModel):
     sql: str
     views: frozenset[str]
     applied_limit: int
+    limit_imposed: bool
 
 
 class QueryResult(BaseModel):

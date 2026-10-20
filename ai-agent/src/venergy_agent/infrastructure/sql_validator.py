@@ -29,9 +29,12 @@ class SqlglotValidator:
         root = self._parse(sql)
         self._reject_forbidden_nodes(root)
         views = self._collect_views(root, allowed_views)
-        root, applied_limit = self._apply_limit(root)
+        root, applied_limit, limit_imposed = self._apply_limit(root)
         return ValidatedQuery(
-            sql=root.sql(dialect=self._dialect), views=views, applied_limit=applied_limit
+            sql=root.sql(dialect=self._dialect),
+            views=views,
+            applied_limit=applied_limit,
+            limit_imposed=limit_imposed,
         )
 
     def _parse(self, sql: str) -> exp.Query:
@@ -79,10 +82,10 @@ class SqlglotValidator:
             raise SqlRejected("could not resolve the tables of the query")
         return frozenset(used)
 
-    def _apply_limit(self, root: exp.Query) -> tuple[exp.Query, int]:
+    def _apply_limit(self, root: exp.Query) -> tuple[exp.Query, int, bool]:
         current = root.args.get("limit")
         if current is None:
-            return root.limit(self._max_rows), self._max_rows
+            return root.limit(self._max_rows), self._max_rows, True
         if isinstance(current, exp.Fetch):
             raise SqlRejected("FETCH is not supported, use LIMIT n")
 
@@ -91,6 +94,6 @@ class SqlglotValidator:
             raise SqlRejected("LIMIT must be an integer literal")
         requested = int(value.name)
         if requested <= self._max_rows:
-            return root, requested
+            return root, requested, False
         current.set("expression", exp.Literal.number(self._max_rows))
-        return root, self._max_rows
+        return root, self._max_rows, True

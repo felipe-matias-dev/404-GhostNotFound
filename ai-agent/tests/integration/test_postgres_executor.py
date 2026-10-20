@@ -1,0 +1,94 @@
+import psycopg
+import pytest
+
+from venergy_agent.domain.errors import ErrorKind, QueryExecutionError
+from venergy_agent.domain.sql import ValidatedQuery
+from venergy_agent.infrastructure.postgres_executor import PostgresQueryExecutor
+
+PROBE = frozenset({"sem_executor_probe"})
+
+
+@pytest.fixture
+def executor(agent_database_url):
+    return PostgresQueryExecutor(database_url=agent_database_url, timeout_seconds=5)
+
+
+def query(sql: str, applied_limit: int = 200, limit_imposed: bool = True) -> ValidatedQuery:
+    return ValidatedQuery(
+        sql=sql, views=PROBE, applied_limit=applied_limit, limit_imposed=limit_imposed
+    )
+
+
+@pytest.mark.usefixtures("probe_view")
+async def test_returns_columns_and_rows(executor):
+    result = await executor.execute(
+        query("SELECT cod_uc, kwh FROM gold.sem_executor_probe ORDER BY cod_uc LIMIT 200")
+    )
+
+    assert result.columns == ("cod_uc", "kwh")
+    assert result.row_count == 3
+    assert result.rows[0]["cod_uc"] == "0001"
+    assert result.truncated is False
+
+
+@pytest.mark.usefixtures("probe_view")
+async def test_marks_truncated_when_rows_reach_an_imposed_limit(executor):
+    result = await executor.execute(
+        query("SELECT cod_uc FROM gold.sem_executor_probe ORDER BY cod_uc LIMIT 2", 2)
+    )
+
+    assert result.row_count == 2
+    assert result.truncated is True
+
+
+@pytest.mark.usefixtures("probe_view")
+async def test_a_limit_asked_by_the_user_is_not_truncation(executor):
+    result = await executor.execute(
+        query("SELECT cod_uc FROM gold.sem_executor_probe LIMIT 2", 2, limit_imposed=False)
+    )
+
+    assert result.truncated is False
+
+
+@pytest.mark.usefixtures("probe_view")
+async def test_database_refuses_writes_even_without_the_validator(executor):
+    with pytest.raises(psycopg.errors.ReadOnlySqlTransaction):
+        await executor.execute(query("INSERT INTO gold.sem_executor_probe VALUES ('9', 1)"))
+
+
+@pytest.mark.parametrize("timeout_seconds", [0.2, 0.0001])
+async def test_slow_query_times_out(agent_database_url, timeout_seconds):
+    executor = PostgresQueryExecutor(
+        database_url=agent_database_url, timeout_seconds=timeout_seconds
+    )
+
+    with pytest.raises(QueryExecutionError) as error:
+        await executor.execute(query("SELECT pg_sleep(2)"))
+
+    assert error.value.kind is ErrorKind.TIMEOUT
+
+
+@pytest.mark.usefixtures("probe_view")
+@pytest.mark.parametrize(
+    ("sql", "kind"),
+    [
+        ("SELECT nope FROM gold.sem_executor_probe", ErrorKind.UNKNOWN_OBJECT),
+        ("SELECT 1 FROM gold.sem_executor_missing", ErrorKind.UNKNOWN_OBJECT),
+        ("SELECT 1 FROM gold.sem_executor_probe WHERE cod_uc = 1", ErrorKind.TYPE_MISMATCH),
+        ("SELECT FROM WHERE", ErrorKind.SYNTAX),
+    ],
+)
+async def test_classifies_errors_for_the_correction_loop(executor, sql, kind):
+    with pytest.raises(QueryExecutionError) as error:
+        await executor.execute(query(sql))
+
+    assert error.value.kind is kind
+
+
+async def test_permission_errors_are_not_classified(executor, owner):
+    owner.execute("CREATE TABLE IF NOT EXISTS app.ordem_executor_probe (id int)")
+    try:
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            await executor.execute(query("SELECT id FROM app.ordem_executor_probe"))
+    finally:
+        owner.execute("DROP TABLE app.ordem_executor_probe")
