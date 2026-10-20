@@ -17,6 +17,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | 19/10/2026 | DEC-005: contrato API → frontend em `contracts/openapi.json`, gerado pelo FastAPI; client com `openapi-typescript` + `openapi-fetch` | O front quebra na compilação quando o contrato muda; a mudança de contrato aparece no diff do PR | João Euclides |
 | 19/10/2026 | DEC-006: `docker compose up` sobe banco, API e Vite em modo de desenvolvimento | Um comando roda o portal em qualquer máquina; deploy em nuvem está fora do escopo | João Euclides |
 | 19/10/2026 | DEC-007: qualidade garantida por pre-commit local e pelo mesmo conjunto de checagens no CI | Código formatado e contrato em dia sem depender de lembrar; o CI barra quem pula o hook | João Euclides |
+| 19/10/2026 | DEC-008: Bronze com auditoria básica (full refresh, tudo string, `ingestion_timestamp` e `source_file`) | Dados o mais próximos da origem; rastreabilidade sem log próprio de ingestão | Alisson |
 
 ## DEC-001 · Localização dos arquivos de origem (landing)
 
@@ -27,7 +28,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Motivo:** separar arquivos imutáveis de tabelas recriáveis. Com o volume
   dentro de `bronze`, um `DROP SCHEMA bronze CASCADE` apagaria os originais.
 - **Regras:** o pipeline nunca escreve nem apaga nada em `landing`. O caminho
-  é parametrizado por widget no notebook `landing_to_bronze`.
+  é parametrizado por widget no notebook `Landing_to_Bronze`.
 
 ## DEC-002 · Banco local PostgreSQL
 
@@ -165,3 +166,45 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
     continuam valendo para eles.
   - `.gitattributes` força LF em todo arquivo de texto, menos nos notebooks;
     `.editorconfig` alinha os editores com os formatadores.
+
+## DEC-008 · Contrato da Bronze (auditoria básica)
+
+- **Data:** 19/10/2026 · **Área:** Dados · **Autor:** Alisson
+- **Decisão:** cada fonte lógica gera ao menos uma tabela Delta em
+  `v_energy.bronze.<fonte>`, com o nome em snake_case e sem prefixo (ex.:
+  `unidades_consumidoras`). Uma fonte pode gerar mais de uma tabela quando seus
+  componentes têm estruturas próprias: `inspecoes.xlsx` gera uma tabela por aba
+  (`inspecoes_ago_set`, `inspecoes_out_nov` e `inspecoes_dez`), e `leituras/` reúne
+  seus arquivos anuais em uma só.
+  Colunas originais, com os nomes originais e do tipo string, mais
+  `source_file` (de `_metadata.file_path`) e `ingestion_timestamp`.
+- **Carga:** batch, full refresh, `overwrite` do Delta com um único overwrite por
+  tabela. Reexecutar sobre os mesmos arquivos não duplica nem perde linhas.
+- **Execução:** um único notebook com uma seção por fonte; `Run All` processa todas em
+  sequência. O widget `gravar` (padrão `nao`) é o único interruptor de escrita: sem ele,
+  o notebook só valida e confere tabelas existentes. Uma fonte com falha é marcada e não
+  é gravada, e o resumo final falha se houver fonte com falha, pendente ou sem
+  idempotência comprovada. As opções de leitura ficam no código da fonte, versionadas,
+  e são impressas a cada execução.
+- **Formatos:** CSV com `FAILFAST` e tudo string. Uma pasta com vários CSVs (`leituras/`)
+  vira uma tabela só se todos os arquivos tiverem o mesmo conjunto de colunas, unidos por
+  nome. JSON preserva structs e arrays, com valores primitivos como string
+  (`primitivesAsString`), conferido contra uma releitura independente do arquivo. XLSX é
+  lido com o leitor nativo `format("excel")` do Databricks, uma tabela por aba, e conferido
+  célula a célula contra a leitura do XML da planilha; divergência reprova a aba.
+- **Sem:** limpeza, deduplicação, tipagem, regras de negócio, `ingestion_log`,
+  snapshots ou histórico próprio. Isso fica para a Silver.
+- **Validação antes de gravar:** o arquivo existe, o cabeçalho foi lido sem
+  ambiguidade, a leitura usa `FAILFAST` (linha malformada interrompe a carga) e
+  `source_file` está consistente. Se algo falhar, a tabela anterior não é tocada.
+- **Histórico:** o `DESCRIBE HISTORY` e o time travel do Delta são recursos
+  complementares, com retenção limitada (log de 30 dias e `VACUUM` de 7 dias por
+  padrão). Não são a trilha permanente de auditoria.
+- **Limitações conhecidas:** o Spark lê campo vazio sem aspas como `NULL`, então
+  "vazio" e "nulo" não se distinguem na Bronze. A contagem de linhas físicas é só
+  uma conferência auxiliar, porque campos entre aspas podem conter quebras de
+  linha.
+- **Evidências:** os resultados da validação (contagens, colunas, estatísticas) são
+  documentados à parte, em relatório privado fora do repositório, porque o dataset é
+  confidencial. Não há tabelas adicionais de auditoria, e os notebooks são
+  versionados sem outputs.
