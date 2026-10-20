@@ -1,0 +1,202 @@
+# Contrato da camada Gold do V-Energy Grid 360 — RASCUNHO v0.1.0
+#
+# Fonte de verdade sobre tabelas, grão, chaves, colunas e tipos. O significado e as fórmulas das
+# métricas ficam em docs/dicionario-de-dados.md. Modelo de referência: docs/arquitetura.md §6.
+#
+# Este rascunho só usa nomes e regras já documentados no repositório (docs/arquitetura.md, docs/backlog.md
+# e backend/src/venergy_api/schemas.py). Nada aqui vem de observação do dataset. O que ainda não está
+# decidido aparece marcado em `status` ou em `open_questions`.
+#
+# status de cada coluna:
+#   confirmada   já usada hoje pelo backend (schemas.py/models.py)
+#   proposta     nome e significado documentados; tipo e regras ainda por validar
+#   a_confirmar  depende da Silver, do profiling ou de decisão do time
+
+version: 0.1.0
+status: rascunho
+updated: 2026-10-20
+
+conventions:
+  database: postgresql                  # DEC-002
+  schema: gold                          # a Gold é somente leitura e recarregável; ordens de inspeção ficam em app.*
+  table_naming: "gold_<assunto>"        # mantido no nome, conforme o planejamento e o backend
+  delivery:                             # DEC-004 (proposta, a validar)
+    format: csv
+    encoding: UTF-8
+    delimiter: ","
+    header: true
+    file_per_table: true                # gold_dim_uc.csv; cabeçalho igual aos nomes das colunas deste contrato
+    boolean: ["true", "false"]
+    null: ""                            # campo vazio é nulo
+    location: data/gold/                # fora do Git: os dados e a Gold agregada não são versionados
+  types:                                # tipos do contrato -> PostgreSQL
+    text: text
+    integer: integer
+    boolean: boolean
+    date: date
+    money: "numeric(14,2)"              # R$; nunca float
+    energy_kwh: "numeric(16,3)"         # a precisão exata depende da Silver
+    ratio: "double precision"
+    text_array: "text[]"
+  shared_keys:                          # Shared Kernel: mudar exige PR com um revisor de cada frente
+    cod_uc:          {type: text, note: "identificador, não número: pode ter zeros à esquerda"}
+    competencia:     {type: text, pattern: '^\d{4}-(0[1-9]|1[0-2])$', note: "mês de referência, YYYY-MM"}
+    classe:          {type: text, allowed: [B1, B2, B3, A4]}
+    cod_alimentador: {type: text}
+    municipio:       {type: text, note: "normalizado na Silver"}
+    bairro:          {type: text, note: "normalizado na Silver"}
+
+tables:
+
+  gold_dim_uc:
+    description: "Dimensão de unidades consumidoras."
+    grain: "1 linha por UC"
+    primary_key: [cod_uc]
+    context: Relacionamento
+    consumers: [UC 360, agente, filtros]
+    owner: Dados (Alisson, Arthur e Gabriel)
+    columns:
+      cod_uc:                {type: text,     nullable: false, status: confirmada}
+      municipio:             {type: text,     nullable: false, status: confirmada}
+      bairro:                {type: text,     nullable: false, status: confirmada}
+      classe:                {type: text,     nullable: false, status: confirmada, allowed: [B1, B2, B3, A4]}
+      cod_alimentador:       {type: text,     nullable: false, status: confirmada}
+      possui_gd:             {type: boolean,  nullable: false, status: confirmada}
+      consumo_medio_kwh_12m: {type: energy_kwh, nullable: false, status: confirmada, check: ">= 0"}
+      cod_cliente:           {type: text,     nullable: true,  status: a_confirmar, note: "titular; pode ter várias UCs"}
+      subgrupo:              {type: text,     nullable: true,  status: a_confirmar}
+      potencia_kw:           {type: ratio,    nullable: true,  status: a_confirmar, note: "só para UCs com GD"}
+
+  gold_fato_faturamento_mensal:
+    description: "Faturamento por UC e competência."
+    grain: "UC × competência"
+    primary_key: [cod_uc, competencia]
+    foreign_keys:
+      - {columns: [cod_uc], references: gold_dim_uc.cod_uc}
+    context: Receita
+    consumers: [KPIs, tela Receita, UC 360, agente]
+    owner: Dados (Alisson, Arthur e Gabriel)
+    columns:
+      cod_uc:              {type: text,       nullable: false, status: proposta}
+      competencia:         {type: text,       nullable: false, status: proposta, pattern: '^\d{4}-(0[1-9]|1[0-2])$'}
+      kwh_faturado:        {type: energy_kwh, nullable: false, status: proposta, note: "já líquido de GD"}
+      receita_faturada:    {type: money,      nullable: false, status: proposta}
+      receita_arrecadada:  {type: money,      nullable: true,  status: proposta}
+      tarifa_media:        {type: ratio,      nullable: true,  status: proposta, note: "receita_faturada ÷ kwh_faturado"}
+      bandeira:            {type: text,       nullable: true,  status: proposta, allowed: [verde, amarela, vermelha_p1, vermelha_p2]}
+
+  gold_receita_decomposicao:
+    description: "Decomposição da variação de receita entre dois períodos (PVM com efeito mix)."
+    grain: "período × município × bairro × classe"
+    primary_key: a_confirmar
+    context: Receita
+    consumers: [tela Receita, insight, diagnóstico]
+    owner: Dados (Alisson, Arthur e Gabriel)
+    columns:
+      periodo_base:   {type: text,  nullable: false, status: a_confirmar, note: "definição de período base em aberto (ver open_questions)"}
+      periodo_atual:  {type: text,  nullable: false, status: a_confirmar}
+      municipio:      {type: text,  nullable: false, status: proposta}
+      bairro:         {type: text,  nullable: false, status: proposta}
+      classe:         {type: text,  nullable: false, status: proposta, allowed: [B1, B2, B3, A4]}
+      efeito_preco:   {type: money, nullable: false, status: proposta}
+      efeito_volume:  {type: money, nullable: false, status: proposta}
+      efeito_mix:     {type: money, nullable: false, status: proposta}
+    checks:
+      - "efeito_preco + efeito_volume + efeito_mix = variação total de receita (diferença de arredondamento < 0,1%)"
+
+  gold_kpis_mensais:
+    description: "Indicadores executivos por competência."
+    grain: "1 linha por competência"
+    primary_key: [competencia]
+    context: [Receita, Rede, Atendimento]
+    consumers: [dashboard executivo, GET /receita/mensal]
+    owner: Dados (Alisson, Arthur e Gabriel)
+    columns:
+      competencia:       {type: text,       nullable: false, status: proposta, pattern: '^\d{4}-(0[1-9]|1[0-2])$'}
+      kwh_faturado:      {type: energy_kwh, nullable: false, status: proposta}
+      receita_faturada:  {type: money,      nullable: false, status: proposta}
+      dec:               {type: ratio,      nullable: true,  status: proposta}
+      fec:               {type: ratio,      nullable: true,  status: proposta}
+      n_chamados:        {type: integer,    nullable: true,  status: a_confirmar, note: "volume de chamados; nome a definir"}
+      satisfacao_media:  {type: ratio,      nullable: true,  status: a_confirmar, note: "nome e escala a definir"}
+
+  gold_continuidade_alimentador_mensal:
+    description: "DEC e FEC por alimentador e competência."
+    grain: "alimentador × competência"
+    primary_key: [cod_alimentador, competencia]
+    context: Continuidade
+    consumers: [tela DEC/FEC, agente]
+    owner: Dados (Alisson, Arthur e Gabriel)
+    columns:
+      cod_alimentador:     {type: text,    nullable: false, status: proposta}
+      competencia:         {type: text,    nullable: false, status: proposta, pattern: '^\d{4}-(0[1-9]|1[0-2])$'}
+      dec:                 {type: ratio,   nullable: false, status: proposta, note: "soma da duração ÷ UCs atendidas"}
+      fec:                 {type: ratio,   nullable: false, status: proposta, note: "contagem ÷ UCs atendidas"}
+      n_uc:                {type: integer, nullable: false, status: proposta}
+      n_interrupcoes:      {type: integer, nullable: false, status: proposta}
+      horas_interrompidas: {type: ratio,   nullable: false, status: proposta}
+
+  gold_interrupcoes_uc:
+    description: "Interrupções que afetaram cada UC."
+    grain: "UC × ocorrência"
+    primary_key: a_confirmar
+    foreign_keys:
+      - {columns: [cod_uc], references: gold_dim_uc.cod_uc}
+    context: Continuidade
+    consumers: [UC 360]
+    owner: Dados (Alisson, Arthur e Gabriel)
+    columns:
+      cod_uc: {type: text, nullable: false, status: proposta}
+      # demais colunas dependem da Silver de ocorrências
+
+  gold_atendimentos_uc:
+    description: "Chamados de atendimento por UC."
+    grain: "UC × chamado"
+    primary_key: a_confirmar
+    foreign_keys:
+      - {columns: [cod_uc], references: gold_dim_uc.cod_uc}
+    context: Relacionamento
+    consumers: [UC 360, agente]
+    owner: Dados (Alisson, Arthur e Gabriel)
+    columns:
+      cod_uc: {type: text, nullable: false, status: proposta}
+      # demais colunas dependem da Silver de atendimentos (JSON achatado)
+
+  gold_medidor_uc:
+    description: "Medidor vigente de cada UC."
+    grain: "UC × medidor vigente"
+    primary_key: a_confirmar
+    foreign_keys:
+      - {columns: [cod_uc], references: gold_dim_uc.cod_uc}
+    context: Relacionamento
+    consumers: [UC 360, score de suspeita]
+    owner: Dados (Alisson, Arthur e Gabriel)
+    columns:
+      cod_uc: {type: text, nullable: false, status: proposta}
+      # demais colunas dependem da Silver de medidores (medidor vigente e idade)
+
+  gold_fila_suspeitas:
+    description: "UCs suspeitas de perda não técnica, ordenadas por prioridade."
+    grain: "1 linha por UC suspeita"
+    primary_key: [cod_uc]
+    foreign_keys:
+      - {columns: [cod_uc], references: gold_dim_uc.cod_uc}
+    context: Perdas
+    consumers: [tela Perdas, ordens de inspeção]
+    owner: Dados (Alisson, Arthur e Gabriel)
+    columns:
+      cod_uc:              {type: text,       nullable: false, status: proposta}
+      score_suspeita:      {type: ratio,      nullable: false, status: proposta}
+      motivos:             {type: text_array, nullable: false, status: proposta, note: "motivos legíveis"}
+      kwh_recuperavel_est: {type: energy_kwh, nullable: true,  status: proposta}
+
+# Fora da Gold: app.ordem_inspecao e app.ordem_evento (modelo de escrita da aplicação), que o loader da
+# Gold nunca altera.
+
+open_questions:
+  - "Cada integrante de Dados constrói a sua versão da Gold a partir da Silver; as três são validadas em conjunto contra este contrato antes de publicar a Gold única."
+  - "Definição de período base: primeiros 12 meses da base ou ano-calendário? Muda gold_receita_decomposicao."
+  - "Chave e colunas de gold_interrupcoes_uc, gold_atendimentos_uc e gold_medidor_uc dependem da Silver."
+  - "Precisão numérica (energy_kwh, money) e normalização de município/bairro dependem da Silver."
+  - "Escala e nome da satisfação média e do volume de chamados em gold_kpis_mensais."
+  - "DEC-004: confirmar com Dados o formato do CSV; a Gold agregada não vai ao repositório público (a confirmar com a organização)."
