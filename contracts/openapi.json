@@ -250,11 +250,118 @@
             }
           }
         }
+      },
+      "patch": {
+        "tags": [
+          "ordens de inspeção"
+        ],
+        "summary": "Atualizar Ordem",
+        "description": "Muda o status da OI (inclusive cancelar) e registra a mudança no histórico.",
+        "operationId": "atualizar_ordem_ordens_inspecao__ordem_id__patch",
+        "parameters": [
+          {
+            "name": "ordem_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Ordem Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AtualizarOrdemSchema"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrdemDetalheSchema"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErroSchema"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErroSchema"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     }
   },
   "components": {
     "schemas": {
+      "AtualizarOrdemSchema": {
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/StatusOrdem"
+          },
+          "resultado": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ResultadoOrdem"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "observacao": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observacao"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "AtualizarOrdemSchema",
+        "description": "Mudança de status de uma OI. Cancelar é mudar para CANCELADA."
+      },
       "CriarOrdensSchema": {
         "properties": {
           "cod_ucs": {

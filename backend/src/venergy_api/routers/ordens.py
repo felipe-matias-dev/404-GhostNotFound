@@ -5,11 +5,18 @@ from typing import Annotated
 from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
 from venergy_api.database import SessionDep
 from venergy_api.models import DimUc, OrdemEvento, OrdemInspecao
-from venergy_api.ordens import STATUS_ATIVOS, StatusOrdem
-from venergy_api.schemas import CriarOrdensSchema, ErroSchema, OrdemDetalheSchema, OrdemSchema
+from venergy_api.ordens import STATUS_ATIVOS, StatusOrdem, TransicaoInvalidaError, validar_transicao
+from venergy_api.schemas import (
+    AtualizarOrdemSchema,
+    CriarOrdensSchema,
+    ErroSchema,
+    OrdemDetalheSchema,
+    OrdemSchema,
+)
 
 router = APIRouter(prefix="/ordens-inspecao", tags=["ordens de inspeção"])
 
@@ -85,12 +92,50 @@ def listar_ordens(
     return [OrdemSchema.model_validate(ordem) for ordem in session.scalars(consulta)]
 
 
-@router.get("/{ordem_id}", responses={status.HTTP_404_NOT_FOUND: {"model": ErroSchema}})
-def obter_ordem(ordem_id: int, session: SessionDep) -> OrdemDetalheSchema:
-    ordem = session.get(OrdemInspecao, ordem_id)
+def _buscar_ordem(session: Session, ordem_id: int, *, travar: bool = False) -> OrdemInspecao:
+    ordem = session.get(OrdemInspecao, ordem_id, with_for_update=travar)
     if ordem is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Ordem de inspeção {ordem_id} não encontrada",
         )
+    return ordem
+
+
+@router.get("/{ordem_id}", responses={status.HTTP_404_NOT_FOUND: {"model": ErroSchema}})
+def obter_ordem(ordem_id: int, session: SessionDep) -> OrdemDetalheSchema:
+    return OrdemDetalheSchema.model_validate(_buscar_ordem(session, ordem_id))
+
+
+@router.patch(
+    "/{ordem_id}",
+    responses={
+        status.HTTP_404_NOT_FOUND: {"model": ErroSchema},
+        status.HTTP_409_CONFLICT: {"model": ErroSchema},
+    },
+)
+def atualizar_ordem(
+    ordem_id: int, mudanca: AtualizarOrdemSchema, session: SessionDep
+) -> OrdemDetalheSchema:
+    """Muda o status da OI (inclusive cancelar) e registra a mudança no histórico."""
+    # Trava a linha até o commit (SELECT ... FOR UPDATE): sem isso, duas mudanças
+    # simultâneas leriam o mesmo status atual e as duas passariam pela validação.
+    ordem = _buscar_ordem(session, ordem_id, travar=True)
+    try:
+        validar_transicao(ordem.status, mudanca.status)
+    except TransicaoInvalidaError as error:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(error)) from error
+
+    ordem.eventos.append(
+        OrdemEvento(
+            status_anterior=ordem.status,
+            status_novo=mudanca.status,
+            observacao=mudanca.observacao,
+        )
+    )
+    ordem.status = mudanca.status
+    ordem.resultado = mudanca.resultado
+    if mudanca.observacao is not None:
+        ordem.observacao = mudanca.observacao
+    session.commit()
     return OrdemDetalheSchema.model_validate(ordem)

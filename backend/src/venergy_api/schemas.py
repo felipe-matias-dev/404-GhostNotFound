@@ -3,7 +3,14 @@
 from datetime import datetime
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    field_validator,
+    model_validator,
+)
 
 from venergy_api.ordens import ResultadoOrdem, StatusOrdem
 
@@ -40,6 +47,28 @@ class CriarOrdensSchema(BaseModel):
         if repetidas:
             raise ValueError(f"UCs repetidas no pedido: {', '.join(repetidas)}")
         return cod_ucs
+
+
+class AtualizarOrdemSchema(BaseModel):
+    """Mudança de status de uma OI. Cancelar é mudar para CANCELADA."""
+
+    status: StatusOrdem
+    resultado: ResultadoOrdem | None = None
+    # O que a equipe viu em campo ou o motivo do cancelamento. Teto para não virar depósito
+    # de texto: anexos e laudos ficam fora do escopo.
+    observacao: (
+        Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=1000)]
+        | None
+    ) = None
+
+    @model_validator(mode="after")
+    def resultado_so_ao_concluir(self) -> "AtualizarOrdemSchema":
+        # Erro de preenchimento, não de estado da OI: por isso 422 aqui, e não 409.
+        if self.status == StatusOrdem.CONCLUIDA and self.resultado is None:
+            raise ValueError("Informe o resultado da inspeção para concluir a ordem")
+        if self.status != StatusOrdem.CONCLUIDA and self.resultado is not None:
+            raise ValueError("O resultado só é registrado ao concluir a ordem")
+        return self
 
 
 class OrdemSchema(BaseModel):

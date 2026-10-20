@@ -76,13 +76,27 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Atualizar Ordem
+         * @description Muda o status da OI (inclusive cancelar) e registra a mudança no histórico.
+         */
+        patch: operations["atualizar_ordem_ordens_inspecao__ordem_id__patch"];
         trace?: never;
     };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * AtualizarOrdemSchema
+         * @description Mudança de status de uma OI. Cancelar é mudar para CANCELADA.
+         */
+        AtualizarOrdemSchema: {
+            status: components["schemas"]["StatusOrdem"];
+            resultado?: components["schemas"]["ResultadoOrdem"] | null;
+            /** Observacao */
+            observacao?: string | null;
+        };
         /**
          * CriarOrdensSchema
          * @description UCs escolhidas na fila de suspeitas; gera uma OI para cada uma.
@@ -381,6 +395,59 @@ export interface operations {
             };
             /** @description Not Found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErroSchema"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    atualizar_ordem_ordens_inspecao__ordem_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ordem_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AtualizarOrdemSchema"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrdemDetalheSchema"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErroSchema"];
+                };
+            };
+            /** @description Conflict */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
