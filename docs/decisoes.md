@@ -166,7 +166,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
     continuam valendo para eles.
   - `.gitattributes` força LF em todo arquivo de texto, menos nos notebooks;
     `.editorconfig` alinha os editores com os formatadores.
-    
+
 ## DEC-008 · Contrato da Bronze (auditoria básica)
 
 - **Data:** 19/10/2026 · **Área:** Dados · **Autor:** Alisson
