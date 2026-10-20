@@ -104,4 +104,18 @@ Problemas encontrados no profiling dos arquivos da landing, com a decisão de tr
 **Coerência validada:** após `OCO-02`, 100% das 180.000 linhas têm `data_encerramento > data_abertura` e `duracao_min` exatamente igual à diferença em minutos entre encerramento e abertura (de 5 a 2.880 min). `tipo` possui 5 categorias padronizadas (`FALTA DE ENERGIA`, `DANO EM EQUIPAMENTO`, `OSCILACAO`, `SOBRECARGA`, `FIO PARTIDO`).
 
 
+## atendimentos
+
+**Resumo:** 318.871 atendimentos únicos (`protocolo` único), sem duplicatas e sem órfãos de `id_uc` (44.940 UCs).
+
+| ID | Coluna | Problema | Evidência | Decisão |
+|---|---|---|---|---|
+| ATD-01 | `nota_satisfacao` | Avaliação de satisfação ausente (`null` na origem) | 9.566 linhas (3,0%) | Flag: manter nulo e sinalizar com `flag_sem_nota_satisfacao` |
+| ATD-02 | `historico` | Array aninhado de 1 a 3 structs (`sequencia`, `data` em `AAAA-MM-DDTHH:MM:SS`, `acao`, `canal`) em que o rótulo de `acao` não segue ordem cronológica fixa (ex.: `ENCERRAMENTO` na sequência 1) | 318.871 linhas (636.857 eventos) | Documentar; tipar campos da struct (`sequencia` inteiro, `data` timestamp) mantendo a estrutura |
+| ATD-03 | `data_abertura`, `data_fechamento` | Registradas com data e hora (`AAAA-MM-DD HH:MM:SS`) | 318.871 linhas | Documentar; converter para `timestamp` |
+
+**Coerência validada:** `canal` (5 categorias), `assunto` (6 categorias) e `subassunto` (15 categorias, 100% coerentes com `assunto`) sem nulos nem espaços sobrando. Em 100% dos registros `data_fechamento > data_abertura`, o primeiro item de `historico` tem o mesmo `canal` do atendimento e o último item coincide com `data_fechamento`. Quando preenchida (309.305 linhas), `nota_satisfacao` varia de `1,3` a `5,0` (1 casa decimal).
+
+
+
 
