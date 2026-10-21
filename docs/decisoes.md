@@ -287,3 +287,12 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   recriada: `docker compose exec db psql -U venergy -d venergy -c "DROP TABLE
   gold.gold_dim_uc"` e, depois, a carga da Gold. Só a tabela da Gold é derrubada, e as
   ordens de inspeção do schema `app` ficam intactas.
+
+## DEC-015 · Gold real e plano gratuito do Gemini (proposta)
+
+- **Data:** 21/10/2026 · **Área:** GenAI e Dados · **Autor:** GenAI
+- **Status:** proposta, a decidir na daily.
+- **Decisão proposta:** o plano gratuito do Gemini (Free Tier) recebe só a amostra sintética. A Gold real só é enviada com chave paga ou fornecida pela organização.
+- **Motivo:** no Free Tier, o Google pode usar o conteúdo enviado para melhorar os produtos dele. O dataset é confidencial e nunca vai para o repositório.
+- **Estado atual:** o README orienta o uso do plano gratuito só para a amostra. O código ainda não verifica o tipo de chave, e o modelo padrão do quickstart é o Gemini direto, então nada impede quem segue o README de enviar a Gold real pelo plano gratuito.
+- **Em aberto:** (1) confirmar se a Gold agregada entra no mesmo critério do dataset; (2) definir quem fornece a chave paga; (3) decidir se o código recusa a chave gratuita quando a configuração aponta para a Gold real.
