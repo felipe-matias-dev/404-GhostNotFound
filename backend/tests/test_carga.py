@@ -2,10 +2,11 @@ import csv
 from pathlib import Path
 
 import pytest
+from pydantic import BaseModel
 from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
 
-from venergy_api.carga import GoldLoadError, load_gold
+from venergy_api.carga import GoldLoadError, load_gold, read_rows
 from venergy_api.models import DimUc
 
 VALID_ROW = {
@@ -72,3 +73,23 @@ def test_invalid_row_keeps_previous_data_untouched(tmp_path: Path, engine: Engin
         load_gold(tmp_path / "gold", engine)
 
     assert [uc.cod_uc for uc in stored_ucs(engine)] == ["0001"]
+
+
+class OptionalColumnSchema(BaseModel):
+    # A gold_dim_uc ainda não tem coluna opcional confirmada no contrato.
+    cod_uc: str
+    receita: float | None
+
+
+def test_empty_cell_becomes_none(tmp_path: Path) -> None:
+    csv_path = tmp_path / "opcional.csv"
+    csv_path.write_text("cod_uc,receita\n0001,\n", encoding="utf-8")
+
+    assert read_rows(csv_path, OptionalColumnSchema) == [{"cod_uc": "0001", "receita": None}]
+
+
+def test_rejects_empty_required_cell(tmp_path: Path, engine: Engine) -> None:
+    write_gold_dim_uc(tmp_path / "gold", [{**VALID_ROW, "bairro": ""}])
+
+    with pytest.raises(GoldLoadError, match="linha 2: bairro"):
+        load_gold(tmp_path / "gold", engine)
