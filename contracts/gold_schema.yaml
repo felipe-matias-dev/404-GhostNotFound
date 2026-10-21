@@ -205,3 +205,22 @@ open_questions:
   - "Precisão numérica (energy_kwh, money) e normalização de município/bairro dependem da Silver."
   - "Escala e nome da satisfação média e do volume de chamados em gold_kpis_mensais."
   - "DEC-004: confirmar com Dados o formato do CSV; a Gold agregada não vai ao repositório público (a confirmar com a organização)."
+
+# Próxima versão (v0.2), combinada na revisão do PR #10 (Portal e GenAI).
+roadmap_v0_2:
+  sem_dependencia_da_silver:
+    - "consumers: incluir agente em gold_receita_decomposicao, gold_kpis_mensais, gold_interrupcoes_uc e gold_medidor_uc; gold_fila_suspeitas fica fora do agente por padrão (decisão de produto)."
+    - "unit por coluna (R$, R$/kWh, kWh, h, kW, adimensional) nas colunas confirmada e proposta."
+    - "description em linguagem de negócio nas colunas confirmada e proposta, a partir da linguagem ubíqua (docs/arquitetura.md §5)."
+    - "sensitive: true para dado pessoal ou texto livre; colunas sensíveis ficam fora das views do agente. Regra preferida: a Gold só carrega dado pessoal ou texto livre se a UC 360 precisar."
+    - "Relações que não são chave estrangeira (ex.: gold_dim_uc <-> gold_continuidade_alimentador_mensal por cod_alimentador; gold_receita_decomposicao <-> gold_dim_uc por municipio, bairro e classe)."
+    - "Registrar em docs/decisoes.md a suposição 'receita' sem qualificador = receita_faturada."
+  depende_da_silver:
+    - "Colunas, chave, unidade e descrição de gold_interrupcoes_uc, gold_atendimentos_uc e gold_medidor_uc."
+    - "Unidade e descrição das colunas a_confirmar (ex.: n_chamados, satisfacao_media, cod_cliente, subgrupo, potencia_kw)."
+    - "Quais colunas são sensitive: depende do que a Silver realmente traz (sem copiar nomes do dataset para o repositório)."
+    - "Precisão numérica final e normalização de município e bairro."
+  depende_de_decisao:
+    - "Formato de periodo_base e periodo_atual, e se gold_receita_decomposicao terá mais de um par de períodos (votação do período base)."
+    - "Quem cria as views sem_* após a carga (Portal e GenAI)."
+  regra: "Renomear ou remover coluna sobe a versão do contrato e é avisado no PR."
