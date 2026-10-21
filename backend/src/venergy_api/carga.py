@@ -10,6 +10,7 @@ Uso: uv run python -m venergy_api.carga
 import csv
 from dataclasses import dataclass
 from pathlib import Path
+from typing import get_args, get_origin
 
 from pydantic import BaseModel, ValidationError
 from sqlalchemy import Engine, insert
@@ -18,6 +19,9 @@ from venergy_api.config import get_settings
 from venergy_api.database import Base, get_engine
 from venergy_api.models import DimUc
 from venergy_api.schemas import DimUcSchema
+
+# conventions.delivery.array_separator do contrato da Gold.
+ARRAY_SEPARATOR = ";"
 
 
 class GoldLoadError(Exception):
@@ -42,6 +46,23 @@ def _describe(error: ValidationError) -> str:
     return "; ".join(f"{'.'.join(map(str, e['loc']))}: {e['msg']}" for e in error.errors())
 
 
+def _is_list(annotation: object) -> bool:
+    """Se o campo é uma lista, inclusive dentro de um opcional (list[str] | None)."""
+    return get_origin(annotation) is list or any(_is_list(arg) for arg in get_args(annotation))
+
+
+def _parse_cell(value: str, is_list: bool) -> object:
+    # Regras do formato CSV do contrato, por isso ficam aqui e não nos schemas: os mesmos
+    # schemas validam o que entra pela API. Célula vazia é nulo, e uma coluna text[]
+    # chega numa célula só, com os itens separados por ponto e vírgula.
+    if value == "":
+        return None
+    if is_list:
+        # Sem descartar item vazio ("a;;b"): o schema recusa, e o erro aponta a linha.
+        return value.split(ARRAY_SEPARATOR)
+    return value
+
+
 def read_rows(csv_path: Path, schema: type[BaseModel]) -> list[dict[str, object]]:
     """Lê o CSV e valida cada linha, parando na primeira que fugir do contrato."""
     # utf-8-sig aceita o BOM que Excel e algumas exportações colocam no início do arquivo.
@@ -51,12 +72,16 @@ def read_rows(csv_path: Path, schema: type[BaseModel]) -> list[dict[str, object]
         if missing:
             raise GoldLoadError(f"{csv_path.name}: colunas faltando: {', '.join(sorted(missing))}")
 
+        list_columns = {
+            name for name, field in schema.model_fields.items() if _is_list(field.annotation)
+        }
         rows = []
         # A linha 1 é o cabeçalho, então a primeira linha de dados é a 2.
         for line_number, raw_row in enumerate(reader, start=2):
-            # No contrato, célula vazia é nulo. A conversão fica aqui, e não nos schemas,
-            # porque é regra do formato CSV: os mesmos schemas validam o que entra pela API.
-            row = {column: None if value == "" else value for column, value in raw_row.items()}
+            row = {
+                column: _parse_cell(value, column in list_columns)
+                for column, value in raw_row.items()
+            }
             try:
                 rows.append(schema.model_validate(row).model_dump())
             except ValidationError as error:

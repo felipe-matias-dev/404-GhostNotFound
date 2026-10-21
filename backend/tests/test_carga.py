@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from venergy_api.carga import GoldLoadError, load_gold, read_rows
 from venergy_api.models import DimUc
+from venergy_api.schemas import RequiredText
 
 VALID_ROW = {
     "cod_uc": "0001",
@@ -106,6 +107,30 @@ def test_empty_cell_becomes_none(tmp_path: Path) -> None:
     csv_path.write_text("cod_uc,receita\n0001,\n", encoding="utf-8")
 
     assert read_rows(csv_path, OptionalColumnSchema) == [{"cod_uc": "0001", "receita": None}]
+
+
+class ListColumnSchema(BaseModel):
+    # Mesmo formato dos motivos da fila de suspeitas: text[] no contrato.
+    cod_uc: str
+    motivos: list[RequiredText]
+
+
+def test_list_cell_is_split_by_semicolon(tmp_path: Path) -> None:
+    csv_path = tmp_path / "lista.csv"
+    csv_path.write_text("cod_uc,motivos\n0001,consumo caiu;medidor antigo\n", encoding="utf-8")
+
+    assert read_rows(csv_path, ListColumnSchema) == [
+        {"cod_uc": "0001", "motivos": ["consumo caiu", "medidor antigo"]}
+    ]
+
+
+def test_rejects_empty_item_in_list_cell(tmp_path: Path) -> None:
+    # Dois ; seguidos é erro de exportação: a carga avisa em vez de descartar o item vazio.
+    csv_path = tmp_path / "lista.csv"
+    csv_path.write_text("cod_uc,motivos\n0001,consumo caiu;;medidor antigo\n", encoding="utf-8")
+
+    with pytest.raises(GoldLoadError, match="linha 2: motivos.1"):
+        read_rows(csv_path, ListColumnSchema)
 
 
 def test_rejects_empty_required_cell(tmp_path: Path, engine: Engine) -> None:
