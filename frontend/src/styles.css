@@ -1,5 +1,32 @@
-
 @import "tailwindcss";
+@import "@fontsource-variable/inter-tight";
+@source "../.storybook";
+
+@font-face {
+  font-family: "Soehne Breit";
+  src: url("./assets/fonts/soehne/test-soehne-breit-vf-roman.woff2") format("woff2");
+  font-weight: 200 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@theme {
+  --font-sans: "Inter Tight Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Soehne Breit", "Inter Tight Variable", ui-sans-serif, sans-serif;
+  /* Escala de display (Söhne Breit): números grandes de KPI e títulos de página. */
+  --text-display-xl: 4.5rem;
+  --text-display-xl--line-height: 1;
+  --text-display-xl--letter-spacing: -0.03em;
+  --text-display-lg: 3rem;
+  --text-display-lg--line-height: 1.05;
+  --text-display-lg--letter-spacing: -0.025em;
+  --text-display-md: 2rem;
+  --text-display-md--line-height: 1.1;
+  --text-display-md--letter-spacing: -0.02em;
+  --text-display-sm: 1.5rem;
+  --text-display-sm--line-height: 1.15;
+  --text-display-sm--letter-spacing: -0.015em;
+}
 
 * {
   box-sizing: border-box;
@@ -13,4 +40,5 @@ body,
 
 body {
   margin: 0;
+  -webkit-font-smoothing: antialiased;
 }

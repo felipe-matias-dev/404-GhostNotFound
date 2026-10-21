@@ -1,0 +1,41 @@
+import { Meta } from "@storybook/addon-docs/blocks";
+
+<Meta title="Fundamentos/Tipografia" />
+
+# Tipografia
+
+Duas famílias, tokens em `src/styles.css` (`@theme`).
+
+- **`font-sans`** (padrão do documento) — Inter Tight variável (100–900): corpo, tabelas,
+  formulários, rótulos, qualquer texto com acento.
+- **`font-display`** — Söhne Breit variável (200–900): marca (logo `VE-360`), headings
+  **sem acento** e números grandes de destaque.
+
+<div className="sb-unstyled my-8 flex flex-col gap-4">
+	<p className="font-display text-display-xl font-semibold">1.250.000</p>
+	<p className="font-display text-display-lg font-semibold">Receita</p>
+	<p className="font-display text-display-md font-medium">Perdas tecnicas</p>
+	<p className="font-display text-display-sm font-medium">Operacao</p>
+	<p className="font-sans text-base">
+		Corpo em Inter Tight: Visão geral, Operação, competência 03/2026, 12,4% de perdas.
+	</p>
+</div>
+
+## Escala de display
+
+`text-display-xl` (72px), `text-display-lg` (48px), `text-display-md` (32px),
+`text-display-sm` (24px), já com `line-height` e `letter-spacing` negativos. Para corpo,
+a escala padrão do Tailwind (`text-sm`, `text-base`…).
+
+## Restrição da Söhne
+
+Os arquivos são a versão de teste da Klim: só `A–Z a–z 0–9 , - .` e espaço. Sem acentos,
+`%`, `R$`, `:` ou `/`. Qualquer glifo ausente cai na Inter Tight, misturando as fontes na
+mesma palavra. Por isso:
+
+- `font-display` só em textos que caibam nesse conjunto. Heading com acento
+  (“Visão geral”) fica em `font-sans` com peso alto.
+- Em número de destaque com unidade (`R$`, `%`, `kWh`), a unidade vai em um `<span>`
+  `font-sans` separado.
+- A versão de teste não pode ir para produção; a licença final substitui os arquivos em
+  `src/assets/fonts/soehne/` sem mudar os tokens.
