@@ -1,5 +1,6 @@
 import { Meta } from "@storybook/addon-docs/blocks";
 import { CheckIcon } from "@phosphor-icons/react";
+import { Badge } from "#/components/ui/badge";
 import { Button } from "#/components/ui/button";
 
 <Meta title="Fundamentos/Estados" />
@@ -50,14 +51,23 @@ export const Botoes = () => (
 	</div>
 );
 
+export const status = [
+	["bg-text-muted", "Rascunho"],
+	["bg-accent", "Em revisão"],
+	["bg-info", "Verificado"],
+	["bg-success", "Sincronizado"],
+	["bg-warning", "Atrasado"],
+];
+
 export const Badges = () => (
 	<div className="flex flex-wrap gap-2">
-		<span className="rounded-sm bg-surface-2 px-1.5 py-0.5 text-small text-text-muted">Rascunho</span>
-		<span className="rounded-sm bg-accent-subtle px-1.5 py-0.5 text-small text-text">Destaque</span>
-		<span className="rounded-sm bg-info-subtle px-1.5 py-0.5 text-small text-info">Verificado</span>
-		<span className="rounded-sm bg-success-subtle px-1.5 py-0.5 text-small text-success">Sincronizado</span>
-		<span className="rounded-sm bg-warning-subtle px-1.5 py-0.5 text-small text-warning">Atrasado</span>
-		<span className="rounded-sm bg-danger-subtle px-1.5 py-0.5 text-small text-danger">Falhou</span>
+		{status.map(([ponto, texto]) => (
+			<Badge key={texto}>
+				<span data-icon="inline-start" aria-hidden className={`size-1.5 rounded-full ${ponto}`} />
+				{texto}
+			</Badge>
+		))}
+		<Badge variant="destructive">Falhou</Badge>
 	</div>
 );
 
@@ -191,11 +201,12 @@ Componente: `Button` de `#/components/ui/button` (shadcn/ui adaptado aos tokens;
 	<Alertas />
 </Temas>
 
-- Badge e alerta: fundo `*-subtle`, texto na cor semântica (`info`, `success`, `warning`,
-  `danger`). Contraste da cor sobre o próprio subtle: 7.6 a 8.1 no escuro, 4.5 a 6.8 no
-  claro.
-- Destaque de marca usa `accent-subtle` com texto `text`: no claro, `accent-text` sobre
-  `accent-subtle` tem 4.47:1.
+- Badge (`Componentes/Badge`): pílula com contorno e **ponto** na cor do status; o texto fica
+  neutro (`text`). Assim a tabela não vira um mosaico de blocos coloridos e o amarelo do ponto
+  `accent` continua raro. Só o erro bloqueante usa fundo: `destructive` (`danger-subtle` +
+  `danger`).
+- Alerta: fundo `*-subtle`, título na cor semântica. Contraste da cor sobre o próprio subtle:
+  7.6 a 8.1 no escuro, 4.5 a 6.8 no claro.
 - Alerta não ganha borda colorida nem sombra; o fundo já separa.
 
 ## Tabela
