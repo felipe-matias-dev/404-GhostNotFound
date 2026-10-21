@@ -1,4 +1,5 @@
 import csv
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
@@ -42,7 +43,8 @@ def test_loads_valid_csv_with_typed_values(tmp_path: Path, engine: Engine) -> No
     first = stored_ucs(engine)[0]
     assert first.cod_uc == "0001"
     assert first.possui_gd is True
-    assert first.consumo_medio_kwh_12m == 152.4
+    # Decimal com as 3 casas do contrato: somas no banco são exatas, sem resíduo de float.
+    assert first.consumo_medio_kwh_12m == Decimal("152.400")
 
 
 def test_loading_twice_does_not_duplicate_rows(tmp_path: Path, engine: Engine) -> None:
