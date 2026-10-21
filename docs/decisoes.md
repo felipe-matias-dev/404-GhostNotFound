@@ -18,7 +18,10 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | 19/10/2026 | DEC-006: `docker compose up` sobe banco, API e Vite em modo de desenvolvimento | Um comando roda o portal em qualquer máquina; deploy em nuvem está fora do escopo | João Euclides |
 | 19/10/2026 | DEC-007: qualidade garantida por pre-commit local e pelo mesmo conjunto de checagens no CI | Código formatado e contrato em dia sem depender de lembrar; o CI barra quem pula o hook | João Euclides |
 | 19/10/2026 | DEC-008: Bronze com auditoria básica (full refresh, tudo string, `ingestion_timestamp` e `source_file`) | Dados o mais próximos da origem; rastreabilidade sem log próprio de ingestão | Alisson |
-| 21/10/2026 | Tokens do frontend vêm do design system da marca VE-360 (paleta OKLCH a partir de #f2c94c, neutros `graphite`, Inter Tight + Söhne Breit + JetBrains Mono); escalas padrão do Tailwind removidas | Uma única fonte de cor, tipo, raio e sombra; utilitário fora do sistema não gera CSS | João Euclides |
+| 20/10/2026 | DEC-009: ordens de inspeção em `app.ordem_inspecao` + `app.ordem_evento`, sem FK para a Gold, com máquina de estados e no máximo uma OI ativa por UC | O trabalho de campo sobrevive a cada recarga da Gold; o resultado registrado mede se a fila de suspeitas acerta | Felipe |
+| 20/10/2026 | DEC-010: energia e dinheiro como `numeric` no banco e número no JSON da API | Somas em SQL sem resíduo de arredondamento; o frontend recebe número, sem converter texto | Felipe |
+| 20/10/2026 | DEC-011: contrato da Gold com `competencia` em texto (`AAAA-MM`) e três cópias independentes de Silver → Gold | Texto preserva o formato em CSV e em todas as camadas; três cópias comparadas dão uma Gold mais sólida | Alisson |
+| 21/10/2026 | DEC-012: Tokens do frontend vêm do design system da marca VE-360 (paleta OKLCH a partir de #f2c94c, neutros `graphite`, Inter Tight + Söhne Breit + JetBrains Mono); escalas padrão do Tailwind removidas | Uma única fonte de cor, tipo, raio e sombra; utilitário fora do sistema não gera CSS | João Euclides |
 
 ## DEC-001 · Localização dos arquivos de origem (landing)
 
@@ -88,6 +91,11 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   (`backend/src/venergy_api/schemas.py`) antes de gravar e substitui as tabelas
   numa única transação. Um arquivo fora do contrato cancela a carga e mantém os
   dados anteriores. Nem os dados brutos nem os CSVs da Gold são versionados.
+- **Célula vazia (20/10/2026):** célula vazia no CSV é nulo, nunca zero ou texto
+  vazio, como no rascunho do contrato da Gold (PR #10). Zero é um fato ("não
+  consumiu", "não pagou"); vazio é falta de informação, e tratar um como o outro
+  levaria uma unidade consumidora inocente para a fila de perdas. Em coluna
+  obrigatória, a célula vazia cancela a carga.
 - **Em aberto:** confirmar com a organização se a Gold agregada pode ir para o
   repositório público. Até lá, não é versionada.
 
@@ -209,3 +217,92 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   documentados à parte, em relatório privado fora do repositório, porque o dataset é
   confidencial. Não há tabelas adicionais de auditoria, e os notebooks são
   versionados sem outputs.
+
+## DEC-009 · Modelo das ordens de inspeção
+
+- **Data:** 20/10/2026 · **Área:** Portal · **Autor:** Felipe
+- **Contexto:** o gerente de perdas gera ordens de inspeção (OIs) a partir da fila de
+  suspeitas, acompanha o status, registra o resultado de campo e cancela as que deixam
+  de fazer sentido. É o único dado do sistema digitado no portal.
+- **Decisão:** duas tabelas no schema `app`: `ordem_inspecao` (uma linha por OI) e
+  `ordem_evento` (uma linha por mudança de status, com status anterior, novo, horário e
+  observação). Rotas em `/ordens-inspecao`: `POST` (lote), `GET` (lista e detalhe) e
+  `PATCH` (mudança de status, inclusive cancelar).
+- **Regras:**
+  - Status `GERADA → EM_CAMPO → CONCLUIDA`, ou `CANCELADA` a partir dos dois primeiros.
+    `CONCLUIDA` e `CANCELADA` são finais: para voltar ao imóvel, gera-se uma OI nova e o
+    histórico mostra as duas visitas. Transição fora do mapa devolve `409`. A regra fica
+    num módulo sem banco (`backend/src/venergy_api/ordens.py`), testado à parte.
+  - Concluir exige resultado (`IRREGULAR_CONFIRMADA`, `REGULAR` ou `NAO_REALIZADA`), e
+    só a conclusão aceita resultado; o contrário devolve `422`. `NAO_REALIZADA` é a
+    equipe que foi e não conseguiu vistoriar; cancelar é a visita que deixou de ser
+    necessária. Separar os dois mostra quantos dias de campo se perdem por falta de acesso.
+  - No máximo uma OI ativa (`GERADA` ou `EM_CAMPO`) por UC, garantida por índice único
+    parcial no banco, e não só por checagem no Python, que deixaria passar duas
+    requisições simultâneas. A API checa antes para devolver um `409` que cita as UCs.
+  - A geração em lote é tudo ou nada: uma UC inexistente (`404`) ou já com OI ativa
+    (`409`) cancela o lote inteiro.
+  - O `PATCH` trava a linha da OI (`SELECT ... FOR UPDATE`) até o commit, para que duas
+    mudanças simultâneas não passem as duas pela validação do status atual.
+  - `DELETE` não existe nem é liberado no CORS: OI se cancela, não se apaga.
+- **Por que sem FK para `gold.gold_dim_uc`:** a carga da Gold apaga e reinsere as UCs a
+  cada execução. Com FK, a carga falharia (FK simples) ou apagaria as OIs junto
+  (`ON DELETE CASCADE`). A existência da UC é validada pela API na criação, e a OI
+  continua como histórico mesmo se a UC sair da Gold depois.
+- **Status e resultado como VARCHAR com CHECK**, e não como ENUM nativo do Postgres: sem
+  ferramenta de migração, acrescentar um valor a um ENUM nativo exige `ALTER TYPE` manual.
+- **Criação das tabelas:** pelo `create_all` que a carga da Gold já executa
+  (`uv run python -m venergy_api.carga`); o `DELETE` da carga só passa pelas tabelas da
+  Gold. Criar no startup da API foi descartado porque derrubaria a API com o banco fora
+  do ar, quando o esperado é o `/health` responder `503`. Alembic foi descartado por ser
+  desproporcional a duas tabelas, a duas semanas da entrega.
+- **Alternativas descartadas:** endpoints de ação (`/cancelar`, `/concluir`), que
+  multiplicam rotas e espalham a validação; e paginação na listagem, desnecessária
+  para a escala de cerca de 200 inspeções por mês.
+- **Limitações:** a OI valida a UC contra `gold_dim_uc`, porque a fila de suspeitas
+  (`gold_fila_suspeitas`) ainda não existe; quando existir, a tela da fila só passa a
+  enviar os `cod_uc` escolhidos, sem mudança no backend. Não há registro de quem fez
+  cada mudança, porque o portal ainda não tem login. Alterar colunas exige recriar as
+  tabelas do `app`, já que não há migrações.
+
+## DEC-010 · Energia e dinheiro como `numeric`, número na API
+
+- **Data:** 20/10/2026 · **Área:** Portal · **Autor:** Felipe
+- **Contexto:** o rascunho do contrato da Gold (PR #10) define energia como
+  `numeric(16,3)` e dinheiro como `numeric(14,2)`; o backend gravava
+  `consumo_medio_kwh_12m` como `float`.
+- **Decisão:** no banco, `numeric` com a escala do contrato; na carga, `Decimal`; no JSON
+  da API, número. O tipo `ExactNumber` (`backend/src/venergy_api/schemas.py`) faz a
+  conversão só na saída e serve às próximas colunas de energia e dinheiro.
+- **Motivo:** o agente de IA lê o banco direto e soma em SQL. Com `numeric`, somas sobre
+  muitas linhas não acumulam resíduo nas casas decimais. Para exibir um valor por tela,
+  a precisão de um número no JSON sobra.
+- **Alcance:** isso evita ruído nas últimas casas, não diferenças de definição. Portal e
+  agente mostram o mesmo número porque o cálculo é feito uma vez, na Gold, e os dois leem
+  a mesma tabela (decisão de 19/10 sobre cálculos de negócio).
+- **Alternativas descartadas:** `Decimal` também no JSON, que chega ao frontend como texto
+  (`"152.400"`) e obrigaria toda tela a converter; e manter `float`, mudando o contrato,
+  que levaria o resíduo de arredondamento para as somas do agente.
+- **Limitações:** o `minimum: 0` some da documentação da resposta no OpenAPI, embora a
+  carga continue recusando valor negativo. Sem migrações, um banco de desenvolvimento
+  criado antes desta mudança mantém a coluna em `double precision` até a tabela ser
+  recriada: `docker compose exec db psql -U venergy -d venergy -c "DROP TABLE
+  gold.gold_dim_uc"` e, depois, a carga da Gold. Só a tabela da Gold é derrubada, e as
+  ordens de inspeção do schema `app` ficam intactas.
+
+## DEC-011 · Convenções do contrato da Gold
+
+- **Data:** 20/10/2026 · **Área:** Dados, Portal e IA · **Autor:** Alisson
+- **Contexto:** `contracts/gold_schema.yaml` (v0.1) é a fonte de verdade sobre tabelas e
+  colunas da Gold. Web e GenAI trabalham contra ele; os tipos são os do PostgreSQL (DEC-002).
+- **Decisão:**
+  - `competencia` é texto no formato `AAAA-MM`, em todas as tabelas e no CSV.
+  - Energia e dinheiro seguem a DEC-010: `numeric` no banco, com a escala do contrato.
+  - Dados faz três cópias independentes da transformação Silver → Gold (Alisson, Arthur e
+    Gabriel), todas contra o contrato, e as compara antes de definir a Gold exportada.
+- **Motivo:** o formato texto não depende de interpretação de data entre CSV, Delta e
+  PostgreSQL; comparar três cópias independentes expõe erro de tratamento que uma só
+  não mostraria.
+- **Regras relacionadas** (detalhes no contrato): chaves estrangeiras são lógicas, checadas
+  no Data Quality e sem constraint no banco; colunas de lista vão numa célula do CSV,
+  separadas por `;`; `tarifa_media` é nula quando `kwh_faturado = 0`.

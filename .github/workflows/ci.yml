@@ -63,6 +63,24 @@ jobs:
         run: uv run --frozen pytest
         working-directory: backend
 
+  ai-agent:
+    name: Agente de IA (pytest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with:
+          version: "0.12.10"
+          enable-cache: true
+      # Os testes de integração do executor rodam contra o venergy_test, como os do backend.
+      - name: Banco de testes
+        run: |
+          cp .env.example .env
+          docker compose up -d --wait db
+      - name: pytest
+        run: uv run --frozen pytest
+        working-directory: ai-agent
+
   frontend:
     name: Frontend (tipos e build)
     runs-on: ubuntu-latest
