@@ -27,9 +27,12 @@ compõem os de `ui/` com dados da API.
   cor ou espaçamento solto no componente.
 - Toda story cobre os estados que a tela vai usar: padrão, carregando, erro e vazio.
 - O painel **Accessibility** precisa ficar sem violações.
-- Sem biblioteca de componentes por enquanto. A referência visual e de micro-interação é o
-  [interior.dev](https://www.interior.dev/): quando um componente de lá servir, o código é
-  trazido para `ui/` e adaptado aos nossos tokens, sem virar dependência.
+- Sem biblioteca de componentes como dependência. Componentes do
+  [shadcn/ui](https://ui.shadcn.com/) entram por `npx shadcn@latest add <nome>`: a CLI gera
+  `src/components/ui/<nome>.tsx`; mova para `ui/<nome>/<nome>.tsx` com `index.ts` e troque
+  as classes do shadcn (`primary`, `ring`, `opacity-50`, `shadow-xs`…) pelos tokens do
+  VE-360. Exemplo: `ui/button`. O [interior.dev](https://www.interior.dev/) segue como
+  referência de micro-interação.
 
 ## Modelo de story
 

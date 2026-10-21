@@ -1,9 +1,10 @@
 import { Meta } from "@storybook/addon-docs/blocks";
+import { Button } from "#/components/ui/button";
 
 <Meta title="Fundamentos/Estados" />
 
-export const Temas = ({ children }) => (
-	<div className="sb-unstyled my-6 grid grid-cols-2 gap-4">
+export const Temas = ({ children, empilhado = false }) => (
+	<div className={`sb-unstyled my-6 grid gap-4 ${empilhado ? "grid-cols-1" : "grid-cols-2"}`}>
 		<div className="rounded-lg border border-border bg-bg p-5 text-text">
 			<p className="mb-4 text-small text-text-muted">Escuro</p>
 			{children}
@@ -15,38 +16,16 @@ export const Temas = ({ children }) => (
 	</div>
 );
 
-export const base =
-	"rounded-md px-3 py-1.5 text-body font-medium disabled:cursor-not-allowed";
+export const botoes = [
+	// Hover/pressionado fixos via className: o cn() do Button troca a classe da variante
+	// pela do estado, só para a demonstração.
+	["default", "Primário", "bg-accent-hover", "bg-accent-hover"],
+	["destructive", "Destrutivo", "bg-danger-hover", "bg-danger-hover"],
+	["outline", "Outline", "bg-hover", "bg-pressed"],
+	["secondary", "Secundário", "border-border-strong", "border-border-strong"],
+	["ghost", "Ghost", "bg-hover", "bg-pressed"],
+];
 
-export const botoes = {
-	primario: {
-		nome: "Primário",
-		repouso: "bg-accent text-on-accent enabled:hover:bg-accent-hover",
-		hover: "bg-accent-hover text-on-accent",
-		pressionado: "bg-accent-hover text-on-accent",
-	},
-	destrutivo: {
-		nome: "Destrutivo",
-		repouso: "bg-danger text-on-danger enabled:hover:bg-danger-hover",
-		hover: "bg-danger-hover text-on-danger",
-		pressionado: "bg-danger-hover text-on-danger",
-	},
-	secundario: {
-		nome: "Secundário",
-		repouso:
-			"border border-border-strong text-text enabled:hover:bg-hover enabled:active:bg-pressed",
-		hover: "border border-border-strong bg-hover text-text",
-		pressionado: "border border-border-strong bg-pressed text-text",
-	},
-	ghost: {
-		nome: "Ghost",
-		repouso: "text-text enabled:hover:bg-hover enabled:active:bg-pressed",
-		hover: "bg-hover text-text",
-		pressionado: "bg-pressed text-text",
-	},
-};
-
-export const desabilitado = "border border-border bg-surface-2 text-text-disabled";
 export const foco = "outline-2 outline-offset-2 outline-focus-ring";
 
 export const Botoes = () => (
@@ -57,14 +36,14 @@ export const Botoes = () => (
 				{estado}
 			</span>
 		))}
-		{Object.entries(botoes).map(([chave, b]) => (
-			<div key={chave} className="contents">
-				<span className="text-small text-text-muted">{b.nome}</span>
-				<button type="button" className={`${base} ${b.repouso}`}>Salvar</button>
-				<button type="button" tabIndex={-1} className={`${base} ${b.hover}`}>Salvar</button>
-				<button type="button" tabIndex={-1} className={`${base} ${b.pressionado}`}>Salvar</button>
-				<button type="button" tabIndex={-1} className={`${base} ${b.repouso} ${foco}`}>Salvar</button>
-				<button type="button" disabled className={`${base} ${desabilitado}`}>Salvar</button>
+		{botoes.map(([variant, nome, hover, pressionado]) => (
+			<div key={variant} className="contents">
+				<span className="text-small text-text-muted">{nome}</span>
+				<Button variant={variant}>Salvar</Button>
+				<Button variant={variant} tabIndex={-1} className={hover}>Salvar</Button>
+				<Button variant={variant} tabIndex={-1} className={pressionado}>Salvar</Button>
+				<Button variant={variant} tabIndex={-1} className={foco}>Salvar</Button>
+				<Button variant={variant} disabled>Salvar</Button>
 			</div>
 		))}
 	</div>
@@ -181,17 +160,20 @@ real.
 
 ## Botões
 
-<Temas>
+Componente: `Button` de `#/components/ui/button` (shadcn/ui adaptado aos tokens; story em
+**Componentes/Button**).
+
+<Temas empilhado>
 	<Botoes />
 </Temas>
 
-| Estado       | Primário            | Destrutivo                 | Secundário / ghost             |
-| ------------ | ------------------- | -------------------------- | ------------------------------ |
-| Repouso      | `accent` + `on-accent` | `danger` + `on-danger`  | transparente (+ `border-strong`) |
-| Hover        | `accent-hover`      | `danger-hover`             | `hover`                        |
-| Pressionado  | `accent-hover`      | `danger-hover`             | `pressed`                      |
-| Foco         | anel `focus-ring` 2px, deslocado 2px (global em `:focus-visible`) | | |
-| Desabilitado | `surface-2` + `border` + `text-disabled`, em qualquer variante | | |
+| Estado       | default                | destructive            | outline / ghost             | secondary                    |
+| ------------ | ---------------------- | ---------------------- | --------------------------- | ---------------------------- |
+| Repouso      | `accent` + `on-accent` | `danger` + `on-danger` | transparente (outline: `border-strong`) | `surface-2` + `border` |
+| Hover        | `accent-hover`         | `danger-hover`         | `hover`                     | borda `border-strong`        |
+| Pressionado  | `accent-hover`         | `danger-hover`         | `pressed`                   | borda `border-strong`        |
+| Foco         | anel `focus-ring` 2px, deslocado 2px (global em `:focus-visible`) | | | |
+| Desabilitado | `surface-2` + `border` + `text-disabled`, em qualquer variante | | | |
 
 - `hover` e `pressed` são camadas translúcidas: funcionam sobre `bg`, `surface-1` ou
   `surface-2` sem um token por superfície. No escuro, `hover` sobre `bg` resulta
@@ -200,8 +182,8 @@ real.
 - **Desabilitado não usa opacidade.** Amarelo a 50% sobre grafite vira oliva; por isso todo
   controle desabilitado vira `surface-2` + `text-disabled`. O contraste baixo é proposital
   (a WCAG isenta controles desabilitados).
-- Use `enabled:hover:` e `enabled:active:` para o hover não aparecer em controle
-  desabilitado.
+- No `Button`, desabilitado também tira os eventos de ponteiro (`pointer-events-none`), então
+  o hover não aparece. Em controle feito à mão, use `enabled:hover:` e `enabled:active:`.
 
 ## Badges e alertas
 
