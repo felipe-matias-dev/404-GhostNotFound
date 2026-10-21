@@ -157,14 +157,3 @@ export const ComoLink: Story = {
 		</Button>
 	),
 };
-
-export const Claro: Story = {
-	...Variantes,
-	decorators: [
-		(Story) => (
-			<div data-tema="claro" className="rounded-lg bg-bg p-6 text-text">
-				<Story />
-			</div>
-		),
-	],
-};

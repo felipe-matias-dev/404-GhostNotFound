@@ -11,14 +11,5 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Escuro: Story = {};
-
-export const Claro: Story = {
-	decorators: [
-		(Story) => (
-			<div data-tema="claro">
-				<Story />
-			</div>
-		),
-	],
-};
+// Tema claro: seletor "Tema" na barra do Storybook.
+export const Padrao: Story = {};
