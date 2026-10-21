@@ -10,6 +10,7 @@ export const semanticos = [
 	["border-strong", "Borda de inputs e controles."],
 	["text", "Texto principal sobre bg e surfaces."],
 	["text-muted", "Texto secundário, labels, metadados."],
+	["text-disabled", "Texto e ícones de controle desabilitado."],
 	["accent", "A cor da marca: botão primário, indicador ativo. Use pouco."],
 	["accent-hover", "Hover/pressed do accent."],
 	["on-accent", "Texto e ícones sobre accent. Sempre escuro."],
@@ -17,9 +18,17 @@ export const semanticos = [
 	["accent-subtle", "Fundo tênue de destaque (badge, linha selecionada)."],
 	["focus-ring", "Anel de foco, 2px."],
 	["info", "Informação, links, dados verificados."],
-	["success", "Sucesso, sync ok, deltas positivos."],
+	["info-subtle", "Fundo de badge e alerta informativos."],
+	["success", "Sucesso, sync ok, deltas positivos. No claro: green-800."],
+	["success-subtle", "Fundo de badge e alerta de sucesso."],
 	["warning", "Alerta. Laranja de propósito: amarelo é da marca."],
-	["danger", "Erro, falha, ação destrutiva."],
+	["warning-subtle", "Fundo de badge e alerta de atenção."],
+	["danger", "Erro, falha, ação destrutiva; fundo do botão destrutivo."],
+	["danger-hover", "Hover do botão destrutivo."],
+	["on-danger", "Texto sobre danger. Escuro no tema escuro, branco no claro."],
+	["danger-subtle", "Fundo de badge, alerta e linha com erro."],
+	["hover", "Camada translúcida de hover sobre qualquer superfície."],
+	["pressed", "Camada translúcida de pressionado."],
 	["cover-slab", "Bloco escuro de identidade (capa, hero)."],
 	["scrim", "Véu atrás de modais e command palette."],
 ];
@@ -148,12 +157,16 @@ gráficos.
 | `accent-text`          | 12.5   | 4.9   |
 | `on-accent` / `accent` | 12.5   | 12.5  |
 | `info`                 | 9.8    | 5.1   |
-| `success`              | 10.6   | 4.6   |
+| `success`              | 10.6   | 7.4   |
 | `warning`              | 9.5    | 5.0   |
 | `danger`               | 9.4    | 5.3   |
+| `on-danger` / `danger` | 9.4    | 5.3   |
 
-No claro, abaixo de 4.5:1 fora do `bg`: `success` sobre `surface-1` (4.4) e `surface-2`
-(4.1), `accent-text` sobre `surface-2` (4.4). Texto pequeno nessas cores fica sobre `bg`.
+No claro, `success` usa green-800 em vez do green-700: o 700 ficava abaixo
+de 4.5:1 sobre `surface-1`, `surface-2` e `success-subtle`. Ainda abaixo do alvo fora do
+`bg`: `accent-text` sobre `surface-2` (4.4) e `focus-ring` sobre `surface-2` (2.7).
+
+Estados (hover, desabilitado, selecionado, badges) em **Fundamentos/Estados**.
 
 ## Primitivos
 

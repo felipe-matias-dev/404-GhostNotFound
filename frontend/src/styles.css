@@ -34,6 +34,8 @@
   --color-border-strong: var(--color-graphite-700);
   --color-text: var(--color-graphite-50);
   --color-text-muted: var(--color-graphite-400);
+  /* Desabilitado: contraste baixo de propósito (WCAG isenta). Nunca usar opacidade. */
+  --color-text-disabled: var(--color-graphite-600);
   --color-accent: var(--color-brand-400);
   --color-accent-hover: var(--color-brand-300);
   --color-on-accent: var(--color-graphite-950);
@@ -41,9 +43,19 @@
   --color-accent-subtle: var(--color-brand-950);
   --color-focus-ring: var(--color-brand-400);
   --color-info: var(--color-indigo-500);
+  --color-info-subtle: var(--color-indigo-950);
   --color-success: var(--color-green-500);
+  --color-success-subtle: var(--color-green-950);
   --color-warning: var(--color-orange-500);
+  --color-warning-subtle: var(--color-orange-950);
   --color-danger: var(--color-red-500);
+  --color-danger-hover: var(--color-red-400);
+  --color-on-danger: var(--color-graphite-950); /* O vermelho do escuro é claro: texto escuro. */
+  --color-danger-subtle: var(--color-red-950);
+  /* Camadas de interação sobre qualquer superfície (no escuro, hover sobre bg = surface-1).
+     O accent não usa: tem accent-hover. */
+  --color-hover: rgb(255 255 255 / 0.04);
+  --color-pressed: rgb(255 255 255 / 0.08);
   --color-cover-slab: var(--color-graphite-800);
   --color-scrim: rgb(8 10 15 / 0.64);
 
@@ -198,15 +210,26 @@
   --color-border-strong: var(--color-graphite-300);
   --color-text: var(--color-graphite-950);
   --color-text-muted: var(--color-graphite-600);
+  --color-text-disabled: var(--color-graphite-400);
   --color-accent-hover: var(--color-brand-500);
   /* #f2c94c sobre branco tem 1.6:1: no claro o amarelo só aparece como preenchimento. */
   --color-accent-text: var(--color-brand-700);
   --color-accent-subtle: var(--color-brand-100);
   --color-focus-ring: var(--color-brand-600);
   --color-info: var(--color-indigo-700);
-  --color-success: var(--color-green-700);
+  --color-info-subtle: var(--color-indigo-100);
+  /* green-800, não green-700: o 700 fica abaixo de 4.5:1 sobre surface-1/2 e
+     success-subtle; o 800 tem 6.7:1 ou mais em todos. */
+  --color-success: var(--color-green-800);
+  --color-success-subtle: var(--color-green-100);
   --color-warning: var(--color-orange-700);
+  --color-warning-subtle: var(--color-orange-100);
   --color-danger: var(--color-red-700);
+  --color-danger-hover: var(--color-red-800);
+  --color-on-danger: #ffffff;
+  --color-danger-subtle: var(--color-red-100);
+  --color-hover: rgb(8 10 15 / 0.04);
+  --color-pressed: rgb(8 10 15 / 0.08);
   --color-cover-slab: var(--color-graphite-900);
   --color-scrim: rgb(8 10 15 / 0.32);
 }
