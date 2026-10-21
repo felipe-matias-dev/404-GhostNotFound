@@ -19,7 +19,7 @@ Dentro de `ai-agent/`:
 ```bash
 uv sync
 cp .env.example .env   # preencha a chave do OpenRouter e a URL do banco
-uv run pytest
+uv run pytest          # os testes de integração precisam do banco: docker compose up -d --wait db (na raiz)
 uv run ruff check . && uv run ruff format --check .
 ```
 

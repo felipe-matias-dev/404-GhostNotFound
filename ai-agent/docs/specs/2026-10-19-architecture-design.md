@@ -64,7 +64,7 @@ ai-agent/
   - `clarify` exige `clarification_question`;
   - qualquer status diferente de `ok` exige `sql is None`.
 - `AttemptFeedback(previous_sql, error_kind, message)` é a entrada da tentativa de correção.
-- `ValidatedQuery(sql, views, applied_limit)` só é produzido pelo validador.
+- `ValidatedQuery(sql, views, applied_limit, limit_imposed)` só é produzido pelo validador. `limit_imposed` diz se o `LIMIT` foi inserido ou reduzido pelo validador; só nesse caso o resultado pode ser marcado como truncado. Um top-N pedido pelo usuário não é truncamento.
 - `QueryResult(columns, rows, row_count, truncated)`.
 
 ### `errors.py`
@@ -239,6 +239,7 @@ Pedidos a abrir como issue para a área dona. O GenAI não altera esses arquivos
 | D2 | Dev (DEC-007, `.github/workflows/ci.yml`) | Job do `ai-agent` no CI: `uv run --frozen pytest` e `ruff` dentro de `ai-agent/` | O CI só roda o backend; uma regressão do validador passaria sem ser vista |
 | D3 | Dev (G1-06, G1-09) | Persistir a auditoria de cada `AgentAnswer` (com timestamp) e expor `POST /ai/ask` e `GET /ai/audit/{id}` | O agente é somente leitura |
 | D4 | Dados | Publicar na amostra e na Gold as tabelas que o agente usa: `gold_fato_faturamento_mensal`, `gold_continuidade_alimentador_mensal`, `gold_atendimentos_uc` | A amostra atual só tem `gold_dim_uc` |
+| D6 | Dev (`infra/postgres/init/01-init.sh`) | Versionar o script com bit de execução (`git update-index --chmod=+x`) | No Docker Desktop do macOS, o entrypoint tenta executar o script sem o bit e o container sai com `bad interpreter: Permission denied` na primeira subida |
 | D5 | Time (`docs/arquitetura.md`) | Atualizar o ADR-01 de "em aberto" para "PostgreSQL (DEC-002)" | Documento do time desatualizado |
 
 ## 11. Próximas features (cada uma em sua branch)
@@ -246,7 +247,7 @@ Pedidos a abrir como issue para a área dona. O GenAI não altera esses arquivos
 Obrigatórios, nesta ordem:
 1. ~~Hardening do validador~~: feito em `fix/ai-agent-review-pr5`, com as regras da §6 e os testes de regressão do item 6 da §8.
 2. **Contrato `AgentAnswer`**: `refused_reason`, `model`, `latency_ms` e as novas invariantes (§4). Precisa ser combinado com V1, porque o backend depende dele.
-3. **Executor read-only Postgres**: timeout por consulta, truncamento, teste de integração confirmando que o banco recusa `INSERT`.
+3. ~~Executor read-only Postgres~~: feito em `feat/ai-agent-executor` (`PostgresQueryExecutor`, plano `docs/plans/2026-10-20-postgres-executor.md`), com timeout por consulta, truncamento, classificação por SQLSTATE e teste de integração confirmando que o banco recusa `INSERT`.
 4. Camada semântica + glossário a partir do contrato Gold (amostra), incluindo o SQL das views `sem_*`.
 5. Gerador PydanticAI + prompts versionados, com o conteúdo do banco delimitado como dado (§5).
 6. **Orquestração `ask()`** com loop de correção, "não sei" e **logs estruturados por etapa**, no mesmo PR. Cada requisição registra `request_id`, `session_id`, a pergunta, o SQL de cada tentativa, o resultado da validação, o erro, o número de linhas, a latência por etapa, os tokens, o modelo e o `prompt_version` (§12 do guia). Sem esse rastreio não dá para diagnosticar as falhas que o golden set vai mostrar.
