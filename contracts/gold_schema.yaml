@@ -27,8 +27,11 @@ conventions:
     header: true
     file_per_table: true                # gold_dim_uc.csv; cabeçalho igual aos nomes das colunas deste contrato
     boolean: ["true", "false"]
-    null: ""                            # campo vazio é nulo
+    "null": ""                          # campo vazio é nulo (entre aspas: sem elas o YAML lê null como chave nula)
+    array_separator: ";"                # colunas text[] (ex.: motivos) vão numa célula só, itens separados por ;
     location: data/gold/                # fora do Git: os dados e a Gold agregada não são versionados
+  foreign_keys: logical                 # chaves estrangeiras são lógicas: checadas no Data Quality, sem constraint no banco,
+                                        # porque o loader recarrega tabela por tabela e uma FK física faria a recarga falhar
   types:                                # tipos do contrato -> PostgreSQL
     text: text
     integer: integer
@@ -82,27 +85,29 @@ tables:
       kwh_faturado:        {type: energy_kwh, nullable: false, status: proposta, note: "já líquido de GD"}
       receita_faturada:    {type: money,      nullable: false, status: proposta}
       receita_arrecadada:  {type: money,      nullable: true,  status: proposta}
-      tarifa_media:        {type: ratio,      nullable: true,  status: proposta, note: "receita_faturada ÷ kwh_faturado"}
+      tarifa_media:        {type: ratio,      nullable: true,  status: proposta, note: "receita_faturada ÷ kwh_faturado; NULL quando kwh_faturado = 0 (ex.: GD que compensa todo o consumo)"}
       bandeira:            {type: text,       nullable: true,  status: proposta, allowed: [verde, amarela, vermelha_p1, vermelha_p2]}
 
   gold_receita_decomposicao:
     description: "Decomposição da variação de receita entre dois períodos (PVM com efeito mix)."
     grain: "período × município × bairro × classe"
-    primary_key: a_confirmar
+    primary_key: [periodo_base, periodo_atual, municipio, bairro, classe]   # a confirmar com a representação do período
     context: Receita
     consumers: [tela Receita, insight, diagnóstico]
     owner: Dados
     columns:
-      periodo_base:   {type: text,  nullable: false, status: a_confirmar, note: "definição de período base em aberto (ver open_questions)"}
-      periodo_atual:  {type: text,  nullable: false, status: a_confirmar}
+      periodo_base:   {type: text,  nullable: false, status: a_confirmar, note: "primeiros 12 meses da base (docs/arquitetura.md); alinhamento com o planejamento em discussão no grupo"}
+      periodo_atual:  {type: text,  nullable: false, status: a_confirmar, note: "últimos 12 meses (docs/arquitetura.md)"}
       municipio:      {type: text,  nullable: false, status: proposta}
       bairro:         {type: text,  nullable: false, status: proposta}
       classe:         {type: text,  nullable: false, status: proposta, allowed: [B1, B2, B3, A4]}
+      receita_base:   {type: money, nullable: false, status: a_confirmar, note: "receita faturada no período base; nome a definir"}
+      receita_atual:  {type: money, nullable: false, status: a_confirmar, note: "receita faturada no período atual; nome a definir"}
       efeito_preco:   {type: money, nullable: false, status: proposta}
       efeito_volume:  {type: money, nullable: false, status: proposta}
       efeito_mix:     {type: money, nullable: false, status: proposta}
     checks:
-      - "efeito_preco + efeito_volume + efeito_mix = variação total de receita (diferença de arredondamento < 0,1%)"
+      - "efeito_preco + efeito_volume + efeito_mix = receita_atual - receita_base (diferença de arredondamento < 0,1%)"
 
   gold_kpis_mensais:
     description: "Indicadores executivos por competência."
@@ -187,7 +192,7 @@ tables:
     columns:
       cod_uc:              {type: text,       nullable: false, status: proposta}
       score_suspeita:      {type: ratio,      nullable: false, status: proposta}
-      motivos:             {type: text_array, nullable: false, status: proposta, note: "motivos legíveis"}
+      motivos:             {type: text_array, nullable: false, status: proposta, note: "motivos legíveis; no CSV, itens separados por ; na mesma célula"}
       kwh_recuperavel_est: {type: energy_kwh, nullable: true,  status: proposta}
 
 # Fora da Gold: app.ordem_inspecao e app.ordem_evento (modelo de escrita da aplicação), que o loader da
@@ -195,7 +200,7 @@ tables:
 
 open_questions:
   - "Dados (Alisson, Arthur e Gabriel) faz três cópias independentes da transformação Silver -> Gold, todas contra este contrato; as três são comparadas entre si antes de definir a Gold que será exportada."
-  - "Definição de período base: primeiros 12 meses da base ou ano-calendário? Muda gold_receita_decomposicao."
+  - "Período base: docs/arquitetura.md define primeiros 12 meses (base) e últimos 12 (atual), mas docs/planejamento.md ainda lista a votação (12 meses ou ano-calendário). Alinhar os dois; muda gold_receita_decomposicao."
   - "Chave e colunas de gold_interrupcoes_uc, gold_atendimentos_uc e gold_medidor_uc dependem da Silver."
   - "Precisão numérica (energy_kwh, money) e normalização de município/bairro dependem da Silver."
   - "Escala e nome da satisfação média e do volume de chamados em gold_kpis_mensais."

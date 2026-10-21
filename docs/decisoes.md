@@ -19,6 +19,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | 19/10/2026 | DEC-007: qualidade garantida por pre-commit local e pelo mesmo conjunto de checagens no CI | Código formatado e contrato em dia sem depender de lembrar; o CI barra quem pula o hook | João Euclides |
 | 19/10/2026 | DEC-008: Bronze com auditoria básica (full refresh, tudo string, `ingestion_timestamp` e `source_file`) | Dados o mais próximos da origem; rastreabilidade sem log próprio de ingestão | Alisson |
 | 20/10/2026 | DEC-009: ordens de inspeção em `app.ordem_inspecao` + `app.ordem_evento`, sem FK para a Gold, com máquina de estados e no máximo uma OI ativa por UC | O trabalho de campo sobrevive a cada recarga da Gold; o resultado registrado mede se a fila de suspeitas acerta | Felipe |
+| 20/10/2026 | DEC-010: contrato da Gold com `competencia` em texto (`AAAA-MM`), valores em R$ em `numeric` e três cópias independentes de Silver → Gold | Texto preserva o formato em CSV e em todas as camadas; `numeric` evita erro de ponto flutuante em dinheiro; três cópias comparadas dão uma Gold mais sólida | Alisson |
 
 ## DEC-001 · Localização dos arquivos de origem (landing)
 
@@ -256,3 +257,20 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   enviar os `cod_uc` escolhidos, sem mudança no backend. Não há registro de quem fez
   cada mudança, porque o portal ainda não tem login. Alterar colunas exige recriar as
   tabelas do `app`, já que não há migrações.
+
+## DEC-010 · Convenções do contrato da Gold
+
+- **Data:** 20/10/2026 · **Área:** Dados, Portal e IA · **Autor:** Alisson
+- **Contexto:** `contracts/gold_schema.yaml` (v0.1) é a fonte de verdade sobre tabelas e
+  colunas da Gold. Web e GenAI trabalham contra ele; os tipos são os do PostgreSQL (DEC-002).
+- **Decisão:**
+  - `competencia` é texto no formato `AAAA-MM`, em todas as tabelas e no CSV.
+  - Valores em R$ usam `numeric(14,2)`, nunca ponto flutuante.
+  - Dados faz três cópias independentes da transformação Silver → Gold (Alisson, Arthur e
+    Gabriel), todas contra o contrato, e as compara antes de definir a Gold exportada.
+- **Motivo:** o formato texto não depende de interpretação de data entre CSV, Delta e
+  PostgreSQL; `numeric` evita erro de arredondamento em dinheiro; comparar três cópias
+  independentes expõe erro de tratamento que uma só não mostraria.
+- **Regras relacionadas** (detalhes no contrato): chaves estrangeiras são lógicas, checadas
+  no Data Quality e sem constraint no banco; colunas de lista vão numa célula do CSV,
+  separadas por `;`; `tarifa_media` é nula quando `kwh_faturado = 0`.
