@@ -31,8 +31,10 @@ compõem os de `ui/` com dados da API.
   [shadcn/ui](https://ui.shadcn.com/) entram por `npx shadcn@latest add <nome>`: a CLI gera
   `src/components/ui/<nome>.tsx`; mova para `ui/<nome>/<nome>.tsx` com `index.ts` e troque
   as classes do shadcn (`primary`, `ring`, `opacity-50`, `shadow-xs`…) pelos tokens do
-  VE-360. Exemplo: `ui/button`. O [interior.dev](https://www.interior.dev/) segue como
-  referência de micro-interação.
+  VE-360. Exemplo: `ui/button`. Componentes do [interior.dev](https://www.interior.dev/)
+  usam a mesma CLI com a URL do registro (`npx shadcn@latest add
+  https://www.interior.dev/r/<nome>.json`, que gera `src/components/interior/`) e seguem o
+  mesmo caminho até `ui/`. Exemplo: `ui/hold-to-confirm`.
 
 ## Modelo de story
 

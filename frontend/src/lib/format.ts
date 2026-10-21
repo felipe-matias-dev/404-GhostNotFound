@@ -9,6 +9,7 @@ const percentual = new Intl.NumberFormat("pt-BR", {
 	style: "percent",
 	maximumFractionDigits: 1,
 });
+const decimal1 = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1 });
 // Datas sem hora ("2025-03-10") são interpretadas em UTC; formatar em UTC evita mostrar o dia anterior.
 const data = new Intl.DateTimeFormat("pt-BR", { timeZone: "UTC" });
 
@@ -59,4 +60,10 @@ export function formatData(iso: string | null | undefined): string {
 	if (!iso) return VAZIO;
 	const date = new Date(iso);
 	return Number.isNaN(date.getTime()) ? iso : data.format(date);
+}
+
+/** Milissegundos → segundos por extenso: 1800 → "1,8 segundos", 1000 → "1 segundo" */
+export function formatSegundos(ms: number): string {
+	const segundos = ms / 1000;
+	return `${decimal1.format(segundos)} ${segundos === 1 ? "segundo" : "segundos"}`;
 }

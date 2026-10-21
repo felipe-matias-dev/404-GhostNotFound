@@ -184,6 +184,9 @@ Componente: `Button` de `#/components/ui/button` (shadcn/ui adaptado aos tokens;
   (a WCAG isenta controles desabilitados).
 - No `Button`, desabilitado também tira os eventos de ponteiro (`pointer-events-none`), então
   o hover não aparece. Em controle feito à mão, use `enabled:hover:` e `enabled:active:`.
+- Ação destrutiva **irreversível** (excluir carga, revogar acesso): `HoldToConfirm` com
+  `tone="destructive"` em vez do `Button` `destructive`. O botão fica neutro em repouso e o
+  vermelho só varre a face enquanto o usuário segura (1,8 s); clique solto não faz nada.
 
 ## Badges e alertas
 
