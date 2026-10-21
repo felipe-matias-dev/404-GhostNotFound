@@ -1,9 +1,10 @@
 """Tabelas do banco local: as da Gold (só leitura) e as da aplicação (ordens de inspeção)."""
 
 from datetime import datetime
+from decimal import Decimal
 from enum import StrEnum
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Index, func, text
+from sqlalchemy import DateTime, Enum, ForeignKey, Index, Numeric, func, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from venergy_api.database import Base
@@ -24,7 +25,9 @@ class DimUc(Base):
     classe: Mapped[str]
     cod_alimentador: Mapped[str]
     possui_gd: Mapped[bool]
-    consumo_medio_kwh_12m: Mapped[float]
+    # numeric(16,3), o tipo de energia do contrato: o agente soma direto em SQL, e a soma
+    # exata faz o número dele bater com o do portal. O Postgres arredonda para 3 casas.
+    consumo_medio_kwh_12m: Mapped[Decimal] = mapped_column(Numeric(16, 3))
 
 
 def _enum_como_texto(enum: type[StrEnum], nome_check: str) -> Enum:

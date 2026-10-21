@@ -2,6 +2,14 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **Status (2026-10-20): executed in PR #5** (`feat/ai-agent-esqueleto`, Lucas). Kept as the record of that work; do not re-run it.
+> Deviations from this plan, accepted in the spec:
+> - The PR also adds `infrastructure/sql_validator.py` (`sqlglot`), which this plan left out.
+> - `sql_dialect` defaults to `postgres` (DEC-002).
+> - It went through a feature branch and PR instead of a single commit on `main`, following the team rule in `CLAUDE.md`.
+>
+> Follow-up work changes contracts this plan created and gets its own plans: `AgentAnswer` gains `refused_reason`, `model` and `latency_ms` (spec §4), while the validator hardening (spec §6) is done in `fix/ai-agent-review-pr5`. Order in spec §11.
+
 **Goal:** Create the `venergy_agent` package skeleton with domain models, ports and settings, covered by invariant tests.
 
 **Architecture:** Hexagonal, 3 layers. `domain` (frozen pydantic models, no I/O) ← `application` (async `Protocol` ports) ← `infrastructure` (empty for now). No adapters in this plan.
@@ -203,7 +211,7 @@ def test_row_count_below_sample_size_is_rejected():
 - Test: `ai-agent/tests/unit/test_config.py`
 
 **Interfaces:**
-- Produces: `AgentSettings(BaseSettings)` with `env_prefix="VENERGY_AGENT_"`, `env_file=".env"`, fields and bounds exactly as in spec §6 (`openrouter_api_key: SecretStr`, `sql_dialect: Literal["sqlite", "postgres"]`, `temperature: float = Field(0.0, ge=0, le=0.2)`, `max_correction_attempts: int = Field(3, ge=1, le=3)`, positive ints via `gt=0`).
+- Produces: `AgentSettings(BaseSettings)` with `env_prefix="VENERGY_AGENT_"`, `env_file=".env"`, fields and bounds exactly as in spec §7 (`openrouter_api_key: SecretStr`, `sql_dialect: Literal["sqlite", "postgres"]`, `temperature: float = Field(0.0, ge=0, le=0.2)`, `max_correction_attempts: int = Field(3, ge=1, le=3)`, positive ints via `gt=0`).
 
 - [ ] **Step 1: Write the failing tests.** Fixture `required_env(monkeypatch)` sets `VENERGY_AGENT_OPENROUTER_API_KEY=sk-test-123` and `VENERGY_AGENT_DATABASE_URL=sqlite:///gold.db`. Every construction passes `_env_file=None`.
 

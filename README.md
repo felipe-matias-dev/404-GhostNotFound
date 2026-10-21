@@ -28,6 +28,32 @@ _TODO_
 
 _TODO: passo a passo dos módulos de dados e agente._
 
+### Atalhos com `make`
+
+O `Makefile` da raiz só chama os comandos descritos neste README e no CI, para quem prefere um comando curto. Não é obrigatório: tudo continua funcionando com os comandos das seções abaixo.
+
+```bash
+make           # lista os alvos
+make setup     # copia os .env que faltam (nunca sobrescreve), instala dependências e hooks
+make up        # sobe banco, API e portal
+make test      # testes do backend e do agente (sobe o banco antes)
+make ci        # roda local o mesmo que o CI: lint, testes e build do frontend
+```
+
+Funciona igual no macOS, no Linux e no Windows. As receitas usam só `uv`, `npm` e `docker`, sem comandos de shell específicos de um sistema. No Windows o `make` não vem instalado; instale uma vez com **um** destes e rode `make` no PowerShell ou no terminal do VS Code:
+
+```bash
+winget install ezwinports.make
+```
+
+```bash
+choco install make
+```
+
+```bash
+scoop install make
+```
+
 ### Portal (banco, API e frontend) com Docker
 
 Requer só o [Docker Desktop](https://www.docker.com/products/docker-desktop/) aberto. Na raiz:
