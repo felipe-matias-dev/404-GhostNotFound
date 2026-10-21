@@ -18,16 +18,21 @@ FIELDS = list(DimUcSchema.model_fields)
 
 # Cobre todas as classes de consumo, UCs com e sem painel solar e municípios citados pelas
 # lideranças. Os códigos são fixos para que o time possa citá-los ("busque a UC 0003").
+# O titular C0001 tem duas UCs (casa e comércio), caso que o contrato prevê. A potência só
+# existe para UCs com painel solar. O subgrupo fica vazio: o domínio ainda não foi definido.
+_JABOATAO = "Jaboatão dos Guararapes"
+_CABO = "Cabo de Santo Agostinho"
 _ROWS = [
-    # cod_uc, municipio, bairro, classe, cod_alimentador, possui_gd, consumo_medio_kwh_12m
-    ("0001", "Recife", "Boa Viagem", "B1", "AL-01", False, 162.5),
-    ("0002", "Recife", "Casa Amarela", "B1", "AL-02", True, 48.0),
-    ("0003", "Olinda", "Casa Caiada", "B1", "AL-03", True, 95.3),
-    ("0004", "Jaboatão dos Guararapes", "Piedade", "B3", "AL-04", False, 1240.0),
-    ("0005", "Paulista", "Janga", "B1", "AL-05", False, 210.7),
-    ("0006", "Cabo de Santo Agostinho", "Zona Rural", "B2", "AL-06", True, 380.0),
-    ("0007", "Recife", "Santo Amaro", "B3", "AL-01", False, 2850.0),
-    ("0008", "Jaboatão dos Guararapes", "Prazeres", "A4", "AL-07", False, 48500.0),
+    # cod_uc, municipio, bairro, classe, cod_alimentador, possui_gd, consumo_medio_kwh_12m,
+    # cod_cliente, subgrupo, potencia_kw
+    ("0001", "Recife", "Boa Viagem", "B1", "AL-01", False, 162.5, "C0001", None, None),
+    ("0002", "Recife", "Casa Amarela", "B1", "AL-02", True, 48.0, "C0002", None, 3.3),
+    ("0003", "Olinda", "Casa Caiada", "B1", "AL-03", True, 95.3, "C0003", None, 5.0),
+    ("0004", _JABOATAO, "Piedade", "B3", "AL-04", False, 1240.0, "C0004", None, None),
+    ("0005", "Paulista", "Janga", "B1", "AL-05", False, 210.7, "C0005", None, None),
+    ("0006", _CABO, "Zona Rural", "B2", "AL-06", True, 380.0, "C0006", None, 10.0),
+    ("0007", "Recife", "Santo Amaro", "B3", "AL-01", False, 2850.0, "C0001", None, None),
+    ("0008", _JABOATAO, "Prazeres", "A4", "AL-07", False, 48500.0, "C0008", None, None),
 ]
 
 # Montar pelo schema faz a própria amostra falhar se sair do contrato.

@@ -4,7 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Index, Numeric, func, text
+from sqlalchemy import DateTime, Double, Enum, ForeignKey, Index, Numeric, func, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from venergy_api.database import Base
@@ -12,7 +12,7 @@ from venergy_api.ordens import STATUS_ATIVOS, ResultadoOrdem, StatusOrdem
 
 
 class DimUc(Base):
-    """Dimensão de unidades consumidoras, uma linha por UC. Colunas provisórias até o contrato."""
+    """Dimensão de unidades consumidoras, uma linha por UC, como em contracts/gold_schema.yaml."""
 
     __tablename__ = "gold_dim_uc"
     # Schema gold: recarregável a partir dos CSVs e o único que o agente de IA consegue ler.
@@ -28,6 +28,12 @@ class DimUc(Base):
     # numeric(16,3), o tipo de energia do contrato: o agente soma direto em SQL, e a soma
     # exata faz o número dele bater com o do portal. O Postgres arredonda para 3 casas.
     consumo_medio_kwh_12m: Mapped[Decimal] = mapped_column(Numeric(16, 3))
+    # Opcionais e ainda "a confirmar" no contrato: o backend espelha o contrato inteiro, e
+    # o teste do contrato aponta o que mudar se o time de dados renomear alguma.
+    cod_cliente: Mapped[str | None]
+    subgrupo: Mapped[str | None]
+    # Double, o tipo "ratio" do contrato: potência é medida, não dinheiro nem energia somada.
+    potencia_kw: Mapped[float | None] = mapped_column(Double)
 
 
 def _enum_como_texto(enum: type[StrEnum], nome_check: str) -> Enum:

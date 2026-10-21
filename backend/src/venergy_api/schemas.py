@@ -38,6 +38,10 @@ class DimUcSchema(BaseModel):
     cod_alimentador: RequiredText
     possui_gd: bool
     consumo_medio_kwh_12m: ExactNumber = Field(ge=0)
+    # Sem valor padrão de propósito: a coluna precisa existir no CSV, mesmo vazia.
+    cod_cliente: RequiredText | None
+    subgrupo: RequiredText | None
+    potencia_kw: float | None
 
 
 class CriarOrdensSchema(BaseModel):

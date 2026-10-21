@@ -14,6 +14,9 @@ STORED_UC = {
     "cod_alimentador": "AL-01",
     "possui_gd": True,
     "consumo_medio_kwh_12m": 152.4,
+    "cod_cliente": "C0001",
+    "subgrupo": None,
+    "potencia_kw": 3.3,
 }
 
 

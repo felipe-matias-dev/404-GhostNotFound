@@ -124,6 +124,12 @@ export interface components {
             possui_gd: boolean;
             /** Consumo Medio Kwh 12M */
             consumo_medio_kwh_12m: number;
+            /** Cod Cliente */
+            cod_cliente: string | null;
+            /** Subgrupo */
+            subgrupo: string | null;
+            /** Potencia Kw */
+            potencia_kw: number | null;
         };
         /**
          * ErroSchema

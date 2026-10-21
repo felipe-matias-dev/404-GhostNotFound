@@ -18,6 +18,9 @@ VALID_ROW = {
     "cod_alimentador": "AL-01",
     "possui_gd": "true",
     "consumo_medio_kwh_12m": "152.4",
+    "cod_cliente": "C0001",
+    "subgrupo": "",
+    "potencia_kw": "3.3",
 }
 
 
