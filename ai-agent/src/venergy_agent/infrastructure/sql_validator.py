@@ -1,6 +1,6 @@
 import sqlglot
 from sqlglot import exp
-from sqlglot.errors import ParseError, SqlglotError
+from sqlglot.errors import SqlglotError
 from sqlglot.optimizer.normalize_identifiers import normalize_identifiers
 from sqlglot.optimizer.scope import traverse_scope
 
@@ -40,7 +40,7 @@ class SqlglotValidator:
     def _parse(self, sql: str) -> exp.Query:
         try:
             statements = sqlglot.parse(sql, read=self._dialect)
-        except ParseError as error:
+        except SqlglotError as error:
             raise SqlRejected("syntax error") from error
         if len(statements) != 1 or statements[0] is None:
             raise SqlRejected("exactly one statement is required")

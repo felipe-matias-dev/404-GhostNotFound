@@ -39,6 +39,9 @@ def validator():
         "",
         "   ",
         "SELEC * FROM sem_uc",
+        "SELECT cod_uc FROM sem_uc WHERE municipio = 'Olinda",
+        "SELECT $$texto FROM sem_uc",
+        "SELECT 1 /* comentário sem fim",
         "SELECT * FROM gold_dim_uc WHERE EXISTS "
         "(WITH gold_dim_uc AS (SELECT 1) SELECT 1 FROM gold_dim_uc)",
         "SELECT query_to_xml('select * from gold.gold_dim_uc', true, true, '')",
