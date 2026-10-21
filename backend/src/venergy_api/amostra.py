@@ -10,7 +10,11 @@ import argparse
 import csv
 from pathlib import Path
 
+from pydantic import BaseModel
+
+from venergy_api.carga import GOLD_TABLES
 from venergy_api.config import get_settings
+from venergy_api.database import Base
 from venergy_api.models import DimUc
 from venergy_api.schemas import DimUcSchema
 
@@ -38,41 +42,50 @@ _ROWS = [
 # Montar pelo schema faz a própria amostra falhar se sair do contrato.
 SAMPLE_UCS = tuple(DimUcSchema(**dict(zip(FIELDS, row, strict=True))) for row in _ROWS)
 
+# Linhas por tabela da Gold. A carga exige um CSV para cada tabela de GOLD_TABLES, e o
+# teste da amostra falha se alguma ficar de fora.
+SAMPLE: dict[type[Base], tuple[BaseModel, ...]] = {DimUc: SAMPLE_UCS}
 
-def _to_csv_row(uc: DimUcSchema) -> dict[str, object]:
+
+def _to_csv_row(row: BaseModel) -> dict[str, object]:
     # Booleanos em minúsculas, como o Spark exporta: "true"/"false".
     return {
         field: str(value).lower() if isinstance(value, bool) else value
-        for field, value in uc.model_dump().items()
+        for field, value in row.model_dump().items()
     }
 
 
-def write_sample(gold_dir: Path, *, force: bool) -> Path:
-    """Grava a amostra em gold_dir. Sem force, nunca sobrescreve um arquivo existente."""
-    csv_path = gold_dir / f"{DimUc.__tablename__}.csv"
-    if csv_path.exists() and not force:
+def write_sample(gold_dir: Path, *, force: bool) -> list[Path]:
+    """Grava um CSV por tabela da Gold em gold_dir. Sem force, não sobrescreve nenhum."""
+    csv_paths = {table: gold_dir / table.file_name for table in GOLD_TABLES}
+    # Confere todos antes de gravar o primeiro: misturar amostra com a Gold real deixaria
+    # números de origens diferentes lado a lado, pior do que não gravar nada.
+    existing = [path for path in csv_paths.values() if path.exists()]
+    if existing and not force:
         raise FileExistsError(
-            f"{csv_path} já existe e pode ser a Gold real. Use --force para sobrescrever."
+            f"{existing[0]} já existe e pode ser a Gold real. Use --force para sobrescrever."
         )
 
     gold_dir.mkdir(parents=True, exist_ok=True)
-    with csv_path.open("w", encoding="utf-8", newline="") as file:
-        writer = csv.DictWriter(file, fieldnames=FIELDS)
-        writer.writeheader()
-        writer.writerows(_to_csv_row(uc) for uc in SAMPLE_UCS)
-    return csv_path
+    for table, csv_path in csv_paths.items():
+        with csv_path.open("w", encoding="utf-8", newline="") as file:
+            writer = csv.DictWriter(file, fieldnames=list(table.schema.model_fields))
+            writer.writeheader()
+            writer.writerows(_to_csv_row(row) for row in SAMPLE[table.model])
+    return list(csv_paths.values())
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Gera a amostra sintética da Gold.")
-    parser.add_argument("--force", action="store_true", help="sobrescreve o CSV existente")
+    parser.add_argument("--force", action="store_true", help="sobrescreve os CSVs existentes")
     args = parser.parse_args()
 
+    gold_dir = get_settings().gold_dir
     try:
-        csv_path = write_sample(get_settings().gold_dir, force=args.force)
+        csv_paths = write_sample(gold_dir, force=args.force)
     except FileExistsError as error:
         raise SystemExit(str(error)) from error
-    print(f"Amostra sintética gravada em {csv_path} ({len(SAMPLE_UCS)} UCs)")
+    print(f"Amostra sintética gravada em {gold_dir}: {', '.join(p.name for p in csv_paths)}")
 
 
 if __name__ == "__main__":

@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 from sqlalchemy import Engine
 
-from venergy_api.amostra import SAMPLE_UCS, write_sample
+from venergy_api.amostra import SAMPLE, write_sample
 from venergy_api.carga import load_gold
 
 
@@ -12,7 +12,8 @@ def test_generated_sample_passes_the_gold_load(tmp_path: Path, engine: Engine) -
 
     counts = load_gold(tmp_path / "gold", engine)
 
-    assert counts == {"gold_dim_uc": len(SAMPLE_UCS)}
+    # A carga exige um CSV por tabela da Gold: se faltar amostra de uma, ela falha antes.
+    assert counts == {model.__tablename__: len(rows) for model, rows in SAMPLE.items()}
 
 
 def test_does_not_overwrite_existing_csv_without_force(tmp_path: Path) -> None:
