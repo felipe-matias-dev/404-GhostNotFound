@@ -11,7 +11,7 @@ from venergy_agent.domain.semantic import (
 )
 from venergy_agent.domain.sql import AttemptFeedback
 
-DELIMITER_TAG = re.compile(r"<(/?)(dados|pergunta)>", flags=re.IGNORECASE)
+DELIMITER_TAG = re.compile(r"<\s*(/?)\s*(dados|pergunta)\s*>", flags=re.IGNORECASE)
 PLACEHOLDER = re.compile(r"\{\{(\w+)\}\}")
 
 
@@ -46,7 +46,7 @@ def render_user_prompt(
     ] or list(layer.views)
     correction = _fill(
         correction_template,
-        sql_anterior=feedback.previous_sql,
+        sql_anterior=_data(feedback.previous_sql),
         tipo_erro=feedback.error_kind.value,
         mensagem=_data(feedback.message),
         colunas="\n".join(_columns_line(view) for view in involved),

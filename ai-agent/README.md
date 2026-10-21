@@ -33,8 +33,8 @@ Cada integrante usa a própria chave, no próprio `ai-agent/.env` (fora do Git):
 
 1. Entre em https://aistudio.google.com com a sua conta Google, vá em **Get API key** e crie uma chave.
 2. Preencha `VENERGY_AGENT_GOOGLE_API_KEY` no `ai-agent/.env`. O modelo padrão já é `google-gla:gemini-3.1-flash-lite`.
-3. Não ative cobrança no projeto: ele fica no Free Tier. Os limites do projeto aparecem em *Rate limit*, no AI Studio.
+3. Para a amostra sintética, mantenha o projeto no Free Tier, sem ativar cobrança. Os limites aparecem em *Rate limit*, no AI Studio.
 
-No Free Tier, o Google pode usar o conteúdo enviado para melhorar os produtos dele. Com a amostra sintética não há problema; com a Gold real, use uma chave paga ou fornecida pela organização.
+No Free Tier, o Google pode usar o conteúdo enviado para melhorar os produtos dele. Por isso, o plano gratuito serve para a amostra sintética. Para a Gold real, a regra ainda não foi decidida pelo time: até decidir, não envie a Gold real pelo plano gratuito.
 
 O OpenRouter continua disponível pelo prefixo `openrouter:` (veja `.env.example`). Os testes não usam nenhuma chave: o modelo é simulado.
