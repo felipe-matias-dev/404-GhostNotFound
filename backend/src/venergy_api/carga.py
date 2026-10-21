@@ -55,8 +55,11 @@ def read_rows(csv_path: Path, schema: type[BaseModel]) -> list[dict[str, object]
         rows = []
         # A linha 1 é o cabeçalho, então a primeira linha de dados é a 2.
         for line_number, raw_row in enumerate(reader, start=2):
+            # No contrato, célula vazia é nulo. A conversão fica aqui, e não nos schemas,
+            # porque é regra do formato CSV: os mesmos schemas validam o que entra pela API.
+            row = {column: None if value == "" else value for column, value in raw_row.items()}
             try:
-                rows.append(schema.model_validate(raw_row).model_dump())
+                rows.append(schema.model_validate(row).model_dump())
             except ValidationError as error:
                 message = f"{csv_path.name}, linha {line_number}: {_describe(error)}"
                 raise GoldLoadError(message) from error

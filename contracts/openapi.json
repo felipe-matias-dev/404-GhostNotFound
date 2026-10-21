@@ -420,7 +420,6 @@
           },
           "consumo_medio_kwh_12m": {
             "type": "number",
-            "minimum": 0.0,
             "title": "Consumo Medio Kwh 12M"
           }
         },

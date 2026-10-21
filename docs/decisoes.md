@@ -19,6 +19,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | 19/10/2026 | DEC-007: qualidade garantida por pre-commit local e pelo mesmo conjunto de checagens no CI | Código formatado e contrato em dia sem depender de lembrar; o CI barra quem pula o hook | João Euclides |
 | 19/10/2026 | DEC-008: Bronze com auditoria básica (full refresh, tudo string, `ingestion_timestamp` e `source_file`) | Dados o mais próximos da origem; rastreabilidade sem log próprio de ingestão | Alisson |
 | 20/10/2026 | DEC-009: ordens de inspeção em `app.ordem_inspecao` + `app.ordem_evento`, sem FK para a Gold, com máquina de estados e no máximo uma OI ativa por UC | O trabalho de campo sobrevive a cada recarga da Gold; o resultado registrado mede se a fila de suspeitas acerta | Felipe |
+| 20/10/2026 | DEC-010: energia e dinheiro como `numeric` no banco e número no JSON da API | Somas em SQL sem resíduo de arredondamento; o frontend recebe número, sem converter texto | Felipe |
 
 ## DEC-001 · Localização dos arquivos de origem (landing)
 
@@ -88,6 +89,11 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   (`backend/src/venergy_api/schemas.py`) antes de gravar e substitui as tabelas
   numa única transação. Um arquivo fora do contrato cancela a carga e mantém os
   dados anteriores. Nem os dados brutos nem os CSVs da Gold são versionados.
+- **Célula vazia (20/10/2026):** célula vazia no CSV é nulo, nunca zero ou texto
+  vazio, como no rascunho do contrato da Gold (PR #10). Zero é um fato ("não
+  consumiu", "não pagou"); vazio é falta de informação, e tratar um como o outro
+  levaria uma unidade consumidora inocente para a fila de perdas. Em coluna
+  obrigatória, a célula vazia cancela a carga.
 - **Em aberto:** confirmar com a organização se a Gold agregada pode ir para o
   repositório público. Até lá, não é versionada.
 
@@ -256,3 +262,28 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   enviar os `cod_uc` escolhidos, sem mudança no backend. Não há registro de quem fez
   cada mudança, porque o portal ainda não tem login. Alterar colunas exige recriar as
   tabelas do `app`, já que não há migrações.
+
+## DEC-010 · Energia e dinheiro como `numeric`, número na API
+
+- **Data:** 20/10/2026 · **Área:** Portal · **Autor:** Felipe
+- **Contexto:** o rascunho do contrato da Gold (PR #10) define energia como
+  `numeric(16,3)` e dinheiro como `numeric(14,2)`; o backend gravava
+  `consumo_medio_kwh_12m` como `float`.
+- **Decisão:** no banco, `numeric` com a escala do contrato; na carga, `Decimal`; no JSON
+  da API, número. O tipo `ExactNumber` (`backend/src/venergy_api/schemas.py`) faz a
+  conversão só na saída e serve às próximas colunas de energia e dinheiro.
+- **Motivo:** o agente de IA lê o banco direto e soma em SQL. Com `numeric`, somas sobre
+  muitas linhas não acumulam resíduo nas casas decimais. Para exibir um valor por tela,
+  a precisão de um número no JSON sobra.
+- **Alcance:** isso evita ruído nas últimas casas, não diferenças de definição. Portal e
+  agente mostram o mesmo número porque o cálculo é feito uma vez, na Gold, e os dois leem
+  a mesma tabela (decisão de 19/10 sobre cálculos de negócio).
+- **Alternativas descartadas:** `Decimal` também no JSON, que chega ao frontend como texto
+  (`"152.400"`) e obrigaria toda tela a converter; e manter `float`, mudando o contrato,
+  que levaria o resíduo de arredondamento para as somas do agente.
+- **Limitações:** o `minimum: 0` some da documentação da resposta no OpenAPI, embora a
+  carga continue recusando valor negativo. Sem migrações, um banco de desenvolvimento
+  criado antes desta mudança mantém a coluna em `double precision` até a tabela ser
+  recriada: `docker compose exec db psql -U venergy -d venergy -c "DROP TABLE
+  gold.gold_dim_uc"` e, depois, a carga da Gold. Só a tabela da Gold é derrubada, e as
+  ordens de inspeção do schema `app` ficam intactas.
