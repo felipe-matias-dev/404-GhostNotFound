@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from sqlalchemy import Engine, inspect, select, text
 from sqlalchemy.orm import Session
 
+from venergy_api.amostra import write_sample
 from venergy_api.carga import GoldLoadError, load_gold, read_rows
 from venergy_api.models import DimUc
 from venergy_api.schemas import RequiredText
@@ -26,7 +27,9 @@ VALID_ROW = {
 
 
 def write_gold_dim_uc(gold_dir: Path, rows: list[dict[str, str]]) -> None:
-    gold_dir.mkdir(exist_ok=True)
+    # A carga exige o CSV de todas as tabelas da Gold: as outras vêm da amostra, e só a
+    # gold_dim_uc recebe as linhas de cada teste.
+    write_sample(gold_dir, force=True)
     with (gold_dir / "gold_dim_uc.csv").open("w", encoding="utf-8", newline="") as file:
         writer = csv.DictWriter(file, fieldnames=list(rows[0]))
         writer.writeheader()
@@ -43,7 +46,7 @@ def test_loads_valid_csv_with_typed_values(tmp_path: Path, engine: Engine) -> No
 
     counts = load_gold(tmp_path / "gold", engine)
 
-    assert counts == {"gold_dim_uc": 2}
+    assert counts["gold_dim_uc"] == 2
     first = stored_ucs(engine)[0]
     assert first.cod_uc == "0001"
     assert first.possui_gd is True

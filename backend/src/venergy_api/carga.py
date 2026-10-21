@@ -17,8 +17,13 @@ from sqlalchemy import Engine, insert
 
 from venergy_api.config import get_settings
 from venergy_api.database import Base, get_engine
-from venergy_api.models import DimUc
-from venergy_api.schemas import DimUcSchema
+from venergy_api.models import DimUc, FatoFaturamentoMensal, KpisMensais, ReceitaDecomposicao
+from venergy_api.schemas import (
+    DimUcSchema,
+    FaturamentoMensalSchema,
+    KpisMensaisSchema,
+    ReceitaDecomposicaoSchema,
+)
 
 # conventions.delivery.array_separator do contrato da Gold.
 ARRAY_SEPARATOR = ";"
@@ -39,7 +44,12 @@ class GoldTable:
 
 
 # Uma entrada por tabela do contrato da Gold.
-GOLD_TABLES = (GoldTable(model=DimUc, schema=DimUcSchema),)
+GOLD_TABLES = (
+    GoldTable(model=DimUc, schema=DimUcSchema),
+    GoldTable(model=FatoFaturamentoMensal, schema=FaturamentoMensalSchema),
+    GoldTable(model=ReceitaDecomposicao, schema=ReceitaDecomposicaoSchema),
+    GoldTable(model=KpisMensais, schema=KpisMensaisSchema),
+)
 
 
 def _describe(error: ValidationError) -> str:
