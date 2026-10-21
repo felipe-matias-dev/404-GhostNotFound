@@ -88,6 +88,11 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   (`backend/src/venergy_api/schemas.py`) antes de gravar e substitui as tabelas
   numa única transação. Um arquivo fora do contrato cancela a carga e mantém os
   dados anteriores. Nem os dados brutos nem os CSVs da Gold são versionados.
+- **Célula vazia (20/10/2026):** célula vazia no CSV é nulo, nunca zero ou texto
+  vazio, como no rascunho do contrato da Gold (PR #10). Zero é um fato ("não
+  consumiu", "não pagou"); vazio é falta de informação, e tratar um como o outro
+  levaria uma unidade consumidora inocente para a fila de perdas. Em coluna
+  obrigatória, a célula vazia cancela a carga.
 - **Em aberto:** confirmar com a organização se a Gold agregada pode ir para o
   repositório público. Até lá, não é versionada.
 
