@@ -28,6 +28,30 @@
   --text-display-sm--letter-spacing: -0.015em;
 }
 
+@theme inline {
+  --color-fundo: var(--fundo);
+  --color-texto: var(--texto);
+  --color-texto-suave: var(--texto-suave);
+  --color-marca: var(--marca);
+}
+
+:root {
+  color-scheme: dark;
+  --fundo: #08090a;
+  --texto: #f7f8f8;
+  --texto-suave: #8a8f98;
+  --marca: #f2c94c;
+}
+
+[data-tema="claro"] {
+  color-scheme: light;
+  --fundo: #ffffff;
+  --texto: #08090a;
+  --texto-suave: #5f636b;
+  /* O amarelo do escuro some no branco; o kit escurece para dourado. */
+  --marca: #b8860b;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -41,4 +65,6 @@ body,
 body {
   margin: 0;
   -webkit-font-smoothing: antialiased;
+  background-color: var(--fundo);
+  color: var(--texto);
 }
