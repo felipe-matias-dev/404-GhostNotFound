@@ -40,8 +40,8 @@ class SqlglotValidator:
     def _parse(self, sql: str) -> exp.Query:
         try:
             statements = sqlglot.parse(sql, read=self._dialect)
-        except SqlglotError as error:
-            raise SqlRejected("syntax error") from error
+        except (SqlglotError, RecursionError) as error:
+            raise SqlRejected(f"syntax error: {error}") from error
         if len(statements) != 1 or statements[0] is None:
             raise SqlRejected("exactly one statement is required")
         root = statements[0]
