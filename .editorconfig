@@ -17,6 +17,10 @@ indent_size = 4
 [frontend/{**.ts,**.tsx,**.js,**.jsx,**.css,**.html,biome.json}]
 indent_style = tab
 
+# O make só aceita tab no começo das receitas.
+[Makefile]
+indent_style = tab
+
 [*.md]
 # Dois espaços no fim da linha são quebra de linha no Markdown.
 trim_trailing_whitespace = false
