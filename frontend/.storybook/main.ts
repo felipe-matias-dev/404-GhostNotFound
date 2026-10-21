@@ -1,4 +1,5 @@
 import type { StorybookConfig } from "@storybook/react-vite";
+import remarkGfm from "remark-gfm";
 import type { PluginOption } from "vite";
 
 // Plugins do TanStack Start, Router e devtools montam o app inteiro (entrada própria,
@@ -15,7 +16,16 @@ function semTanstack(plugins: PluginOption[]): PluginOption[] {
 const config: StorybookConfig = {
 	framework: "@storybook/react-vite",
 	stories: ["./docs/**/*.mdx", "../src/**/*.stories.tsx"],
-	addons: ["@storybook/addon-docs", "@storybook/addon-a11y"],
+	addons: [
+		// remark-gfm: tabelas Markdown nas páginas de Fundamentos.
+		{
+			name: "@storybook/addon-docs",
+			options: {
+				mdxPluginOptions: { mdxCompileOptions: { remarkPlugins: [remarkGfm] } },
+			},
+		},
+		"@storybook/addon-a11y",
+	],
 	core: { disableTelemetry: true },
 	// Reaproveita o vite.config.ts (Tailwind, React Compiler, alias #/) sem o TanStack.
 	viteFinal: (viteConfig) => {
