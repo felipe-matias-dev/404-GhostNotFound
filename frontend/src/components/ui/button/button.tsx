@@ -1,11 +1,12 @@
-// Button do shadcn/ui (`npx shadcn@latest add button`) adaptado aos tokens da marca VE-360:
+// Button do shadcn/ui (`npx shadcn@latest add button`, estilo base-nova sobre Base UI)
+// adaptado aos tokens da marca VE-360:
 // - cores só por tokens semânticos (accent, danger, hover/pressed…);
 // - foco igual ao do shadcn (borda + anel de 3px a 50%), na cor `focus-ring`;
 // - desabilitado vira surface-2 + text-disabled em qualquer variante, sem opacidade;
 // - sem sombra: o amarelo já é o destaque.
+// Link com cara de botão: `<a className={buttonVariants(…)}>`; o Button é só para ações.
+import { Button as ButtonPrimitive } from "@base-ui/react/button";
 import { cva, type VariantProps } from "class-variance-authority";
-import { Slot } from "radix-ui";
-import type * as React from "react";
 import { cn } from "#/lib/utils";
 
 const buttonVariants = cva(
@@ -44,16 +45,11 @@ function Button({
 	className,
 	variant = "default",
 	size = "default",
-	asChild = false,
 	...props
-}: React.ComponentProps<"button"> &
-	VariantProps<typeof buttonVariants> & {
-		asChild?: boolean;
-	}) {
-	const Comp = asChild ? Slot.Root : "button";
-
+}: Omit<ButtonPrimitive.Props, "className"> &
+	VariantProps<typeof buttonVariants> & { className?: string }) {
 	return (
-		<Comp
+		<ButtonPrimitive
 			data-slot="button"
 			data-variant={variant}
 			data-size={size}

@@ -5,7 +5,7 @@ import {
 	TrashIcon,
 } from "@phosphor-icons/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { Button } from "./button";
+import { Button, buttonVariants } from "./button";
 
 const meta = {
 	title: "Componentes/Button",
@@ -149,11 +149,12 @@ export const SoIcone: Story = {
 	),
 };
 
+// Link com cara de botão: <a> com as classes do Button. O Button do Base UI é só para ações
+// (com `render` ele vira role="button" e o link perde a semântica de navegação).
 export const ComoLink: Story = {
-	args: { asChild: true, variant: "outline" },
-	render: (args) => (
-		<Button {...args}>
-			<a href="#relatorio">Abrir relatório</a>
-		</Button>
+	render: () => (
+		<a href="#relatorio" className={buttonVariants({ variant: "outline" })}>
+			Abrir relatório
+		</a>
 	),
 };

@@ -151,7 +151,7 @@ carrega `src/styles.css`.
   `<nome>.stories.tsx` ao lado do componente, cobrindo padrão, carregando, erro e vazio.
 - Painel **Accessibility** (addon a11y) sem violações.
 - Sem biblioteca de componentes como dependência. Componentes do
-  [shadcn/ui](https://ui.shadcn.com/) entram pela CLI (`npx shadcn@latest add <nome>`,
+  [shadcn/ui](https://ui.shadcn.com/) (estilo `base-nova`, sobre Base UI) entram pela CLI (`npx shadcn@latest add <nome>`,
   configurada em `components.json`), são movidos para `ui/<nome>/<nome>.tsx` + `index.ts` e
   adaptados aos tokens. O [interior.dev](https://www.interior.dev/) é a referência de
   micro-interação.
