@@ -1,0 +1,12 @@
+{
+	"name": "V-Energy Grid 360",
+	"short_name": "VE-360",
+	"icons": [
+		{ "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" },
+		{ "src": "/apple-touch-icon.png", "sizes": "180x180", "type": "image/png" }
+	],
+	"theme_color": "#08090a",
+	"background_color": "#08090a",
+	"display": "standalone",
+	"start_url": "/"
+}

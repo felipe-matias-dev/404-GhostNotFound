@@ -26,12 +26,31 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 			{
 				title: "V-Energy Grid 360",
 			},
+			{
+				name: "theme-color",
+				content: "#08090a",
+			},
 		],
 		links: [
 			{
 				rel: "stylesheet",
 				href: appCss,
 			},
+			{ rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
+			{
+				rel: "icon",
+				href: "/favicon-32.png",
+				type: "image/png",
+				sizes: "32x32",
+			},
+			{
+				rel: "icon",
+				href: "/favicon-16.png",
+				type: "image/png",
+				sizes: "16x16",
+			},
+			{ rel: "apple-touch-icon", href: "/apple-touch-icon.png" },
+			{ rel: "manifest", href: "/manifest.webmanifest" },
 		],
 	}),
 	shellComponent: RootDocument,
