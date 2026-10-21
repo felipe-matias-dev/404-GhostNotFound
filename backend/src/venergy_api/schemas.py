@@ -91,6 +91,28 @@ class KpisMensaisSchema(BaseModel):
     satisfacao_media: float | None
 
 
+class ContinuidadeAlimentadorMensalSchema(BaseModel):
+    """DEC e FEC de um alimentador numa competência."""
+
+    cod_alimentador: RequiredText
+    competencia: Competencia
+    dec: float
+    fec: float
+    n_uc: int
+    n_interrupcoes: int
+    horas_interrompidas: float
+
+
+class FilaSuspeitaSchema(BaseModel):
+    """Uma UC suspeita de perda não técnica, com o porquê e o quanto vale inspecionar."""
+
+    cod_uc: RequiredText
+    score_suspeita: float
+    # Motivos legíveis para o gerente de perdas decidir; no CSV, separados por ";".
+    motivos: list[RequiredText]
+    kwh_recuperavel_est: ExactNumber | None
+
+
 class CriarOrdensSchema(BaseModel):
     """UCs escolhidas na fila de suspeitas; gera uma OI para cada uma."""
 

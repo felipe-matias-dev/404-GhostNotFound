@@ -4,9 +4,9 @@ import pytest
 from sqlalchemy import Engine, func, select
 from sqlalchemy.orm import Session
 
-from venergy_api.amostra import SAMPLE, write_sample
+from venergy_api.amostra import SAMPLE, SAMPLE_FILA, write_sample
 from venergy_api.carga import load_gold
-from venergy_api.models import FatoFaturamentoMensal, KpisMensais
+from venergy_api.models import FatoFaturamentoMensal, FilaSuspeita, KpisMensais
 
 
 def test_generated_sample_passes_the_gold_load(tmp_path: Path, engine: Engine) -> None:
@@ -36,6 +36,20 @@ def test_kpis_match_the_sum_of_the_billing_in_the_database(tmp_path: Path, engin
             select(KpisMensais.competencia, KpisMensais.kwh_faturado, KpisMensais.receita_faturada)
         )
         assert set(kpis) == set(billing)
+
+
+def test_queue_reasons_come_back_as_a_list_from_the_database(
+    tmp_path: Path, engine: Engine
+) -> None:
+    # Ida e volta completa: lista → célula com ";" no CSV → text[] no banco → lista.
+    write_sample(tmp_path / "gold", force=False)
+    load_gold(tmp_path / "gold", engine)
+
+    with Session(engine) as session:
+        stored = session.get(FilaSuspeita, "0005")
+
+    assert stored is not None
+    assert stored.motivos == SAMPLE_FILA[0].motivos
 
 
 def test_does_not_overwrite_existing_csv_without_force(tmp_path: Path) -> None:

@@ -4,7 +4,18 @@ from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
 
-from sqlalchemy import DateTime, Double, Enum, ForeignKey, Index, Numeric, func, text
+from sqlalchemy import (
+    ARRAY,
+    DateTime,
+    Double,
+    Enum,
+    ForeignKey,
+    Index,
+    Numeric,
+    Text,
+    func,
+    text,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from venergy_api.database import Base
@@ -88,6 +99,35 @@ class KpisMensais(Base):
     fec: Mapped[float | None] = mapped_column(Double)
     n_chamados: Mapped[int | None]
     satisfacao_media: Mapped[float | None] = mapped_column(Double)
+
+
+class ContinuidadeAlimentadorMensal(Base):
+    """DEC e FEC por alimentador e competência: a tela de continuidade e o ranking."""
+
+    __tablename__ = "gold_continuidade_alimentador_mensal"
+    __table_args__ = {"schema": "gold"}
+
+    cod_alimentador: Mapped[str] = mapped_column(primary_key=True)
+    competencia: Mapped[str] = mapped_column(primary_key=True)
+    dec: Mapped[float] = mapped_column(Double)
+    fec: Mapped[float] = mapped_column(Double)
+    n_uc: Mapped[int]
+    n_interrupcoes: Mapped[int]
+    horas_interrompidas: Mapped[float] = mapped_column(Double)
+
+
+class FilaSuspeita(Base):
+    """UCs suspeitas de perda não técnica: de onde o gerente de perdas gera as OIs."""
+
+    __tablename__ = "gold_fila_suspeitas"
+    __table_args__ = {"schema": "gold"}
+
+    cod_uc: Mapped[str] = mapped_column(primary_key=True)
+    score_suspeita: Mapped[float] = mapped_column(Double)
+    # Lista nativa do Postgres (text[]), e não uma tabela de motivos à parte: os motivos só
+    # são lidos junto com a UC, e o agente consegue filtrar com ANY() no mesmo SELECT.
+    motivos: Mapped[list[str]] = mapped_column(ARRAY(Text))
+    kwh_recuperavel_est: Mapped[Decimal | None] = mapped_column(_ENERGY)
 
 
 def _enum_como_texto(enum: type[StrEnum], nome_check: str) -> Enum:

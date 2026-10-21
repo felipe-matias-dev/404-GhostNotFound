@@ -13,13 +13,22 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
-from venergy_api.carga import GOLD_TABLES
+from venergy_api.carga import ARRAY_SEPARATOR, GOLD_TABLES
 from venergy_api.config import get_settings
 from venergy_api.database import Base
-from venergy_api.models import DimUc, FatoFaturamentoMensal, KpisMensais, ReceitaDecomposicao
+from venergy_api.models import (
+    ContinuidadeAlimentadorMensal,
+    DimUc,
+    FatoFaturamentoMensal,
+    FilaSuspeita,
+    KpisMensais,
+    ReceitaDecomposicao,
+)
 from venergy_api.schemas import (
+    ContinuidadeAlimentadorMensalSchema,
     DimUcSchema,
     FaturamentoMensalSchema,
+    FilaSuspeitaSchema,
     KpisMensaisSchema,
     ReceitaDecomposicaoSchema,
 )
@@ -113,20 +122,66 @@ def _faturamento() -> tuple[FaturamentoMensalSchema, ...]:
     return tuple(rows)
 
 
-def _kpis(faturamento: tuple[FaturamentoMensalSchema, ...]) -> tuple[KpisMensaisSchema, ...]:
+# UCs atendidas e DEC/FEC de referência por alimentador. O AL-06, rural e de rede longa, é
+# o pior, para o ranking de continuidade ter um destaque claro.
+_ALIMENTADORES = {
+    # cod_alimentador: (n_uc, DEC de referência em horas, FEC de referência)
+    "AL-01": (4200, 0.8, 0.5),
+    "AL-02": (3100, 1.1, 0.7),
+    "AL-03": (2800, 0.9, 0.6),
+    "AL-04": (5200, 1.4, 0.9),
+    "AL-05": (3600, 1.0, 0.6),
+    "AL-06": (1300, 3.2, 1.8),
+    "AL-07": (900, 0.6, 0.4),
+}
+# Interrupções de cada mês, de janeiro a dezembro, em % da referência: mais na estação chuvosa.
+_CHUVA_PCT = (85, 85, 95, 115, 130, 140, 125, 100, 90, 85, 80, 85)
+
+
+def _continuidade() -> tuple[ContinuidadeAlimentadorMensalSchema, ...]:
+    # Pelo contrato, dec = horas_interrompidas ÷ n_uc e fec = n_interrupcoes ÷ n_uc. Para o
+    # DEC sair em horas por consumidor, horas e interrupções somam o que cada UC afetada
+    # sofreu (consumidor × hora), e não o tempo de relógio da ocorrência.
+    rows = []
+    for cod_alimentador, (n_uc, dec_referencia, fec_referencia) in _ALIMENTADORES.items():
+        for competencia in COMPETENCIAS:
+            chuva = _CHUVA_PCT[int(competencia[5:]) - 1] / 100
+            horas = round(n_uc * dec_referencia * chuva, 1)
+            interrupcoes = round(n_uc * fec_referencia * chuva)
+            rows.append(
+                ContinuidadeAlimentadorMensalSchema(
+                    cod_alimentador=cod_alimentador,
+                    competencia=competencia,
+                    dec=horas / n_uc,
+                    fec=interrupcoes / n_uc,
+                    n_uc=n_uc,
+                    n_interrupcoes=interrupcoes,
+                    horas_interrompidas=horas,
+                )
+            )
+    return tuple(rows)
+
+
+def _kpis(
+    faturamento: tuple[FaturamentoMensalSchema, ...],
+    continuidade: tuple[ContinuidadeAlimentadorMensalSchema, ...],
+) -> tuple[KpisMensaisSchema, ...]:
     # Somas do faturamento, para que o painel da diretoria bata com a soma das UCs.
-    # DEC e FEC saem da continuidade, que ainda não tem amostra; chamados e satisfação
-    # ainda não têm definição no contrato.
+    # Chamados e satisfação ainda não têm definição no contrato.
     rows = []
     for competencia in COMPETENCIAS:
         do_mes = [linha for linha in faturamento if linha.competencia == competencia]
+        rede = [linha for linha in continuidade if linha.competencia == competencia]
+        # DEC e FEC da empresa: totais sobre o total de UCs atendidas, e não a média dos
+        # alimentadores, que daria o mesmo peso a um rural pequeno e a um urbano grande.
+        n_uc = sum(linha.n_uc for linha in rede)
         rows.append(
             KpisMensaisSchema(
                 competencia=competencia,
                 kwh_faturado=sum((linha.kwh_faturado for linha in do_mes), Decimal(0)),
                 receita_faturada=sum((linha.receita_faturada for linha in do_mes), Decimal(0)),
-                dec=None,
-                fec=None,
+                dec=sum(linha.horas_interrompidas for linha in rede) / n_uc,
+                fec=sum(linha.n_interrupcoes for linha in rede) / n_uc,
                 n_chamados=None,
                 satisfacao_media=None,
             )
@@ -172,8 +227,32 @@ def _decomposicao(
     return tuple(rows)
 
 
+# Fila de suspeitas, da maior para a menor prioridade. A UC 0004 ainda não tem estimativa
+# de energia recuperável: o gerente de perdas vê a suspeita mesmo sem o valor.
+SAMPLE_FILA = (
+    FilaSuspeitaSchema(
+        cod_uc="0005",
+        score_suspeita=0.91,
+        motivos=["leituras estimadas em 3 dos últimos 6 meses", "medidor com mais de 15 anos"],
+        kwh_recuperavel_est=Decimal("1850.000"),
+    ),
+    FilaSuspeitaSchema(
+        cod_uc="0007",
+        score_suspeita=0.78,
+        motivos=["inspeção anterior encontrou irregularidade"],
+        kwh_recuperavel_est=Decimal("4200.000"),
+    ),
+    FilaSuspeitaSchema(
+        cod_uc="0004",
+        score_suspeita=0.64,
+        motivos=["leituras estimadas em 2 dos últimos 6 meses"],
+        kwh_recuperavel_est=None,
+    ),
+)
+
 SAMPLE_FATURAMENTO = _faturamento()
-SAMPLE_KPIS = _kpis(SAMPLE_FATURAMENTO)
+SAMPLE_CONTINUIDADE = _continuidade()
+SAMPLE_KPIS = _kpis(SAMPLE_FATURAMENTO, SAMPLE_CONTINUIDADE)
 SAMPLE_DECOMPOSICAO = _decomposicao(SAMPLE_FATURAMENTO)
 
 # Linhas por tabela da Gold. A carga exige um CSV para cada tabela de GOLD_TABLES, e o
@@ -183,15 +262,23 @@ SAMPLE: dict[type[Base], tuple[BaseModel, ...]] = {
     FatoFaturamentoMensal: SAMPLE_FATURAMENTO,
     ReceitaDecomposicao: SAMPLE_DECOMPOSICAO,
     KpisMensais: SAMPLE_KPIS,
+    ContinuidadeAlimentadorMensal: SAMPLE_CONTINUIDADE,
+    FilaSuspeita: SAMPLE_FILA,
 }
 
 
+def _to_csv_cell(value: object) -> object:
+    # Formato do contrato: booleanos em minúsculas, como o Spark exporta ("true"/"false"),
+    # e listas numa célula só, com os itens separados por ponto e vírgula.
+    if isinstance(value, bool):
+        return str(value).lower()
+    if isinstance(value, list):
+        return ARRAY_SEPARATOR.join(value)
+    return value
+
+
 def _to_csv_row(row: BaseModel) -> dict[str, object]:
-    # Booleanos em minúsculas, como o Spark exporta: "true"/"false".
-    return {
-        field: str(value).lower() if isinstance(value, bool) else value
-        for field, value in row.model_dump().items()
-    }
+    return {field: _to_csv_cell(value) for field, value in row.model_dump().items()}
 
 
 def write_sample(gold_dir: Path, *, force: bool) -> list[Path]:

@@ -18,6 +18,9 @@ CONTRACT_PATH = Path(__file__).resolve().parents[2] / "contracts" / "gold_schema
 CONTRACT = yaml.safe_load(CONTRACT_PATH.read_text(encoding="utf-8"))
 CONTRACT_TYPES = CONTRACT["conventions"]["types"]
 
+# Dependem da Silver: o contrato ainda não define as colunas nem a chave delas.
+PENDING_TABLES = {"gold_interrupcoes_uc", "gold_atendimentos_uc", "gold_medidor_uc"}
+
 backend_tables = pytest.mark.parametrize(
     "table", GOLD_TABLES, ids=[table.model.__tablename__ for table in GOLD_TABLES]
 )
@@ -39,6 +42,22 @@ def literal_values(annotation: object) -> set[object]:
     if get_origin(annotation) is Literal:
         return set(get_args(annotation))
     return {value for arg in get_args(annotation) for value in literal_values(arg)}
+
+
+def test_pending_tables_are_the_ones_without_a_key_in_the_contract() -> None:
+    # Falha quando o time de dados definir a chave de uma pendente: é a hora de o backend
+    # implementá-la e tirá-la desta lista.
+    without_key = {
+        name for name, spec in CONTRACT["tables"].items() if spec["primary_key"] == "a_confirmar"
+    }
+
+    assert without_key == PENDING_TABLES
+
+
+def test_backend_loads_every_contract_table_that_is_not_pending() -> None:
+    loaded = {table.model.__tablename__ for table in GOLD_TABLES}
+
+    assert loaded == set(CONTRACT["tables"]) - PENDING_TABLES
 
 
 @backend_tables
