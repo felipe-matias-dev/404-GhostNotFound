@@ -8,6 +8,7 @@ Portal web do V-Energy Grid 360. SPA em React + TypeScript (Vite) que consome a 
 - **TanStack Query** (dados da API), **Table** (tabelas), **Form** (formulários)
 - **Zod** (validação de filtros na URL e formulários)
 - **Tailwind CSS** e **Biome** (lint + formatação)
+- **Storybook** (catálogo do design system)
 
 ## Como rodar
 
@@ -39,6 +40,8 @@ npm run dev                  # http://localhost:3000
 | `npm run check` | Lint + formatação (Biome) |
 | `npx tsc --noEmit` | Checagem de tipos |
 | `npm run gen:api` | Regenera `src/lib/api-schema.gen.ts` a partir de `contracts/openapi.json` |
+| `npm run storybook` | Storybook do design system em http://localhost:6006 |
+| `npm run build-storybook` | Build estático do Storybook em `storybook-static/` |
 
 ## Client da API
 
@@ -133,9 +136,34 @@ export const Route = createFileRoute("/perdas")({
 
 `visaoGeral` (KPIs), `receita` (preço × volume), `unidadeConsumidora` (visão 360), `perdas` (fila e ordens de inspeção), `operacao` (DEC/FEC), `agente` (chat e insights de IA), `auth` (perfis, quando entrar).
 
+## Design system
+
+Os componentes reutilizáveis (backlog V2-02) são construídos e documentados no Storybook
+antes de entrar nas telas. A configuração fica em `.storybook/`: ela reaproveita o
+`vite.config.ts` (Tailwind, React Compiler, alias `#/`) sem os plugins do TanStack Start, e
+carrega `src/styles.css`.
+
+- **Fundamentos**: tokens da marca **VE-360** no `@theme` de `src/styles.css`
+  (cores semânticas com tema escuro e claro via `data-tema="claro"`, primitivos para
+  gráficos, tipografia, raio e sombra). As escalas padrão do Tailwind foram removidas;
+  componentes não usam cor ou espaçamento solto.
+- **Componentes** (`src/components/ui/`) e **Layout** (`src/components/layout/`): story em
+  `<nome>.stories.tsx` ao lado do componente, cobrindo padrão, carregando, erro e vazio.
+- Painel **Accessibility** (addon a11y) sem violações.
+- Sem biblioteca de componentes como dependência. Componentes do
+  [shadcn/ui](https://ui.shadcn.com/) (estilo `base-nova`, sobre Base UI) entram pela CLI (`npx shadcn@latest add <nome>`,
+  configurada em `components.json`), são movidos para `ui/<nome>/<nome>.tsx` + `index.ts` e
+  adaptados aos tokens. O [interior.dev](https://www.interior.dev/) é a referência de
+  micro-interação.
+- Ícones: [Phosphor](https://phosphoricons.com/) (`@phosphor-icons/react`), regras de
+  tamanho, peso, cor e acessibilidade em **Fundamentos/Ícones**.
+
+Regras e modelo de story na página **Introdução** do Storybook
+(`.storybook/docs/introducao.mdx`).
+
 ## Convenções
 
 - Dados da API: hooks com `useQuery`/`useMutation` chamando o `api.ts` da feature; após mutations, invalide as queries afetadas.
 - Filtros de tela ficam na URL via `validateSearch` com Zod.
 - Números e datas exibidos sempre via `src/lib/format.ts`.
-- Testes e Storybook ainda não estão configurados. Quando entrarem: `__tests__/` dentro da feature e `<nome>.stories.tsx` ao lado do componente em `ui/`.
+- Testes ainda não estão configurados. Quando entrarem: `__tests__/` dentro da feature.

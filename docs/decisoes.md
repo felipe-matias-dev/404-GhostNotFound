@@ -21,7 +21,9 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | 20/10/2026 | DEC-009: ordens de inspeção em `app.ordem_inspecao` + `app.ordem_evento`, sem FK para a Gold, com máquina de estados e no máximo uma OI ativa por UC | O trabalho de campo sobrevive a cada recarga da Gold; o resultado registrado mede se a fila de suspeitas acerta | Felipe |
 | 20/10/2026 | DEC-010: energia e dinheiro como `numeric` no banco e número no JSON da API | Somas em SQL sem resíduo de arredondamento; o frontend recebe número, sem converter texto | Felipe |
 | 20/10/2026 | DEC-011: contrato da Gold com `competencia` em texto (`AAAA-MM`) e três cópias independentes de Silver → Gold | Texto preserva o formato em CSV e em todas as camadas; três cópias comparadas dão uma Gold mais sólida | Alisson |
-| 21/10/2026 | DEC-012: o backend espelha o contrato da Gold (6 de 9 tabelas), conferido por teste no CI; a carga recria as tabelas da Gold | Divergência entre contrato e backend aparece no CI, e não na carga da Gold real; coluna nova no contrato entra sem apagar tabela à mão | Felipe |
+| 21/10/2026 | DEC-012: tokens do frontend vêm do design system da marca VE-360 (paleta OKLCH a partir de #f2c94c, neutros `graphite`, Inter Tight + Söhne Breit + JetBrains Mono); escalas padrão do Tailwind removidas | Uma única fonte de cor, tipo, raio e sombra; utilitário fora do sistema não gera CSS | João Euclides |
+| 21/10/2026 | DEC-013: componentes base trazidos do shadcn/ui no estilo `base-nova` (Base UI) e do interior.dev para `frontend/src/components/ui/`, adaptados aos tokens; nenhuma biblioteca de componentes como dependência | O código fica no repositório e segue os tokens da marca; uma única base de primitivas (Base UI, sem Radix) | João Euclides |
+| 21/10/2026 | DEC-014: o backend espelha o contrato da Gold (6 de 9 tabelas), conferido por teste no CI; a carga recria as tabelas da Gold | Divergência entre contrato e backend aparece no CI, e não na carga da Gold real; coluna nova no contrato entra sem apagar tabela à mão | Felipe |
 
 ## DEC-001 · Localização dos arquivos de origem (landing)
 
@@ -289,7 +291,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   recriada: `docker compose exec db psql -U venergy -d venergy -c "DROP TABLE
   gold.gold_dim_uc"` e, depois, a carga da Gold. Só a tabela da Gold é derrubada, e as
   ordens de inspeção do schema `app` ficam intactas.
-- **Atualização (21/10/2026):** desde a DEC-012, a própria carga recria as tabelas da Gold,
+- **Atualização (21/10/2026):** desde a DEC-014, a própria carga recria as tabelas da Gold,
   e o `DROP TABLE` manual deixou de ser necessário.
 
 ## DEC-011 · Convenções do contrato da Gold
@@ -309,7 +311,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   no Data Quality e sem constraint no banco; colunas de lista vão numa célula do CSV,
   separadas por `;`; `tarifa_media` é nula quando `kwh_faturado = 0`.
 
-## DEC-012 · O backend espelha o contrato da Gold
+## DEC-014 · O backend espelha o contrato da Gold
 
 - **Data:** 21/10/2026 · **Área:** Portal · **Autor:** Felipe
 - **Contexto:** o contrato da Gold (`contracts/gold_schema.yaml`, v0.1.0, PR #10) tem 9

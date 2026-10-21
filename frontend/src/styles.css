@@ -1,16 +1,263 @@
-
 @import "tailwindcss";
+@import "@fontsource-variable/inter-tight";
+@import "@fontsource-variable/jetbrains-mono";
+@source "../.storybook";
 
-* {
-  box-sizing: border-box;
+/* Design system da marca VE-360. Paleta gerada em OKLCH e convertida
+   para hex; regras de uso em .storybook/docs/ (Fundamentos). */
+
+@font-face {
+  font-family: "Soehne Breit";
+  src: url("./assets/fonts/soehne/test-soehne-breit-vf-roman.woff2") format("woff2");
+  font-weight: 200 900;
+  font-style: normal;
+  font-display: swap;
 }
 
-html,
-body,
-#app {
-  min-height: 100%;
+/* `static`: emite todas as variáveis, inclusive primitivos que só o tema claro e os
+   gráficos (via var()) referenciam. Os `initial` removem os padrões do Tailwind para que
+   só existam utilitários gerados a partir dos tokens da marca. */
+@theme static {
+  --color-*: initial;
+  --font-*: initial;
+  --text-*: initial;
+  --radius-*: initial;
+  --shadow-*: initial;
+  --inset-shadow-*: initial;
+  --drop-shadow-*: initial;
+
+  /* Semânticos (tema escuro, o principal). Componentes consomem só estes. */
+  --color-bg: var(--color-graphite-950);
+  --color-surface-1: var(--color-graphite-900);
+  --color-surface-2: var(--color-graphite-800);
+  --color-border: var(--color-graphite-800);
+  --color-border-strong: var(--color-graphite-700);
+  --color-text: var(--color-graphite-50);
+  --color-text-muted: var(--color-graphite-400);
+  /* Desabilitado: contraste baixo de propósito (WCAG isenta). Nunca usar opacidade. */
+  --color-text-disabled: var(--color-graphite-600);
+  --color-accent: var(--color-brand-400);
+  --color-accent-hover: var(--color-brand-300);
+  --color-on-accent: var(--color-graphite-950);
+  --color-accent-text: var(--color-brand-400);
+  --color-accent-subtle: var(--color-brand-950);
+  --color-focus-ring: var(--color-brand-400);
+  --color-info: var(--color-indigo-500);
+  --color-info-subtle: var(--color-indigo-950);
+  --color-success: var(--color-green-500);
+  --color-success-subtle: var(--color-green-950);
+  --color-warning: var(--color-orange-500);
+  --color-warning-subtle: var(--color-orange-950);
+  --color-danger: var(--color-red-500);
+  --color-danger-hover: var(--color-red-400);
+  --color-on-danger: var(--color-graphite-950); /* O vermelho do escuro é claro: texto escuro. */
+  --color-danger-subtle: var(--color-red-950);
+  /* Camadas de interação sobre qualquer superfície (no escuro, hover sobre bg = surface-1).
+     O accent não usa: tem accent-hover. */
+  --color-hover: rgb(255 255 255 / 0.04);
+  --color-pressed: rgb(255 255 255 / 0.08);
+  --color-cover-slab: var(--color-graphite-800);
+  --color-scrim: rgb(8 10 15 / 0.64);
+
+  /* Primitivos: constroem os semânticos e colorem gráficos. */
+  --color-brand-50: #fffbe7;
+  --color-brand-100: #fff4cd;
+  --color-brand-200: #ffe6a0;
+  --color-brand-300: #ffd66c;
+  --color-brand-400: #f2c94c;
+  --color-brand-500: #e1af45;
+  --color-brand-600: #ba8d34;
+  --color-brand-700: #926921;
+  --color-brand-800: #6d4b11;
+  --color-brand-900: #4d3106;
+  --color-brand-950: #341f04;
+
+  --color-graphite-50: #f9fafe;
+  --color-graphite-100: #f2f3f8;
+  --color-graphite-200: #e5e6ea;
+  --color-graphite-300: #d1d4dc;
+  --color-graphite-400: #9fa1a9;
+  --color-graphite-500: #6f7179;
+  --color-graphite-600: #4d5057;
+  --color-graphite-700: #33353c;
+  --color-graphite-800: #1f2128;
+  --color-graphite-900: #121419;
+  --color-graphite-950: #080a0f;
+
+  --color-indigo-50: #f8faff;
+  --color-indigo-100: #eff3ff;
+  --color-indigo-200: #e0e7ff;
+  --color-indigo-300: #ced9ff;
+  --color-indigo-400: #bdccff;
+  --color-indigo-500: #9eb3ff;
+  --color-indigo-600: #718aff;
+  --color-indigo-700: #4f62dc;
+  --color-indigo-800: #3644ab;
+  --color-indigo-900: #222b7f;
+  --color-indigo-950: #14185b;
+
+  --color-cyan-50: #f4fcff;
+  --color-cyan-100: #e4f7ff;
+  --color-cyan-200: #c9efff;
+  --color-cyan-300: #a7e6ff;
+  --color-cyan-400: #81dcff;
+  --color-cyan-500: #29c9fa;
+  --color-cyan-600: #10a4ce;
+  --color-cyan-700: #007d9f;
+  --color-cyan-800: #005c75;
+  --color-cyan-900: #003e51;
+  --color-cyan-950: #002936;
+
+  --color-violet-50: #fbf9ff;
+  --color-violet-100: #f6f0ff;
+  --color-violet-200: #eee1ff;
+  --color-violet-300: #e5d0ff;
+  --color-violet-400: #dcbfff;
+  --color-violet-500: #cc9fff;
+  --color-violet-600: #b26df6;
+  --color-violet-700: #8a4ec3;
+  --color-violet-800: #673496;
+  --color-violet-900: #491d6e;
+  --color-violet-950: #310d4e;
+
+  --color-green-50: #effff4;
+  --color-green-100: #d8ffe4;
+  --color-green-200: #adfec9;
+  --color-green-300: #94f3b6;
+  --color-green-400: #79e9a4;
+  --color-green-500: #4ed589;
+  --color-green-600: #38ae6d;
+  --color-green-700: #1e8650;
+  --color-green-800: #046337;
+  --color-green-900: #004424;
+  --color-green-950: #002d15;
+
+  --color-red-50: #fff8f8;
+  --color-red-100: #ffefee;
+  --color-red-200: #ffdfdc;
+  --color-red-300: #ffcdc8;
+  --color-red-400: #ffbab3;
+  --color-red-500: #ff958d;
+  --color-red-600: #f85452;
+  --color-red-700: #c43738;
+  --color-red-800: #961d21;
+  --color-red-900: #6d040e;
+  --color-red-950: #4b0006;
+
+  --color-orange-50: #fff9f4;
+  --color-orange-100: #fff0e5;
+  --color-orange-200: #ffe2cb;
+  --color-orange-300: #ffd0ab;
+  --color-orange-400: #ffbe8a;
+  --color-orange-500: #ff9c3f;
+  --color-orange-600: #d77b16;
+  --color-orange-700: #a75c00;
+  --color-orange-800: #7b4200;
+  --color-orange-900: #552c00;
+  --color-orange-950: #391b00;
+
+  /* Tipografia. display/title/metric pedem `font-display`; o resto usa `font-sans`. */
+  --font-sans: "Inter Tight Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Soehne Breit", "Inter Tight Variable", ui-sans-serif, sans-serif;
+  --font-mono: "JetBrains Mono Variable", ui-monospace, monospace;
+
+  --text-display: 3.5rem;
+  --text-display--line-height: 3.75rem;
+  --text-display--letter-spacing: -0.03em;
+  --text-display--font-weight: 700;
+  --text-title: 1.75rem;
+  --text-title--line-height: 2.125rem;
+  --text-title--letter-spacing: -0.02em;
+  --text-title--font-weight: 600;
+  --text-metric: 2.5rem;
+  --text-metric--line-height: 2.75rem;
+  --text-metric--letter-spacing: -0.02em;
+  --text-metric--font-weight: 500;
+  --text-heading: 1.0625rem;
+  --text-heading--line-height: 1.5rem;
+  --text-heading--letter-spacing: -0.01em;
+  --text-heading--font-weight: 600;
+  --text-body: 0.875rem;
+  --text-body--line-height: 1.25rem;
+  --text-body--font-weight: 400;
+  --text-small: 0.75rem;
+  --text-small--line-height: 1rem;
+  --text-small--font-weight: 500;
+  --text-code: 0.8125rem;
+  --text-code--line-height: 1.25rem;
+  --text-code--font-weight: 400;
+
+  --radius-sm: 0.25rem; /* Badges, chips. */
+  --radius-md: 0.375rem; /* Botões, inputs, cards. */
+  --radius-lg: 0.5rem; /* Modais, painéis grandes. */
+
+  /* Elevação vem de superfície + borda; sombra só no que flutua. */
+  --shadow-edge: inset 0 1px 0 0 rgb(255 255 255 / 0.04); /* Brilho de topo, só no escuro. */
+  --shadow-overlay: 0 4px 16px -4px rgb(8 10 15 / 0.32); /* Menus, popovers, tooltips. */
+  --shadow-modal: 0 16px 48px -12px rgb(8 10 15 / 0.48); /* Modais, sobre scrim. */
 }
 
-body {
-  margin: 0;
+:root {
+  color-scheme: dark;
+}
+
+[data-tema="claro"] {
+  color-scheme: light;
+  --color-bg: #ffffff;
+  --color-surface-1: var(--color-graphite-50);
+  --color-surface-2: var(--color-graphite-100);
+  --color-border: var(--color-graphite-200);
+  --color-border-strong: var(--color-graphite-300);
+  --color-text: var(--color-graphite-950);
+  --color-text-muted: var(--color-graphite-600);
+  --color-text-disabled: var(--color-graphite-400);
+  --color-accent-hover: var(--color-brand-500);
+  /* #f2c94c sobre branco tem 1.6:1: no claro o amarelo só aparece como preenchimento. */
+  --color-accent-text: var(--color-brand-700);
+  --color-accent-subtle: var(--color-brand-100);
+  --color-focus-ring: var(--color-brand-600);
+  --color-info: var(--color-indigo-700);
+  --color-info-subtle: var(--color-indigo-100);
+  /* green-800, não green-700: o 700 fica abaixo de 4.5:1 sobre surface-1/2 e
+     success-subtle; o 800 tem 6.7:1 ou mais em todos. */
+  --color-success: var(--color-green-800);
+  --color-success-subtle: var(--color-green-100);
+  --color-warning: var(--color-orange-700);
+  --color-warning-subtle: var(--color-orange-100);
+  --color-danger: var(--color-red-700);
+  --color-danger-hover: var(--color-red-800);
+  --color-on-danger: #ffffff;
+  --color-danger-subtle: var(--color-red-100);
+  --color-hover: rgb(8 10 15 / 0.04);
+  --color-pressed: rgb(8 10 15 / 0.08);
+  --color-cover-slab: var(--color-graphite-900);
+  --color-scrim: rgb(8 10 15 / 0.32);
+}
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  html,
+  body,
+  #app {
+    min-height: 100%;
+  }
+
+  body {
+    margin: 0;
+    -webkit-font-smoothing: antialiased;
+    background-color: var(--color-bg);
+    color: var(--color-text);
+    font-family: var(--font-sans);
+    font-size: var(--text-body);
+    line-height: var(--text-body--line-height);
+  }
+
+  /* Foco no padrão do shadcn/ui (anel de 3px a 50%) com a cor da marca (OKLCH #f2c94c). */
+  :focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-focus-ring) 50%, transparent);
+  }
 }

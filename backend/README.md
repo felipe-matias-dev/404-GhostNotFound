@@ -107,7 +107,7 @@ A carga espera um CSV para cada tabela do contrato da Gold
 
 `gold_interrupcoes_uc`, `gold_atendimentos_uc` e `gold_medidor_uc` entram quando o
 contrato definir as colunas e a chave delas
-([DEC-012](../docs/decisoes.md#dec-012--o-backend-espelha-o-contrato-da-gold)).
+([DEC-014](../docs/decisoes.md#dec-014--o-backend-espelha-o-contrato-da-gold)).
 
 A carga valida cada linha contra o contrato (`src/venergy_api/schemas.py`). Se um
 arquivo estiver fora do formato, ela é cancelada, informa a linha e a coluna com
@@ -193,4 +193,4 @@ tests/            # pytest
 | Testes param com "Usuário do agente não conecta" | O banco foi criado antes do script de inicialização atual: `docker compose down -v` |
 
 As decisões por trás desta estrutura estão em [docs/decisoes.md](../docs/decisoes.md)
-(DEC-002 a DEC-004, DEC-010 e DEC-012).
+(DEC-002 a DEC-004, DEC-010 e DEC-014).
