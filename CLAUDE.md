@@ -1,0 +1,40 @@
+# V-Energy Grid 360 (404-GhostNotFound)
+
+Plataforma da distribuidora V-Energy: pipeline de dados (Databricks), portal web (FastAPI + React) e agente Text-to-SQL. Contexto completo em `README.md`, `docs/decisoes.md`, `ai-agent/docs/specs/` e `ai-agent/docs/plans/`.
+
+## Estrutura
+
+- `data-engineering/`: notebooks Bronze, Silver e Gold e o Workflow (Databricks).
+- `backend/`: API FastAPI (`src/venergy_api`), com SQLAlchemy 2.0 e psycopg.
+- `frontend/`: React + TypeScript (Vite). Ver `frontend/AGENTS.md` e `frontend/README.md`.
+- `ai-agent/`: agente Text-to-SQL (`src/venergy_agent`): contratos de domínio, portas, configuração e validador SQL. Spec, plano e guia de boas práticas em `ai-agent/docs/`.
+- `infra/postgres/init/`: script que cria os schemas `gold` e `app` e o usuário somente leitura do agente.
+- `docs/`: decisões, dicionário de dados e diagnóstico da receita.
+
+## Comandos
+
+Backend (rodar dentro de `backend/`):
+- `uv run python -m venergy_api.amostra`: gera a amostra sintética em `data/gold/` (use `--force` só para sobrescrever).
+- `uv run python -m venergy_api.carga`: carrega os CSVs da Gold no banco local.
+- `uv run pytest` e `uv run ruff check`.
+
+Banco local (na raiz): `docker compose up -d`. Precisa do `.env` copiado de `.env.example`.
+
+## Regras do projeto
+
+- **Dataset nunca vai para o repositório.** Os arquivos brutos e os CSVs da Gold ficam em `data/`, que está no `.gitignore`. Nada de `*.csv`, `*.xlsx` ou `*.zip` versionado.
+- **Decisões vão para `docs/decisoes.md`** (formato DEC-NNN). Toda suposição feita onde o case não é explícito entra lá e no README.
+- **Commits** no padrão Conventional Commits (`feat:`, `fix:`, `docs:`, `chore:`, `test:`, `refactor:`). Uma branch por tarefa, PR revisado por outra pessoa antes da `main`.
+- **Não faça commit, push nem abra PR sem pedido explícito.**
+- **Linguagem:** código e nomes técnicos em inglês quando o módulo pedir (o `ai-agent` segue o plano); documentação e textos para a banca em português. Os nomes de tabelas, colunas e métricas seguem a linguagem ubíqua do planejamento (`gold_dim_uc`, `cod_uc`, `competencia` YYYY-MM).
+- **Cálculos de negócio** (DEC/FEC, efeito preço × volume) ficam na Gold e no backend. O frontend só exibe. O agente lê essas métricas, não as recalcula.
+
+## Agente Text-to-SQL
+
+Contexto do GenAI para todos os times (contrato com o backend, o que o agente precisa da Gold, regras de segurança):
+
+@ai-agent/CLAUDE.md
+
+## Ordens de inspeção e schemas
+
+- `gold.*` é recarregável e é sobrescrito pela carga. `app.*` (ordens de inspeção) nunca é tocado por ela.
