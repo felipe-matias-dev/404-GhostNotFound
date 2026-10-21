@@ -6,12 +6,12 @@ export function Logo({ className = "" }: { className?: string }) {
 		<div
 			role="img"
 			aria-label="VE-360"
-			className={`inline-flex items-center gap-[0.5em] font-display text-2xl font-semibold leading-none ${className}`}
+			className={`inline-flex items-center gap-[0.5em] font-display text-title leading-none ${className}`}
 		>
 			<svg
 				aria-hidden="true"
 				viewBox="0 0 24 24"
-				className="size-[1.2em] shrink-0 text-marca"
+				className="size-[1.2em] shrink-0 text-accent-text"
 			>
 				<path
 					d="M21 12A9 9 0 1 1 17.24 4.68"
@@ -22,8 +22,8 @@ export function Logo({ className = "" }: { className?: string }) {
 				/>
 				<circle cx="20.02" cy="7.91" r="1.4" fill="currentColor" />
 			</svg>
-			<span aria-hidden="true" className="text-texto">
-				VE<span className="text-texto-suave">-360</span>
+			<span aria-hidden="true" className="text-text">
+				VE<span className="text-text-muted">-360</span>
 			</span>
 		</div>
 	);

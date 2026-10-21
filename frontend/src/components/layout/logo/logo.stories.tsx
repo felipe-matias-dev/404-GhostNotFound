@@ -5,7 +5,7 @@ const meta = {
 	title: "Layout/Logo",
 	component: Logo,
 	tags: ["autodocs"],
-	args: { className: "bg-fundo p-6" },
+	args: { className: "bg-bg p-6" },
 } satisfies Meta<typeof Logo>;
 
 export default meta;

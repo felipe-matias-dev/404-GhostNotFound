@@ -143,8 +143,10 @@ antes de entrar nas telas. A configuração fica em `.storybook/`: ela reaprovei
 `vite.config.ts` (Tailwind, React Compiler, alias `#/`) sem os plugins do TanStack Start, e
 carrega `src/styles.css`.
 
-- **Fundamentos**: tokens no `@theme` de `src/styles.css`; componentes não usam cor ou
-  espaçamento solto.
+- **Fundamentos**: tokens da marca **VE-360** no `@theme` de `src/styles.css`
+  (cores semânticas com tema escuro e claro via `data-tema="claro"`, primitivos para
+  gráficos, tipografia, raio e sombra). As escalas padrão do Tailwind foram removidas;
+  componentes não usam cor ou espaçamento solto.
 - **Componentes** (`src/components/ui/`) e **Layout** (`src/components/layout/`): story em
   `<nome>.stories.tsx` ao lado do componente, cobrindo padrão, carregando, erro e vazio.
 - Painel **Accessibility** (addon a11y) sem violações.

@@ -1,0 +1,71 @@
+import { Meta } from "@storybook/addon-docs/blocks";
+
+<Meta title="Fundamentos/Espaço, raio e elevação" />
+
+# Espaço, raio e elevação
+
+## Espaçamento
+
+Grade de 4px do Tailwind (`--spacing: 0.25rem`). Os passos nomeados da marca são
+`p-0.5` / `gap-0.5` (2px), `1.5` (6px), `3` (12px) e `5` (20px); os demais múltiplos de
+4px seguem a mesma grade.
+
+## Raio
+
+A escala padrão do Tailwind foi substituída por três raios (`rounded-full` continua para
+pílulas e avatares):
+
+<div className="sb-unstyled my-6 flex gap-6 rounded-lg bg-bg p-6 text-text">
+	<div className="flex flex-col items-center gap-2">
+		<div className="size-16 rounded-sm border border-border-strong bg-surface-2" />
+		<code>rounded-sm</code>
+		<span className="text-small text-text-muted">4px · badges, chips</span>
+	</div>
+	<div className="flex flex-col items-center gap-2">
+		<div className="size-16 rounded-md border border-border-strong bg-surface-2" />
+		<code>rounded-md</code>
+		<span className="text-small text-text-muted">6px · botões, inputs, cards</span>
+	</div>
+	<div className="flex flex-col items-center gap-2">
+		<div className="size-16 rounded-lg border border-border-strong bg-surface-2" />
+		<code>rounded-lg</code>
+		<span className="text-small text-text-muted">8px · modais, painéis grandes</span>
+	</div>
+</div>
+
+## Elevação: quase nenhuma sombra
+
+A profundidade vem de **luz e linha**, não de sombra. Em ordem de preferência:
+
+1. **Luminosidade da superfície:** `bg` → `surface-1` → `surface-2`. Mais alto, mais claro.
+2. **Hairline:** `border` (1px) entre superfícies; `border-strong` em inputs e controles.
+3. **Sombra, só no que flutua** por cima do conteúdo.
+
+| Elemento                                 | Elevação                                                                 |
+| ---------------------------------------- | ------------------------------------------------------------------------ |
+| Página, sidebar, painéis fixos           | `bg` / `surface-1` + `border`. Sem sombra.                               |
+| Cards, linhas de tabela, inputs, botões  | `surface-1` / `surface-2` + `border`. Opcional no escuro: `shadow-edge`. |
+| Menus, dropdowns, popovers, tooltips     | `surface-2` + `border` + `shadow-overlay`                                |
+| Modais, command palette                  | `surface-2` + `border` + `shadow-modal`, sobre `bg-scrim`                |
+
+<div className="sb-unstyled my-6 flex gap-6 rounded-lg bg-bg p-6 text-text">
+	<div className="w-40 rounded-md border border-border bg-surface-1 p-3 text-small">surface-1 + border</div>
+	<div className="w-40 rounded-md border border-border-strong bg-surface-2 p-3 text-small shadow-edge">
+		surface-2 + shadow-edge
+	</div>
+	<div className="w-40 rounded-md border border-border-strong bg-surface-2 p-3 text-small shadow-overlay">
+		shadow-overlay
+	</div>
+	<div className="w-40 rounded-lg border border-border-strong bg-surface-2 p-3 text-small shadow-modal">
+		shadow-modal
+	</div>
+</div>
+
+As escalas `shadow-*`, `inset-shadow-*` e `drop-shadow-*` do Tailwind foram removidas; só
+existem as três acima.
+
+- **Hover nunca ganha sombra:** sobe um degrau de superfície ou acende a borda.
+- **Botão primário não “levanta”:** o amarelo já é o destaque.
+- **Nada de sombra colorida ou glow amarelo.** A única luz amarela é o `focus-ring`.
+- No escuro, `border` tem o mesmo valor de `surface-2`: em elemento `surface-2` a borda
+  some contra o próprio preenchimento. Para recortar `surface-2`, use `border-strong`.

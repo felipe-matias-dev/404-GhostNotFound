@@ -1,0 +1,174 @@
+import { Meta } from "@storybook/addon-docs/blocks";
+
+<Meta title="Fundamentos/Cores" />
+
+export const semanticos = [
+	["bg", "Fundo da página. Escuro é o tema principal."],
+	["surface-1", "Painéis, sidebar, cards em repouso."],
+	["surface-2", "Cards elevados, menus, popovers, hover de linha."],
+	["border", "Hairline padrão (1px) entre superfícies."],
+	["border-strong", "Borda de inputs e controles."],
+	["text", "Texto principal sobre bg e surfaces."],
+	["text-muted", "Texto secundário, labels, metadados."],
+	["accent", "A cor da marca: botão primário, indicador ativo. Use pouco."],
+	["accent-hover", "Hover/pressed do accent."],
+	["on-accent", "Texto e ícones sobre accent. Sempre escuro."],
+	["accent-text", "Accent como texto/ícone. No claro cai para brand-700."],
+	["accent-subtle", "Fundo tênue de destaque (badge, linha selecionada)."],
+	["focus-ring", "Anel de foco, 2px."],
+	["info", "Informação, links, dados verificados."],
+	["success", "Sucesso, sync ok, deltas positivos."],
+	["warning", "Alerta. Laranja de propósito: amarelo é da marca."],
+	["danger", "Erro, falha, ação destrutiva."],
+	["cover-slab", "Bloco escuro de identidade (capa, hero)."],
+	["scrim", "Véu atrás de modais e command palette."],
+];
+
+export const familias = [
+	["brand", "Marca (90°)"],
+	["graphite", "Neutros frios (270°, croma 0.012)"],
+	["indigo", "Complementar (270°)"],
+	["cyan", "Split-complementar 1 (225°)"],
+	["violet", "Split-complementar 2 (305°)"],
+	["green", "Sucesso (155°)"],
+	["orange", "Alerta (60°)"],
+	["red", "Erro (25°)"],
+];
+
+export const passos = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950];
+
+export const Amostra = ({ token }) => (
+	<span
+		style={{
+			display: "inline-block",
+			width: 40,
+			height: 24,
+			borderRadius: "var(--radius-sm)",
+			border: "1px solid var(--color-border-strong)",
+			background: `var(--color-${token})`,
+		}}
+	/>
+);
+
+export const Semanticos = () => (
+	<div className="sb-unstyled" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+		{["escuro", "claro"].map((tema) => (
+			<div
+				key={tema}
+				data-tema={tema === "claro" ? "claro" : undefined}
+				style={{
+					background: "var(--color-bg)",
+					color: "var(--color-text)",
+					padding: 16,
+					borderRadius: "var(--radius-lg)",
+					border: "1px solid var(--color-border)",
+				}}
+			>
+				<p className="text-heading" style={{ margin: "0 0 12px" }}>{tema === "claro" ? "Claro" : "Escuro"}</p>
+				{semanticos.map(([token, uso]) => (
+					<div key={token} style={{ display: "flex", gap: 12, alignItems: "center", padding: "4px 0" }}>
+						<Amostra token={token} />
+						<div>
+							<code className="text-code">{token}</code>
+							<div className="text-small" style={{ color: "var(--color-text-muted)" }}>{uso}</div>
+						</div>
+					</div>
+				))}
+			</div>
+		))}
+	</div>
+);
+
+export const Primitivos = () => (
+	<div
+		className="sb-unstyled"
+		style={{
+			display: "flex",
+			flexDirection: "column",
+			gap: 8,
+			background: "var(--color-bg)",
+			color: "var(--color-text)",
+			padding: 16,
+			borderRadius: "var(--radius-lg)",
+		}}
+	>
+		{familias.map(([familia, papel]) => (
+			<div key={familia} style={{ display: "grid", gridTemplateColumns: "180px repeat(11, 1fr)", gap: 4, alignItems: "end" }}>
+				<div>
+					<code>{familia}</code>
+					<div style={{ fontSize: 12, opacity: 0.7 }}>{papel}</div>
+				</div>
+				{passos.map((passo) => (
+					<div key={passo} title={`${familia}-${passo}`}>
+						<div style={{ height: 32, borderRadius: "var(--radius-sm)", background: `var(--color-${familia}-${passo})` }} />
+						<div style={{ fontSize: 10, textAlign: "center" }}>{passo}</div>
+					</div>
+				))}
+			</div>
+		))}
+	</div>
+);
+
+# Cores — VE-360
+
+Uma paleta escura, precisa e calma, com um único ponto de energia: **#f2c94c**. O amarelo
+carrega a **energia**; o complementar, azul-índigo, carrega a **confiança** e tinge os
+neutros. Todas as escalas foram geradas em OKLCH: o mesmo passo (`indigo-500`,
+`green-500`) tem o mesmo peso visual em qualquer matiz.
+
+Tokens em `src/styles.css`. Utilitários: `bg-surface-1`, `text-text-muted`,
+`border-border-strong`, `bg-accent text-on-accent`, `outline-focus-ring`, `fill-indigo-500`…
+O tema claro é ativado com `data-tema="claro"` em qualquer ancestral.
+
+## Semânticos
+
+Componentes consomem só estes. Os primitivos existem para construir os semânticos e para
+gráficos.
+
+<Semanticos />
+
+## Regras de uso
+
+- **Proporção 90 / 8 / 2:** ~90% graphite (bg, surfaces, texto), ~8% tons funcionais
+  (info, semânticas, séries), ~2% brand (um botão primário, o item ativo da sidebar, o
+  anel de foco, o número que importa). Mais de um amarelo por região da tela e ele para de
+  significar alguma coisa.
+- **Texto sobre accent é sempre escuro** (`on-accent`). Branco sobre #f2c94c tem 1.6:1.
+- **Accent como texto** usa `accent-text`; no claro o #f2c94c só aparece como preenchimento.
+- **Alerta não é amarelo:** `warning` é laranja. Nenhuma cor semântica usa o matiz da marca.
+- **Links e dados verificados** usam `info` (selos de “sincronizado”, fontes de dados).
+- **Foco** é sempre `focus-ring` em 2px (regra global de `:focus-visible`).
+
+## Contraste (WCAG 2.1, sobre `bg`)
+
+| Par                    | Escuro | Claro |
+| ---------------------- | ------ | ----- |
+| `text`                 | 19.0   | 19.8  |
+| `text-muted`           | 7.7    | 8.1   |
+| `accent-text`          | 12.5   | 4.9   |
+| `on-accent` / `accent` | 12.5   | 12.5  |
+| `info`                 | 9.8    | 5.1   |
+| `success`              | 10.6   | 4.6   |
+| `warning`              | 9.5    | 5.0   |
+| `danger`               | 9.4    | 5.3   |
+
+No claro, abaixo de 4.5:1 fora do `bg`: `success` sobre `surface-1` (4.4) e `surface-2`
+(4.1), `accent-text` sobre `surface-2` (4.4). Texto pequeno nessas cores fica sobre `bg`.
+
+## Primitivos
+
+<Primitivos />
+
+## Gráficos e dados
+
+- **Ordem categórica:** `brand-400` (a série que importa), `indigo-500` (comparação),
+  `cyan-500`, `violet-500`, `green-500`, `orange-500`. No claro, desça para o passo 600.
+  Mais de 6 séries: agrupe em “outros” com `graphite-500`.
+- **Destaque com uma cor só:** a série toda em `graphite-600` (escuro) / `graphite-300`
+  (claro) e só o ponto relevante em `brand-400`.
+- **Sequencial** (heatmap, intensidade): `brand-950` → `brand-700` → `brand-500` →
+  `brand-300` → `brand-100`. Mais corrente, mais luz.
+- **Divergente:** `indigo-600` → `graphite-700` (neutro) → `brand-400`. Azul × amarelo
+  continua distinguível para daltônicos.
+- **Deltas:** `success` para alta e `danger` para queda, sempre com seta ou sinal (+/−),
+  nunca só pela cor.
