@@ -1,0 +1,78 @@
+# Hooks que rodam a cada commit. Instalação, uma vez por clone (na raiz):
+#   uvx pre-commit install
+# Rodar em tudo, sem commitar: uvx pre-commit run --all-files
+# Os hooks locais usam as ferramentas do projeto: precisam de `uv sync` em backend/ e
+# `npm ci` em frontend/. O CI roda a mesma configuração.
+
+repos:
+  # Notebooks (.ipynb) nunca são modificados pelos hooks: são editados e versionados pelo
+  # Databricks, e qualquer reescrita local viraria conflito na próxima sincronização.
+  # Hooks que só checam (JSON válido, segredos, arquivos grandes) continuam valendo para eles.
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+        exclude: &notebooks \.ipynb$
+      - id: end-of-file-fixer
+        exclude: *notebooks
+      - id: mixed-line-ending
+        args: [--fix=lf]
+        exclude: *notebooks
+      - id: check-yaml
+      - id: check-toml
+      - id: check-json
+        # tsconfig.json aceita comentários (JSONC), que o JSON puro não aceita.
+        exclude: (^|/)tsconfig\.json$
+      - id: check-merge-conflict
+      - id: check-case-conflict
+      - id: check-added-large-files
+        args: [--maxkb=1024]
+      - id: detect-private-key
+
+  # Senhas e chaves de API (ex.: OpenRouter do agente) nunca entram no histórico.
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks
+
+  # Mesma versão do ruff em backend/uv.lock. Cada pasta usa o [tool.ruff] do seu pyproject.toml.
+  # Só arquivos .py: o ruff também formataria os blocos de código dos .md e os notebooks do
+  # Databricks, onde `spark` e `dbutils` existem sem import e virariam erro.
+  # --no-cache: o hook roda na raiz, onde o ruff criaria um .ruff_cache/; nos poucos arquivos
+  # de um commit o cache não faz diferença.
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.17.1
+    hooks:
+      - id: ruff-check
+        args: [--fix, --no-cache]
+        types_or: [python, pyi]
+      - id: ruff-format
+        args: [--no-cache]
+        types_or: [python, pyi]
+
+  - repo: local
+    hooks:
+      # Roda no projeto inteiro, com a versão e o biome.json do frontend.
+      - id: biome
+        name: biome (frontend)
+        language: system
+        entry: npm --prefix frontend run check -- --write
+        files: ^frontend/
+        pass_filenames: false
+
+      # Contrato backend → frontend. Os dois hooks disparam juntos: o primeiro regera
+      # contracts/openapi.json a partir das rotas, o segundo regera os tipos do client.
+      # Se algum arquivo mudar, o commit para e basta adicionar os arquivos gerados.
+      - id: openapi-contract
+        name: contrato OpenAPI (backend → contracts/openapi.json)
+        language: system
+        entry: uv run --project backend python -m venergy_api.openapi
+        files: &contract-files ^(backend/(src/|pyproject\.toml$|uv\.lock$)|contracts/openapi\.json$|frontend/(package(-lock)?\.json$|src/lib/api-schema\.gen\.ts$))
+        pass_filenames: false
+      - id: openapi-types
+        name: tipos do client (contracts/openapi.json → frontend)
+        language: system
+        entry: npm --prefix frontend run gen:api
+        files: *contract-files
+        pass_filenames: false

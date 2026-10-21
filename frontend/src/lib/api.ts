@@ -1,7 +1,19 @@
+import createClient from "openapi-fetch";
+import type { paths } from "./api-schema.gen";
+
 export const API_URL = (import.meta.env.VITE_API_URL || "/api").replace(
 	/\/+$/,
 	"",
 );
+
+/**
+ * Client tipado pelo contrato `contracts/openapi.json` (tipos em `api-schema.gen.ts`,
+ * gerados por `npm run gen:api`). Rota, parâmetros e resposta erram na compilação.
+ */
+export const api = createClient<paths>({
+	baseUrl: API_URL,
+	headers: { Accept: "application/json" },
+});
 
 export class ApiError extends Error {
 	readonly status: number;
@@ -16,27 +28,14 @@ export class ApiError extends Error {
 	}
 }
 
-async function readBody(response: Response): Promise<unknown> {
-	const text = await response.text();
-	if (!text) return null;
-	try {
-		return JSON.parse(text);
-	} catch {
-		return text;
-	}
-}
-
-/** `path` relativo à base da API, começando com "/" (ex.: "/ucs/123"). */
-export async function apiFetch<T>(
-	path: string,
-	init?: RequestInit,
+/**
+ * Devolve o `data` de uma chamada do `api` ou lança `ApiError`, para que o TanStack Query
+ * receba a falha em `error`. Ex.: `unwrap(api.GET("/rota/{id}", { params: { path: { id } } }))`.
+ */
+export async function unwrap<T>(
+	request: Promise<{ data?: T; error?: unknown; response: Response }>,
 ): Promise<T> {
-	const headers = new Headers(init?.headers);
-	if (!headers.has("Accept")) headers.set("Accept", "application/json");
-
-	const response = await fetch(`${API_URL}${path}`, { ...init, headers });
-	const body = await readBody(response);
-
-	if (!response.ok) throw new ApiError(response.status, body);
-	return body as T;
+	const { data, error, response } = await request;
+	if (!response.ok) throw new ApiError(response.status, error);
+	return data as T;
 }

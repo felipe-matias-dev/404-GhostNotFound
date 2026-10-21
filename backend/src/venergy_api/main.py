@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from venergy_api.config import Settings, get_settings
-from venergy_api.routers import health, unidades
+from venergy_api.routers import health, ordens, unidades
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -19,9 +19,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
-        # Só leitura por enquanto; POST e PATCH entram com as ordens de inspeção.
-        allow_methods=["GET"],
+        # Só o que a API usa: leitura, mais POST e PATCH das ordens de inspeção.
+        allow_methods=["GET", "POST", "PATCH"],
     )
     app.include_router(health.router)
     app.include_router(unidades.router)
+    app.include_router(ordens.router)
     return app

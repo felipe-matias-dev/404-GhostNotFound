@@ -14,6 +14,12 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | 19/10/2026 | DEC-002: banco local PostgreSQL em Docker, com schemas `gold` e `app` | Usuário somente leitura nativo para o agente; recarga da Gold não apaga as ordens de inspeção | Time |
 | 19/10/2026 | DEC-003: walking skeleton com amostra sintética da Gold | Integração entre camadas testada desde o início, sem depender do dataset confidencial | Time |
 | 19/10/2026 | DEC-004 (proposta): Gold entregue em CSV, um arquivo por tabela, em `data/gold/` | Um único caminho de carga, validado contra o contrato, para amostra e Gold real | Felipe |
+| 19/10/2026 | DEC-005: contrato API → frontend em `contracts/openapi.json`, gerado pelo FastAPI; client com `openapi-typescript` + `openapi-fetch` | O front quebra na compilação quando o contrato muda; a mudança de contrato aparece no diff do PR | João Euclides |
+| 19/10/2026 | DEC-006: `docker compose up` sobe banco, API e Vite em modo de desenvolvimento | Um comando roda o portal em qualquer máquina; deploy em nuvem está fora do escopo | João Euclides |
+| 19/10/2026 | DEC-007: qualidade garantida por pre-commit local e pelo mesmo conjunto de checagens no CI | Código formatado e contrato em dia sem depender de lembrar; o CI barra quem pula o hook | João Euclides |
+| 19/10/2026 | DEC-008: Bronze com auditoria básica (full refresh, tudo string, `ingestion_timestamp` e `source_file`) | Dados o mais próximos da origem; rastreabilidade sem log próprio de ingestão | Alisson |
+| 20/10/2026 | DEC-009: ordens de inspeção em `app.ordem_inspecao` + `app.ordem_evento`, sem FK para a Gold, com máquina de estados e no máximo uma OI ativa por UC | O trabalho de campo sobrevive a cada recarga da Gold; o resultado registrado mede se a fila de suspeitas acerta | Felipe |
+| 20/10/2026 | DEC-010: energia e dinheiro como `numeric` no banco e número no JSON da API | Somas em SQL sem resíduo de arredondamento; o frontend recebe número, sem converter texto | Felipe |
 
 ## DEC-001 · Localização dos arquivos de origem (landing)
 
@@ -24,7 +30,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Motivo:** separar arquivos imutáveis de tabelas recriáveis. Com o volume
   dentro de `bronze`, um `DROP SCHEMA bronze CASCADE` apagaria os originais.
 - **Regras:** o pipeline nunca escreve nem apaga nada em `landing`. O caminho
-  é parametrizado por widget no notebook `landing_to_bronze`.
+  é parametrizado por widget no notebook `Landing_to_Bronze`.
 
 ## DEC-002 · Banco local PostgreSQL
 
@@ -83,5 +89,201 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   (`backend/src/venergy_api/schemas.py`) antes de gravar e substitui as tabelas
   numa única transação. Um arquivo fora do contrato cancela a carga e mantém os
   dados anteriores. Nem os dados brutos nem os CSVs da Gold são versionados.
+- **Célula vazia (20/10/2026):** célula vazia no CSV é nulo, nunca zero ou texto
+  vazio, como no rascunho do contrato da Gold (PR #10). Zero é um fato ("não
+  consumiu", "não pagou"); vazio é falta de informação, e tratar um como o outro
+  levaria uma unidade consumidora inocente para a fila de perdas. Em coluna
+  obrigatória, a célula vazia cancela a carga.
 - **Em aberto:** confirmar com a organização se a Gold agregada pode ir para o
   repositório público. Até lá, não é versionada.
+
+## DEC-005 · Contrato OpenAPI entre API e frontend
+
+- **Data:** 19/10/2026 · **Área:** Portal · **Autor:** João Euclides
+- **Decisão:** o OpenAPI que o FastAPI gera das rotas e schemas é exportado para
+  `contracts/openapi.json` (`uv run python -m venergy_api.openapi`) e versionado. O
+  frontend gera dele os tipos (`npm run gen:api` → `src/lib/api-schema.gen.ts`, com
+  `openapi-typescript`) e chama a API pelo client tipado `api` de `src/lib/api.ts`
+  (`openapi-fetch`).
+- **Motivo:** rota, parâmetro ou campo renomeado no backend vira erro de compilação
+  no frontend, e não tela quebrada em produção. Com o arquivo versionado, o front gera
+  os tipos sem subir a API, e o revisor vê a mudança de contrato no PR.
+- **Alternativa descartada:** `@hey-api/openapi-ts`, que gera funções e hooks do
+  TanStack Query, mas nomeia as funções pelo `operationId` (o FastAPI gera
+  `get_unidade_consumidora_unidades_consumidoras__cod_uc__get`) e gera código de
+  runtime. O `openapi-fetch` só tipa pela rota e pesa cerca de 6 kB.
+- **Regras:**
+  - Rotas declaram em `responses=` os erros que devolvem (ex.: `404` com
+    `ErroSchema`), para o erro também chegar tipado.
+  - Arquivos gerados não são editados à mão. O pre-commit e o CI regeneram os dois e
+    falham se o resultado não estiver commitado.
+  - O `openapi-typescript` declara suporte só ao TypeScript 5; o `overrides` do
+    `package.json` o faz usar o TypeScript 6 do projeto. Rever quando sair versão
+    compatível.
+
+## DEC-006 · Ambiente de desenvolvimento em Docker
+
+- **Data:** 19/10/2026 · **Área:** Portal · **Autor:** João Euclides
+- **Decisão:** o `docker-compose.yml` da raiz sobe `db` (PostgreSQL), `api`
+  (uvicorn com `--reload`) e `web` (Vite), com o código montado da máquina para
+  recarregar a cada mudança. Quem prefere rodar API e frontend fora do Docker sobe só
+  o banco: `docker compose up -d --wait db`.
+- **Motivo:** história V2-12 ("subir banco, backend e frontend com um comando"),
+  inclusive para quem é de Dados ou IA e não tem Python e Node configurados. Deploy em
+  nuvem é Won't no planejamento, então não há imagem de produção (build estático,
+  nginx).
+- **Regras:**
+  - O navegador fala só com o Vite, que encaminha `/api/*` para o serviço `api`:
+    sem CORS, igual ao desenvolvimento fora do Docker.
+  - Portas só em `127.0.0.1`, configuráveis no `.env` da raiz (`API_PORT`,
+    `WEB_PORT`, `POSTGRES_PORT`).
+  - Os containers rodam sem root (UID 1000). Só `src/` de cada serviço é montado da
+    máquina: dependências (`.venv`, `node_modules`) são as da imagem, com binários para
+    Linux, e mudança em `pyproject.toml`, `package.json` ou `vite.config.ts` pede
+    `docker compose up -d --build`. Montar a pasta inteira exigiria um volume para o
+    `node_modules`, que o Docker cria como root na máquina e quebra o `npm ci` local.
+  - A detecção de mudanças usa varredura (`WATCHFILES_FORCE_POLLING`,
+    `CHOKIDAR_USEPOLLING`), porque eventos de arquivo não atravessam o volume no
+    Docker Desktop do Windows.
+
+## DEC-007 · Hooks de pre-commit e CI
+
+- **Data:** 19/10/2026 · **Área:** Todas · **Autor:** João Euclides
+- **Decisão:** `.pre-commit-config.yaml` na raiz, instalado com
+  `uvx pre-commit install`, e um workflow do GitHub Actions (`.github/workflows/ci.yml`)
+  que roda os mesmos hooks, o pytest do backend, a checagem de tipos e o build do
+  frontend e o build das imagens Docker em todo PR.
+- **Hooks:** higiene de arquivos (espaços, fim de linha LF, YAML/TOML/JSON válidos,
+  conflitos, arquivos grandes, chaves privadas), gitleaks (segredos), ruff (Python),
+  Biome (frontend) e o contrato OpenAPI (DEC-005). Mensagens de commit não são
+  validadas por hook: o padrão Conventional Commits segue como convenção do time.
+- **Motivo:** o `pre-commit` gerencia hooks de Python, Node e binários num lugar só;
+  o husky só atende Node. O hook pode ser pulado com `--no-verify`, então o CI é o
+  portão que vale.
+- **Regras:**
+  - Biome e geradores do contrato rodam com as versões do projeto (`npm ci` em
+    `frontend/`, `uv` no backend). O ruff do hook tem a mesma versão do
+    `backend/uv.lock`; ao atualizar um, atualize o outro.
+  - O ruff roda só em `.py`: notebooks do Databricks usam `spark` e `dbutils` sem
+    import, e os blocos de código dos `.md` não devem ser reformatados.
+  - Nenhum hook modifica notebooks (`.ipynb`): eles são editados e versionados pelo
+    Databricks, e reescrevê-los localmente (saídas, fim de arquivo) geraria conflito na
+    sincronização. Por isso não há nbstripout; limpar as saídas antes do commit é
+    responsabilidade de quem exporta. Hooks só de checagem (JSON válido, segredos)
+    continuam valendo para eles.
+  - `.gitattributes` força LF em todo arquivo de texto, menos nos notebooks;
+    `.editorconfig` alinha os editores com os formatadores.
+
+## DEC-008 · Contrato da Bronze (auditoria básica)
+
+- **Data:** 19/10/2026 · **Área:** Dados · **Autor:** Alisson
+- **Decisão:** cada fonte lógica gera ao menos uma tabela Delta em
+  `v_energy.bronze.<fonte>`, com o nome em snake_case e sem prefixo (ex.:
+  `unidades_consumidoras`). Uma fonte pode gerar mais de uma tabela quando seus
+  componentes têm estruturas próprias: `inspecoes.xlsx` gera uma tabela por aba
+  (`inspecoes_ago_set`, `inspecoes_out_nov` e `inspecoes_dez`), e `leituras/` reúne
+  seus arquivos anuais em uma só.
+  Colunas originais, com os nomes originais e do tipo string, mais
+  `source_file` (de `_metadata.file_path`) e `ingestion_timestamp`.
+- **Carga:** batch, full refresh, `overwrite` do Delta com um único overwrite por
+  tabela. Reexecutar sobre os mesmos arquivos não duplica nem perde linhas.
+- **Execução:** um único notebook com uma seção por fonte; `Run All` processa todas em
+  sequência. O widget `gravar` (padrão `nao`) é o único interruptor de escrita: sem ele,
+  o notebook só valida e confere tabelas existentes. Uma fonte com falha é marcada e não
+  é gravada, e o resumo final falha se houver fonte com falha, pendente ou sem
+  idempotência comprovada. As opções de leitura ficam no código da fonte, versionadas,
+  e são impressas a cada execução.
+- **Formatos:** CSV com `FAILFAST` e tudo string. Uma pasta com vários CSVs (`leituras/`)
+  vira uma tabela só se todos os arquivos tiverem o mesmo conjunto de colunas, unidos por
+  nome. JSON preserva structs e arrays, com valores primitivos como string
+  (`primitivesAsString`), conferido contra uma releitura independente do arquivo. XLSX é
+  lido com o leitor nativo `format("excel")` do Databricks, uma tabela por aba, e conferido
+  célula a célula contra a leitura do XML da planilha; divergência reprova a aba.
+- **Sem:** limpeza, deduplicação, tipagem, regras de negócio, `ingestion_log`,
+  snapshots ou histórico próprio. Isso fica para a Silver.
+- **Validação antes de gravar:** o arquivo existe, o cabeçalho foi lido sem
+  ambiguidade, a leitura usa `FAILFAST` (linha malformada interrompe a carga) e
+  `source_file` está consistente. Se algo falhar, a tabela anterior não é tocada.
+- **Histórico:** o `DESCRIBE HISTORY` e o time travel do Delta são recursos
+  complementares, com retenção limitada (log de 30 dias e `VACUUM` de 7 dias por
+  padrão). Não são a trilha permanente de auditoria.
+- **Limitações conhecidas:** o Spark lê campo vazio sem aspas como `NULL`, então
+  "vazio" e "nulo" não se distinguem na Bronze. A contagem de linhas físicas é só
+  uma conferência auxiliar, porque campos entre aspas podem conter quebras de
+  linha.
+- **Evidências:** os resultados da validação (contagens, colunas, estatísticas) são
+  documentados à parte, em relatório privado fora do repositório, porque o dataset é
+  confidencial. Não há tabelas adicionais de auditoria, e os notebooks são
+  versionados sem outputs.
+
+## DEC-009 · Modelo das ordens de inspeção
+
+- **Data:** 20/10/2026 · **Área:** Portal · **Autor:** Felipe
+- **Contexto:** o gerente de perdas gera ordens de inspeção (OIs) a partir da fila de
+  suspeitas, acompanha o status, registra o resultado de campo e cancela as que deixam
+  de fazer sentido. É o único dado do sistema digitado no portal.
+- **Decisão:** duas tabelas no schema `app`: `ordem_inspecao` (uma linha por OI) e
+  `ordem_evento` (uma linha por mudança de status, com status anterior, novo, horário e
+  observação). Rotas em `/ordens-inspecao`: `POST` (lote), `GET` (lista e detalhe) e
+  `PATCH` (mudança de status, inclusive cancelar).
+- **Regras:**
+  - Status `GERADA → EM_CAMPO → CONCLUIDA`, ou `CANCELADA` a partir dos dois primeiros.
+    `CONCLUIDA` e `CANCELADA` são finais: para voltar ao imóvel, gera-se uma OI nova e o
+    histórico mostra as duas visitas. Transição fora do mapa devolve `409`. A regra fica
+    num módulo sem banco (`backend/src/venergy_api/ordens.py`), testado à parte.
+  - Concluir exige resultado (`IRREGULAR_CONFIRMADA`, `REGULAR` ou `NAO_REALIZADA`), e
+    só a conclusão aceita resultado; o contrário devolve `422`. `NAO_REALIZADA` é a
+    equipe que foi e não conseguiu vistoriar; cancelar é a visita que deixou de ser
+    necessária. Separar os dois mostra quantos dias de campo se perdem por falta de acesso.
+  - No máximo uma OI ativa (`GERADA` ou `EM_CAMPO`) por UC, garantida por índice único
+    parcial no banco, e não só por checagem no Python, que deixaria passar duas
+    requisições simultâneas. A API checa antes para devolver um `409` que cita as UCs.
+  - A geração em lote é tudo ou nada: uma UC inexistente (`404`) ou já com OI ativa
+    (`409`) cancela o lote inteiro.
+  - O `PATCH` trava a linha da OI (`SELECT ... FOR UPDATE`) até o commit, para que duas
+    mudanças simultâneas não passem as duas pela validação do status atual.
+  - `DELETE` não existe nem é liberado no CORS: OI se cancela, não se apaga.
+- **Por que sem FK para `gold.gold_dim_uc`:** a carga da Gold apaga e reinsere as UCs a
+  cada execução. Com FK, a carga falharia (FK simples) ou apagaria as OIs junto
+  (`ON DELETE CASCADE`). A existência da UC é validada pela API na criação, e a OI
+  continua como histórico mesmo se a UC sair da Gold depois.
+- **Status e resultado como VARCHAR com CHECK**, e não como ENUM nativo do Postgres: sem
+  ferramenta de migração, acrescentar um valor a um ENUM nativo exige `ALTER TYPE` manual.
+- **Criação das tabelas:** pelo `create_all` que a carga da Gold já executa
+  (`uv run python -m venergy_api.carga`); o `DELETE` da carga só passa pelas tabelas da
+  Gold. Criar no startup da API foi descartado porque derrubaria a API com o banco fora
+  do ar, quando o esperado é o `/health` responder `503`. Alembic foi descartado por ser
+  desproporcional a duas tabelas, a duas semanas da entrega.
+- **Alternativas descartadas:** endpoints de ação (`/cancelar`, `/concluir`), que
+  multiplicam rotas e espalham a validação; e paginação na listagem, desnecessária
+  para a escala de cerca de 200 inspeções por mês.
+- **Limitações:** a OI valida a UC contra `gold_dim_uc`, porque a fila de suspeitas
+  (`gold_fila_suspeitas`) ainda não existe; quando existir, a tela da fila só passa a
+  enviar os `cod_uc` escolhidos, sem mudança no backend. Não há registro de quem fez
+  cada mudança, porque o portal ainda não tem login. Alterar colunas exige recriar as
+  tabelas do `app`, já que não há migrações.
+
+## DEC-010 · Energia e dinheiro como `numeric`, número na API
+
+- **Data:** 20/10/2026 · **Área:** Portal · **Autor:** Felipe
+- **Contexto:** o rascunho do contrato da Gold (PR #10) define energia como
+  `numeric(16,3)` e dinheiro como `numeric(14,2)`; o backend gravava
+  `consumo_medio_kwh_12m` como `float`.
+- **Decisão:** no banco, `numeric` com a escala do contrato; na carga, `Decimal`; no JSON
+  da API, número. O tipo `ExactNumber` (`backend/src/venergy_api/schemas.py`) faz a
+  conversão só na saída e serve às próximas colunas de energia e dinheiro.
+- **Motivo:** o agente de IA lê o banco direto e soma em SQL. Com `numeric`, somas sobre
+  muitas linhas não acumulam resíduo nas casas decimais. Para exibir um valor por tela,
+  a precisão de um número no JSON sobra.
+- **Alcance:** isso evita ruído nas últimas casas, não diferenças de definição. Portal e
+  agente mostram o mesmo número porque o cálculo é feito uma vez, na Gold, e os dois leem
+  a mesma tabela (decisão de 19/10 sobre cálculos de negócio).
+- **Alternativas descartadas:** `Decimal` também no JSON, que chega ao frontend como texto
+  (`"152.400"`) e obrigaria toda tela a converter; e manter `float`, mudando o contrato,
+  que levaria o resíduo de arredondamento para as somas do agente.
+- **Limitações:** o `minimum: 0` some da documentação da resposta no OpenAPI, embora a
+  carga continue recusando valor negativo. Sem migrações, um banco de desenvolvimento
+  criado antes desta mudança mantém a coluna em `double precision` até a tabela ser
+  recriada: `docker compose exec db psql -U venergy -d venergy -c "DROP TABLE
+  gold.gold_dim_uc"` e, depois, a carga da Gold. Só a tabela da Gold é derrubada, e as
+  ordens de inspeção do schema `app` ficam intactas.

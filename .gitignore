@@ -8,12 +8,21 @@ atendimentos.json
 *.db
 *.sqlite
 
+# Relatórios, evidências e profiling derivados do dataset (privados, nunca versionar)
+docs/bronze/
+evidencias/
+relatorio-*
+profiling/
+*.parquet
+
 # Python
 __pycache__/
 *.pyc
 .venv/
 venv/
 .env
+.ruff_cache/
+.pytest_cache/
 
 # Node
 node_modules/
