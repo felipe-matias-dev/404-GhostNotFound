@@ -6,6 +6,7 @@
 // - desabilitado = surface-2 + text-disabled, sem opacidade;
 // - textos para leitor de tela em português, duração via #/lib/format.
 // Uso: ações destrutivas e irreversíveis (excluir, revogar). Não substitui o Button comum.
+import { CheckIcon } from "@phosphor-icons/react";
 import {
 	animate,
 	motion,
@@ -372,19 +373,7 @@ function Faces({
 				transition={FACE}
 				className="col-start-1 row-start-1 flex items-center justify-center gap-1.5 whitespace-nowrap"
 			>
-				<svg
-					width="12"
-					height="12"
-					viewBox="0 0 12 12"
-					fill="none"
-					stroke="currentColor"
-					strokeWidth="1.7"
-					strokeLinecap="round"
-					strokeLinejoin="round"
-					aria-hidden="true"
-				>
-					<path d="M2.5 6.4 4.7 8.6 9.5 3.5" />
-				</svg>
+				<CheckIcon aria-hidden weight="bold" className="size-3" />
 				{confirmLabel}
 			</motion.span>
 		</span>

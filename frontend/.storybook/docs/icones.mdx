@@ -1,0 +1,163 @@
+import { Meta } from "@storybook/addon-docs/blocks";
+import {
+	ArrowDownIcon,
+	ArrowUpIcon,
+	ArrowsClockwiseIcon,
+	BuildingsIcon,
+	CalendarBlankIcon,
+	CaretDownIcon,
+	CheckCircleIcon,
+	CurrencyCircleDollarIcon,
+	DownloadSimpleIcon,
+	FunnelIcon,
+	GaugeIcon,
+	HouseIcon,
+	InfoIcon,
+	LightningSlashIcon,
+	MagnifyingGlassIcon,
+	PlusIcon,
+	SparkleIcon,
+	TrashIcon,
+	WarningIcon,
+	XCircleIcon,
+	XIcon,
+} from "@phosphor-icons/react";
+
+<Meta title="Fundamentos/Ícones" />
+
+export const Painel = ({ children }) => (
+	<div className="sb-unstyled my-6 rounded-lg border border-border bg-bg p-5 text-text">
+		{children}
+	</div>
+);
+
+export const Grade = ({ itens }) => (
+	<div className="grid grid-cols-4 gap-3">
+		{itens.map(([Icone, nome, uso]) => (
+			<div key={nome} className="flex items-center gap-3 rounded-md bg-surface-1 p-3">
+				<Icone aria-hidden className="size-5 shrink-0 text-text-muted" />
+				<div>
+					<code className="text-code">{nome}</code>
+					<div className="text-small text-text-muted">{uso}</div>
+				</div>
+			</div>
+		))}
+	</div>
+);
+
+# Ícones
+
+Pacote `@phosphor-icons/react`, importado por nome com o sufixo `Icon`
+(`import { TrashIcon } from "@phosphor-icons/react"`). O `components.json` também aponta
+para ele, então componentes novos adicionados pela CLI já chegam com estes ícones.
+
+## Tamanhos
+
+Quatro tamanhos, pela escala de espaçamento (`size-*`):
+
+<Painel>
+	<div className="flex items-end gap-8">
+		{[
+			["size-3", "12px", "indicador mínimo (check do confirmado)"],
+			["size-4", "16px", "padrão: botões, inputs, tabelas"],
+			["size-5", "20px", "navegação, sidebar"],
+			["size-6", "24px", "estado vazio, destaque de card"],
+		].map(([classe, px, uso]) => (
+			<div key={classe} className="flex flex-col items-start gap-2">
+				<GaugeIcon aria-hidden className={classe} />
+				<code className="text-code">{classe}</code>
+				<span className="text-small text-text-muted">
+					{px} · {uso}
+				</span>
+			</div>
+		))}
+	</div>
+</Painel>
+
+Dentro do `Button` o ícone já sai com 16px (e com padding ajustado); não passe `size`.
+
+## Peso
+
+<Painel>
+	<div className="flex gap-8">
+		{["regular", "bold", "fill"].map((peso) => (
+			<div key={peso} className="flex flex-col items-start gap-2">
+				<div className="flex gap-3">
+					<CheckCircleIcon aria-hidden weight={peso} className="size-6" />
+					<LightningSlashIcon aria-hidden weight={peso} className="size-6" />
+					<HouseIcon aria-hidden weight={peso} className="size-6" />
+				</div>
+				<code className="text-code">weight="{peso}"</code>
+			</div>
+		))}
+	</div>
+</Painel>
+
+- **`regular`** (padrão, não precisa passar): todos os usos comuns.
+- **`bold`**: só em 12px, onde o traço regular some (ex.: o check do confirmado).
+- **`fill`**: estado ativo/selecionado, como o item atual da navegação.
+- `thin`, `light` e `duotone` não são usados: somem no fundo escuro ou competem com o accent.
+
+## Cor
+
+Ícone herda `currentColor`: a cor vem do texto do pai (`text-text-muted`, `text-success`,
+`text-on-accent`…). Não use a prop `color`; ela foge dos tokens e não troca com o tema.
+
+<Painel>
+	<div className="flex flex-wrap gap-5 text-body">
+		<span className="flex items-center gap-1.5 text-success">
+			<ArrowUpIcon aria-hidden weight="bold" className="size-3" />
+			+3,9%
+		</span>
+		<span className="flex items-center gap-1.5 text-danger">
+			<ArrowDownIcon aria-hidden weight="bold" className="size-3" />
+			−1,2%
+		</span>
+		<span className="flex items-center gap-1.5 text-info">
+			<CheckCircleIcon aria-hidden className="size-4" />
+			Fonte verificada
+		</span>
+		<span className="flex items-center gap-1.5 text-warning">
+			<WarningIcon aria-hidden className="size-4" />
+			Competência incompleta
+		</span>
+	</div>
+</Painel>
+
+## Acessibilidade
+
+- Ícone ao lado de texto é decorativo: `aria-hidden`.
+- Botão só com ícone: o nome vai no botão (`<Button size="icon" aria-label="Exportar CSV">`)
+  e o ícone continua `aria-hidden`.
+- Ícone nunca é o único portador de um estado: delta leva sinal (+/−), status leva texto.
+
+## Ícones de referência
+
+Para a mesma ideia, o mesmo ícone em todas as telas.
+
+<Painel>
+	<Grade
+		itens={[
+			[HouseIcon, "HouseIcon", "Visão geral"],
+			[CurrencyCircleDollarIcon, "CurrencyCircleDollarIcon", "Receita"],
+			[BuildingsIcon, "BuildingsIcon", "Unidade consumidora"],
+			[LightningSlashIcon, "LightningSlashIcon", "Perdas"],
+			[GaugeIcon, "GaugeIcon", "Operação"],
+			[SparkleIcon, "SparkleIcon", "Agente"],
+			[MagnifyingGlassIcon, "MagnifyingGlassIcon", "Buscar"],
+			[FunnelIcon, "FunnelIcon", "Filtros"],
+			[CalendarBlankIcon, "CalendarBlankIcon", "Competência, data"],
+			[DownloadSimpleIcon, "DownloadSimpleIcon", "Exportar"],
+			[ArrowsClockwiseIcon, "ArrowsClockwiseIcon", "Atualizar, sincronizar"],
+			[PlusIcon, "PlusIcon", "Criar"],
+			[TrashIcon, "TrashIcon", "Excluir"],
+			[XIcon, "XIcon", "Fechar, limpar"],
+			[CaretDownIcon, "CaretDownIcon", "Abrir select/menu"],
+			[ArrowUpIcon, "ArrowUpIcon / ArrowDownIcon", "Delta de alta/queda"],
+			[CheckCircleIcon, "CheckCircleIcon", "Sucesso, verificado"],
+			[WarningIcon, "WarningIcon", "Alerta"],
+			[XCircleIcon, "XCircleIcon", "Erro"],
+			[InfoIcon, "InfoIcon", "Informação"],
+		]}
+	/>
+</Painel>

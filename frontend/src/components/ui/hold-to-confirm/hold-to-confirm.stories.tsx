@@ -1,3 +1,4 @@
+import { TrashIcon } from "@phosphor-icons/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { fn } from "storybook/test";
 import { HoldToConfirm } from "./hold-to-confirm";
@@ -40,7 +41,12 @@ export const Carregando: Story = {
 
 export const ZonaDePerigo: Story = {
 	args: {
-		children: "Segure para excluir a carga",
+		children: (
+			<>
+				<TrashIcon aria-hidden />
+				Segure para excluir a carga
+			</>
+		),
 		confirmLabel: "Carga excluída",
 	},
 	render: (args) => (

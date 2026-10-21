@@ -155,6 +155,8 @@ carrega `src/styles.css`.
   configurada em `components.json`), são movidos para `ui/<nome>/<nome>.tsx` + `index.ts` e
   adaptados aos tokens. O [interior.dev](https://www.interior.dev/) é a referência de
   micro-interação.
+- Ícones: [Phosphor](https://phosphoricons.com/) (`@phosphor-icons/react`), regras de
+  tamanho, peso, cor e acessibilidade em **Fundamentos/Ícones**.
 
 Regras e modelo de story na página **Introdução** do Storybook
 (`.storybook/docs/introducao.mdx`).

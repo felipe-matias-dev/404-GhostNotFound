@@ -1,3 +1,9 @@
+import {
+	CircleNotchIcon,
+	DownloadSimpleIcon,
+	PlusIcon,
+	TrashIcon,
+} from "@phosphor-icons/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { Button } from "./button";
 
@@ -81,7 +87,66 @@ export const Desabilitado: Story = {
 };
 
 export const Carregando: Story = {
-	args: { children: "Salvando…", disabled: true, "aria-busy": true },
+	args: {
+		disabled: true,
+		"aria-busy": true,
+		children: (
+			<>
+				<CircleNotchIcon
+					aria-hidden
+					className="animate-spin motion-reduce:animate-none"
+				/>
+				Salvando…
+			</>
+		),
+	},
+};
+
+// Ícone à esquerda do texto: o Button já dimensiona em 16px e ajusta o padding.
+export const ComIcone: Story = {
+	render: (args) => (
+		<div className="flex flex-wrap items-center gap-3">
+			<Button {...args}>
+				<PlusIcon aria-hidden />
+				Nova inspeção
+			</Button>
+			<Button {...args} variant="outline">
+				<DownloadSimpleIcon aria-hidden />
+				Exportar CSV
+			</Button>
+			<Button {...args} variant="destructive">
+				<TrashIcon aria-hidden />
+				Excluir
+			</Button>
+		</div>
+	),
+};
+
+// Só ícone: o nome acessível vem do aria-label do botão.
+export const SoIcone: Story = {
+	render: (args) => (
+		<div className="flex items-center gap-3">
+			<Button
+				{...args}
+				size="icon-sm"
+				variant="ghost"
+				aria-label="Exportar CSV"
+			>
+				<DownloadSimpleIcon aria-hidden />
+			</Button>
+			<Button
+				{...args}
+				size="icon"
+				variant="outline"
+				aria-label="Nova inspeção"
+			>
+				<PlusIcon aria-hidden />
+			</Button>
+			<Button {...args} size="icon-lg" aria-label="Nova inspeção">
+				<PlusIcon aria-hidden />
+			</Button>
+		</div>
+	),
 };
 
 export const ComoLink: Story = {
