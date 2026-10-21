@@ -1,11 +1,15 @@
 import type { Preview } from "@storybook/react-vite";
 import { useEffect } from "storybook/preview-api";
+import { themes } from "storybook/theming";
 import "../src/styles.css";
 
 const preview: Preview = {
 	parameters: {
 		layout: "centered",
 		controls: { expanded: true },
+		// Páginas de docs no escuro, o tema principal da marca (o padrão do Storybook é claro e
+		// deixava texto claro sobre fundo branco).
+		docs: { theme: themes.dark },
 		// Violações de acessibilidade aparecem no painel "Accessibility" de cada story.
 		a11y: { test: "todo" },
 		options: {
@@ -14,7 +18,7 @@ const preview: Preview = {
 			},
 		},
 	},
-	// Seletor "Tema" na barra do Storybook: aplica o tema no <html>, como o app faz.
+	// Seletor "Tema" na barra do Storybook: aplica o tema como o app faz.
 	globalTypes: {
 		tema: {
 			description: "Tema da interface",
@@ -32,15 +36,28 @@ const preview: Preview = {
 	initialGlobals: { tema: "escuro" },
 	decorators: [
 		(Story, { globals, viewMode }) => {
-			// Só no canvas: as páginas de docs mostram os dois temas lado a lado e dependem do
-			// <html> no escuro.
-			const tema = viewMode === "docs" ? "escuro" : globals.tema;
+			const claro = globals.tema === "claro";
+
+			// Canvas: o tema vai no <html>, como no app. Em docs o <html> fica no escuro.
+			const htmlClaro = claro && viewMode !== "docs";
 			useEffect(() => {
 				const raiz = document.documentElement;
-				if (tema === "claro") raiz.dataset.tema = "claro";
+				if (htmlClaro) raiz.dataset.tema = "claro";
 				else delete raiz.dataset.tema;
-			}, [tema]);
-			return Story();
+			}, [htmlClaro]);
+			// Docs: várias stories (e as páginas de Fundamentos, com os dois temas lado a lado)
+			// dividem o mesmo <html>, que fica no escuro; cada story ganha o próprio fundo do tema.
+			if (viewMode === "docs") {
+				return (
+					<div
+						data-tema={claro ? "claro" : undefined}
+						className="rounded-lg bg-bg p-6 text-text"
+					>
+						<Story />
+					</div>
+				);
+			}
+			return <Story />;
 		},
 	],
 };
