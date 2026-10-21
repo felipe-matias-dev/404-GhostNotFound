@@ -127,7 +127,9 @@ neutros. Todas as escalas foram geradas em OKLCH: o mesmo passo (`indigo-500`,
 
 Tokens em `src/styles.css`. Utilitários: `bg-surface-1`, `text-text-muted`,
 `border-border-strong`, `bg-accent text-on-accent`, `ring-focus-ring/50`, `fill-indigo-500`…
-O tema claro é ativado com `data-tema="claro"` em qualquer ancestral.
+O tema claro é ativado com `data-tema="claro"` em qualquer ancestral. No app, quem troca é o
+`ThemeToggle` (via `useTema` de `#/lib/tema`): grava a escolha no `localStorage` e um script
+no `<head>` reaplica antes da primeira pintura. Escuro é o padrão.
 
 ## Semânticos
 

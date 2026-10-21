@@ -6,6 +6,7 @@ import {
 	Scripts,
 } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
+import { scriptTemaInicial } from "#/lib/tema";
 import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
 import appCss from "../styles.css?url";
 
@@ -52,13 +53,16 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 			{ rel: "apple-touch-icon", href: "/apple-touch-icon.png" },
 			{ rel: "manifest", href: "/manifest.webmanifest" },
 		],
+		// Aplica o tema salvo antes da primeira pintura (sem piscar o escuro no claro).
+		scripts: [{ children: scriptTemaInicial }],
 	}),
 	shellComponent: RootDocument,
 });
 
 function RootDocument({ children }: { children: React.ReactNode }) {
 	return (
-		<html lang="pt-BR">
+		// O script do tema pode pôr `data-tema` no <html> antes da hidratação.
+		<html lang="pt-BR" suppressHydrationWarning>
 			<head>
 				<HeadContent />
 			</head>
