@@ -6,12 +6,15 @@ do Postgres (SQLSTATE) para garantir que cada escrita falhou pelo motivo certo.
 
 import os
 from collections.abc import Iterator
+from pathlib import Path
 
 import pytest
 from sqlalchemy import Engine, text
 from sqlalchemy.exc import DBAPIError, OperationalError
 from sqlalchemy.orm import Session
 
+from venergy_api.amostra import SAMPLE_UCS, write_sample
+from venergy_api.carga import load_gold
 from venergy_api.database import Base, create_db_engine
 from venergy_api.models import DimUc
 
@@ -62,6 +65,21 @@ def test_agent_reads_the_gold(agent_engine: Engine) -> None:
         total = connection.execute(text("SELECT count(*) FROM gold.gold_dim_uc")).scalar_one()
 
     assert total == 1
+
+
+def test_agent_still_reads_the_gold_after_a_reload(
+    tmp_path: Path, engine: Engine, agent_engine: Engine
+) -> None:
+    # A carga recria as tabelas da Gold. A permissão de leitura vem do ALTER DEFAULT
+    # PRIVILEGES do schema, que vale para toda tabela nova: a recarga não pode tirá-la.
+    write_sample(tmp_path / "gold", force=True)
+    load_gold(tmp_path / "gold", engine)
+    load_gold(tmp_path / "gold", engine)
+
+    with agent_engine.connect() as connection:
+        total = connection.execute(text("SELECT count(*) FROM gold.gold_dim_uc")).scalar_one()
+
+    assert total == len(SAMPLE_UCS)
 
 
 @pytest.mark.usefixtures("gold_with_one_uc")

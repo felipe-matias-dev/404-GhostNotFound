@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 from pydantic import BaseModel
-from sqlalchemy import Engine, select
+from sqlalchemy import Engine, inspect, select, text
 from sqlalchemy.orm import Session
 
 from venergy_api.carga import GoldLoadError, load_gold, read_rows
@@ -54,6 +54,21 @@ def test_loading_twice_does_not_duplicate_rows(tmp_path: Path, engine: Engine) -
     load_gold(tmp_path / "gold", engine)
 
     assert len(stored_ucs(engine)) == 1
+
+
+def test_reload_recreates_table_with_columns_added_to_the_contract(
+    tmp_path: Path, engine: Engine
+) -> None:
+    # Simula um banco carregado antes de o contrato ganhar uma coluna.
+    with engine.begin() as connection:
+        connection.execute(text("CREATE TABLE gold.gold_dim_uc (cod_uc text PRIMARY KEY)"))
+    write_gold_dim_uc(tmp_path / "gold", [VALID_ROW])
+
+    load_gold(tmp_path / "gold", engine)
+
+    columns = {column["name"] for column in inspect(engine).get_columns("gold_dim_uc", "gold")}
+    assert "consumo_medio_kwh_12m" in columns
+    assert stored_ucs(engine)[0].consumo_medio_kwh_12m == Decimal("152.400")
 
 
 def test_rejects_csv_with_missing_column(tmp_path: Path, engine: Engine) -> None:

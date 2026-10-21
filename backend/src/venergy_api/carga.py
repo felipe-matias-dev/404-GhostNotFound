@@ -12,8 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from pydantic import BaseModel, ValidationError
-from sqlalchemy import Engine, delete, insert
-from sqlalchemy.orm import Session
+from sqlalchemy import Engine, insert
 
 from venergy_api.config import get_settings
 from venergy_api.database import Base, get_engine
@@ -76,16 +75,19 @@ def load_gold(gold_dir: Path, engine: Engine) -> dict[str, int]:
             raise GoldLoadError(f"arquivo não encontrado: {csv_path}")
         validated[table] = read_rows(csv_path, table.schema)
 
-    # Cria as tabelas que faltarem, inclusive as do schema app (ordens de inspeção). O
-    # delete abaixo só passa por GOLD_TABLES, então recarregar a Gold nunca apaga uma OI.
-    Base.metadata.create_all(engine)
-    # Apagar e inserir na mesma transação: rodar duas vezes não duplica, e uma falha
-    # no meio desfaz tudo.
-    with Session(engine) as session, session.begin():
+    gold_tables = [table.model.__table__ for table in GOLD_TABLES]
+    # Tudo numa transação (no Postgres, DROP e CREATE também voltam atrás): rodar duas
+    # vezes não duplica, e uma falha no meio desfaz tudo, inclusive o DROP.
+    with engine.begin() as connection:
+        # Recria a Gold em vez de só apagar as linhas: sem migrações, o create_all não
+        # acrescenta coluna em tabela que já existe, e cada mudança do contrato exigiria
+        # apagar a tabela à mão. O drop só passa por GOLD_TABLES: nunca apaga uma OI.
+        Base.metadata.drop_all(connection, tables=gold_tables)
+        # Cria a Gold e o que faltar no schema app, sem mexer no que já está lá.
+        Base.metadata.create_all(connection)
         for table, rows in validated.items():
-            session.execute(delete(table.model))
             if rows:
-                session.execute(insert(table.model), rows)
+                connection.execute(insert(table.model), rows)
 
     return {table.model.__tablename__: len(rows) for table, rows in validated.items()}
 
