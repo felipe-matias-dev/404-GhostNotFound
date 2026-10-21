@@ -1,6 +1,6 @@
 // Button do shadcn/ui (`npx shadcn@latest add button`) adaptado aos tokens da marca VE-360:
 // - cores só por tokens semânticos (accent, danger, hover/pressed…);
-// - foco é o anel global de `:focus-visible` (styles.css), não o ring do shadcn;
+// - foco igual ao do shadcn (borda + anel de 3px a 50%), na cor `focus-ring`;
 // - desabilitado vira surface-2 + text-disabled em qualquer variante, sem opacidade;
 // - sem sombra: o amarelo já é o destaque.
 import { cva, type VariantProps } from "class-variance-authority";
@@ -9,7 +9,7 @@ import type * as React from "react";
 import { cn } from "#/lib/utils";
 
 const buttonVariants = cva(
-	"inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-md font-medium text-body transition-colors disabled:pointer-events-none disabled:border disabled:border-border disabled:bg-surface-2 disabled:text-text-disabled aria-invalid:border-danger [&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+	"inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-md font-medium text-body outline-none transition-all focus-visible:border-focus-ring focus-visible:ring-3 focus-visible:ring-focus-ring/50 disabled:pointer-events-none disabled:border disabled:border-border disabled:bg-surface-2 disabled:text-text-disabled aria-invalid:border-danger aria-invalid:ring-danger/20 [&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0",
 	{
 		variants: {
 			variant: {

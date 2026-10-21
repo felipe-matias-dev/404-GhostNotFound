@@ -16,7 +16,7 @@ export const semanticos = [
 	["on-accent", "Texto e ícones sobre accent. Sempre escuro."],
 	["accent-text", "Accent como texto/ícone. No claro cai para brand-700."],
 	["accent-subtle", "Fundo tênue de destaque (badge, linha selecionada)."],
-	["focus-ring", "Anel de foco, 2px."],
+	["focus-ring", "Anel de foco: 3px a 50% + borda, no padrão do shadcn."],
 	["info", "Informação, links, dados verificados."],
 	["info-subtle", "Fundo de badge e alerta informativos."],
 	["success", "Sucesso, sync ok, deltas positivos. No claro: green-800."],
@@ -126,7 +126,7 @@ neutros. Todas as escalas foram geradas em OKLCH: o mesmo passo (`indigo-500`,
 `green-500`) tem o mesmo peso visual em qualquer matiz.
 
 Tokens em `src/styles.css`. Utilitários: `bg-surface-1`, `text-text-muted`,
-`border-border-strong`, `bg-accent text-on-accent`, `outline-focus-ring`, `fill-indigo-500`…
+`border-border-strong`, `bg-accent text-on-accent`, `ring-focus-ring/50`, `fill-indigo-500`…
 O tema claro é ativado com `data-tema="claro"` em qualquer ancestral.
 
 ## Semânticos
@@ -146,7 +146,10 @@ gráficos.
 - **Accent como texto** usa `accent-text`; no claro o #f2c94c só aparece como preenchimento.
 - **Alerta não é amarelo:** `warning` é laranja. Nenhuma cor semântica usa o matiz da marca.
 - **Links e dados verificados** usam `info` (selos de “sincronizado”, fontes de dados).
-- **Foco** é sempre `focus-ring` em 2px (regra global de `:focus-visible`).
+- **Foco** segue o padrão do shadcn/ui na cor `focus-ring`: anel de 3px a 50% e borda
+  `focus-ring`. Componentes de `ui/` usam `outline-none focus-visible:border-focus-ring
+  focus-visible:ring-3 focus-visible:ring-focus-ring/50`; a regra global de `:focus-visible`
+  aplica o mesmo anel ao resto.
 
 ## Contraste (WCAG 2.1, sobre `bg`)
 

@@ -26,7 +26,7 @@ export const botoes = [
 	["ghost", "Ghost", "bg-hover", "bg-pressed"],
 ];
 
-export const foco = "outline-2 outline-offset-2 outline-focus-ring";
+export const foco = "border-focus-ring ring-3 ring-focus-ring/50";
 
 export const Botoes = () => (
 	<div className="grid grid-cols-[auto_repeat(5,auto)] items-center gap-x-3 gap-y-3">
@@ -172,7 +172,7 @@ Componente: `Button` de `#/components/ui/button` (shadcn/ui adaptado aos tokens;
 | Repouso      | `accent` + `on-accent` | `danger` + `on-danger` | transparente (outline: `border-strong`) | `surface-2` + `border` |
 | Hover        | `accent-hover`         | `danger-hover`         | `hover`                     | borda `border-strong`        |
 | Pressionado  | `accent-hover`         | `danger-hover`         | `pressed`                   | borda `border-strong`        |
-| Foco         | anel `focus-ring` 2px, deslocado 2px (global em `:focus-visible`) | | | |
+| Foco         | anel de 3px em `focus-ring` a 50% + borda `focus-ring` (padrão do shadcn) | | | |
 | Desabilitado | `surface-2` + `border` + `text-disabled`, em qualquer variante | | | |
 
 - `hover` e `pressed` são camadas translúcidas: funcionam sobre `bg`, `surface-1` ou

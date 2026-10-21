@@ -255,9 +255,9 @@
     line-height: var(--text-body--line-height);
   }
 
-  /* Foco é sempre o focus-ring de 2px: a única luz amarela permitida em componentes. */
+  /* Foco no padrão do shadcn/ui (anel de 3px a 50%) com a cor da marca (OKLCH #f2c94c). */
   :focus-visible {
-    outline: 2px solid var(--color-focus-ring);
-    outline-offset: 2px;
+    outline: none;
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-focus-ring) 50%, transparent);
   }
 }
