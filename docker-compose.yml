@@ -24,20 +24,27 @@ services:
       retries: 10
 
   api:
-    build: ./backend
-    # --reload reinicia a API a cada mudança em src/, montado da sua máquina logo abaixo.
-    command: uvicorn venergy_api.main:create_app --factory --host 0.0.0.0 --port 8000 --reload --reload-dir src
+    # Contexto na raiz: a imagem da API instala o agente de IA pelo workspace do uv (DEC-017).
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    # --reload reinicia a API a cada mudança no código da API ou do agente, montados logo abaixo.
+    command: uvicorn venergy_api.main:create_app --factory --host 0.0.0.0 --port 8000 --reload --reload-dir backend/src --reload-dir ai-agent/src
     environment:
       # Na rede do compose, o banco é o serviço db na porta padrão do PostgreSQL.
       VENERGY_API_DATABASE_URL: postgresql+psycopg://venergy:${POSTGRES_PASSWORD}@db:5432/venergy
       VENERGY_API_GOLD_DIR: /data/gold
+      # Agente de IA: usuário somente leitura e chave do Gemini de cada integrante (.env da raiz).
+      VENERGY_AGENT_DATABASE_URL: postgresql://venergy_agent:${AGENT_DB_PASSWORD}@db:5432/venergy
+      VENERGY_AGENT_GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
       # Detecção de mudanças por varredura: eventos do sistema de arquivos não atravessam
       # o volume no Docker Desktop do Windows.
       WATCHFILES_FORCE_POLLING: "true"
     ports:
       - "127.0.0.1:${API_PORT:-8000}:8000"
     volumes:
-      - ./backend/src:/app/src
+      - ./backend/src:/app/backend/src
+      - ./ai-agent/src:/app/ai-agent/src
       # CSVs da Gold (data/gold/), lidos pela carga e escritos pelo gerador da amostra.
       - ./data:/data
     depends_on:

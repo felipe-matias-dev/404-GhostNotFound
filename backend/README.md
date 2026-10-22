@@ -30,7 +30,7 @@ docker compose up -d --wait db
 Depois a API, dentro da pasta **`backend/`**:
 
 ```bash
-# 3. Instala as dependências
+# 3. Instala as dependências (na .venv da raiz, compartilhada com o agente: DEC-017)
 uv sync
 
 # 4. Cria o .env da API (no PowerShell: Copy-Item .env.example .env)

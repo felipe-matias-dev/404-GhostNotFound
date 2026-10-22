@@ -1,0 +1,15 @@
+# Contexto de build da API (raiz do repositório). Só backend/, ai-agent/, contracts/ e os
+# arquivos do workspace entram na imagem: nada de dataset, chaves ou dependências locais.
+*
+!pyproject.toml
+!uv.lock
+!backend
+!ai-agent
+!contracts
+**/.venv/
+**/.env
+**/.env.*
+!**/.env.example
+**/__pycache__/
+**/.pytest_cache/
+**/.ruff_cache/

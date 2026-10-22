@@ -11,4 +11,4 @@
 frontend/src/routeTree.gen.ts linguist-generated
 frontend/src/lib/api-schema.gen.ts linguist-generated
 frontend/package-lock.json linguist-generated
-backend/uv.lock linguist-generated
+uv.lock linguist-generated

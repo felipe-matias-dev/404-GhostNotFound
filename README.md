@@ -104,7 +104,7 @@ modificados pelos hooks, para não conflitar com o Databricks.
 Uma vez por clone, na raiz:
 
 ```bash
-(cd backend && uv sync) && (cd frontend && npm ci)   # ferramentas usadas pelos hooks
+uv sync --all-packages && (cd frontend && npm ci)    # ferramentas usadas pelos hooks
 uvx pre-commit install                               # requer uv
 uvx pre-commit run --all-files                       # opcional: roda em tudo
 ```

@@ -23,6 +23,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | 20/10/2026 | DEC-011: contrato da Gold com `competencia` em texto (`AAAA-MM`) e três cópias independentes de Silver → Gold | Texto preserva o formato em CSV e em todas as camadas; três cópias comparadas dão uma Gold mais sólida | Alisson |
 | 21/10/2026 | DEC-012: tokens do frontend vêm do design system da marca VE-360 (paleta OKLCH a partir de #f2c94c, neutros `graphite`, Inter Tight + Söhne Breit + JetBrains Mono); escalas padrão do Tailwind removidas | Uma única fonte de cor, tipo, raio e sombra; utilitário fora do sistema não gera CSS | João Euclides |
 | 21/10/2026 | DEC-013: componentes base trazidos do shadcn/ui no estilo `base-nova` (Base UI) e do interior.dev para `frontend/src/components/ui/`, adaptados aos tokens; nenhuma biblioteca de componentes como dependência | O código fica no repositório e segue os tokens da marca; uma única base de primitivas (Base UI, sem Radix) | João Euclides |
+| 22/10/2026 | DEC-017: backend e agente formam um workspace do uv, com um único `uv.lock` na raiz | Com o `/ai`, a API instala o agente; uma resolução só garante que o que é testado é o que roda | Luis Felipe |
 
 ## DEC-001 · Localização dos arquivos de origem (landing)
 
@@ -148,6 +149,8 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   - A detecção de mudanças usa varredura (`WATCHFILES_FORCE_POLLING`,
     `CHOKIDAR_USEPOLLING`), porque eventos de arquivo não atravessam o volume no
     Docker Desktop do Windows.
+  - A imagem da API é construída com contexto na raiz e instala o agente de IA pelo
+    workspace do uv (DEC-017); o compose monta `backend/src` e `ai-agent/src`.
 
 ## DEC-007 · Hooks de pre-commit e CI
 
@@ -166,7 +169,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Regras:**
   - Biome e geradores do contrato rodam com as versões do projeto (`npm ci` em
     `frontend/`, `uv` no backend). O ruff do hook tem a mesma versão do
-    `backend/uv.lock`; ao atualizar um, atualize o outro.
+    `uv.lock` da raiz (DEC-017); ao atualizar um, atualize o outro.
   - O ruff roda só em `.py`: notebooks do Databricks usam `spark` e `dbutils` sem
     import, e os blocos de código dos `.md` não devem ser reformatados.
   - Nenhum hook modifica notebooks (`.ipynb`): eles são editados e versionados pelo
@@ -325,3 +328,35 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Motivo:** o `ai-agent/CLAUDE.md` pede uma versão nova para cada mudança de prompt, que só entra com golden set sem regressão. Hoje a v1 não está na `main` e o golden set ainda não foi executado com dados. Criar a v2 agora mudaria o `prompt_version` de auditoria sem ganho real.
 - **Consequência:** o `prompt_version='v1'` gravado na auditoria passa a cobrir os dois prompts de correção. Quem olhar uma resposta antiga precisa saber que ela foi gerada antes da delimitação.
 - **Em aberto:** (1) aceitar a exceção ou exigir a v2 antes do merge; (2) a partir de quando o golden set roda como portão para mudanças de prompt. Depois do primeiro merge na `main`, qualquer mudança de prompt vai para `prompts/v2/`.
+
+## DEC-017 · Workspace do uv com um único `uv.lock`
+
+- **Data:** 22/10/2026 · **Área:** Portal e GenAI · **Autor:** Luis Felipe (decidido na daily de 21/10; issue #18)
+- **Decisão:** `pyproject.toml` na raiz com `[tool.uv.workspace] members = ["backend", "ai-agent"]`,
+  um único `uv.lock` e uma única `.venv` na raiz. O backend depende de `venergy-agent` com
+  `{ workspace = true }` e importa só a porta `TextToSqlAgent` do agente.
+- **Motivo:** com o endpoint `/ai` (G1-09), a API instala o agente. Com um lock por módulo, as
+  dependências do agente seriam resolvidas duas vezes, e o CI testaria o agente com versões
+  diferentes das que rodam na API. Uma resolução só garante que o que é testado é o que roda.
+- **Alternativa descartada:** um lock por módulo com dependência por caminho
+  (`venergy-agent = { path = "../ai-agent" }`). A autonomia de versões, que era a vantagem,
+  deixa de existir quando a API instala o agente, e o trabalho no Docker é o mesmo.
+- **Consequências:**
+  - As versões ficam acopladas. O cliente do Gemini (`google-genai`) exige `websockets<17`, então
+    a API passou de `websockets` 17.2 para 16.1.1. Na migração, nenhuma outra versão do agente mudou;
+    no backend, só `httpx2` e `httpcore2` (de testes) foram de 2.14 para 2.16.
+  - PRs de times diferentes que mexem em dependências disputam o mesmo `uv.lock`. Em conflito,
+    mantenha os `pyproject.toml` dos dois lados e rode `uv lock` na raiz.
+  - A imagem da API é construída com contexto na raiz (`backend/Dockerfile`), com um
+    `.dockerignore` que só deixa entrar `backend/`, `ai-agent/`, `contracts/` e os arquivos do
+    workspace: nada de dataset, `.env` ou `.venv`.
+- **Regras:**
+  - `uv sync --all-packages` na raiz instala tudo (`make setup`). `uv run` dentro de `backend/`
+    ou de `ai-agent/` continua funcionando e usa o lock da raiz.
+  - Dependência nova: `uv add` dentro da pasta do pacote que a usa; o `uv.lock` atualizado é
+    o da raiz.
+  - O ambiente é a `.venv` da raiz. As antigas `backend/.venv` e `ai-agent/.venv` podem ser
+    apagadas, e o interpretador do editor passa a ser `.venv/bin/python` na raiz.
+  - O serviço `api` recebe `VENERGY_AGENT_DATABASE_URL` (usuário `venergy_agent`) e
+    `VENERGY_AGENT_GOOGLE_API_KEY`, que vem de `GOOGLE_API_KEY` no `.env` da raiz. A chave é
+    opcional até o `/ai` existir e nunca entra em camada da imagem.

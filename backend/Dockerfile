@@ -1,6 +1,8 @@
 # syntax=docker/dockerfile:1
-# Imagem da API. No docker compose, o código de src/ é montado por cima e o uvicorn
-# recarrega a cada mudança; sem o volume, a imagem roda sozinha com o código copiado.
+# Imagem da API. O contexto de build é a raiz do repositório (workspace do uv, DEC-017): a
+# API instala o agente de IA (ai-agent/) a partir do uv.lock da raiz. No docker compose, o
+# código de backend/src e ai-agent/src é montado por cima e o uvicorn recarrega a cada mudança;
+# sem os volumes, a imagem roda sozinha com o código copiado.
 FROM python:3.12-slim
 
 COPY --from=ghcr.io/astral-sh/uv:0.12.10 /uv /bin/uv
@@ -14,15 +16,20 @@ ENV UV_PROJECT_ENVIRONMENT=/opt/venv \
 
 WORKDIR /app
 
-# Dependências antes do código: a camada só é refeita quando o uv.lock muda.
+# Dependências antes do código: a camada só é refeita quando o uv.lock ou um pyproject muda.
 RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=uv.lock,target=uv.lock \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
-    uv sync --frozen --no-dev --no-install-project
+    --mount=type=bind,source=backend/pyproject.toml,target=backend/pyproject.toml \
+    --mount=type=bind,source=ai-agent/pyproject.toml,target=ai-agent/pyproject.toml \
+    uv sync --frozen --no-dev --no-install-workspace --package venergy-api
 
-COPY . .
+COPY pyproject.toml uv.lock ./
+COPY backend backend
+COPY ai-agent ai-agent
+COPY contracts contracts
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev
+    uv sync --frozen --no-dev --package venergy-api
 
 # Sem root: o mesmo UID do primeiro usuário do Linux, dono dos arquivos montados.
 RUN useradd --uid 1000 --create-home app

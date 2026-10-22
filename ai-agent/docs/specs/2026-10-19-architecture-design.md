@@ -209,7 +209,7 @@ O validador é a primeira trava. A segunda é o banco: role somente leitura, com
 | `prompt_version` | `v1` | Pasta em `prompts/` |
 | `answer_sample_rows` | `20` | **Item 6.** `> 0`; linhas em `AgentAnswer.rows` e no `AnswerWriter` |
 | `semantic_layer_path` | `ai-agent/semantic/semantic_layer.yaml` | **Item 5.** Resolvido pelo caminho do pacote, como o `.env` |
-| `gold_contract_path` | `contracts/gold_schema.yaml` da raiz | **Item 5.** Idem. Dentro do container da API o arquivo precisa estar disponível (D8) |
+| `gold_contract_path` | `contracts/gold_schema.yaml` da raiz | **Item 5.** Idem. A imagem da API já copia `contracts/` (DEC-017) |
 
 **Adiado de propósito:** rate limit e orçamento de tokens por sessão (§5.4 do guia). O case não os exige, e o rate limit por usuário cabe melhor no backend, que conhece o usuário. Entram como diferencial (§11).
 
@@ -290,7 +290,7 @@ Pedidos a abrir como issue para a área dona. O GenAI não altera esses arquivos
 | D5 | Time (`docs/arquitetura.md`) | Atualizar o ADR-01 de "em aberto" para "PostgreSQL (DEC-002)" | Documento do time desatualizado | Aberto |
 | D6 | Dev (`infra/postgres/init/01-init.sh`) | Versionar o script com bit de execução (`git update-index --chmod=+x`) | No Docker Desktop do macOS, a primeira subida do banco falha com `bad interpreter: Permission denied` | Aberto |
 | D7 | Dev (loader `venergy_api.carga`) | Rodar o `ai-agent/semantic/views.sql` (gerado pelo item 5) com o usuário dono, depois do `create_all` da carga | O usuário do agente é somente leitura. A recarga usa `DELETE` + `INSERT`, então as views sobrevivem; o `DROP TABLE` sugerido na DEC-010 falha enquanto houver view dependente (precisa de `CASCADE` e de recriar as views) | Aberto; depende do item 5 |
-| D8 | Dev (`backend/`, `docker-compose.yml`, CI) | Decidir como o backend instala o agente quando o `/ai` for integrado: *workspace* do uv na raiz ou dependência por caminho (`venergy-agent = { path = "../ai-agent" }`). Inclui levar `contracts/gold_schema.yaml` e `ai-agent/semantic/` para dentro do container da API. Até lá, cada módulo mantém o próprio `uv.lock` e o `make setup` instala tudo | O workspace muda o build da API (`build: ./backend` e `uv sync --frozen` usam o `backend/uv.lock`), o CI e a versão do ruff presa ao `backend/uv.lock` (DEC-007) | Aberto; decidir no início do D3 |
+| D8 | Dev (`backend/`, `docker-compose.yml`, CI) | Instalar o agente na API: workspace do uv com um único `uv.lock` na raiz, build da API com contexto na raiz e as variáveis `VENERGY_AGENT_*` no serviço `api` | O backend precisa importar o agente para o `/ai` (G1-09) | **Feito** (DEC-017, issue #18). A imagem já leva `ai-agent/` (com `prompts/` e, no item 5, `semantic/`) e `contracts/` |
 | D9 | Dev (G2-04, G2-05) | Montar o JSON de métricas de cada tela, chamar o `InsightWriter` e guardar o insight em cache por combinação de filtros; quando o agente devolver `None`, mostrar a tela sem o insight | O LLM só narra números prontos (ADR-04); o agente não guarda estado no processo (§14 do guia) | Aberto; depende do item 9 |
 
 ## 11. Próximas features (cada uma em sua branch, com plano próprio)

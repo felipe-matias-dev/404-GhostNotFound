@@ -36,7 +36,7 @@ repos:
     hooks:
       - id: gitleaks
 
-  # Mesma versão do ruff em backend/uv.lock. Cada pasta usa o [tool.ruff] do seu pyproject.toml.
+  # Mesma versão do ruff no uv.lock da raiz (workspace, DEC-017). Cada pasta usa o [tool.ruff] do seu pyproject.toml.
   # Só arquivos .py: o ruff também formataria os blocos de código dos .md e os notebooks do
   # Databricks, onde `spark` e `dbutils` existem sem import e virariam erro.
   # --no-cache: o hook roda na raiz, onde o ruff criaria um .ruff_cache/; nos poucos arquivos
@@ -68,7 +68,7 @@ repos:
         name: contrato OpenAPI (backend → contracts/openapi.json)
         language: system
         entry: uv run --project backend python -m venergy_api.openapi
-        files: &contract-files ^(backend/(src/|pyproject\.toml$|uv\.lock$)|contracts/openapi\.json$|frontend/(package(-lock)?\.json$|src/lib/api-schema\.gen\.ts$))
+        files: &contract-files ^(backend/(src/|pyproject\.toml$)|uv\.lock$|contracts/openapi\.json$|frontend/(package(-lock)?\.json$|src/lib/api-schema\.gen\.ts$))
         pass_filenames: false
       - id: openapi-types
         name: tipos do client (contracts/openapi.json → frontend)

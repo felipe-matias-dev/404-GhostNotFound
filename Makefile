@@ -18,8 +18,7 @@ help:
 	@echo make ci - lint, test e frontend-check: o CI inteiro, local
 
 setup: env
-	uv --directory backend sync
-	uv --directory ai-agent sync
+	uv sync --all-packages
 	cd frontend && npm ci --no-audit --no-fund
 	uvx pre-commit install
 

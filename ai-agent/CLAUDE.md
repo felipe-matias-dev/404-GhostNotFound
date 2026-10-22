@@ -25,7 +25,8 @@ Se o agente não souber, diz que não sabe. Resposta inventada é falha crítica
   - o SQL das views é gerado pelo GenAI em `ai-agent/semantic/views.sql` e aplicado pelo loader com o usuário dono (spec §10, D7).
 - **Configuração:**
   - variáveis com prefixo `VENERGY_AGENT_` (`src/venergy_agent/config.py`, modelo em `.env.example`). O `ai-agent/.env` é localizado pelo caminho do pacote, não pelo diretório atual, e as variáveis de ambiente do processo têm precedência sobre ele;
-  - quando o agente rodar dentro da API, o serviço `api` do compose precisa receber essas variáveis, porque hoje não recebe;
+  - dentro da API, o serviço `api` do compose recebe `VENERGY_AGENT_DATABASE_URL` e `VENERGY_AGENT_GOOGLE_API_KEY` (de `GOOGLE_API_KEY` no `.env` da raiz);
+  - backend e agente formam um workspace do uv com um único `uv.lock` na raiz (DEC-017): dependência nova é `uv add` dentro de `ai-agent/`, e o lock atualizado é o da raiz;
   - cada integrante usa a própria chave do Gemini (`VENERGY_AGENT_GOOGLE_API_KEY`) ou do OpenRouter; nenhuma chave vai para log, resposta ou Git.
 - **CI:** o job "Agente de IA (pytest)" do `ci.yml` roda os testes do agente, inclusive os de integração contra o Postgres do compose.
 
