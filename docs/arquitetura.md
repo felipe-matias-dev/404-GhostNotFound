@@ -104,7 +104,7 @@ Estes termos são usados com o mesmo significado no código, no banco, no portal
 | Termo | Definição | Nome técnico |
 |---|---|---|
 | Unidade Consumidora (UC) | Ponto com medidor; entidade central do modelo | `cod_uc` |
-| Cliente | Titular; pode ter várias UCs | `cod_cliente` |
+| Cliente | Titular da UC; o glossário do case prevê que um cliente pode ter várias UCs, mas no dataset cada titular tem uma UC só. A Gold traz só o titular mascarado | `titular_mascarado`, `documento_mascarado` |
 | Competência | Mês de referência do consumo e da fatura (não o mês de pagamento) | `competencia` (`YYYY-MM`) |
 | Classe de consumo | B1 residencial, B2 rural, B3 comercial/poder público, A4 industrial MT; a classe do cadastro (Residencial, Comercial, Industrial, Rural, Poder Público) separa o comercial do poder público | `classe`, `classe_cadastro` |
 | Alimentador | Circuito de média tensão que atende um conjunto de UCs | `cod_alimentador` |

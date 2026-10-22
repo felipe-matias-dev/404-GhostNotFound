@@ -66,7 +66,8 @@ Dimensão de unidades consumidoras.
 | `cod_alimentador` | text | não |  | confirmada | Alimentador (circuito de média tensão) que atende a UC. |
 | `possui_gd` | boolean | não |  | confirmada | A UC tem geração própria (ex.: solar). |
 | `consumo_medio_kwh_12m` | numeric(16,3) | sim | kWh/mês | confirmada | Consumo médio mensal da UC nos últimos 12 meses; vazio quando a UC não tem leitura. Nulo, e não zero: há UCs do cadastro sem nenhuma leitura (log da Silver), e sem leitura não há média (DEC-023). |
-| `cod_cliente` | text | sim |  | a confirmar | Titular da UC; um cliente pode ter várias UCs. **Sensível: fora do agente.** Identifica pessoa: fora do agente. |
+| `titular_mascarado` | text | sim |  | proposta | Iniciais do titular da UC, para o atendente confirmar a identidade na UC 360. **Sensível: fora do agente.** O nome completo não chega à Gold; fora do agente (DEC-023). |
+| `documento_mascarado` | text | sim |  | proposta | Documento do titular com só os 3 últimos dígitos, para o atendente confirmar a identidade. **Sensível: fora do agente.** O documento completo não chega à Gold; fora do agente (DEC-023). |
 | `potencia_kwp` | double precision | sim | kWp | proposta | Potência de pico instalada da geração própria; só para UCs com GD. Era potencia_kw: a origem só traz potência de pico (kWp), e kW seria outra grandeza (DEC-023); o tratamento dos registros com potência anômala da Silver é decidido na Gold. |
 
 ### `gold_fato_faturamento_mensal`
@@ -302,7 +303,7 @@ UCs suspeitas de perda não técnica, ordenadas por prioridade.
 - Período base: decidido manter qualquer par de períodos em gold_receita_decomposicao. Falta alinhar docs/arquitetura.md e docs/planejamento.md, que ainda falam em primeiros e últimos 12 meses e em votação.
 - Chave e colunas de gold_interrupcoes_uc, gold_atendimentos_uc e gold_medidor_uc dependem da Silver.
 - Precisão numérica (energy_kwh, money) e normalização de município/bairro dependem da Silver.
-- Colunas mascaradas do titular (nome e documento), se a UC 360 precisar: nomes e tipos a definir ao desenhar a Gold.
+- Titular na UC 360 (DECIDIDO, DEC-023): a Gold traz só titular_mascarado (iniciais) e documento_mascarado (3 últimos dígitos), ambos sensitive. Não há cod_cliente: a origem não tem código de cliente e, no dataset, cada titular tem uma UC só, exceto um documento repetido em um grupo de UCs cadastradas sem medidor e sem fatura, que merece verificação (ver o log de qualidade).
 - DEC-004: a Gold agregada não vai ao repositório público (a confirmar com a organização).
 - classe x subgrupo (DECIDIDO: opção B, DEC-023): o glossário do case chama de 'classe de consumo' os grupos B1, B2, B3 e A4, e o B3 junta comercial e poder público; a diretoria pergunta por 'receita comercial' e 'volume residencial', e a Silver traz as duas informações (classe com 5 nomes e subgrupo_tarifario B1/B2/B3/A4, com cada classe em um só subgrupo). Opção A: classe passa a ter os 5 nomes e subgrupo guarda B1/B2/B3/A4. Opção B: classe continua B1/B2/B3/A4, como no case, e entra uma coluna nova com os 5 nomes. A opção A muda o domínio de classe, que hoje é usado pelo backend (teste do contrato) e pela camada semântica do agente (regra 'classe tem exatamente B1, B2, B3 e A4' e exemplos); a opção B só acrescenta coluna.
 - receita (A CONFIRMAR APÓS A RECONCILIAÇÃO): receita_energia é a base provisória do PVM e da tarifa_media (DEC-023). Teste declarado: medir qual definição (com ou sem tributos) reproduz a variação citada pela diretoria e registrar o resultado como hipótese testada, sem ajustar números. Confirmar com o diagnóstico do PR #19 qual coluna foi usada para reproduzir a variação.
