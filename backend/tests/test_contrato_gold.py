@@ -5,8 +5,11 @@ muda o YAML, estes testes apontam o que o backend precisa acompanhar, antes de a
 falhar com a Gold real.
 """
 
+from datetime import date
+from decimal import Decimal
 from pathlib import Path
-from typing import Any, Literal, get_args, get_origin
+from types import UnionType
+from typing import Annotated, Any, Literal, Union, get_args, get_origin
 
 import pytest
 import yaml
@@ -17,6 +20,18 @@ from venergy_api.carga import GOLD_TABLES, GoldTable
 CONTRACT_PATH = Path(__file__).resolve().parents[2] / "contracts" / "gold_schema.yaml"
 CONTRACT = yaml.safe_load(CONTRACT_PATH.read_text(encoding="utf-8"))
 CONTRACT_TYPES = CONTRACT["conventions"]["types"]
+# Tipo Python que o schema usa para cada tipo do contrato. Dinheiro e energia em Decimal,
+# nunca float (DEC-010): é o que a carga entrega ao banco.
+CONTRACT_PYTHON_TYPES = {
+    "text": str,
+    "integer": int,
+    "boolean": bool,
+    "date": date,
+    "money": Decimal,
+    "energy_kwh": Decimal,
+    "ratio": float,
+    "text_array": list,
+}
 
 # Dependem da Silver: o contrato ainda não define as colunas nem a chave delas.
 PENDING_TABLES = {"gold_interrupcoes_uc", "gold_atendimentos_uc", "gold_medidor_uc"}
@@ -42,6 +57,25 @@ def literal_values(annotation: object) -> set[object]:
     if get_origin(annotation) is Literal:
         return set(get_args(annotation))
     return {value for arg in get_args(annotation) for value in literal_values(arg)}
+
+
+def accepts_none(annotation: object) -> bool:
+    return type(None) in get_args(annotation)
+
+
+def python_type(annotation: object) -> object:
+    """Tipo base de um campo do schema, sem o None do opcional e sem as restrições."""
+    origin = get_origin(annotation)
+    if origin in (Union, UnionType):
+        (base,) = [arg for arg in get_args(annotation) if arg is not type(None)]
+        return python_type(base)
+    if origin is Annotated:
+        return python_type(get_args(annotation)[0])
+    if origin is Literal:
+        return type(get_args(annotation)[0])
+    if origin is list:
+        return list
+    return annotation
 
 
 def test_pending_tables_are_the_ones_without_a_key_in_the_contract() -> None:
@@ -95,6 +129,21 @@ def test_database_types_match_the_contract(table: GoldTable) -> None:
     assert {
         column.name: normalize_type(column.type.compile(dialect=dialect))
         for column in table.model.__table__.columns
+    } == expected
+
+
+@backend_tables
+def test_schema_types_and_nullability_match_the_contract(table: GoldTable) -> None:
+    # O schema valida cada linha do CSV antes de ela chegar ao banco: um tipo ou uma
+    # nulidade errados ali deixariam passar dado fora do contrato, mesmo com a tabela certa.
+    expected = {
+        name: (CONTRACT_PYTHON_TYPES[spec["type"]], spec["nullable"])
+        for name, spec in contract_columns(table).items()
+    }
+
+    assert {
+        name: (python_type(field.annotation), accepts_none(field.annotation))
+        for name, field in table.schema.model_fields.items()
     } == expected
 
 
