@@ -1,0 +1,60 @@
+import { Meta } from "@storybook/addon-docs/blocks";
+
+<Meta title="Fundamentos/Tipografia" />
+
+# Tipografia
+
+Três famílias, tokens em `src/styles.css` (`@theme`). A escala padrão do Tailwind
+(`text-sm`, `text-2xl`…) foi removida: só existem os estilos abaixo.
+
+- **`font-sans`** (padrão do documento) — Inter Tight variável: todo o texto de interface,
+  corpo, labels, tabelas e qualquer heading com acento.
+- **`font-display`** — Söhne Breit variável (200–900): marca (logo `VE-360`), headings
+  **sem acento** e números grandes de destaque.
+- **`font-mono`** — JetBrains Mono variável: código, IDs, hashes.
+
+<div className="sb-unstyled my-8 flex flex-col gap-4 rounded-lg bg-bg p-6 text-text">
+	<p className="font-display text-display">Receita</p>
+	<p className="font-display text-title">Perdas tecnicas</p>
+	<p className="font-display text-metric tabular-nums">1.250.000</p>
+	<p className="font-sans text-heading">Visão geral da operação</p>
+	<p className="font-sans text-body">
+		Corpo em Inter Tight: competência 03/2026, 12,4% de perdas.
+	</p>
+	<p className="font-sans text-small text-text-muted">Atualizado há 5 min</p>
+	<p className="font-mono text-code">uc_0042-17a9</p>
+</div>
+
+## Escala
+
+Cada `text-*` já traz tamanho, `line-height`, `letter-spacing` e peso. A família vem
+separada: `display`, `title` e `metric` pedem `font-display`; os demais usam `font-sans`
+(padrão) ou `font-mono`.
+
+| Utilitário     | Família   | Tamanho / linha | Peso | Tracking | Uso                                         |
+| -------------- | --------- | --------------- | ---- | -------- | ------------------------------------------- |
+| `text-display` | display   | 56 / 60px       | 700  | −3%      | Hero e títulos de página sem acento         |
+| `text-title`   | display   | 28 / 34px       | 600  | −2%      | Títulos de seção sem acento                 |
+| `text-metric`  | display   | 40 / 44px       | 500  | −2%      | Número de destaque (KPI), com `tabular-nums` |
+| `text-heading` | sans      | 17 / 24px       | 600  | −1%      | Headings de UI, inclusive com acento        |
+| `text-body`    | sans      | 14 / 20px       | 400  | 0        | Texto corrido, células de tabela (padrão)   |
+| `text-small`   | sans      | 12 / 16px       | 500  | 0        | Labels, metadados, badges                   |
+| `text-code`    | mono      | 13 / 20px       | 400  | 0        | Código, IDs, hashes                         |
+
+- Evite pesos abaixo de 400 no fundo escuro: somem ao lado do accent.
+- O número que importa num `metric` pode levar `text-accent-text`, um dos usos legítimos
+  dos 2% de amarelo.
+
+## Restrição da Söhne
+
+Os arquivos são a versão de teste da Klim: só `A–Z a–z 0–9 , - .` e espaço. Sem acentos,
+`%`, `R$`, `:` ou `/`. Qualquer glifo ausente cai na Inter Tight, misturando as fontes na
+mesma palavra. Por isso:
+
+- `font-display` só em textos que caibam nesse conjunto. Heading com acento
+  (“Visão geral”) vai em `text-heading` (Inter Tight 600). Na dúvida (texto do usuário ou
+  vindo de dados), é Inter Tight.
+- Em número de destaque com unidade (`R$`, `%`, `kWh`), a unidade vai em um `<span>`
+  `font-sans` separado.
+- A versão de teste não pode ir para produção; a licença final substitui os arquivos em
+  `src/assets/fonts/soehne/` sem mudar os tokens.

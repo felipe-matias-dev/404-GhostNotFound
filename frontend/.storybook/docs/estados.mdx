@@ -1,0 +1,238 @@
+import { Meta } from "@storybook/addon-docs/blocks";
+import { CheckIcon } from "@phosphor-icons/react";
+import { Badge } from "#/components/ui/badge";
+import { Button } from "#/components/ui/button";
+
+<Meta title="Fundamentos/Estados" />
+
+export const Temas = ({ children, empilhado = false }) => (
+	<div className={`sb-unstyled my-6 grid gap-4 ${empilhado ? "grid-cols-1" : "grid-cols-2"}`}>
+		<div className="rounded-lg border border-border bg-bg p-5 text-text">
+			<p className="mb-4 text-small text-text-muted">Escuro</p>
+			{children}
+		</div>
+		<div data-tema="claro" className="rounded-lg border border-border bg-bg p-5 text-text">
+			<p className="mb-4 text-small text-text-muted">Claro</p>
+			{children}
+		</div>
+	</div>
+);
+
+export const botoes = [
+	// Hover/pressionado fixos via className: o cn() do Button troca a classe da variante
+	// pela do estado, só para a demonstração.
+	["default", "Primário", "bg-accent-hover", "bg-accent-hover"],
+	["destructive", "Destrutivo", "bg-danger-hover", "bg-danger-hover"],
+	["outline", "Outline", "bg-hover", "bg-pressed"],
+	["secondary", "Secundário", "border-border-strong", "border-border-strong"],
+	["ghost", "Ghost", "bg-hover", "bg-pressed"],
+];
+
+export const foco = "border-focus-ring ring-3 ring-focus-ring/50";
+
+export const Botoes = () => (
+	<div className="grid grid-cols-[auto_repeat(5,auto)] items-center gap-x-3 gap-y-3">
+		<span />
+		{["Repouso", "Hover", "Pressionado", "Foco", "Desabilitado"].map((estado) => (
+			<span key={estado} className="text-small text-text-muted">
+				{estado}
+			</span>
+		))}
+		{botoes.map(([variant, nome, hover, pressionado]) => (
+			<div key={variant} className="contents">
+				<span className="text-small text-text-muted">{nome}</span>
+				<Button variant={variant}>Salvar</Button>
+				<Button variant={variant} tabIndex={-1} className={hover}>Salvar</Button>
+				<Button variant={variant} tabIndex={-1} className={pressionado}>Salvar</Button>
+				<Button variant={variant} tabIndex={-1} className={foco}>Salvar</Button>
+				<Button variant={variant} disabled>Salvar</Button>
+			</div>
+		))}
+	</div>
+);
+
+export const status = [
+	["bg-text-muted", "Rascunho"],
+	["bg-accent", "Em revisão"],
+	["bg-info", "Verificado"],
+	["bg-success", "Sincronizado"],
+	["bg-warning", "Atrasado"],
+];
+
+export const Badges = () => (
+	<div className="flex flex-wrap gap-2">
+		{status.map(([ponto, texto]) => (
+			<Badge key={texto}>
+				<span data-icon="inline-start" aria-hidden className={`size-1.5 rounded-full ${ponto}`} />
+				{texto}
+			</Badge>
+		))}
+		<Badge variant="destructive">Falhou</Badge>
+	</div>
+);
+
+export const Alertas = () => (
+	<div className="flex flex-col gap-2">
+		<div className="rounded-md bg-info-subtle p-3">
+			<p className="text-heading text-info">Fonte verificada</p>
+			<p className="text-body">Dados conferidos com a medição de 03/2026.</p>
+		</div>
+		<div className="rounded-md bg-success-subtle p-3">
+			<p className="text-heading text-success">Carga concluída</p>
+			<p className="text-body">12 tabelas atualizadas há 5 min.</p>
+		</div>
+		<div className="rounded-md bg-warning-subtle p-3">
+			<p className="text-heading text-warning">Competência incompleta</p>
+			<p className="text-body">Faltam 3 unidades consumidoras.</p>
+		</div>
+		<div className="rounded-md bg-danger-subtle p-3">
+			<p className="text-heading text-danger">Falha na sincronização</p>
+			<p className="text-body">A API não respondeu. Tente de novo.</p>
+		</div>
+	</div>
+);
+
+export const linhas = [
+	["Repouso", "UC 0042", "R$ 12.480,00", "hover:bg-hover"],
+	["Hover", "UC 0043", "R$ 9.112,50", "bg-hover"],
+	["Selecionada", "UC 0044", "R$ 15.903,10", "bg-accent-subtle before:bg-accent"],
+	["Com erro", "UC 0045", "—", "bg-danger-subtle before:bg-danger"],
+];
+
+export const Tabela = () => (
+	<div className="overflow-hidden rounded-md border border-border bg-surface-1">
+		{linhas.map(([estado, uc, valor, classes]) => (
+			<div
+				key={uc}
+				className={`relative grid grid-cols-3 border-b border-border px-3 py-1.5 text-body last:border-b-0 before:absolute before:inset-y-0 before:left-0 before:w-0.5 ${classes}`}
+			>
+				<span>{uc}</span>
+				<span className="tabular-nums">{valor}</span>
+				<span className="text-small text-text-muted">{estado}</span>
+			</div>
+		))}
+	</div>
+);
+
+export const Sidebar = () => (
+	<nav aria-label="Exemplo de navegação" className="flex w-52 flex-col gap-0.5 rounded-md border border-border bg-surface-1 p-1.5">
+		<a href="#estados" aria-current="page" className="relative rounded-md bg-hover px-3 py-1.5 text-body font-medium text-text before:absolute before:inset-y-1.5 before:left-0 before:w-0.5 before:rounded-full before:bg-accent">
+			Visão geral
+		</a>
+		<a href="#estados" className="rounded-md px-3 py-1.5 text-body text-text-muted hover:bg-hover hover:text-text">
+			Receita
+		</a>
+		<a href="#estados" className="rounded-md px-3 py-1.5 text-body text-text-muted hover:bg-hover hover:text-text">
+			Perdas
+		</a>
+		<span aria-disabled="true" className="rounded-md px-3 py-1.5 text-body text-text-disabled">
+			Agente (em breve)
+		</span>
+	</nav>
+);
+
+export const Marcacoes = () => (
+	<div className="flex flex-wrap gap-5 text-body">
+		<span className="flex items-center gap-2">
+			<span aria-hidden="true" className="size-4 rounded-sm border border-border-strong" />
+			Desmarcado
+		</span>
+		<span className="flex items-center gap-2">
+			<span aria-hidden="true" className="grid size-4 place-items-center rounded-sm bg-accent text-on-accent">
+				<CheckIcon aria-hidden weight="bold" className="size-3" />
+			</span>
+			Marcado
+		</span>
+		<span aria-disabled="true" className="flex items-center gap-2 text-text-disabled">
+			<span aria-hidden="true" className="grid size-4 place-items-center rounded-sm border border-border bg-surface-2">
+				<CheckIcon aria-hidden weight="bold" className="size-3" />
+			</span>
+			Desabilitado
+		</span>
+		<span className="flex items-center gap-2">
+			<span aria-hidden="true" className="grid size-4 place-items-center rounded-full bg-accent">
+				<span className="size-1.5 rounded-full bg-on-accent" />
+			</span>
+			Rádio
+		</span>
+	</div>
+);
+
+# Estados
+
+Tokens em `src/styles.css`. Os exemplos estão nos dois temas; passe o mouse para ver o hover
+real.
+
+## Botões
+
+Componente: `Button` de `#/components/ui/button` (shadcn/ui adaptado aos tokens; story em
+**Componentes/Button**).
+
+<Temas empilhado>
+	<Botoes />
+</Temas>
+
+| Estado       | default                | destructive            | outline / ghost             | secondary                    |
+| ------------ | ---------------------- | ---------------------- | --------------------------- | ---------------------------- |
+| Repouso      | `accent` + `on-accent` | `danger` + `on-danger` | transparente (outline: `border-strong`) | `surface-2` + `border` |
+| Hover        | `accent-hover`         | `danger-hover`         | `hover`                     | borda `border-strong`        |
+| Pressionado  | `accent-hover`         | `danger-hover`         | `pressed`                   | borda `border-strong`        |
+| Foco         | anel de 3px em `focus-ring` a 50% + borda `focus-ring` (padrão do shadcn) | | | |
+| Desabilitado | `surface-2` + `border` + `text-disabled`, em qualquer variante | | | |
+
+- `hover` e `pressed` são camadas translúcidas: funcionam sobre `bg`, `surface-1` ou
+  `surface-2` sem um token por superfície. No escuro, `hover` sobre `bg` resulta
+  exatamente no `surface-1` (“sobe um degrau”).
+- O accent e o danger não usam a camada: têm `accent-hover` e `danger-hover`.
+- **Desabilitado não usa opacidade.** Amarelo a 50% sobre grafite vira oliva; por isso todo
+  controle desabilitado vira `surface-2` + `text-disabled`. O contraste baixo é proposital
+  (a WCAG isenta controles desabilitados).
+- No `Button`, desabilitado também tira os eventos de ponteiro (`pointer-events-none`), então
+  o hover não aparece. Em controle feito à mão, use `enabled:hover:` e `enabled:active:`.
+- Ação destrutiva **irreversível** (excluir carga, revogar acesso): `HoldToConfirm` com
+  `tone="destructive"` em vez do `Button` `destructive`. O botão fica neutro em repouso e o
+  vermelho só varre a face enquanto o usuário segura (1,8 s); clique solto não faz nada.
+
+## Badges e alertas
+
+<Temas>
+	<Badges />
+	<div className="h-4" />
+	<Alertas />
+</Temas>
+
+- Badge (`Componentes/Badge`): pílula com contorno e **ponto** na cor do status; o texto fica
+  neutro (`text`). Assim a tabela não vira um mosaico de blocos coloridos e o amarelo do ponto
+  `accent` continua raro. Só o erro bloqueante usa fundo: `destructive` (`danger-subtle` +
+  `danger`).
+- Alerta: fundo `*-subtle`, título na cor semântica. Contraste da cor sobre o próprio subtle:
+  7.6 a 8.1 no escuro, 4.5 a 6.8 no claro.
+- Alerta não ganha borda colorida nem sombra; o fundo já separa.
+
+## Tabela
+
+<Temas>
+	<Tabela />
+</Temas>
+
+- Hover de linha: `hover`. Selecionada: `accent-subtle` + indicador de 2px em `accent` à
+  esquerda. Com erro: `danger-subtle` + indicador em `danger`.
+- O indicador é um `before:` absoluto: não desloca o conteúdo da linha.
+
+## Navegação
+
+<Temas>
+	<Sidebar />
+</Temas>
+
+- Item ativo: texto `text`, fundo `hover` e indicador `accent`; é um dos 2% de amarelo da
+  tela. Os demais: `text-muted`, que vai para `text` + `hover` no hover.
+
+## Checkbox e rádio
+
+<Temas>
+	<Marcacoes />
+</Temas>
+
+- Marcado: preenchimento `accent` com o ícone em `on-accent`. Desmarcado: `border-strong`.
+  Desabilitado: `surface-2` + `border` + `text-disabled`.

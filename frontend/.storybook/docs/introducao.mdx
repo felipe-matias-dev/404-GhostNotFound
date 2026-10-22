@@ -1,0 +1,66 @@
+import { Meta } from "@storybook/addon-docs/blocks";
+
+<Meta title="Introdução" />
+
+# Design system — V-Energy Grid 360
+
+Catálogo dos componentes reutilizáveis do portal (backlog **V2-02**). Toda tela é montada
+com o que está aqui; componente novo entra primeiro no Storybook, depois na tela.
+
+## Seções
+
+- **Fundamentos** — `src/styles.css` (`@theme` do Tailwind) com os tokens do design system
+  **VE-360**: cor, tipografia, espaçamento, raio e sombra. As escalas padrão do Tailwind
+  (cores, `text-*`, `rounded-*`, `shadow-*`) foram removidas.
+- **Componentes** — `src/components/ui/<nome>/`: genéricos, sem regra de negócio
+  (`kpi-card`, `data-table`, `filter-bar`…).
+- **Layout** — `src/components/layout/`: casca do app (sidebar, header, containers de página).
+
+Componentes de feature (`src/features/<feature>/components`) não entram no catálogo: eles
+compõem os de `ui/` com dados da API.
+
+## Regras
+
+- Story ao lado do componente: `src/components/ui/<nome>/<nome>.stories.tsx`, com o
+  `title` na seção certa (`Componentes/KpiCard`).
+- Estilo só por tokens do `@theme` (classes do Tailwind geradas a partir deles); nada de
+  cor ou espaçamento solto no componente.
+- Toda story cobre os estados que a tela vai usar: padrão, carregando, erro e vazio.
+- Tema claro não vira story separada: use o seletor **Tema** na barra do Storybook (vale no
+  canvas e nos exemplos das páginas de docs). O painel Accessibility deve passar nos dois.
+- O painel **Accessibility** precisa ficar sem violações.
+- Sem biblioteca de componentes como dependência. Componentes do
+  [shadcn/ui](https://ui.shadcn.com/) (estilo `base-nova`, sobre Base UI) entram por `npx shadcn@latest add <nome>`: a CLI gera
+  `src/components/ui/<nome>.tsx`; mova para `ui/<nome>/<nome>.tsx` com `index.ts` e troque
+  as classes do shadcn (`primary`, `ring`, `opacity-50`, `shadow-xs`…) pelos tokens do
+  VE-360. Exemplo: `ui/button`. Componentes do [interior.dev](https://www.interior.dev/)
+  usam a mesma CLI com a URL do registro (`npx shadcn@latest add
+  https://www.interior.dev/r/<nome>.json`, que gera `src/components/interior/`) e seguem o
+  mesmo caminho até `ui/`. Exemplo: `ui/hold-to-confirm`.
+- Ícones só de `@phosphor-icons/react`; tamanho, peso, cor e acessibilidade em
+  **Fundamentos/Ícones**.
+
+## Modelo de story
+
+```tsx
+// src/components/ui/kpi-card/kpi-card.stories.tsx
+import type { Meta, StoryObj } from "@storybook/react-vite";
+import { KpiCard } from "./kpi-card";
+
+const meta = {
+	title: "Componentes/KpiCard",
+	component: KpiCard,
+	tags: ["autodocs"],
+} satisfies Meta<typeof KpiCard>;
+
+export default meta;
+type Story = StoryObj<typeof meta>;
+
+export const Padrao: Story = { args: { titulo: "Receita", valor: 1250000 } };
+export const Carregando: Story = { args: { ...Padrao.args, carregando: true } };
+```
+
+## Previstos (V2-02)
+
+`KpiCard` (valor + variação vs período), `DataTable` (ordenação/paginação), `SeriesChart`,
+`WaterfallChart`, `FilterBar` e os estados de loading/erro/vazio.

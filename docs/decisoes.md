@@ -20,6 +20,9 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | 19/10/2026 | DEC-008: Bronze com auditoria básica (full refresh, tudo string, `ingestion_timestamp` e `source_file`) | Dados o mais próximos da origem; rastreabilidade sem log próprio de ingestão | Alisson |
 | 20/10/2026 | DEC-009: ordens de inspeção em `app.ordem_inspecao` + `app.ordem_evento`, sem FK para a Gold, com máquina de estados e no máximo uma OI ativa por UC | O trabalho de campo sobrevive a cada recarga da Gold; o resultado registrado mede se a fila de suspeitas acerta | Felipe |
 | 20/10/2026 | DEC-010: energia e dinheiro como `numeric` no banco e número no JSON da API | Somas em SQL sem resíduo de arredondamento; o frontend recebe número, sem converter texto | Felipe |
+| 20/10/2026 | DEC-011: contrato da Gold com `competencia` em texto (`AAAA-MM`) e três cópias independentes de Silver → Gold | Texto preserva o formato em CSV e em todas as camadas; três cópias comparadas dão uma Gold mais sólida | Alisson |
+| 21/10/2026 | DEC-012: tokens do frontend vêm do design system da marca VE-360 (paleta OKLCH a partir de #f2c94c, neutros `graphite`, Inter Tight + Söhne Breit + JetBrains Mono); escalas padrão do Tailwind removidas | Uma única fonte de cor, tipo, raio e sombra; utilitário fora do sistema não gera CSS | João Euclides |
+| 21/10/2026 | DEC-013: componentes base trazidos do shadcn/ui no estilo `base-nova` (Base UI) e do interior.dev para `frontend/src/components/ui/`, adaptados aos tokens; nenhuma biblioteca de componentes como dependência | O código fica no repositório e segue os tokens da marca; uma única base de primitivas (Base UI, sem Radix) | João Euclides |
 
 ## DEC-001 · Localização dos arquivos de origem (landing)
 
@@ -287,6 +290,23 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   recriada: `docker compose exec db psql -U venergy -d venergy -c "DROP TABLE
   gold.gold_dim_uc"` e, depois, a carga da Gold. Só a tabela da Gold é derrubada, e as
   ordens de inspeção do schema `app` ficam intactas.
+
+## DEC-011 · Convenções do contrato da Gold
+
+- **Data:** 20/10/2026 · **Área:** Dados, Portal e IA · **Autor:** Alisson
+- **Contexto:** `contracts/gold_schema.yaml` (v0.1) é a fonte de verdade sobre tabelas e
+  colunas da Gold. Web e GenAI trabalham contra ele; os tipos são os do PostgreSQL (DEC-002).
+- **Decisão:**
+  - `competencia` é texto no formato `AAAA-MM`, em todas as tabelas e no CSV.
+  - Energia e dinheiro seguem a DEC-010: `numeric` no banco, com a escala do contrato.
+  - Dados faz três cópias independentes da transformação Silver → Gold (Alisson, Arthur e
+    Gabriel), todas contra o contrato, e as compara antes de definir a Gold exportada.
+- **Motivo:** o formato texto não depende de interpretação de data entre CSV, Delta e
+  PostgreSQL; comparar três cópias independentes expõe erro de tratamento que uma só
+  não mostraria.
+- **Regras relacionadas** (detalhes no contrato): chaves estrangeiras são lógicas, checadas
+  no Data Quality e sem constraint no banco; colunas de lista vão numa célula do CSV,
+  separadas por `;`; `tarifa_media` é nula quando `kwh_faturado = 0`.
 
 ## DEC-015 · Gold real e plano gratuito do Gemini (proposta)
 
