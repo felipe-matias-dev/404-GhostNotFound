@@ -38,6 +38,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/receita/mensal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Receita Mensal
+         * @description Indicadores de cada competência, do mês mais antigo ao mais recente.
+         */
+        get: operations["get_receita_mensal_receita_mensal_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/ordens-inspecao": {
         parameters: {
             query?: never;
@@ -155,6 +175,26 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /**
+         * KpisMensaisSchema
+         * @description Indicadores executivos de uma competência.
+         */
+        KpisMensaisSchema: {
+            /** Competencia */
+            competencia: string;
+            /** Kwh Faturado */
+            kwh_faturado: number;
+            /** Receita Faturada */
+            receita_faturada: number;
+            /** Dec */
+            dec: number | null;
+            /** Fec */
+            fec: number | null;
+            /** N Chamados */
+            n_chamados: number | null;
+            /** Satisfacao Media */
+            satisfacao_media: number | null;
         };
         /**
          * OrdemDetalheSchema
@@ -293,6 +333,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_receita_mensal_receita_mensal_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KpisMensaisSchema"][];
                 };
             };
         };

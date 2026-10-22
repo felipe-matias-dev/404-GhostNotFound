@@ -82,6 +82,8 @@ class ReceitaDecomposicaoSchema(BaseModel):
 class KpisMensaisSchema(BaseModel):
     """Indicadores executivos de uma competência."""
 
+    model_config = ConfigDict(from_attributes=True)
+
     competencia: Competencia
     kwh_faturado: ExactNumber
     receita_faturada: ExactNumber

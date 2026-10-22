@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "V-Energy Grid 360 API",
-    "version": "0.2.0"
+    "version": "0.3.0"
   },
   "paths": {
     "/health": {
@@ -75,6 +75,32 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/receita/mensal": {
+      "get": {
+        "tags": [
+          "receita"
+        ],
+        "summary": "Get Receita Mensal",
+        "description": "Indicadores de cada competência, do mês mais antigo ao mais recente.",
+        "operationId": "get_receita_mensal_receita_mensal_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/KpisMensaisSchema"
+                  },
+                  "type": "array",
+                  "title": "Response Get Receita Mensal Receita Mensal Get"
                 }
               }
             }
@@ -540,6 +566,79 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "KpisMensaisSchema": {
+        "properties": {
+          "competencia": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+            "title": "Competencia"
+          },
+          "kwh_faturado": {
+            "type": "number",
+            "title": "Kwh Faturado"
+          },
+          "receita_faturada": {
+            "type": "number",
+            "title": "Receita Faturada"
+          },
+          "dec": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dec"
+          },
+          "fec": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fec"
+          },
+          "n_chamados": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "N Chamados"
+          },
+          "satisfacao_media": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Satisfacao Media"
+          }
+        },
+        "type": "object",
+        "required": [
+          "competencia",
+          "kwh_faturado",
+          "receita_faturada",
+          "dec",
+          "fec",
+          "n_chamados",
+          "satisfacao_media"
+        ],
+        "title": "KpisMensaisSchema",
+        "description": "Indicadores executivos de uma competência."
       },
       "OrdemDetalheSchema": {
         "properties": {
