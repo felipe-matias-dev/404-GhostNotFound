@@ -61,3 +61,37 @@ def test_returns_an_empty_list_before_the_gold_is_loaded(client: TestClient) -> 
 
     assert response.status_code == 200
     assert response.json() == []
+
+
+@pytest.mark.parametrize(
+    ("query", "expected_months"),
+    [
+        ({"inicio": "2024-12", "fim": "2025-01"}, ["2024-12", "2025-01"]),
+        ({"inicio": "2025-01"}, ["2025-01", "2025-02"]),
+        ({"fim": "2024-12"}, ["2024-12"]),
+        ({"inicio": "2025-02", "fim": "2025-02"}, ["2025-02"]),
+    ],
+)
+def test_filters_the_period_including_both_ends(
+    engine: Engine, client: TestClient, query: dict[str, str], expected_months: list[str]
+) -> None:
+    store_kpis(engine)
+
+    response = client.get("/receita/mensal", params=query)
+
+    assert response.status_code == 200
+    assert [row["competencia"] for row in response.json()] == expected_months
+
+
+@pytest.mark.parametrize("month", ["2025-13", "2025-1", "jan/2025"])
+def test_rejects_a_month_outside_the_yyyy_mm_format(client: TestClient, month: str) -> None:
+    response = client.get("/receita/mensal", params={"inicio": month})
+
+    assert response.status_code == 422
+
+
+def test_rejects_a_period_that_starts_after_it_ends(client: TestClient) -> None:
+    response = client.get("/receita/mensal", params={"inicio": "2025-02", "fim": "2024-12"})
+
+    assert response.status_code == 422
+    assert "O início do período (2025-02) é depois do fim (2024-12)" in response.text

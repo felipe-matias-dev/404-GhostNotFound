@@ -47,7 +47,7 @@ export interface paths {
         };
         /**
          * Get Receita Mensal
-         * @description Indicadores de cada competência, do mês mais antigo ao mais recente.
+         * @description Indicadores de cada competência do período, do mês mais antigo ao mais recente.
          */
         get: operations["get_receita_mensal_receita_mensal_get"];
         put?: never;
@@ -339,7 +339,10 @@ export interface operations {
     };
     get_receita_mensal_receita_mensal_get: {
         parameters: {
-            query?: never;
+            query?: {
+                inicio?: string | null;
+                fim?: string | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -353,6 +356,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["KpisMensaisSchema"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

@@ -93,6 +93,21 @@ class KpisMensaisSchema(BaseModel):
     satisfacao_media: float | None
 
 
+class PeriodoSchema(BaseModel):
+    """Recorte de competências, inclusivo nas duas pontas. Sem limites, a série inteira."""
+
+    inicio: Competencia | None = None
+    fim: Competencia | None = None
+
+    @model_validator(mode="after")
+    def inicio_ate_o_fim(self) -> "PeriodoSchema":
+        # Aqui, e não na rota: o erro sai no mesmo formato 422 do formato inválido, e o
+        # client do frontend trata um só. Texto AAAA-MM compara na ordem do calendário.
+        if self.inicio and self.fim and self.inicio > self.fim:
+            raise ValueError(f"O início do período ({self.inicio}) é depois do fim ({self.fim})")
+        return self
+
+
 class ContinuidadeAlimentadorMensalSchema(BaseModel):
     """DEC e FEC de um alimentador numa competência."""
 

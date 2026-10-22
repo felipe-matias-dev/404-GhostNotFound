@@ -88,19 +88,65 @@
           "receita"
         ],
         "summary": "Get Receita Mensal",
-        "description": "Indicadores de cada competência, do mês mais antigo ao mais recente.",
+        "description": "Indicadores de cada competência do período, do mês mais antigo ao mais recente.",
         "operationId": "get_receita_mensal_receita_mensal_get",
+        "parameters": [
+          {
+            "name": "inicio",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^\\d{4}-(0[1-9]|1[0-2])$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Inicio"
+            }
+          },
+          {
+            "name": "fim",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^\\d{4}-(0[1-9]|1[0-2])$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Fim"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
+                  "type": "array",
                   "items": {
                     "$ref": "#/components/schemas/KpisMensaisSchema"
                   },
-                  "type": "array",
                   "title": "Response Get Receita Mensal Receita Mensal Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
