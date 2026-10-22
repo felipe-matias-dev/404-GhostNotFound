@@ -39,6 +39,9 @@ def validator():
         "",
         "   ",
         "SELEC * FROM sem_uc",
+        "SELECT cod_uc FROM sem_uc WHERE municipio = 'Olinda",
+        "SELECT $$text FROM sem_uc",
+        "SELECT 1 /* unterminated comment",
         "SELECT * FROM gold_dim_uc WHERE EXISTS "
         "(WITH gold_dim_uc AS (SELECT 1) SELECT 1 FROM gold_dim_uc)",
         "SELECT query_to_xml('select * from gold.gold_dim_uc', true, true, '')",
@@ -161,3 +164,27 @@ def test_limit_above_maximum_is_reduced(validator):
     assert query.applied_limit == 200
     assert query.limit_imposed is True
     assert query.sql.upper().endswith("LIMIT 200")
+
+
+@pytest.mark.parametrize("depth", [50, 100, 300])
+def test_deeply_nested_sql_is_rejected_not_crashing(validator, depth):
+    sql = "SELECT " + "(" * depth + "1" + ")" * depth
+
+    with pytest.raises(SqlRejected, match="syntax error"):
+        validator.validate(sql, ALLOWED)
+
+
+def test_syntax_error_carries_the_parser_message(validator):
+    with pytest.raises(SqlRejected) as rejected:
+        validator.validate("SELECT cod_uc FROM sem_uc WHERE municipio = 'Olinda", ALLOWED)
+
+    assert rejected.value.reason.startswith("syntax error: ")
+    assert "tokenizing" in rejected.value.reason
+
+
+@pytest.mark.parametrize("sql", ["SELECT FROM WHERE (", "SELECT cod_uc FROM WHERE"])
+def test_syntax_error_reason_has_no_terminal_escape_codes(validator, sql):
+    with pytest.raises(SqlRejected) as rejected:
+        validator.validate(sql, ALLOWED)
+
+    assert "\x1b" not in rejected.value.reason
