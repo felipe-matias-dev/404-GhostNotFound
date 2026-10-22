@@ -3,10 +3,13 @@ import type { QueryClient } from "@tanstack/react-query";
 import {
 	createRootRouteWithContext,
 	HeadContent,
+	Outlet,
 	Scripts,
 } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
+import { AppShell } from "#/components/layout/app-shell";
 import { scriptTemaInicial } from "#/lib/tema";
+import { NaoEncontrado } from "#/pages/nao-encontrado";
 import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
 import appCss from "../styles.css?url";
 
@@ -57,7 +60,17 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 		scripts: [{ children: scriptTemaInicial }],
 	}),
 	shellComponent: RootDocument,
+	component: RootLayout,
+	notFoundComponent: NaoEncontrado,
 });
+
+function RootLayout() {
+	return (
+		<AppShell>
+			<Outlet />
+		</AppShell>
+	);
+}
 
 function RootDocument({ children }: { children: React.ReactNode }) {
 	return (

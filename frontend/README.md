@@ -132,6 +132,12 @@ export const Route = createFileRoute("/perdas")({
 });
 ```
 
+### Casca do app
+
+`src/routes/__root.tsx` envolve todas as rotas no `AppShell` (`components/layout/app-shell`), montado sobre a Sidebar do shadcn (`components/ui/sidebar`, variante `inset`): a navegação recolhe para ícones pelo trigger do header, pelo rail ou com Ctrl/Cmd+B; abaixo de 768px vira um `Sheet`. O header traz o título da seção (o `<h1>` da página) e o painel de conteúdo rola sozinho. Rota sem match cai em `pages/nao-encontrado.tsx`.
+
+Tela nova na navegação: crie a rota e adicione o item em `NAVEGACAO` (`components/layout/app-sidebar/navegacao.ts`), com o ícone de **Fundamentos/Ícones**. O título do header vem desse item; rotas filhas (`/uc/0042`) herdam o da seção. O conteúdo da página vai dentro de `Pagina` (`components/layout/pagina`), que fixa largura e respiro.
+
 ### Features previstas
 
 `visaoGeral` (KPIs), `receita` (preço × volume), `unidadeConsumidora` (visão 360), `perdas` (fila e ordens de inspeção), `operacao` (DEC/FEC), `agente` (chat e insights de IA), `auth` (perfis, quando entrar).
