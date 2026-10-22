@@ -179,4 +179,12 @@ def test_syntax_error_carries_the_parser_message(validator):
         validator.validate("SELECT cod_uc FROM sem_uc WHERE municipio = 'Olinda", ALLOWED)
 
     assert rejected.value.reason.startswith("syntax error: ")
-    assert len(rejected.value.reason) > len("syntax error: ")
+    assert "tokenizing" in rejected.value.reason
+
+
+@pytest.mark.parametrize("sql", ["SELECT FROM WHERE (", "SELECT cod_uc FROM WHERE"])
+def test_syntax_error_reason_has_no_terminal_escape_codes(validator, sql):
+    with pytest.raises(SqlRejected) as rejected:
+        validator.validate(sql, ALLOWED)
+
+    assert "\x1b" not in rejected.value.reason
