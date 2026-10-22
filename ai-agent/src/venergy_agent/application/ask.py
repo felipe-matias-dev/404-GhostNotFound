@@ -6,12 +6,14 @@ from uuid import uuid4
 from pydantic import ValidationError
 
 from venergy_agent.application.ports import (
+    AnswerWriter,
     QueryExecutor,
     SqlGenerator,
     SqlValidator,
 )
 from venergy_agent.domain.answer import AgentAnswer, AnswerStatus, Confidence
 from venergy_agent.domain.errors import ErrorKind, QueryExecutionError, SqlRejected
+from venergy_agent.domain.numbers import unsupported_numbers
 from venergy_agent.domain.question import Question
 from venergy_agent.domain.semantic import SemanticLayer
 from venergy_agent.domain.sql import (
@@ -54,6 +56,7 @@ class AskUseCase:
         generator: SqlGenerator,
         validator: SqlValidator,
         executor: QueryExecutor,
+        answer_writer: AnswerWriter,
         max_question_chars: int,
         max_correction_attempts: int,
         answer_sample_rows: int,
@@ -64,6 +67,7 @@ class AskUseCase:
         self._generator = generator
         self._validator = validator
         self._executor = executor
+        self._answer_writer = answer_writer
         self._max_question_chars = max_question_chars
         self._max_attempts = max_correction_attempts
         self._sample_rows = answer_sample_rows
@@ -287,14 +291,9 @@ class AskUseCase:
         started: float,
     ) -> AgentAnswer:
         sample = result.rows[: self._sample_rows]
+        visible = result.model_copy(update={"rows": sample})
         text = self._deterministic_text(result, draft, validated)
-        self._log(
-            question.request_id,
-            question.session_id,
-            step="resposta",
-            status="determinista",
-            row_count=result.row_count,
-        )
+        text = await self._narrate(question, draft, visible, text)
 
         return AgentAnswer(
             answer=text,
@@ -313,6 +312,39 @@ class AskUseCase:
             prompt_version=self._prompt_version,
             latency_ms=_elapsed_ms(started),
         )
+
+    async def _narrate(
+        self,
+        question: Question,
+        draft: SqlDraft,
+        visible: QueryResult,
+        fallback: str,
+    ) -> str:
+        try:
+            narrative = await self._answer_writer.write(question, draft, visible)
+        except Exception as error:
+            self._log(
+                question.request_id,
+                question.session_id,
+                step="resposta",
+                status="narrativa_falhou",
+                error=type(error).__name__,
+            )
+            return fallback
+
+        values = [visible.row_count, *(value for row in visible.rows for value in row.values())]
+        unsupported = unsupported_numbers(narrative, values)
+        if unsupported:
+            self._log(
+                question.request_id,
+                question.session_id,
+                step="resposta",
+                status="verificacao_numerica_falhou",
+                unsupported=list(unsupported),
+            )
+            return fallback
+        self._log(question.request_id, question.session_id, step="resposta", status="narrativa_ok")
+        return narrative
 
     def _deterministic_text(
         self, result: QueryResult, draft: SqlDraft, validated: ValidatedQuery

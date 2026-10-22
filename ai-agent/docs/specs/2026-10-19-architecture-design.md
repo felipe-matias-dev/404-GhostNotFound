@@ -15,19 +15,14 @@ O agente transforma uma pergunta em português numa consulta SQL somente leitura
 - executor somente leitura no Postgres (PR #8);
 - gerador de SQL com PydanticAI (PRs #13 e #14);
 - job do agente no CI (PR #8);
-- camada semântica validada contra o contrato da Gold (PR #20, item 5);
-- contrato `AgentAnswer` com status e invariantes (PR #21, item 2).
+- contrato `AgentAnswer` com status e invariantes (PRs #21 e #29, item 2);
+- camada semântica v0.2, validada contra o contrato da Gold v0.2.0 (PRs #20 e #35, item 5);
+- orquestração `ask()`, `bootstrap.py` e comando de terminal (PR #30, item 6);
+- golden set com 66 itens, rascunho até a revisão humana (PR #32, parte do item 7).
 
-**Em revisão, na ordem de merge** (cada uma sobre a anterior):
-1. PR #29: invariantes do `AgentAnswer` pedidas na revisão do PR #21 (texto em branco, `row_count >= 0`, `truncated` exige linhas).
-2. PR #31: ordem da DEC-018 e da DEC-020 no `decisoes.md`.
-3. Branch `feat/ai-agent-camada-semantica-v0.2`: camada semântica alinhada ao contrato v0.2.0 (já integra os PRs #29 e #31).
-4. PR #30: orquestração `ask()` (item 6), com o `bootstrap.py` e o comando de terminal.
-5. PR #32: golden set (item 7), já alinhado à camada v0.2. Continua rascunho até a revisão humana de cada item.
+**Em revisão:** narração com verificação numérica (item 8, branch `feat/ai-agent-narracao-v2`, DEC-019).
 
-**Branches prontas, sem PR:** `feat/ai-agent-narracao` (item 8) e `feat/ai-agent-insight` (item 9), empilhadas sobre o contrato anterior; fazem rebase na `main` depois do PR #30.
-
-**Falta, na ordem da §11:** red team e runner de métricas (item 7), e os PRs dos itens 8 e 9.
+**Falta, na ordem da §11:** red team e runner de métricas (item 7), e o `InsightWriter` (item 9, branch `feat/ai-agent-insight`, que faz rebase depois do item 8).
 
 **Critério de sucesso de cada feature:** `uv run pytest` e `uv run ruff check` passam em `ai-agent/` (inclusive no CI), os contratos desta spec batem com o código e os testes da §8 cobrem as regras novas.
 
@@ -341,8 +336,8 @@ Pedidos a abrir como issue para a área dona. O GenAI não altera esses arquivos
 - A revisão humana de cada item é do GenAI (Perylo), e a dos SQLs contra a amostra, dos Dados. O gabarito só se fixa com a Gold real.
 
 **8. `AnswerWriter` + verificação numérica.** Narrativa a partir das linhas, com o conteúdo do banco delimitado como dado (§5.2) e volta ao texto determinístico quando a verificação falha. A mesma verificação numérica serve ao item 9.
-- Estado: branch `feat/ai-agent-narracao`, sem PR, empilhada sobre o contrato anterior. Rebase na `main` depois do PR #30.
-- A decidir antes do PR: DEC-019 (proposta, na branch). A narrativa só vale se cada número existir nas linhas. Falta confirmar a leitura de números em pt-BR e en, porque `1.234` pode ser mil ou um vírgula dois. Sugestão: ler só pt-BR, como as respostas são escritas, e tratar o resto como número ausente.
+- Estado: branch `feat/ai-agent-narracao-v2`, refeita sobre a `main` depois do PR #30. O `AnswerWriter` entra pelo `build_agent`, e o prompt fica em `prompts/answer/v1/`.
+- DEC-019 aceita. Cada número da narrativa precisa existir nas linhas ou no total de linhas; números só da pergunta não contam. O texto é lido só em pt-BR, e os valores do banco são lidos no próprio tipo.
 
 **9. `InsightWriter`.** Narra o JSON de métricas de uma tela (G2-04, tela de Receita; G2-05, "conta alta" na UC 360, Should) em 2 a 4 frases, sem conclusões causais que o JSON não sustenta (§9 do guia), e devolve `None` se algum número do texto não estiver no JSON. O cache por filtros e a montagem do JSON são do backend (D9).
 - Estado: branch `feat/ai-agent-insight`, sem PR, empilhada sobre a narração. Rebase depois do item 8.

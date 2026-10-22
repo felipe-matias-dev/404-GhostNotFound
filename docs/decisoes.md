@@ -438,6 +438,15 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Consequência:** `sem_faturamento_mensal` liga a `sem_uc` por `cod_uc`, e `sem_uc` liga a `sem_continuidade_alimentador_mensal` por `cod_alimentador`.
 - **Decomposição (23/10/2026):** `sem_receita_decomposicao` entra sem relação com outras views. A junção composta com `gold_dim_uc` (município, bairro, classe e GD) continua `a_confirmar` no contrato e repetiria cada efeito uma vez por UC do recorte. As perguntas de recorte se respondem filtrando a própria view.
 
+## DEC-019 · Verificação numérica da narrativa
+
+- **Data:** 22/10/2026 · **Área:** GenAI · **Autor:** Lucas · **Atualizada:** 23/10/2026, Luis Felipe
+- **Status:** aceita.
+- **Decisão:** a narrativa em linguagem natural só é aceita se cada número dela existir nas linhas que o redator recebeu ou no total de linhas. Números que aparecem só na pergunta ou nas suposições não contam. Se a verificação falhar, ou o redator der erro, a resposta volta ao texto determinístico.
+- **Leitura dos números:** o texto da narrativa é lido só em pt-BR (ponto separa milhar, vírgula separa decimal). Os valores do banco são lidos no próprio tipo: `Decimal`, `int` e `float` pelo valor, datas e textos pelos números que contêm. A proposta inicial aceitava pt-BR e en ao mesmo tempo, e aí `1.234` valia como 1234 e como 1,234: um número errado podia passar na verificação. Número escrito em formato en derruba a narrativa, o que é seguro.
+- **Motivo:** o `CLAUDE.md` do agente diz que todo número da resposta vem das linhas retornadas, e a spec (§8, item 8) exige que um número inexistente nas linhas derrube a narrativa.
+- **Consequência:** uma narrativa que cite um ano ou um limite da pergunta ("acima de 300 kWh") cai no texto determinístico quando o número não está nas linhas. O prompt do redator (`prompts/answer/v1`) pede para não repetir esses números e para escrever no formato brasileiro.
+
 ## DEC-020 · Contrato `AgentAnswer` com status (aceita)
 
 - **Data:** 22/10/2026 · **Área:** GenAI e Backend (V1) · **Autor:** Lucas

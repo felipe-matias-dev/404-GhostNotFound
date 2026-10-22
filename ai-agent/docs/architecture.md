@@ -2,7 +2,7 @@
 
 Resumo para orientar quem chega ao `ai-agent/` (pessoa ou sessão de IA). A fonte da verdade continua sendo a [spec](specs/2026-10-19-architecture-design.md); este arquivo só diz o que existe hoje, onde está e o que falta. Atualize-o no mesmo PR que mudar o estado.
 
-- **Atualizado em:** 23/10/2026, com a camada semântica v0.2 (branch `feat/ai-agent-camada-semantica-v0.2`, que já integra os PRs #29 e #31) sobre o contrato da Gold v0.2.0. O que está em revisão e a ordem de merge estão na spec §1.
+- **Atualizado em:** 23/10/2026, com a narração (item 8) sobre a `main` depois dos PRs #29, #30, #31, #32 e #35. O que está em revisão está na spec §1.
 
 ## 1. O que o agente faz
 
@@ -16,17 +16,19 @@ Hexagonal: `domain` ← `application` ← `infrastructure`.
 |---|---|---|---|
 | domain | `question.py` | `Question` (texto limpo e limitado) | pronto |
 | domain | `sql.py` | `SqlDraft` (`ok`, `unknown`, `clarify`, `refuse`), `AttemptFeedback`, `ValidatedQuery`, `QueryResult` | pronto |
-| domain | `errors.py` | `ErrorKind`, `SqlRejected`, `QueryExecutionError` | pronto; `ErrorKind.REJECTED` entra no item 6 |
+| domain | `errors.py` | `ErrorKind`, `SqlRejected`, `QueryExecutionError` | pronto, com `ErrorKind.REJECTED` (item 6) |
+| domain | `numbers.py` | `unsupported_numbers`: números da narrativa (lidos em pt-BR) que não estão nos valores das linhas (DEC-019) | item 8 |
 | domain | `semantic.py` | `SemanticLayer`, `ViewSpec`, `ColumnSpec`, `Relation`, glossário, regras, exemplos | pronto |
 | domain | `answer.py` | `AgentAnswer` com `status` e invariantes por status (DEC-020), `Insight` | pronto (PR #21; texto em branco e `row_count >= 0` no PR #29) |
-| application | `ports.py` | `TextToSqlAgent`, `SemanticLayerSource`, `SqlGenerator`, `SqlValidator`, `QueryExecutor`, `AnswerWriter`, `InsightWriter` | `ask.py` (`AskUseCase`) em revisão no PR #30 |
+| application | `ports.py` | `TextToSqlAgent`, `SemanticLayerSource`, `SqlGenerator`, `SqlValidator`, `QueryExecutor`, `AnswerWriter`, `InsightWriter` | `ask.py` (`AskUseCase`), pronto (PR #30) |
 | infrastructure | `sql_validator.py` | `SqlglotValidator`: um `SELECT`, allowlist de views, funções conhecidas, `LIMIT` imposto | pronto |
 | infrastructure | `postgres_executor.py` | `PostgresQueryExecutor`: `BEGIN READ ONLY`, `statement_timeout`, SQLSTATE → `ErrorKind` | pronto |
 | infrastructure | `sql_generator.py`, `prompt_renderer.py`, `llm.py` | PydanticAI com `output_type=SqlDraft`; prompt em `prompts/v1/`; delimitadores com nonce; Gemini direto (padrão) ou OpenRouter | pronto |
 | infrastructure | `semantic_source.py`, `views_sql.py` | `YamlSemanticLayerSource` valida `semantic/semantic_layer.yaml` contra `contracts/gold_schema.yaml` (inclusive `consumers` e `sensitive`); `views_sql` gera `semantic/views.sql` | pronto |
-| raiz | `config.py` | `AgentSettings` (`VENERGY_AGENT_*`) | pronto |
+| infrastructure | `answer_writer.py` | `PydanticAiAnswerWriter`: narra as linhas, com o conteúdo do banco delimitado como dado; prompt em `prompts/answer/v1/` | item 8 |
+| raiz | `config.py`, `bootstrap.py`, `__main__.py` | `AgentSettings` (`VENERGY_AGENT_*`); `build_agent(settings)` monta o agente; `python -m venergy_agent "pergunta"` | pronto |
 
-## 3. Fluxo do `ask()` (item 6, PR #30)
+## 3. Fluxo do `ask()`
 
 ```
 pergunta → Question → SemanticLayer (carregada uma vez)
@@ -35,12 +37,14 @@ pergunta → Question → SemanticLayer (carregada uma vez)
             ok → SqlglotValidator → PostgresQueryExecutor
                  erro corrigível → AttemptFeedback → nova tentativa (até 3)
                  erro do banco não classificado → failed
-        → texto determinístico (item 6) ou AnswerWriter (item 8) → AgentAnswer
+        → AnswerWriter (narrativa) → números conferidos com as linhas (DEC-019)
+            falhou → texto determinístico
+        → AgentAnswer
 ```
 
-Detalhes, confiança e logs: spec §5.1. O `bootstrap.py` (`build_agent(settings)`) monta o agente a partir do `AgentSettings` e entra com o item 6 (PR #30), junto com o comando `python -m venergy_agent`.
+Detalhes, confiança e logs: spec §5.1. O backend monta o agente uma vez por processo com `build_agent(AgentSettings())`.
 
-Em branches: `AnswerWriter` (`feat/ai-agent-narracao`, prompt em `prompts/answer/v1/`, verificação numérica da DEC-019) e `InsightWriter` (`feat/ai-agent-insight`, prompt em `prompts/insight/v1/`). O golden set está em `eval/golden_set.yaml` no PR #32 (66 itens, alinhado à camada v0.2, rascunho até a revisão humana).
+Em branch: `InsightWriter` (`feat/ai-agent-insight`, prompt em `prompts/insight/v1/`, item 9). O golden set está em `eval/golden_set.yaml` (66 itens, alinhado à camada v0.2, rascunho até a revisão humana).
 
 ## 4. Camada semântica hoje
 
