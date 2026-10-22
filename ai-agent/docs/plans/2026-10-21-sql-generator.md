@@ -2,6 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **Status (2026-10-22): executed in PRs #13 and #14** (merged). Kept as the record of that work; do not re-run it.
+> #14 replaced the tag escaping with a random label per generator instance (`<dados-{nonce}>`, spec §5.2), moved the previous SQL and the error message into data blocks, and changed `prompts/v1` before it reached `main` (DEC-016). Next change to the prompt goes to `prompts/v2`.
+
 **Goal:** Implement the `SqlGenerator` port with PydanticAI. The prompt is versioned and built from the `SemanticLayer`, and the structured output is validated as `SqlDraft`.
 
 **Architecture:** There are two units.

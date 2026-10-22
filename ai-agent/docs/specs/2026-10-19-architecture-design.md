@@ -1,30 +1,44 @@
 # Arquitetura do agente Text-to-SQL — estrutura e contratos
 
-- **Data:** 2026-10-19 · **Atualizada:** 2026-10-20 (sincronizada com DEC-002, backlog G1/G2 e o review do PR #5)
+- **Data:** 2026-10-19 · **Revisada:** 2026-10-22 (estado depois dos PRs #5, #7, #8, #13, #14 e #15; contrato da Gold v0.1.0; decisões sobre status da resposta, seleção da camada semântica e linhas de exemplo).
 - **Escopo:** apenas `ai-agent/` (BC6 Assistente Analítico). O que depende de backend, infra ou dados fica registrado como pedido na §10.
-- **Base:** case Rocket Lab 2026.2 (Módulo 3), `docs/arquitetura.md`, `docs/decisoes.md`, `docs/backlog.md` (G1, G2) e o [guia de boas práticas do agente](../contexto-agente-text-to-sql.md), citado como "§x do guia".
+- **Base:** case Rocket Lab 2026.2 (Módulo 3), `docs/arquitetura.md`, `docs/decisoes.md`, `docs/backlog.md` (G1, G2), `contracts/gold_schema.yaml` e o [guia de boas práticas do agente](../contexto-agente-text-to-sql.md), citado como "§x do guia".
+- **Convenção:** "hoje" descreve o que está na `main`; "item N" aponta para a feature da §11 que vai implementar o que ainda não existe.
 
-## 1. Objetivo
+## 1. Objetivo e estado
 
-Criar o esqueleto multi-camadas do agente: estrutura de pacotes, modelos de domínio, portas e configuração. Esse esqueleto está no PR #5 (em revisão), junto com o primeiro adapter, o validador SQL (`sqlglot`). As correções de segurança do validador (§6), encontradas no review do PR #5, estão na branch `fix/ai-agent-review-pr5`. Os demais adapters viram features em branches próprias (§11).
+O agente transforma uma pergunta em português numa consulta SQL somente leitura sobre a Gold, executa e devolve uma resposta auditável. Se não souber, diz que não sabe.
 
-**Critério de sucesso:** `uv run pytest` e `uv run ruff check` passam em `ai-agent/`; os contratos abaixo existem e estão cobertos pelos testes da §8.
+**Já está na `main`:**
+- domínio, portas e configuração (PR #5);
+- validador SQL endurecido (PRs #7 e #15);
+- executor somente leitura no Postgres (PR #8);
+- gerador de SQL com PydanticAI (PRs #13 e #14);
+- job do agente no CI (PR #8).
+
+**Falta, na ordem da §11:** camada semântica (item 5), contrato final do `AgentAnswer` (item 2), orquestração `ask()` (item 6), avaliação (item 7), redação da resposta (item 8) e insights (item 9).
+
+**Critério de sucesso de cada feature:** `uv run pytest` e `uv run ruff check` passam em `ai-agent/` (inclusive no CI), os contratos desta spec batem com o código e os testes da §8 cobrem as regras novas.
 
 ## 2. Decisões
 
 | Decisão | Escolha | Motivo |
 |---|---|---|
-| Framework de agente (ADR-02) | PydanticAI, atrás de portas próprias | Saída tipada com retry de validação, suporte nativo a OpenRouter, `TestModel` para testes sem custo, troca isolada em um adapter |
-| Provedor de LLM | Gemini direto (`google-gla:gemini-3.1-flash-lite`), com o OpenRouter (`openrouter:...`) como alternativa ou fallback | Modelo recomendado pelo case, gratuito no Free Tier do Google, com cota por projeto (uma chave por pessoa). No OpenRouter o Flash-Lite é pago e os modelos `:free` têm 50 requisições por dia por conta. No Free Tier do Google o conteúdo pode ser usado pelo Google: Gold real só com chave paga ou fornecida pela organização |
-| Banco (ADR-01, DEC-002) | PostgreSQL 17, com o usuário `venergy_agent` (somente leitura) | Decidido pelo time. Só há executor Postgres; SQLite saiu do roadmap |
+| Framework de agente (ADR-02) | PydanticAI, atrás de portas próprias | Saída tipada com retry de validação, Gemini e OpenRouter nativos, `FunctionModel` para testes sem custo, troca isolada em um adapter |
+| Provedor de LLM | Gemini direto (`google-gla:gemini-3.1-flash-lite`), com o OpenRouter (`openrouter:...`) como alternativa ou fallback | Modelo recomendado pelo case, gratuito no Free Tier do Google, com cota por projeto (uma chave por pessoa). No OpenRouter o Flash-Lite é pago e os modelos `:free` têm 50 requisições por dia por conta. No Free Tier o Google pode usar o conteúdo enviado: Gold real só com chave paga ou fornecida pela organização (DEC-015, proposta) |
+| Banco (ADR-01, DEC-002) | PostgreSQL 17, com o usuário `venergy_agent` (somente leitura) | Decidido pelo time. Só há executor Postgres |
 | Escopo de dados do agente | Views `sem_*` num schema próprio, com permissão de leitura só nele | A allowlist precisa valer também no banco, e não só no validador (§10, D1) |
+| Seleção da camada semântica | Um arquivo do GenAI (`semantic/semantic_layer.yaml`) escolhe tabelas e colunas, validado contra o contrato da Gold | A camada semântica é a ACL do GenAI sobre a Gold (`docs/arquitetura.md`). O campo `consumers` do contrato é informativo e não decide o que o agente enxerga |
+| Linhas de exemplo no prompt | Sintéticas, escritas à mão no arquivo do GenAI; os valores possíveis de colunas categóricas vêm do `allowed` do contrato | O prompt de sistema nunca leva dado real da Gold, nem para o Free Tier (DEC-015) |
+| Status da resposta | O `AgentAnswer` declara `status`: `answered`, `unknown`, `clarify`, `refused` ou `failed` | "Não sei", recusa e falha técnica são coisas diferentes para o usuário, para o golden set (G1-07) e para o red team (G1-11) |
 | Organização | Hexagonal em 3 camadas (`domain` ← `application` ← `infrastructure`) | Framework isolado (§14 do guia), cada etapa testável com fakes |
 | Triagem | Feita pelo `status` do `SqlDraft`, sem chamada extra ao LLM | "Simples primeiro"; etapa separada só com ganho medido na avaliação |
+| `EXPLAIN` antes de executar | Não usar | O validador barra o que é estrutural e o executor classifica os erros do banco para a correção (§6 do guia pede `EXPLAIN` "quando o banco permitir"); é uma ida ao banco a mais sem ganho medido |
 | Auditoria | O agente devolve os dados de auditoria no `AgentAnswer`; o backend persiste | O agente é somente leitura e não grava em lugar nenhum (G1-06) |
-| Follow-up | Fora deste escopo (diferencial) | Obrigatórios primeiro |
-| Avaliação | Golden set + métricas determinísticas logo após o primeiro `ask()` de ponta a ponta | Nenhuma mudança de prompt, modelo ou contexto entra sem medir (§1.5 e §10.3 do guia) |
+| Follow-up | Fora do escopo dos obrigatórios (diferencial) | Obrigatórios primeiro |
+| Avaliação | Golden set + métricas determinísticas logo depois do primeiro `ask()` de ponta a ponta | Nenhuma mudança de prompt, modelo ou contexto entra sem medir (§1.5 e §10.3 do guia) |
 | LLM as a judge | Só para clareza e fidelidade da resposta em português, com modelo diferente do gerador; entra depois dos obrigatórios | Corretude numérica é medida por execução, não por opinião de LLM |
-| "Receita" sem qualificador | `receita_faturada`, com a suposição declarada na resposta | Proposta do GenAI, pendente de confirmação do time. Ainda não consta no contrato da Gold (PR #10); entra nas regras de negócio do prompt quando for confirmada |
+| "Receita" sem qualificador | `receita_faturada`, com a suposição declarada na resposta | Proposta do GenAI, pendente de confirmação do time; o contrato v0.1.0 não define. Entra nas regras de negócio do arquivo da camada semântica (item 5) |
 
 ## 3. Estrutura
 
@@ -32,86 +46,78 @@ Criar o esqueleto multi-camadas do agente: estrutura de pacotes, modelos de dom�
 ai-agent/
 ├── pyproject.toml
 ├── .env.example
-├── prompts/v1/              # system.md e correction.md, versão em AgentSettings.prompt_version
+├── prompts/v1/                  # system.md e correction.md; versão em AgentSettings.prompt_version
+├── semantic/                    # item 5: semantic_layer.yaml (do GenAI) e views.sql (gerado)
+├── eval/                        # item 7: golden_set.yaml, red_team.yaml, runs/
 ├── src/venergy_agent/
 │   ├── config.py
-│   ├── domain/
-│   │   ├── question.py
-│   │   ├── semantic.py
-│   │   ├── sql.py
-│   │   ├── answer.py
-│   │   └── errors.py
+│   ├── bootstrap.py             # item 6: composition root, monta o agente a partir das settings
+│   ├── domain/                  # question, semantic, sql, answer, errors
 │   ├── application/
-│   │   └── ports.py
-│   └── infrastructure/
-│       ├── sql_validator.py
-│       ├── postgres_executor.py
-│       ├── prompt_renderer.py
-│       ├── sql_generator.py
-│       └── llm.py
-└── tests/unit/
-    ├── domain/
-    └── infrastructure/
+│   │   ├── ports.py
+│   │   └── ask.py               # item 6: caso de uso que implementa TextToSqlAgent
+│   └── infrastructure/          # sql_validator, postgres_executor, prompt_renderer, sql_generator, llm
+│                                # item 5: semantic_source e views_sql
+└── tests/
+    ├── unit/
+    └── integration/             # executor e, no item 5, as views contra o venergy_test
 ```
 
-**Regra de dependência:** `domain` não importa nada do projeto e não faz I/O. `application` importa apenas `domain`. `infrastructure` implementa as portas de `application`. O composition root (`bootstrap.py`) entra junto com o primeiro caso de uso que liga os adapters.
-
-`semantic/`, `eval/golden_set.yaml` e `eval/red_team.yaml` nascem com as features que os usam.
+**Regra de dependência:** `domain` não importa nada do projeto e não faz I/O. `application` importa apenas `domain` (pode medir tempo e registrar logs). `infrastructure` implementa as portas de `application`. Só o `bootstrap.py` conhece as classes concretas.
 
 ## 4. Domínio
 
-### `question.py`
-- `Question(text: str, session_id: str, request_id: str)`. `text` é normalizado com `strip` e não pode ficar vazio. `request_id` usa `uuid4` como padrão.
+### `question.py` (hoje)
+- `Question(text: str, session_id: str, request_id: str)`. `text` é normalizado com `strip` e não pode ficar vazio. `request_id` usa `uuid4` como padrão. O limite de tamanho (`max_question_chars`) é aplicado pelo `ask()` (§5.1), não aqui.
 
 ### `sql.py`
-- `DraftStatus`: `ok`, `unknown`, `clarify`, `refuse`.
-- `SqlDraft(status, sql, views_used, assumptions, clarification_question)` é a saída estruturada do LLM. Invariantes (uma string em branco conta como ausente):
-  - `ok` exige `sql`;
-  - `clarify` exige `clarification_question`;
-  - qualquer status diferente de `ok` exige `sql is None`.
+- Hoje: `DraftStatus` (`ok`, `unknown`, `clarify`, `refuse`), `SqlDraft`, `AttemptFeedback`, `ValidatedQuery` e `QueryResult`.
+- `SqlDraft(status, sql, views_used, assumptions, clarification_question)` é a saída estruturada do LLM. Invariantes (uma string em branco conta como ausente): `ok` exige `sql`; `clarify` exige `clarification_question`; qualquer status diferente de `ok` exige `sql is None`.
 - `AttemptFeedback(previous_sql, error_kind, message)` é a entrada da tentativa de correção.
 - `ValidatedQuery(sql, views, applied_limit, limit_imposed)` só é produzido pelo validador. `limit_imposed` diz se o `LIMIT` foi inserido ou reduzido pelo validador; só nesse caso o resultado pode ser marcado como truncado. Um top-N pedido pelo usuário não é truncamento.
 - `QueryResult(columns, rows, row_count, truncated)`.
+- **Item 6:** `Generation(draft: SqlDraft, model: str, input_tokens: int, output_tokens: int)`. O `SqlGenerator` passa a devolver isso, porque o `AgentAnswer` e os logs precisam do modelo que respondeu de fato (pode ser o fallback) e dos tokens gastos.
 
 ### `errors.py`
-- `ErrorKind`: `syntax`, `unknown_object`, `type_mismatch`, `timeout`.
-- `SqlRejected(reason)` e `QueryExecutionError(kind, message)`. Resultado vazio não é erro.
+- Hoje: `ErrorKind` (`syntax`, `unknown_object`, `type_mismatch`, `timeout`), `SqlRejected(reason)` e `QueryExecutionError(kind, message)`. Resultado vazio não é erro.
+- **Item 6:** `ErrorKind.REJECTED`, para devolver ao modelo, na correção, o motivo de uma rejeição do validador (regra 7 da §6). Sem isso o `AttemptFeedback` não consegue carregar uma rejeição.
 
-### `semantic.py`
-- `ColumnSpec(name, type, description, unit, allowed_values)`.
-- `ViewSpec(name, description, grain, columns, sample_rows)`.
-- `Relation(left_view, left_column, right_view, right_column)`.
-- `GlossaryTerm(term, synonyms, maps_to)`, `BusinessRule(text)`, `FewShotExample(question, sql, expected_status)`.
-- `SemanticLayer(version, views, relations, glossary, rules, examples)`. Invariantes: nomes de view únicos; toda `Relation` referencia views e colunas existentes. A propriedade `allowed_views` (frozenset dos nomes das views) é a allowlist do validador.
+### `semantic.py` (hoje)
+- `ColumnSpec(name, type, description, unit, allowed_values)`, `ViewSpec(name, description, grain, columns, sample_rows)`, `Relation(left_view, left_column, right_view, right_column)`, `GlossaryTerm(term, synonyms, maps_to)`, `BusinessRule(text)`, `FewShotExample(question, sql, expected_status)`.
+- `SemanticLayer(version, views, relations, glossary, rules, examples)`. Invariantes: nomes de view únicos; toda `Relation` referencia views e colunas existentes. A propriedade `allowed_views` é a allowlist do validador.
 
 ### `answer.py`
 - `Confidence`: `high`, `medium`, `low`, `unknown`. O mapeamento para os rótulos em português fica no portal.
-- `AgentAnswer` é o contrato com o backend (`docs/arquitetura.md`, G1-04):
+- `Insight(text, metrics_used)`.
+- `AgentAnswer` é o contrato com o backend (`docs/arquitetura.md`, G1-04). **Hoje** tem `answer`, `sql`, `rows`, `row_count`, `confidence`, `sources`, `assumptions`, `clarification`, `request_id` e `prompt_version`. **O item 2** acrescenta os campos marcados abaixo, combinado com o V1:
 
 | Campo | Tipo | Observação |
 |---|---|---|
 | `answer` | `str` | Texto para o usuário |
-| `sql` | `str \| None` | Último SQL gerado (mesmo se rejeitado ou com erro), para auditoria |
-| `rows` | `tuple[dict, ...]` | Amostra das linhas |
-| `row_count` | `int` | Total real de linhas |
-| `confidence` | `Confidence` | — |
+| `status` | `AnswerStatus` | **Item 2.** `answered`, `unknown` (a informação não existe nas views), `clarify` (precisa de esclarecimento), `refused` (pedido fora do escopo, de escrita ou de manipulação) ou `failed` (tentativas esgotadas ou erro técnico) |
+| `sql` | `str \| None` | Último SQL gerado, mesmo se rejeitado ou com erro, para auditoria |
+| `rows` | `tuple[dict, ...]` | Amostra das linhas, até `answer_sample_rows` (§7) |
+| `row_count` | `int` | Total de linhas que a consulta devolveu |
+| `truncated` | `bool` | **Item 2.** O validador impôs o `LIMIT` e o resultado o atingiu; a resposta precisa avisar (§7.3 do guia) |
+| `confidence` | `Confidence` | Regra na §5.1 |
 | `sources` | `tuple[str, ...]` | Views consultadas |
 | `assumptions` | `tuple[str, ...]` | Suposições declaradas |
 | `clarification` | `str \| None` | Pergunta de esclarecimento |
-| `refused_reason` | `str \| None` | Motivo quando o agente não responde (fora de escopo, "não sei", SQL rejeitado, tentativas esgotadas) |
+| `refused_reason` | `str \| None` | **Item 2.** Motivo, em português, de não ter respondido |
 | `request_id` | `str` | — |
-| `model` | `str` | Modelo que gerou a resposta (G1-06) |
+| `model` | `str` | **Item 2.** Modelo que respondeu de fato (G1-06) |
 | `prompt_version` | `str` | — |
-| `latency_ms` | `int` | `≥ 0` (G1-06) |
+| `latency_ms` | `int` | **Item 2.** `≥ 0` (G1-06) |
 
 Invariantes:
-- `row_count >= len(rows)`, porque `rows` é uma amostra e o total real vem declarado.
-- `refused_reason` e `clarification` são mutuamente exclusivos.
-- Com `refused_reason` presente: `rows` vazio, `row_count == 0` e `confidence == unknown`. Isso impede devolver resultado parcial como se fosse resposta (§6 do guia).
+- Hoje: `row_count >= len(rows)`, porque `rows` é uma amostra.
+- Item 2:
+  - `answered`: sem `refused_reason` e sem `clarification`.
+  - `clarify`: exige `clarification`; `sql` nulo, `rows` vazio, `row_count == 0`, `confidence == unknown`.
+  - `unknown`, `refused` e `failed`: exigem `refused_reason`; sem `clarification`; `rows` vazio, `row_count == 0`, `confidence == unknown`. Isso impede devolver resultado parcial como se fosse resposta (§6 do guia).
+  - `truncated` só é verdadeiro com `answered`.
 
 O timestamp da auditoria é registrado pelo backend ao persistir; o agente não lê relógio no domínio.
-
-- `Insight(text, metrics_used)`.
 
 Todos os modelos de domínio são imutáveis (`frozen`).
 
@@ -121,37 +127,62 @@ São `typing.Protocol` assíncronos, exceto `SqlValidator`, que é síncrono por
 
 | Porta | Assinatura | Observação |
 |---|---|---|
-| `TextToSqlAgent` | `ask(question: str, session_id: str) -> AgentAnswer` | Contrato de entrada com o backend (Partnership BC6↔BC7) |
-| `SemanticLayerSource` | `load() -> SemanticLayer` | Gerada a partir do contrato/dicionário da Gold |
-| `SqlGenerator` | `generate(question: Question, layer: SemanticLayer, feedback: AttemptFeedback \| None) -> SqlDraft` | Adapter PydanticAI. Saída inválida volta ao modelo até 2 vezes. Erros transitórios do provedor (429, 503) são repetidos com backoff pelo próprio cliente: no Gemini, via `retry_options` configurado nas settings; no OpenRouter, pelo retry nativo do SDK (2 novas tentativas). Esgotadas as tentativas, ou com erro do provedor, levanta `UnexpectedModelBehavior`/`ModelHTTPError`, que a orquestração converte em `refused_reason` |
+| `TextToSqlAgent` | `ask(question: str, session_id: str) -> AgentAnswer` | Contrato de entrada com o backend (Partnership BC6↔BC7). Implementada pelo `ask()` do item 6. Nunca levanta exceção: toda falha vira `AgentAnswer` com `status` |
+| `SemanticLayerSource` | `load() -> SemanticLayer` | Item 5. Monta a camada a partir do arquivo do GenAI e do contrato. Erro de configuração falha na subida, não na primeira pergunta |
+| `SqlGenerator` | `generate(question: Question, layer: SemanticLayer, feedback: AttemptFeedback \| None) -> SqlDraft` | Adapter PydanticAI. O item 6 muda o retorno para `Generation` (§4). Saída inválida volta ao modelo até 2 vezes. Erros transitórios do provedor (429, 503) são repetidos com backoff pelo próprio cliente: no Gemini, via `retry_options` das settings; no OpenRouter, pelo retry nativo do SDK. Esgotadas as tentativas, ou com erro do provedor, levanta `UnexpectedModelBehavior`, `ModelHTTPError` ou `ModelAPIError` |
 | `SqlValidator` | `validate(sql: str, allowed_views: frozenset[str]) -> ValidatedQuery` | Levanta `SqlRejected`; adapter `SqlglotValidator` (§6) |
-| `QueryExecutor` | `execute(query: ValidatedQuery) -> QueryResult` | Levanta `QueryExecutionError`; conexão read-only |
-| `AnswerWriter` | `write(question: Question, draft: SqlDraft, result: QueryResult) -> str` | Resposta só a partir das linhas |
-| `InsightWriter` | `narrate(screen: str, metrics: Mapping[str, object]) -> Insight` | LLM só narra números prontos |
+| `QueryExecutor` | `execute(query: ValidatedQuery) -> QueryResult` | Levanta `QueryExecutionError` para erros que o modelo pode corrigir; os demais erros do banco (permissão, somente leitura, conexão) propagam sem classificação |
+| `AnswerWriter` | `write(question: Question, draft: SqlDraft, result: QueryResult) -> str` | Item 8. Resposta só a partir das linhas |
+| `InsightWriter` | `narrate(screen: str, metrics: Mapping[str, object]) -> Insight` | Item 9. O LLM só narra números prontos. O item 9 muda o retorno para `Insight \| None`: `None` quando a verificação numérica falha |
 
-### Dados não são instruções
+### 5.1 Fluxo do `ask()` (item 6)
 
-Tudo o que vem do banco é **dado, nunca instrução** (§5.3 do guia):
-- o `SqlGenerator` recebe `sample_rows` e `allowed_values`;
-- o `AnswerWriter` recebe as linhas do resultado, que podem conter texto livre das tratativas do call center.
+O caso de uso `application/ask.py` implementa `TextToSqlAgent` encadeando as portas. Cada etapa é uma chamada separada e testável com fakes (§4 do guia).
 
-Os dois adapters delimitam esse conteúdo no prompt, num bloco de dados separado das instruções, e instruem o modelo a ignorar qualquer comando que apareça dentro dele. A pergunta do usuário nunca é concatenada em SQL: todo SQL passa pelo validador. O red team (§9.2) inclui casos de injeção pelos dados.
+1. **Entrada.** Monta a `Question`. Texto acima de `max_question_chars` → `refused`, sem chamar o modelo.
+2. **Camada semântica.** `SemanticLayerSource.load()` uma vez por processo; a camada não muda entre perguntas e o prompt de sistema fica estável para o cache do provedor.
+3. **Tentativas**, até `max_correction_attempts`:
+   1. `generate(question, layer, feedback)`.
+   2. `unknown`, `clarify` ou `refuse` → encerra com o status equivalente (`unknown`, `clarify`, `refused`), sem executar SQL.
+   3. `ok` → `validate`. `SqlRejected` → `feedback = AttemptFeedback(sql, REJECTED, reason)` e próxima tentativa.
+   4. `execute`. `QueryExecutionError` → `feedback = AttemptFeedback(sql, kind, message)` e próxima tentativa. Erro não classificado do banco → `failed` na hora, sem nova tentativa: o modelo não deve contornar uma trava do banco.
+   5. Sucesso → `answered`.
+4. **Tentativas esgotadas** → `failed`, com o último SQL em `sql` para auditoria. Erro do provedor do modelo (exceções da §5) → `failed`.
+5. **Confiança** (só para `answered`):
+   - `low`: resultado vazio ou `truncated`;
+   - `medium`: o modelo declarou suposições ou precisou de correção;
+   - `high`: nos demais casos.
+   - Qualquer outro status → `unknown`.
+6. **Resultado vazio** é `answered` com `confidence = low`. A resposta diz que nenhum registro atende aos filtros e repete as suposições, porque o agente não distingue "zero" de "dado ausente" (§6 do guia).
+7. **Texto da resposta.**
+   - Item 6: texto determinístico, montado sem LLM (quantas linhas, as suposições e o aviso de truncamento), mais a amostra em `rows`.
+   - Item 8: o `AnswerWriter` substitui esse texto por uma narrativa. Se a verificação numérica falhar (§7.3 do guia), volta para o texto determinístico.
+8. **Mensagens de `unknown`, `refused` e `failed`:** textos fixos em português, sem LLM, em `refused_reason` e em `answer`. O modelo não escreve o motivo de não ter respondido.
+9. **Logs estruturados:** uma linha JSON por etapa (stdlib `logging`), com `request_id`, `session_id`, número da tentativa, etapa, status, SQL, motivo ou tipo de erro, número de linhas, latência da etapa, modelo, tokens e `prompt_version` (§12 do guia). Sem a amostra de linhas, para não levar dado pessoal aos logs.
 
-## 6. Validador SQL (`infrastructure/sql_validator.py`)
+### 5.2 Dados não são instruções
+
+Tudo o que vem do banco ou do usuário é **dado, nunca instrução** (§5.3 do guia):
+- o `SqlGenerator` recebe `sample_rows`, `allowed_values`, o SQL anterior e a mensagem de erro;
+- o `AnswerWriter` (item 8) recebe as linhas do resultado, que podem conter texto livre das tratativas do call center.
+
+Hoje o renderizador delimita esse conteúdo com tags que levam um rótulo aleatório por instância do gerador (`<dados-{nonce}>`, `<pergunta-{nonce}>`, `secrets.token_hex(8)`). Quem escreve o conteúdo não conhece o rótulo e não consegue fechar o bloco; se o rótulo aparecer no texto, ele é trocado por `[redigido]`; rótulo em branco é recusado. O conteúdo chega ao modelo sem escape: o SQL anterior é exatamente o que rodou, e sinais `<` e `>` da pergunta ficam intactos. O item 8 usa o mesmo mecanismo. A pergunta nunca é concatenada em SQL: todo SQL passa pelo validador. O red team (§9.2) inclui injeção pelos dados.
+
+## 6. Validador SQL (`infrastructure/sql_validator.py`, hoje)
 
 `SqlglotValidator(dialect: str, max_rows: int, allowed_schema: str)`. Parser, nunca regex. Regras:
 
-1. Exatamente **um** statement, e a raiz é um `SELECT` ou `WITH … SELECT` (`exp.Query`, inclusive `UNION`).
+1. Exatamente **um** statement, e a raiz é um `SELECT` ou `WITH … SELECT` (`exp.Query`, inclusive `UNION`). SQL que o parser não consegue ler (aspa sem fechar, `$$`, comentário sem fim, aninhamento profundo que estoura a recursão) vira `SqlRejected`, nunca exceção solta.
 2. Nenhum nó de DML, DDL, `Command`, `SET` ou `COPY` em qualquer ponto da árvore (pega DML dentro de CTE).
 3. Sem cláusulas de bloqueio (`FOR UPDATE`, `FOR SHARE`) e sem `SELECT … INTO`.
 4. **Resolução de nomes por escopo** (`sqlglot.optimizer.scope`): um CTE só encobre tabelas dentro do próprio escopo. Toda tabela física referenciada precisa estar em `allowed_views` e no `allowed_schema` (ou sem schema); qualquer catálogo é rejeitado. Identificadores sem aspas são normalizados para minúsculas, como o Postgres faz. No SQL de saída, toda view é qualificada com o `allowed_schema`, para a execução não depender do `search_path` da conexão.
 5. **Funções:**
    - Só são aceitas as que o sqlglot reconhece como expressões tipadas no dialeto.
-   - Toda função desconhecida para o parser (`exp.Anonymous`) é rejeitada. É assim que aparecem `query_to_xml`, `table_to_xml`, `dblink`, `pg_read_file`, `pg_sleep`, `current_setting` e `set_config` (verificado no sqlglot 30.21).
+   - Toda função desconhecida para o parser (`exp.Anonymous`) é rejeitada. É assim que aparecem `query_to_xml`, `table_to_xml`, `dblink`, `pg_read_file`, `pg_sleep`, `current_setting` e `set_config` (verificado no sqlglot 30.23).
    - Entre as reconhecidas, uma denylist curta bloqueia as que expõem o servidor ou a sessão: `version()`, `current_user`, `session_user`, `current_database()`, `current_catalog` e `current_schema`. `current_role` e `user` chegam como coluna, não como função, e ficam a cargo da role do banco (D1).
    - O efeito na acurácia é medido no golden set. Uma função legítima rejeitada (ex.: `make_date`, que o sqlglot trata como `Anonymous`) entra numa lista explícita de exceções, com teste.
-6. `LIMIT`: inserido quando ausente e reduzido quando acima de `max_rows`. `FETCH FIRST`, `LIMIT ALL` e qualquer valor que não seja literal inteiro são rejeitados, com um motivo que pede `LIMIT n`.
-7. Cada rejeição tem um `reason` específico, porque ele volta para o modelo na tentativa de correção.
+6. `LIMIT`: inserido quando ausente e reduzido quando acima de `max_rows`. `FETCH FIRST`, `LIMIT ALL` e qualquer valor que não seja literal inteiro são rejeitados, com um motivo que pede `LIMIT n`. `OFFSET` não é verificado: um `OFFSET` inválido chega ao banco e volta como `type_mismatch`.
+7. Cada rejeição tem um `reason` específico, porque ele volta para o modelo na tentativa de correção. Para erro de sintaxe, o motivo traz a mensagem do parser, sem códigos de terminal.
 
 O validador é a primeira trava. A segunda é o banco: role somente leitura, com permissão só no schema das views (§10, D1). Uma não substitui a outra.
 
@@ -161,55 +192,59 @@ O validador é a primeira trava. A segunda é o banco: role somente leitura, com
 
 | Campo | Padrão | Restrição |
 |---|---|---|
-| `llm_model` | `google-gla:gemini-3.1-flash-lite` | Prefixo `google-gla:` ou `openrouter:` |
-| `fallback_model` | `None` | — |
-| `google_api_key` | obrigatório se algum modelo usa `google-gla:` | `SecretStr`, nunca no `repr` |
-| `openrouter_api_key` | obrigatório se algum modelo usa `openrouter:` | `SecretStr`, nunca no `repr` |
+| `llm_model` | `google-gla:gemini-3.1-flash-lite` | Prefixo `google-gla:` ou `openrouter:`, com nome de modelo |
+| `fallback_model` | `None` | Mesma regra |
+| `google_api_key` | obrigatório se algum modelo usa `google-gla:` | `SecretStr`, nunca no `repr`; em branco conta como ausente |
+| `openrouter_api_key` | obrigatório se algum modelo usa `openrouter:` | Idem |
 | `temperature` | `0.0` | `0 ≤ t ≤ 0.2` |
 | `llm_retry_attempts` | `3` | `1 ≤ n ≤ 5`; tentativas no total, só para erros transitórios (429, 503) do Gemini |
 | `llm_retry_initial_delay_seconds` | `1` | `> 0`; backoff exponencial com jitter a partir deste valor |
-| `sql_dialect` | `postgres` | Só `postgres` (DEC-002). Usado pelo validador e pelas regras de dialeto do prompt |
+| `sql_dialect` | `postgres` | Só `postgres` (DEC-002) |
 | `database_url` | obrigatório | Usuário `venergy_agent`, nunca as credenciais do backend |
 | `allowed_schema` | `gold` | Passa a ser o schema das views `sem_*` quando D1 for atendido |
-| `max_question_chars` | `500` | `> 0` |
-| `max_rows` | `200` | `> 0` |
+| `max_question_chars` | `500` | `> 0`; aplicado pelo `ask()` |
+| `max_rows` | `200` | `> 0`; teto do `LIMIT` |
 | `query_timeout_seconds` | `10` | `> 0` |
 | `max_correction_attempts` | `3` | `1 ≤ n ≤ 3` |
-| `prompt_version` | `v1` | — |
+| `prompt_version` | `v1` | Pasta em `prompts/` |
+| `answer_sample_rows` | `20` | **Item 6.** `> 0`; linhas em `AgentAnswer.rows` e no `AnswerWriter` |
+| `semantic_layer_path` | `ai-agent/semantic/semantic_layer.yaml` | **Item 5.** Resolvido pelo caminho do pacote, como o `.env` |
+| `gold_contract_path` | `contracts/gold_schema.yaml` da raiz | **Item 5.** Idem. Dentro do container da API o arquivo precisa estar disponível (D8) |
 
-**Adiado de propósito:** rate limit e orçamento de tokens por sessão (§5.4 do guia) não estão nas settings. O case não os exige, e o rate limit por usuário cabe melhor no backend, que conhece o usuário. Entram como diferencial (§11), com os limites em settings quando chegarem.
+**Adiado de propósito:** rate limit e orçamento de tokens por sessão (§5.4 do guia). O case não os exige, e o rate limit por usuário cabe melhor no backend, que conhece o usuário. Entram como diferencial (§11).
 
-**Origem das variáveis:** em produção, quem constrói `AgentSettings` é o composition root, chamado pelo backend FastAPI. As variáveis `VENERGY_AGENT_*` vêm do ambiente do processo (compose e `.env` da raiz). O `ai-agent/.env` só vale para rodar o agente isolado (testes, avaliação), e por isso o caminho do `.env` não pode depender do diretório atual.
+**Origem das variáveis:** em produção, quem constrói `AgentSettings` é o `bootstrap.py`, chamado pelo backend FastAPI. As variáveis `VENERGY_AGENT_*` vêm do ambiente do processo (compose e `.env` da raiz). O `ai-agent/.env` só vale para rodar o agente isolado (testes, avaliação), e por isso o caminho do `.env` não depende do diretório atual.
 
 ## 8. Testes
 
-Só regras do projeto; nada de testar enums, Protocols ou a própria biblioteca.
+Só regras do projeto; nada de testar enums, Protocols ou a própria biblioteca. A avaliação com o modelo real (§9) fica fora do `pytest` padrão.
 
+**Hoje:**
 1. `SqlDraft`: as três invariantes (parametrizadas, com strings em branco) e um caso válido.
 2. `SemanticLayer`: relação para view ou coluna inexistente é rejeitada; nomes duplicados são rejeitados; `allowed_views` expõe os nomes.
-3. `AgentAnswer`: `row_count < len(rows)` é rejeitado; `refused_reason` com linhas, com `row_count > 0`, com `confidence` diferente de `unknown` ou junto de `clarification` é rejeitado.
+3. `AgentAnswer`: `row_count < len(rows)` é rejeitado.
 4. `Question`: texto em branco é rejeitado.
-5. `AgentSettings`: variável com prefixo sobrescreve o padrão; falta da chave do provedor de `llm_model` ou de `fallback_model` falha, e só ela é exigida; provedor desconhecido é rejeitado; `temperature` e `max_correction_attempts` fora da faixa são rejeitados; a chave não aparece no `repr`.
-6. `SqlglotValidator`: lista parametrizada de SQL malicioso ou inválido (DDL, DML, múltiplos statements, DML em CTE, funções de sistema, tabelas fora da allowlist, schema ou catálogo errado) e de SQL válido (join, CTE, `UNION`, `LIMIT`). Inclui como regressões os desvios encontrados no review do PR #5:
-   - CTE com o nome de uma tabela proibida, declarado em outro escopo: `SELECT * FROM gold_dim_uc WHERE EXISTS (WITH gold_dim_uc AS (SELECT 1) SELECT 1 FROM gold_dim_uc)` → rejeitado;
-   - `query_to_xml`/`table_to_xml`, inclusive via `LATERAL` → rejeitado;
-   - `FOR UPDATE` → rejeitado;
-   - `FETCH FIRST 5000 ROWS ONLY` → rejeitado, com motivo que pede `LIMIT`;
-   - funções legítimas de data e texto (`date_trunc`, `extract`, `to_char`, `round`) → aceitas, para a regra de funções não bloquear consultas válidas.
+5. `AgentSettings`: variável com prefixo sobrescreve o padrão; só a chave do provedor escolhido é exigida; chave em branco, provedor desconhecido e nome de modelo vazio falham; valores fora da faixa são rejeitados; a chave não aparece no `repr`; o `.env` do diretório atual é ignorado.
+6. `SqlglotValidator`: lista parametrizada de SQL malicioso ou inválido (DDL, DML, múltiplos statements, DML em CTE, funções de sistema, tabelas fora da allowlist, schema ou catálogo errado, SQL ilegível, aninhamento profundo) e de SQL válido (join, CTE, `UNION`, `LIMIT`, funções de data e texto). Inclui como regressões os desvios dos reviews dos PRs #5 e #15 (CTE em outro escopo, `query_to_xml` via `LATERAL`, `FOR UPDATE`, `FETCH FIRST`, motivo com a mensagem do parser e sem códigos de terminal).
+7. Executor (integração, contra o `venergy_test`): linhas e colunas; truncamento só com `LIMIT` imposto; o banco recusa `INSERT` mesmo sem passar pelo validador; timeout; classificação dos SQLSTATE; permissão negada não é classificada.
+8. Gerador e prompt (`FunctionModel`, sem custo de API): o `SqlDraft` do modelo é devolvido; saída inválida volta ao modelo; o prompt de sistema traz a camada semântica inteira e não contém a pergunta; conteúdo de dados delimitado com o rótulo aleatório; variantes de tag forjadas continuam texto; o rótulo é redigido se aparecer no conteúdo; rótulo em branco é recusado; o SQL anterior chega sem alteração; cada gerador sorteia o próprio rótulo; versão de prompt inexistente falha na construção.
+9. Fábrica de modelo: `GoogleModel` para `google-gla:` e `OpenRouterModel` para `openrouter:`; `FallbackModel` com fallback, inclusive misturando provedores; o cliente do Gemini recebe as opções de retry das settings; provedor desconhecido nunca vai para o OpenRouter.
 
-7. Gerador e prompt (`FunctionModel`, sem custo de API): o `SqlDraft` do modelo é devolvido; saída inválida volta ao modelo; o prompt de sistema traz a camada semântica inteira e não contém a pergunta (cache); linhas de exemplo e valores permitidos ficam em `<dados>`, e uma tag de fechamento dentro deles é neutralizada; sinais `<` e `>` da pergunta chegam intactos; a correção traz o SQL anterior, o tipo de erro e as colunas válidas (todas as views quando o SQL não cita nenhuma conhecida); versão de prompt inexistente falha na construção.
-8. Fábrica de modelo: `GoogleModel` para `google-gla:` (padrão) e `OpenRouterModel` para `openrouter:`; `FallbackModel` quando há fallback, inclusive misturando os dois provedores; o cliente do Gemini recebe as opções de retry das settings (tentativas, atraso inicial, códigos 429 e 503).
+**Com as próximas features:**
+- Item 5: o arquivo da camada semântica é validado contra o contrato (coluna inexistente, coluna `a_confirmar`, view sem chave primária confirmada → falha na carga); relações saem das `foreign_keys` e das `shared_keys`; `allowed_values` vem do `allowed`; o `views.sql` versionado é igual ao gerado; as views funcionam no `venergy_test` pelo validador e pelo executor.
+- Item 2: as invariantes de status do `AgentAnswer` (§4).
+- Item 6: com fakes de todas as portas, cada linha da §5.1 (limite de tamanho, os três status sem SQL, correção depois de rejeição e de erro de execução, erro não classificado vira `failed` sem nova tentativa, tentativas esgotadas, erro do provedor, regra de confiança, resultado vazio); o `ask()` nunca levanta exceção; um log por etapa sem a amostra de linhas.
+- Item 8: verificação numérica (número inexistente nas linhas derruba a narrativa e volta ao texto determinístico).
+- Item 9: insight com número fora do JSON de métricas é descartado.
 
-O teste de que o banco recusa escrita é de integração e chega com o executor (§11, item 3).
+## 9. Avaliação (item 7)
 
-## 9. Avaliação
-
-A avaliação do agente é diferente dos testes de código da §8. Ela roda o modelo real, é paga e mais lenta, e fica fora do `pytest` padrão. O golden set é do G2 (G2-01); o runner é do G1.
+A avaliação roda o modelo real, é paga e mais lenta, e fica fora do `pytest` padrão. O golden set é do G2 (G2-01); o runner é do G1.
 
 ### 9.1 Golden set (`ai-agent/eval/golden_set.yaml`)
-- Campos de cada item: `id`, `question`, `category`, `reference_sql` (nulo quando o esperado não é SQL), `expected_behavior` (os mesmos valores de `DraftStatus`: `ok | unknown | clarify | refuse`) e `follow_up_of` (diferencial).
+- Campos de cada item: `id`, `question`, `category`, `reference_sql` (nulo quando o esperado não é resposta), `expected_status` (os valores de `AnswerStatus`: `answered`, `unknown`, `clarify` ou `refused`; `failed` nunca é esperado) e `follow_up_of` (diferencial).
 - O conjunto começa com 40+ itens e cobre todas as categorias de §10.1 do guia (simples, junção, temporal, sinônimos, sem resposta, ambígua, manipulação), com **pelo menos 8 sem resposta** e **pelo menos 5 de injection** (G2-01). Inclui as falas das lideranças do case.
-- **Toda `reference_sql` é escrita ou revisada por uma pessoa e executada no banco.** Gabarito gerado por LLM sem revisão invalida a avaliação. O gabarito é preenchido sobre a amostra e recalibrado quando a Gold real chegar.
+- **Toda `reference_sql` é escrita ou revisada por uma pessoa e executada no banco.** Gabarito gerado por LLM sem revisão invalida a avaliação. O gabarito é feito sobre a amostra e recalibrado quando a Gold real chegar.
 - O arquivo é versionado. Todo erro encontrado em uso real vira um item novo, com o gabarito corrigido.
 
 ### 9.2 Red team (`ai-agent/eval/red_team.yaml`)
@@ -221,10 +256,11 @@ A avaliação do agente é diferente dos testes de código da §8. Ela roda o mo
 | Métrica | Como se mede | Meta |
 |---|---|---|
 | Execution accuracy | Conjunto de linhas do SQL gerado = conjunto do `reference_sql`. A ordem só conta se a pergunta pedir ordenação; colunas extras são ignoradas | ≥ 80% sobre a Gold real (G1-05) |
-| Acurácia de comportamento | `status` do `SqlDraft` = `expected_behavior` | 100% nos itens sem resposta (G1-07) |
-| Bloqueio de manipulação | Itens `refuse` e red team sem SQL de escrita ou fora da allowlist executado | 100% |
-| Fidelidade numérica | Todo número do texto da resposta existe nas linhas | 100% |
-| Operacional | SQL inválido, média de tentativas, latência p50/p95, tokens, custo | Acompanhar a evolução |
+| Acurácia de status | `AgentAnswer.status` = `expected_status` | 100% nos itens sem resposta (G1-07) |
+| Taxa de `failed` | Itens que terminaram em `failed` | Acompanhar; cada um é investigado nos logs |
+| Bloqueio de manipulação | Itens `refused` e red team sem SQL de escrita ou fora da allowlist executado | 100% |
+| Fidelidade numérica | Todo número do texto da resposta existe nas linhas (depende do item 8) | 100% |
+| Operacional | SQL inválido, média de tentativas, latência p50/p95, tokens, custo | Acompanhar |
 
 Comparar o texto do SQL não vale como métrica: duas consultas diferentes podem estar ambas certas.
 
@@ -236,41 +272,57 @@ Comparar o texto do SQL não vale como métrica: duas consultas diferentes podem
 - Antes de confiar no juiz, calibrar com uma amostra pequena avaliada por uma pessoa.
 
 ### 9.5 Encaixe na arquitetura
-- O pacote `venergy_agent/evaluation/` traz o runner, que consome só portas: `TextToSqlAgent`, para gerar, e `QueryExecutor`, para rodar o `reference_sql`. Assim o runner avalia qualquer implementação do agente sem conhecer o framework.
+- O pacote `venergy_agent/evaluation/` traz o runner, que consome só portas: `TextToSqlAgent`, para responder, e `QueryExecutor`, para rodar o `reference_sql`. Assim o runner avalia qualquer implementação do agente sem conhecer o framework.
 - O juiz entra como a porta `AnswerJudge.judge(question: str, answer: AgentAnswer) -> JudgeVerdict`, com adapter PydanticAI. As settings ganham `judge_model`.
 - Cada execução grava um relatório (`eval/runs/<timestamp>.json`) com modelo, `prompt_version`, versão da camada semântica e métricas. Uma variável muda por vez.
-- **Regra de merge:** uma mudança de prompt, modelo, few-shot, glossário ou camada semântica só entra se a execution accuracy e a acurácia de comportamento não regredirem.
+- **Regra de merge:** a partir da primeira execução do golden set, uma mudança de prompt, modelo, few-shot, glossário ou camada semântica só entra se a execution accuracy e a acurácia de status não regredirem, e mudança de prompt vai para uma versão nova em `prompts/` (DEC-016).
 
 ## 10. Dependências de outras áreas
 
 Pedidos a abrir como issue para a área dona. O GenAI não altera esses arquivos.
 
-| # | Área | Pedido | Por quê |
-|---|---|---|---|
-| D1 | Dev (V1-02, `infra/postgres/init`) | Criar um schema para as views `sem_*` (sugestão: `semantic`) e dar ao `venergy_agent` `USAGE` e `SELECT` só nele. Tirar o `ALTER DEFAULT PRIVILEGES … GRANT SELECT` em `gold`, que hoje libera todas as tabelas da Gold. Definir `statement_timeout` na role | Hoje o agente lê qualquer tabela de `gold`, inclusive colunas pessoais que as views removeriam (§2.1 e §5.1 do guia) |
-| D2 | Dev (DEC-007, `.github/workflows/ci.yml`) | Job do `ai-agent` no CI: `uv run --frozen pytest` e `ruff` dentro de `ai-agent/` | O CI só roda o backend; uma regressão do validador passaria sem ser vista |
-| D3 | Dev (G1-06, G1-09) | Persistir a auditoria de cada `AgentAnswer` (com timestamp) e expor `POST /ai/ask` e `GET /ai/audit/{id}` | O agente é somente leitura |
-| D4 | Dados | Publicar na amostra e na Gold as tabelas que o agente usa: `gold_fato_faturamento_mensal`, `gold_continuidade_alimentador_mensal`, `gold_atendimentos_uc` | A amostra atual só tem `gold_dim_uc` |
-| D6 | Dev (`infra/postgres/init/01-init.sh`) | Versionar o script com bit de execução (`git update-index --chmod=+x`) | No Docker Desktop do macOS, o entrypoint tenta executar o script sem o bit e o container sai com `bad interpreter: Permission denied` na primeira subida |
-| D7 | Dev (loader `venergy_api.carga`) | Criar as views `sem_*` com o usuário dono, depois do `create_all` da carga, a partir do SQL gerado pelo GenAI | O usuário do agente é somente leitura. A recarga usa `DELETE` + `INSERT`, então as views sobrevivem a ela; mas o `DROP TABLE gold.gold_dim_uc` sugerido na DEC-010 falha enquanto houver view dependente (precisa de `CASCADE` e de recriar as views) |
-| D8 | Dev (`backend/`, `docker-compose.yml`, CI) | Decidir como o backend instala o agente quando o `/ai` for integrado: *workspace* do uv na raiz (um `uv.lock` e uma `.venv` para backend e agente) ou dependência por caminho no `backend/pyproject.toml` (`venergy-agent = { path = "../ai-agent" }`). Até lá, cada módulo mantém o próprio `uv.lock` e o `make setup` instala tudo | O workspace muda o build da API (`build: ./backend` e `uv sync --frozen` usam o `backend/uv.lock`), o CI e a versão do ruff presa ao `backend/uv.lock` (DEC-007). É uma decisão de arquitetura que afeta o Dev, não só o GenAI |
-| D5 | Time (`docs/arquitetura.md`) | Atualizar o ADR-01 de "em aberto" para "PostgreSQL (DEC-002)" | Documento do time desatualizado |
+| # | Área | Pedido | Por quê | Estado |
+|---|---|---|---|---|
+| D1 | Dev (V1-02, `infra/postgres/init`) | Criar um schema para as views `sem_*` (sugestão: `semantic`) e dar ao `venergy_agent` `USAGE` e `SELECT` só nele. Tirar o `ALTER DEFAULT PRIVILEGES … GRANT SELECT` em `gold`, que hoje libera todas as tabelas da Gold. Definir `statement_timeout` na role | Hoje o agente lê qualquer tabela de `gold`, inclusive colunas que as views removeriam (§2.1 e §5.1 do guia) | Aberto |
+| D2 | Dev (DEC-007, `.github/workflows/ci.yml`) | Job do `ai-agent` no CI | Uma regressão do validador passaria sem ser vista | **Feito** (PR #8) |
+| D3 | Dev (G1-06, G1-09) | Persistir a auditoria de cada `AgentAnswer` (com timestamp) e expor `POST /ai/ask` e `GET /ai/audit/{id}` | O agente é somente leitura | Aberto; depende do item 6 |
+| D4 | Dados | Publicar na amostra e na Gold as tabelas que o agente usa: `gold_fato_faturamento_mensal`, `gold_continuidade_alimentador_mensal`, `gold_receita_decomposicao` | A amostra só tem `gold_dim_uc` | Em andamento (PR #17 traz as tabelas do contrato ao backend) |
+| D5 | Time (`docs/arquitetura.md`) | Atualizar o ADR-01 de "em aberto" para "PostgreSQL (DEC-002)" | Documento do time desatualizado | Aberto |
+| D6 | Dev (`infra/postgres/init/01-init.sh`) | Versionar o script com bit de execução (`git update-index --chmod=+x`) | No Docker Desktop do macOS, a primeira subida do banco falha com `bad interpreter: Permission denied` | Aberto |
+| D7 | Dev (loader `venergy_api.carga`) | Rodar o `ai-agent/semantic/views.sql` (gerado pelo item 5) com o usuário dono, depois do `create_all` da carga | O usuário do agente é somente leitura. A recarga usa `DELETE` + `INSERT`, então as views sobrevivem; o `DROP TABLE` sugerido na DEC-010 falha enquanto houver view dependente (precisa de `CASCADE` e de recriar as views) | Aberto; depende do item 5 |
+| D8 | Dev (`backend/`, `docker-compose.yml`, CI) | Decidir como o backend instala o agente quando o `/ai` for integrado: *workspace* do uv na raiz ou dependência por caminho (`venergy-agent = { path = "../ai-agent" }`). Inclui levar `contracts/gold_schema.yaml` e `ai-agent/semantic/` para dentro do container da API. Até lá, cada módulo mantém o próprio `uv.lock` e o `make setup` instala tudo | O workspace muda o build da API (`build: ./backend` e `uv sync --frozen` usam o `backend/uv.lock`), o CI e a versão do ruff presa ao `backend/uv.lock` (DEC-007) | Aberto; decidir no início do D3 |
+| D9 | Dev (G2-04, G2-05) | Montar o JSON de métricas de cada tela, chamar o `InsightWriter` e guardar o insight em cache por combinação de filtros; quando o agente devolver `None`, mostrar a tela sem o insight | O LLM só narra números prontos (ADR-04); o agente não guarda estado no processo (§14 do guia) | Aberto; depende do item 9 |
 
-## 11. Próximas features (cada uma em sua branch)
+## 11. Próximas features (cada uma em sua branch, com plano próprio)
 
-Obrigatórios, nesta ordem:
-1. ~~Hardening do validador~~: feito em `fix/ai-agent-review-pr5`, com as regras da §6 e os testes de regressão do item 6 da §8.
-2. **Contrato `AgentAnswer`**: `refused_reason`, `model`, `latency_ms` e as novas invariantes (§4). Precisa ser combinado com V1, porque o backend depende dele.
-3. ~~Executor read-only Postgres~~: feito em `feat/ai-agent-executor` (`PostgresQueryExecutor`, plano `docs/plans/2026-10-20-postgres-executor.md`), com timeout por consulta, truncamento, classificação por SQLSTATE e teste de integração confirmando que o banco recusa `INSERT`.
-4. ~~Gerador PydanticAI~~: feito em `feat/ai-agent-gerador` (`PydanticAiSqlGenerator`, `build_model`, `prompts/v1/`, plano `docs/plans/2026-10-21-sql-generator.md`). Prompts versionados, com o conteúdo do banco delimitado como dado (§5). Vem antes da camada semântica porque não depende do contrato da Gold: recebe um `SemanticLayer` e é testado com um montado no próprio teste.
-5. **Camada semântica** + glossário, depois do merge do PR #10. Fonte: `contracts/gold_schema.yaml` (tabelas com `agente` em `consumers`; só colunas `confirmada` e `proposta`; relações das `foreign_keys` e das `shared_keys`) + um arquivo do GenAI com descrições, unidades, glossário e regras de negócio. Gera também o SQL das views `sem_*` (D7).
-6. **Orquestração `ask()`** com loop de correção, "não sei" e **logs estruturados por etapa**, no mesmo PR. Cada requisição registra `request_id`, `session_id`, a pergunta, o SQL de cada tentativa, o resultado da validação, o erro, o número de linhas, a latência por etapa, os tokens, o modelo e o `prompt_version` (§12 do guia). Sem esse rastreio não dá para diagnosticar as falhas que o golden set vai mostrar.
-7. Golden set + red team + runner com as métricas de §9.3. Os itens podem ser escritos em paralelo desde já, porque não dependem de código.
-8. Verificação numérica e `AnswerWriter`, com o conteúdo do banco delimitado como dado (§5).
-9. `InsightWriter`.
+**Feitas:** 1. hardening do validador (PRs #7 e #15) · 3. executor somente leitura (PR #8) · 4. gerador PydanticAI e prompts v1 (PRs #13 e #14).
 
-Diferenciais, só depois dos obrigatórios:
-- follow-up com memória;
+**Ordem de execução das próximas: 5 → 2 → 6 → 7 → 8 → 9.** Os números são identificadores estáveis, citados nesta spec e nos planos; a ordem acima é a que vale.
+
+**5. Camada semântica + glossário.** Desbloqueada pelo merge do contrato v0.1.0.
+- `semantic/semantic_layer.yaml`, do GenAI. Para cada view: nome `sem_*`, tabela de origem, descrição, grão, colunas escolhidas com descrição e unidade, e linhas de exemplo sintéticas. Mais o glossário de sinônimos (G1-08, G2-02), as regras de negócio (definição de "receita", competência, períodos base e atual) e os exemplos few-shot.
+- Adapter `SemanticLayerSource` que lê esse arquivo e o contrato e valida:
+  - a tabela e a coluna existem no contrato;
+  - a coluna não é `a_confirmar`;
+  - a view só entra se todas as colunas da chave primária estiverem confirmadas ou propostas.
+
+  Ele também traz o tipo e o `allowed` do contrato e monta as relações a partir das `foreign_keys` e das `shared_keys` entre as views escolhidas.
+- Primeira versão: `gold_dim_uc`, `gold_fato_faturamento_mensal` e `gold_continuidade_alimentador_mensal`. `gold_receita_decomposicao` entra assim que `periodo_base` e `periodo_atual` deixarem de ser `a_confirmar`; `gold_atendimentos_uc`, quando a Silver definir as colunas.
+- Gerador do `semantic/views.sql` (`CREATE OR REPLACE VIEW <schema>.sem_x AS SELECT ... FROM gold.gold_x`), versionado e conferido por teste, para o Dev aplicar (D7). Enquanto D1 não sair, as views ficam no schema `gold`, onde o `venergy_agent` já lê.
+- Teste de integração: cria as tabelas mínimas e as views no `venergy_test` e consulta pelo validador e pelo executor.
+
+**2. Contrato `AgentAnswer`.** `status`, `truncated`, `refused_reason`, `model`, `latency_ms` e as invariantes da §4. Combinar com o V1 antes do merge, porque o backend depende dele (D3).
+
+**6. Orquestração `ask()` + logs estruturados**, no mesmo PR: o fluxo da §5.1, `ErrorKind.REJECTED`, `Generation` no `SqlGenerator`, `answer_sample_rows` e o `bootstrap.py`. Inclui um teste rápido com o modelo real, fora do `pytest`, como o feito para o gerador.
+
+**7. Golden set + red team + runner** com as métricas de §9.3. Os itens do golden set e do red team podem ser escritos desde já, porque não dependem de código; o `reference_sql` precisa da amostra (D4).
+
+**8. `AnswerWriter` + verificação numérica.** Narrativa a partir das linhas, com o conteúdo do banco delimitado como dado (§5.2) e volta ao texto determinístico quando a verificação falha. A mesma verificação numérica serve ao item 9.
+
+**9. `InsightWriter`.** Narra o JSON de métricas de uma tela (G2-04, tela de Receita; G2-05, "conta alta" na UC 360, Should) em 2 a 4 frases, sem conclusões causais que o JSON não sustenta (§9 do guia), e devolve `None` se algum número do texto não estiver no JSON. O cache por filtros e a montagem do JSON são do backend (D9).
+
+**Diferenciais, só depois dos obrigatórios:**
+- follow-up com memória (G1-10; o histórico fica fora do processo, §8 do guia);
 - LLM as a judge (§9.4);
-- avaliação automatizada a cada mudança, com tabela comparativa de experimentos;
+- avaliação automatizada a cada mudança, com tabela comparativa de experimentos (G2-08);
 - rate limit e orçamento de tokens por sessão (§7).

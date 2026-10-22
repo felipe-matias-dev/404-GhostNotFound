@@ -2,6 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **Status (2026-10-22): executed in PR #8** (merged). Kept as the record of that work; do not re-run it.
+> Changes from the review, accepted in the spec: `ValidatedQuery.limit_imposed` (only a validator-imposed limit marks a result as truncated), a timeout rounded up and never 0, `connect_timeout`, and rollback through the connection context instead of `finally`. The same PR added the `ai-agent` CI job (spec §10, D2).
+
 **Goal:** Implement the `QueryExecutor` port as a read-only Postgres adapter with timeout, truncation flag and SQLSTATE error classification.
 
 **Architecture:** One adapter in `infrastructure/`. It uses async psycopg 3 directly, with no SQLAlchemy and one connection per query. Every query runs inside `BEGIN READ ONLY` with `SET LOCAL statement_timeout` and always ends in `ROLLBACK`. Integration tests run against `venergy_test` from the root `docker compose`, mirroring `backend/tests/test_agent_role.py`.
