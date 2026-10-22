@@ -1,10 +1,12 @@
 from pathlib import Path
 
 import pytest
-from sqlalchemy import Engine
+from sqlalchemy import Engine, func, select
+from sqlalchemy.orm import Session
 
-from venergy_api.amostra import SAMPLE_UCS, write_sample
+from venergy_api.amostra import SAMPLE, SAMPLE_FILA, write_sample
 from venergy_api.carga import load_gold
+from venergy_api.models import FatoFaturamentoMensal, FilaSuspeita, KpisMensais
 
 
 def test_generated_sample_passes_the_gold_load(tmp_path: Path, engine: Engine) -> None:
@@ -12,7 +14,42 @@ def test_generated_sample_passes_the_gold_load(tmp_path: Path, engine: Engine) -
 
     counts = load_gold(tmp_path / "gold", engine)
 
-    assert counts == {"gold_dim_uc": len(SAMPLE_UCS)}
+    # A carga exige um CSV por tabela da Gold: se faltar amostra de uma, ela falha antes.
+    assert counts == {model.__tablename__: len(rows) for model, rows in SAMPLE.items()}
+
+
+def test_kpis_match_the_sum_of_the_billing_in_the_database(tmp_path: Path, engine: Engine) -> None:
+    # A mesma conferência vale para a Gold real: o painel da diretoria tem que bater com a
+    # soma do faturamento das UCs, mês a mês, depois de passar por CSV, carga e banco.
+    write_sample(tmp_path / "gold", force=False)
+    load_gold(tmp_path / "gold", engine)
+
+    with Session(engine) as session:
+        billing = session.execute(
+            select(
+                FatoFaturamentoMensal.competencia,
+                func.sum(FatoFaturamentoMensal.kwh_faturado),
+                func.sum(FatoFaturamentoMensal.receita_faturada),
+            ).group_by(FatoFaturamentoMensal.competencia)
+        )
+        kpis = session.execute(
+            select(KpisMensais.competencia, KpisMensais.kwh_faturado, KpisMensais.receita_faturada)
+        )
+        assert set(kpis) == set(billing)
+
+
+def test_queue_reasons_come_back_as_a_list_from_the_database(
+    tmp_path: Path, engine: Engine
+) -> None:
+    # Ida e volta completa: lista → célula com ";" no CSV → text[] no banco → lista.
+    write_sample(tmp_path / "gold", force=False)
+    load_gold(tmp_path / "gold", engine)
+
+    with Session(engine) as session:
+        stored = session.get(FilaSuspeita, "0005")
+
+    assert stored is not None
+    assert stored.motivos == SAMPLE_FILA[0].motivos
 
 
 def test_does_not_overwrite_existing_csv_without_force(tmp_path: Path) -> None:

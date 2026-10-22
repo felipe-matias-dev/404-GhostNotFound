@@ -4,11 +4,13 @@ from pathlib import Path
 
 import pytest
 from pydantic import BaseModel
-from sqlalchemy import Engine, select
+from sqlalchemy import Engine, inspect, select, text
 from sqlalchemy.orm import Session
 
+from venergy_api.amostra import write_sample
 from venergy_api.carga import GoldLoadError, load_gold, read_rows
 from venergy_api.models import DimUc
+from venergy_api.schemas import RequiredText
 
 VALID_ROW = {
     "cod_uc": "0001",
@@ -18,11 +20,16 @@ VALID_ROW = {
     "cod_alimentador": "AL-01",
     "possui_gd": "true",
     "consumo_medio_kwh_12m": "152.4",
+    "cod_cliente": "C0001",
+    "subgrupo": "",
+    "potencia_kw": "3.3",
 }
 
 
 def write_gold_dim_uc(gold_dir: Path, rows: list[dict[str, str]]) -> None:
-    gold_dir.mkdir(exist_ok=True)
+    # A carga exige o CSV de todas as tabelas da Gold: as outras vêm da amostra, e só a
+    # gold_dim_uc recebe as linhas de cada teste.
+    write_sample(gold_dir, force=True)
     with (gold_dir / "gold_dim_uc.csv").open("w", encoding="utf-8", newline="") as file:
         writer = csv.DictWriter(file, fieldnames=list(rows[0]))
         writer.writeheader()
@@ -39,7 +46,7 @@ def test_loads_valid_csv_with_typed_values(tmp_path: Path, engine: Engine) -> No
 
     counts = load_gold(tmp_path / "gold", engine)
 
-    assert counts == {"gold_dim_uc": 2}
+    assert counts["gold_dim_uc"] == 2
     first = stored_ucs(engine)[0]
     assert first.cod_uc == "0001"
     assert first.possui_gd is True
@@ -54,6 +61,21 @@ def test_loading_twice_does_not_duplicate_rows(tmp_path: Path, engine: Engine) -
     load_gold(tmp_path / "gold", engine)
 
     assert len(stored_ucs(engine)) == 1
+
+
+def test_reload_recreates_table_with_columns_added_to_the_contract(
+    tmp_path: Path, engine: Engine
+) -> None:
+    # Simula um banco carregado antes de o contrato ganhar uma coluna.
+    with engine.begin() as connection:
+        connection.execute(text("CREATE TABLE gold.gold_dim_uc (cod_uc text PRIMARY KEY)"))
+    write_gold_dim_uc(tmp_path / "gold", [VALID_ROW])
+
+    load_gold(tmp_path / "gold", engine)
+
+    columns = {column["name"] for column in inspect(engine).get_columns("gold_dim_uc", "gold")}
+    assert "consumo_medio_kwh_12m" in columns
+    assert stored_ucs(engine)[0].consumo_medio_kwh_12m == Decimal("152.400")
 
 
 def test_rejects_csv_with_missing_column(tmp_path: Path, engine: Engine) -> None:
@@ -88,6 +110,30 @@ def test_empty_cell_becomes_none(tmp_path: Path) -> None:
     csv_path.write_text("cod_uc,receita\n0001,\n", encoding="utf-8")
 
     assert read_rows(csv_path, OptionalColumnSchema) == [{"cod_uc": "0001", "receita": None}]
+
+
+class ListColumnSchema(BaseModel):
+    # Mesmo formato dos motivos da fila de suspeitas: text[] no contrato.
+    cod_uc: str
+    motivos: list[RequiredText]
+
+
+def test_list_cell_is_split_by_semicolon(tmp_path: Path) -> None:
+    csv_path = tmp_path / "lista.csv"
+    csv_path.write_text("cod_uc,motivos\n0001,consumo caiu;medidor antigo\n", encoding="utf-8")
+
+    assert read_rows(csv_path, ListColumnSchema) == [
+        {"cod_uc": "0001", "motivos": ["consumo caiu", "medidor antigo"]}
+    ]
+
+
+def test_rejects_empty_item_in_list_cell(tmp_path: Path) -> None:
+    # Dois ; seguidos é erro de exportação: a carga avisa em vez de descartar o item vazio.
+    csv_path = tmp_path / "lista.csv"
+    csv_path.write_text("cod_uc,motivos\n0001,consumo caiu;;medidor antigo\n", encoding="utf-8")
+
+    with pytest.raises(GoldLoadError, match="linha 2: motivos.1"):
+        read_rows(csv_path, ListColumnSchema)
 
 
 def test_rejects_empty_required_cell(tmp_path: Path, engine: Engine) -> None:

@@ -88,15 +88,35 @@ a rota devolve (ex.: `404` com `ErroSchema`), para que o frontend também receba
 A API não sabe se os dados são de amostra ou reais: os dois chegam pelo mesmo caminho
 (CSV em `data/gold/` → carga → banco).
 
-- **Amostra:** 8 unidades consumidoras com valores inventados, geradas pelo passo 5.
-  Nada vem do dataset da V-Energy, que é confidencial.
+- **Amostra:** 8 unidades consumidoras e 24 meses (2024 e 2025) com valores inventados,
+  gerados pelo passo 5. Nada vem do dataset da V-Energy, que é confidencial.
 - **Gold real:** coloque os CSVs exportados do Databricks em `data/gold/`, um arquivo
-  por tabela (`gold_dim_uc.csv`), e rode a carga (passo 6) de novo.
+  por tabela, e rode a carga (passo 6) de novo.
+
+A carga espera um CSV para cada tabela do contrato da Gold
+([`contracts/gold_schema.yaml`](../contracts/gold_schema.yaml)) que já tem chave definida:
+
+| Arquivo | Uma linha por |
+|---|---|
+| `gold_dim_uc.csv` | unidade consumidora |
+| `gold_fato_faturamento_mensal.csv` | unidade consumidora × competência |
+| `gold_receita_decomposicao.csv` | período × município × bairro × classe |
+| `gold_kpis_mensais.csv` | competência |
+| `gold_continuidade_alimentador_mensal.csv` | alimentador × competência |
+| `gold_fila_suspeitas.csv` | unidade consumidora suspeita |
+
+`gold_interrupcoes_uc`, `gold_atendimentos_uc` e `gold_medidor_uc` entram quando o
+contrato definir as colunas e a chave delas
+([DEC-014](../docs/decisoes.md#dec-014--o-backend-espelha-o-contrato-da-gold)).
 
 A carga valida cada linha contra o contrato (`src/venergy_api/schemas.py`). Se um
 arquivo estiver fora do formato, ela é cancelada, informa a linha e a coluna com
-problema e mantém os dados anteriores. O gerador da amostra nunca sobrescreve um CSV
-existente sem `--force`.
+problema e mantém os dados anteriores. A cada execução, ela recria as tabelas da Gold:
+coluna nova no contrato entra sem apagar nada à mão. O gerador da amostra nunca
+sobrescreve um CSV existente sem `--force`.
+
+O teste `tests/test_contrato_gold.py` compara o contrato com os modelos e os schemas do
+backend. Mudou o YAML? Ele aponta o que o backend precisa acompanhar.
 
 `data/` fica na raiz do repositório e está no `.gitignore`: nenhum dado é versionado.
 
@@ -106,7 +126,7 @@ O `docker compose` cria, na primeira subida (`infra/postgres/init/01-init.sh`):
 
 | O quê | Para quê |
 |---|---|
-| Schema `gold` | Tabelas da Gold, recarregadas a partir dos CSVs |
+| Schema `gold` | Tabelas da Gold, recriadas a cada carga a partir dos CSVs |
 | Schema `app` | Dados criados no portal (ordens de inspeção). A carga nunca toca nele |
 | Usuário `venergy` | Usado pela API: lê e escreve |
 | Usuário `venergy_agent` | Usado pelo agente de IA: só `SELECT` no schema `gold`, sem acesso a `app` |
@@ -167,9 +187,10 @@ tests/            # pytest
 | A API não sobe e reclama de `database_url` ou `gold_dir` | Falta o `.env` de `backend/` (passo 4) |
 | `/health` responde `503` | O banco está parado (`docker compose ps`) ou a URL no `.env` de `backend/` está errada |
 | A busca de UC responde `500` | A carga ainda não rodou (passos 5 e 6) |
+| A carga é cancelada com "arquivo não encontrado" ou "colunas faltando" | A amostra em `data/gold/` é de uma versão anterior do contrato: `uv run python -m venergy_api.amostra --force` |
 | Testes param com "Banco de testes indisponível" | O banco não está no ar: `docker compose up -d --wait db` |
 | A API não sobe: porta 8000 em uso | A API do `docker compose` está no ar: `docker compose stop api web` |
 | Testes param com "Usuário do agente não conecta" | O banco foi criado antes do script de inicialização atual: `docker compose down -v` |
 
 As decisões por trás desta estrutura estão em [docs/decisoes.md](../docs/decisoes.md)
-(DEC-002 a DEC-004).
+(DEC-002 a DEC-004, DEC-010 e DEC-014).
