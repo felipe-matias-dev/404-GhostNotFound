@@ -13,7 +13,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | 19/10/2026 | Valores exibidos (R$, kWh, %, competência, datas) formatados só por `frontend/src/lib/format.ts` | Mesmo número com o mesmo formato em todas as telas | João Euclides |
 | 19/10/2026 | DEC-002: banco local PostgreSQL em Docker, com schemas `gold` e `app` | Usuário somente leitura nativo para o agente; recarga da Gold não apaga as ordens de inspeção | Time |
 | 19/10/2026 | DEC-003: walking skeleton com amostra sintética da Gold | Integração entre camadas testada desde o início, sem depender do dataset confidencial | Time |
-| 19/10/2026 | DEC-004 (proposta): Gold entregue em CSV, um arquivo por tabela, em `data/gold/` | Um único caminho de carga, validado contra o contrato, para amostra e Gold real | Felipe |
+| 19/10/2026 | DEC-004: Gold entregue em CSV, um arquivo por tabela, em `data/gold/` | Um único caminho de carga, validado contra o contrato, para amostra e Gold real | Felipe |
 | 19/10/2026 | DEC-005: contrato API → frontend em `contracts/openapi.json`, gerado pelo FastAPI; client com `openapi-typescript` + `openapi-fetch` | O front quebra na compilação quando o contrato muda; a mudança de contrato aparece no diff do PR | João Euclides |
 | 19/10/2026 | DEC-006: `docker compose up` sobe banco, API e Vite em modo de desenvolvimento | Um comando roda o portal em qualquer máquina; deploy em nuvem está fora do escopo | João Euclides |
 | 19/10/2026 | DEC-007: qualidade garantida por pre-commit local e pelo mesmo conjunto de checagens no CI | Código formatado e contrato em dia sem depender de lembrar; o CI barra quem pula o hook | João Euclides |
@@ -25,6 +25,9 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | 21/10/2026 | DEC-013: componentes base trazidos do shadcn/ui no estilo `base-nova` (Base UI) e do interior.dev para `frontend/src/components/ui/`, adaptados aos tokens; nenhuma biblioteca de componentes como dependência | O código fica no repositório e segue os tokens da marca; uma única base de primitivas (Base UI, sem Radix) | João Euclides |
 | 21/10/2026 | DEC-014: o backend espelha o contrato da Gold (6 de 9 tabelas), conferido por teste no CI; a carga recria as tabelas da Gold | Divergência entre contrato e backend aparece no CI, e não na carga da Gold real; coluna nova no contrato entra sem apagar tabela à mão | Felipe |
 | 22/10/2026 | DEC-017: backend e agente formam um workspace do uv, com um único `uv.lock` na raiz | Com o `/ai`, a API instala o agente; uma resolução só garante que o que é testado é o que roda | Luis Felipe |
+| 21/10/2026 | DEC-022: o agente só lê colunas não sensíveis das tabelas liberadas no contrato, e "receita" sem qualificador é a receita faturada | Dado pessoal e texto livre ficam fora do agente; uma definição única de receita evita respostas divergentes | Alisson |
+| 22/10/2026 | DEC-023: receita da Gold em três medidas (total, energia e tributos), com a energia como base provisória do PVM; consumo médio nulo sem leitura; `potencia_kwp`; reconciliação do faturamento e da energia | Nenhum valor descartado sem explicação; os números da diretoria podem ser conciliados com os da Gold | Alisson |
+| 22/10/2026 | DEC-024: resultados agregados necessários para sustentar uma hipótese podem ir ao repositório; identificação de pessoas e de UCs e dado de LGPD ficam mascarados; linha a linha, amostras e outputs nunca sobem | O diagnóstico precisa mostrar a evidência, mas o dataset é confidencial e há dado pessoal | Alisson |
 
 ## DEC-001 · Localização dos arquivos de origem (landing)
 
@@ -78,11 +81,11 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   não pode sair do contrato. O gerador nunca sobrescreve um CSV existente sem
   `--force`, para não trocar a Gold real por dados inventados.
 
-## DEC-004 · Entrega da Gold em `data/gold/` (proposta)
+## DEC-004 · Entrega da Gold em `data/gold/`
 
 - **Data:** 19/10/2026 · **Área:** Portal e Dados · **Autor:** Felipe
-- **Status:** proposta do Portal, a validar com o time de Dados no card
-  "Contrato da Gold".
+- **Status:** adotada. Proposta do Portal, confirmada pelo time de Dados na revisão do contrato da Gold
+  (PR #10), com o formato de CSV acima.
 - **Decisão:** a Gold chega ao banco local como CSV, um arquivo por tabela com o
   nome da tabela (`gold_dim_uc.csv`), em UTF-8, separado por vírgula, com
   cabeçalho e booleanos como `true`/`false`. Os arquivos ficam em `data/gold/`,
@@ -99,8 +102,8 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   consumiu", "não pagou"); vazio é falta de informação, e tratar um como o outro
   levaria uma unidade consumidora inocente para a fila de perdas. Em coluna
   obrigatória, a célula vazia cancela a carga.
-- **Em aberto:** confirmar com a organização se a Gold agregada pode ir para o
-  repositório público. Até lá, não é versionada.
+- **Gold agregada no repositório:** os CSVs da Gold continuam fora do Git. O agregado necessário
+  para sustentar uma hipótese do diagnóstico pode ir em texto, como a [DEC-024](#dec-024--o-que-pode-subir-ao-repositório-público) define.
 
 ## DEC-005 · Contrato OpenAPI entre API e frontend
 
@@ -221,7 +224,9 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Evidências:** os resultados da validação (contagens, colunas, estatísticas) são
   documentados à parte, em relatório privado fora do repositório, porque o dataset é
   confidencial. Não há tabelas adicionais de auditoria, e os notebooks são
-  versionados sem outputs.
+  versionados sem outputs. A [DEC-024](#dec-024--o-que-pode-subir-ao-repositório-público) substitui
+  em parte esta regra: o agregado necessário a uma hipótese pode subir; identificação e dado de
+  LGPD ficam mascarados; linhas, amostras e outputs nunca sobem.
 
 ## DEC-009 · Modelo das ordens de inspeção
 
@@ -422,3 +427,143 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   - O serviço `api` recebe `VENERGY_AGENT_DATABASE_URL` (usuário `venergy_agent`) e
     `VENERGY_AGENT_GOOGLE_API_KEY`, que vem de `GOOGLE_API_KEY` no `.env` da raiz. A chave é
     opcional até o `/ai` existir e nunca entra em camada da imagem.
+
+## DEC-022 · Regras do agente sobre a Gold e decisões da daily de 21/10
+
+- **Data:** 21/10/2026 · **Área:** Dados e IA · **Autor:** Alisson
+- **Contexto:** a revisão do GenAI no contrato da Gold (PR #10) pediu regras claras sobre o
+  que o agente pode ler e sobre o significado de "receita" quando a pergunta não qualifica.
+- **Decisão:**
+  - As views `sem_*` do agente usam só as tabelas com `agente` em `consumers` e só as
+    colunas com status `confirmada` ou `proposta` e `sensitive` diferente de `true`.
+  - `gold_fila_suspeitas` fica fora do agente por padrão, por ser uma lista de suspeitos.
+  - "Receita" sem qualificador é `receita_faturada`. O agente declara essa suposição na
+    resposta.
+  - `gold_receita_decomposicao` guarda qualquer par de períodos (faixas de meses), não só
+    primeiros e últimos 12 meses, para comparar também os mesmos meses em anos diferentes.
+  - `score_suspeita` é a posição no ranking (1 = mais suspeita), e não uma nota.
+  - Dado pessoal (nome e documento do titular) só entra na Gold mascarado, com `sensitive: true`;
+    o dado original não chega às tabelas Gold.
+- **Motivo:** dado pessoal e texto livre de chamado são o principal risco de vazamento e
+  de prompt injection; uma definição única de receita evita que portal e agente mostrem
+  números diferentes para a mesma pergunta.
+- **Onde está:** `contracts/gold_schema.yaml` (`conventions.agent`, `sensitive` e
+  `consumers`), versão 0.2.0.
+
+## DEC-023 · Medidas de receita, reconciliação e ajustes de colunas da Gold
+
+- **Data:** 22/10/2026 · **Área:** Dados · **Autor:** Alisson
+- **Status:** decidido no time de Dados; a base oficial da receita do PVM só é confirmada depois da
+  reconciliação.
+- **Contexto:** a Silver de faturas traz o valor da energia, os tributos e o valor total da fatura
+  (total = energia + tributos), e o glossário do projeto define a receita faturada como o valor
+  emitido na fatura. Faltava dizer qual valor sustenta o PVM e a tarifa média, e como tratar as
+  faturas de UCs fora do cadastro.
+- **Decisão:**
+  - A Gold guarda as três medidas, sem descartar nenhuma: `receita_faturada` (total, com
+    tributos), `receita_energia` (sem tributos) e `tributos`, em `gold_fato_faturamento_mensal`;
+    `receita_energia` também entra em `gold_kpis_mensais`.
+  - Provisoriamente, `receita_energia` é a base do PVM (`receita_base` e `receita_atual`) e da
+    `tarifa_media`: tributos não são receita da distribuidora na decomposição de preço.
+  - A base oficial só é confirmada depois de uma reconciliação e de um teste declarado: medir qual
+    definição (com ou sem tributos) reproduz a variação citada pela diretoria e registrar o
+    resultado como hipótese testada, sem ajustar números para coincidir com o case.
+  - **Reconciliação (aprovada):** `gold_reconciliacao_faturamento`, uma linha por competência, é a ponte do
+    número bruto até o usado nos indicadores. Receita: total de todas as faturas, parcela das UCs fora do
+    cadastro, receita das UCs do cadastro, tributos e receita de energia. Energia: consumo apurado nas
+    leituras, correção das trocas de medidor, correção do sinal invertido e energia faturada final. As
+    faturas órfãs ficam fora do fato por UC, mas nunca são descartadas: aparecem aqui. Responde à banca
+    qual receita é considerada, quanto vem de faturas sem cadastro e de onde vem a diferença entre a
+    receita da diretoria e a nossa (tributos, órfãs ou período). Validações permanentes: total = cadastro
+    + órfãs, cadastro = energia + tributos, energia final = leitura + correções, e tudo bate com a soma
+    do fato por competência. Entra no agente.
+  - `consumo_medio_kwh_12m` passa a aceitar nulo: há UCs do cadastro sem nenhuma leitura, e sem
+    leitura não há média. Zero seria inventar dado.
+  - `potencia_kw` passa a ser `potencia_kwp`, em kWp: a origem só traz potência de pico, e kW
+    é outra grandeza. A referência a kW vinha só da documentação escrita antes de ver os dados.
+  - A bandeira é convertida na Gold para o formato do contrato (`verde`, `vermelha_p1`...).
+  - **Classe (opção B):** `classe` continua com B1, B2, B3 e A4, como o glossário do case define
+    "classe de consumo", e que backend e agente já usam. Entra `classe_cadastro` em `gold_dim_uc`,
+    com as 5 classes do cadastro (Residencial, Comercial, Industrial, Rural, Poder Público), para
+    separar Comercial de Poder Público, que dividem o B3. A decomposição continua por `classe`.
+  - O diagnóstico do PR #19 mostra que a variação da receita é a mesma com e sem tributos, então a
+    escolha da base muda os valores absolutos, mas não a variação. A base continua sendo a energia,
+    pela definição, e não pelo ajuste ao número da diretoria.
+- **Regra de `kwh_faturado` (validada contra a fatura):**
+  - A fatura não traz kWh, mas é o que foi cobrado. O kWh implícito dela (energia da fatura dividida
+    pela tarifa mediana do subgrupo na competência, calculada só com leituras limpas) serviu de
+    referência para testar cada regra.
+  - Todo caso que precisa de correção tem consumo negativo. Se há medidor instalado na competência
+    (troca de medidor), `kwh_faturado` = leitura atual; se não há (sinal invertido), valor absoluto.
+    Consumo não negativo: o consumo da leitura.
+  - Resultado do teste: nos casos sinalizados, a leitura atual reproduziu a fatura em todas as
+    trocas de medidor, e o valor absoluto reproduziu os de sinal invertido; o consumo bruto não
+    reproduziu nenhum. A coluna `origem_kwh` registra qual regra valeu em cada linha, e
+    `kwh_leitura` guarda o consumo original.
+  - Origem da hipótese: diagnóstico do PR #19. A regra passa a valer por ter sido validada nos dados,
+    e não pela autoria.
+  - **Geração distribuída:** o consumo da leitura já é líquido de GD, como o case descreve. Teste: nas
+    UCs com GD, a queda do consumo médio depois da conexão (até 12 meses de cada lado, mínimo 6)
+    dividida pela energia injetada média mensal tem mediana próxima de 1, e todas ficam entre 0,7 e
+    1,3. Isso vale também para as UCs com potência anômala: a anomalia está na potência, e não na
+    energia injetada. Portanto `kwh_faturado` não precisa de correção por GD.
+- **Efeito bandeira e efeito GD na decomposição:** em `gold_receita_decomposicao`, `efeito_preco`
+  passa a ser a soma de `efeito_tarifa` (reajuste da tarifa base) e `efeito_bandeira` (acréscimo da
+  bandeira tarifária), e `possui_gd` entra no grão. O efeito GD é o efeito volume das linhas com
+  `possui_gd = true`, sem coluna de efeito própria. Motivo: o diagnóstico do PR #19 mostra que a
+  bandeira e a GD explicam boa parte da variação, e o portal precisa mostrá-las separadas.
+- **KPIs por recorte:** nova `gold_kpis_segmento_mensal`, com grão mês × município × bairro × classe
+  × geração própria (`possui_gd`, por competência),
+  que guarda componentes somáveis (UCs, kWh, receitas, horas e interrupções, chamados, soma e
+  contagem das notas) e não os índices. O portal soma os componentes do filtro da diretoria e
+  calcula DEC, FEC e satisfação no final, e assim bairro, município e empresa ficam consistentes.
+  `gold_kpis_mensais` continua como total da empresa; a soma da nova por mês tem que bater com ela
+  e com a continuidade por alimentador (validações da Gold). Motivo: o filtro da diretoria por
+  município, bairro e classe e a separação de KPI por recorte, pedidos no grupo. DEC e FEC por
+  recorte saem das ocorrências por UC (no case, cada ocorrência é uma UC interrompida).
+  Período: qualquer intervalo é a soma das competências escolhidas. `n_uc` é um estoque, então para
+  vários meses o DEC e o FEC usam a média mensal de `n_uc`. O agente e o portal podem cruzar tempo,
+  território, classe e GD sobre as mesmas colunas.
+- **Atendimento:** `n_chamados`, `soma_notas`, `n_notas` e `satisfacao_media` passam de `a_confirmar`
+  para `proposta`: a Silver de atendimentos já existe (ATD-01 a ATD-03). O chamado conta pelo mês de
+  abertura, a nota vai de 1 a 5, e o chamado sem nota fica fora da média.
+- **Motivo:** cada número do portal e do agente precisa ser rastreável até a origem. Com as três
+  medidas e a reconciliação, a diferença entre a receita da diretoria e a calculada pelo time pode
+  ser explicada parcela por parcela (tributos, faturas órfãs, período).
+- **Pendências:** definir e validar o método do cálculo do efeito bandeira. Os dois grupos de leitura negativa foram testados e são exclusivos e completos: cada leitura
+  negativa cai em exatamente uma das duas regras.
+- **Impacto:** muda colunas, nome e nulidade no contrato (`contracts/gold_schema.yaml`, v0.2). Pela
+  DEC-014, o ajuste do backend vai no mesmo PR, e o GenAI é avisado (camada semântica, PR #20).
+
+## DEC-024 · O que pode subir ao repositório público
+
+- **Data:** 22/10/2026 · **Área:** Dados, Portal e IA · **Autor:** Alisson (decidido na daily de 22/10)
+- **Contexto:** o dataset do case é confidencial e o repositório é público. Até aqui a regra era não
+  publicar nada derivado do dataset (DEC-008). O diagnóstico da receita precisa mostrar a evidência
+  de cada hipótese, e isso exige números.
+- **Decisão:**
+  - **Pode subir:** resultado agregado necessário para confirmar ou refutar uma hipótese ou para
+    sustentar uma recomendação: contagens, percentuais, valores em R$ e GWh, tarifas médias por
+    classe, nomes de município, de bairro e de alimentador quando forem parte da evidência.
+  - **Fica mascarado:** tudo o que identifica uma pessoa ou uma UC individual, e qualquer dado
+    relacionado à LGPD: nome e documento do titular, endereço completo, CEP, coordenadas, `cod_uc`,
+    `cod_cliente`, protocolo de atendimento, telefone e e-mail. Quando precisar aparecer, entra
+    mascarado (como já está no contrato da Gold: coluna `sensitive`, sem o dado original).
+  - **Nunca sobe:** registro linha a linha, amostra de linhas, CSVs, arquivos do dataset e outputs de
+    notebook (o notebook é versionado sem outputs). Credenciais e tokens também não.
+  - **Recorte que identifica um cliente individual:** não publicar agregado cujo recorte aponte para
+    um cliente só, como uma indústria isolada, uma UC única de uma classe ou um grupo tão pequeno que
+    permita saber quem é. Nesses casos, agrupar num "outros" mantendo o total. Não há número mínimo
+    fixo: vale o critério de identificar ou não um cliente.
+  - **Achado individual:** nada que ligue uma irregularidade, fraude ou inadimplência a uma UC, a um
+    titular ou a um endereço. Em texto público, "irregularidade confirmada" (e não "fraude"), porque a
+    inspeção não distingue furto, fraude e erro.
+  - Todo documento público com números deve dizer, no topo, que segue esta decisão.
+- **Motivo:** o diagnóstico precisa de evidência para ser defensável diante da diretoria, e o
+  agregado necessário à hipótese não identifica ninguém. O risco real está na identificação e em
+  achados atribuíveis a um indivíduo.
+- **Substitui em parte:** a regra de "nenhum número do dataset" da DEC-008 (evidências em relatório
+  privado) e a pergunta em aberto da DEC-004 sobre a Gold agregada no repositório: o agregado
+  necessário à hipótese pode subir; os CSVs da Gold continuam fora do Git.
+- **Em aberto:** confirmar com a Visagio que resultados agregados do diagnóstico podem ser públicos
+  (o case marca os materiais como confidenciais e pede um repositório público).

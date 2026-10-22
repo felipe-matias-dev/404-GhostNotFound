@@ -1,26 +1,34 @@
-# Contrato da camada Gold do V-Energy Grid 360 — RASCUNHO v0.1.0
+# Contrato da camada Gold do V-Energy Grid 360 — RASCUNHO v0.2.0 (parte 1)
 #
 # Fonte de verdade sobre tabelas, grão, chaves, colunas e tipos. O significado e as fórmulas das
 # métricas ficam em docs/dicionario-de-dados.md. Modelo de referência: docs/arquitetura.md §6.
 #
 # Este rascunho só usa nomes e regras já documentados no repositório (docs/arquitetura.md, docs/backlog.md
 # e backend/src/venergy_api/schemas.py). Nada aqui vem de observação do dataset. O que ainda não está
-# decidido aparece marcado em `status` ou em `open_questions`.
+# decidido aparece marcado em `status`, em `open_questions` ou em `roadmap_v0_2`.
 #
-# status de cada coluna:
-#   confirmada   já usada hoje pelo backend (schemas.py/models.py)
-#   proposta     nome e significado documentados; tipo e regras ainda por validar
-#   a_confirmar  depende da Silver, do profiling ou de decisão do time
+# Campos de cada coluna:
+#   type, nullable, allowed, pattern   estrutura (lida pelo backend: backend/tests/test_contrato_gold.py)
+#   status        confirmada  já usada hoje pelo backend
+#                 proposta    nome e significado documentados; tipo e regras ainda por validar
+#                 a_confirmar depende da Silver, do profiling ou de decisão do time
+#   unit          unidade do valor (só colunas numéricas; ver conventions.units)
+#   description   significado em linguagem de negócio (usado pela camada semântica do agente)
+#   sensitive     true para dado pessoal ou texto livre; padrão false (ver conventions.agent)
+#
+# v0.2 (rascunho): consumers do agente, unit, description, sensitive, relações, decisões da daily de 21/10
+# (DEC-022) e ajustes de colunas e medidas de receita (DEC-023). Mudanças que alteram nome, tipo, nulidade ou
+# colunas exigem o ajuste do backend no mesmo PR (DEC-014).
 
-version: 0.1.0
+version: 0.2.0
 status: rascunho
-updated: 2026-10-20
+updated: 2026-10-22
 
 conventions:
   database: postgresql                  # DEC-002
   schema: gold                          # a Gold é somente leitura e recarregável; ordens de inspeção ficam em app.*
   table_naming: "gold_<assunto>"        # mantido no nome, conforme o planejamento e o backend
-  delivery:                             # DEC-004 (proposta, a validar)
+  delivery:                             # DEC-004
     format: csv
     encoding: UTF-8
     delimiter: ","
@@ -37,10 +45,29 @@ conventions:
     integer: integer
     boolean: boolean
     date: date
-    money: "numeric(14,2)"              # R$; nunca float
+    money: "numeric(14,2)"              # R$; nunca float (DEC-010)
     energy_kwh: "numeric(16,3)"         # a precisão exata depende da Silver
     ratio: "double precision"
     text_array: "text[]"
+  units:                                # vocabulário do campo unit
+    "R$": "reais"
+    "R$/kWh": "reais por quilowatt-hora"
+    "kWh": "quilowatt-hora"
+    "kWh/mês": "quilowatt-hora por mês"
+    "kWp": "quilowatt-pico (potência de pico da geração solar)"
+    "h": "horas"
+    "UC·h": "consumidor × hora: soma das horas de interrupção de cada UC afetada"
+    "interrupções": "número de interrupções"
+    "contagem": "número de itens (UCs, chamados, interrupções)"
+    "adimensional": "número sem unidade (índice)"
+    "nota": "nota de satisfação do atendimento, de 1 a 5"
+    "posição": "posição em um ranking (1 = primeira)"
+  agent:                                # regras da camada semântica do agente (views sem_*)
+    tables: "só as tabelas com agente em consumers"
+    columns: "só colunas com status confirmada ou proposta e sensitive diferente de true"
+    contract_version: "as views registram a versão deste contrato"
+    receita_sem_qualificador: receita_faturada   # DEC-022: o agente assume e declara na resposta
+  personal_data: "Dado pessoal (nome e documento do titular) só entra na Gold mascarado, e a coluna mascarada leva sensitive: true. O dado original não chega às tabelas Gold."
   shared_keys:                          # Shared Kernel: mudar exige PR com um revisor de cada frente
     cod_uc:          {type: text, note: "identificador, não número: pode ter zeros à esquerda"}
     competencia:     {type: text, pattern: '^\d{4}-(0[1-9]|1[0-2])$', note: "mês de referência, YYYY-MM"}
@@ -48,6 +75,13 @@ conventions:
     cod_alimentador: {type: text}
     municipio:       {type: text, note: "normalizado na Silver"}
     bairro:          {type: text, note: "normalizado na Silver"}
+
+# Relações que não são chave estrangeira. Alinhado à DEC-018 (GenAI, proposta): o agente só junta views por
+# chave de entidade (cod_uc, cod_alimentador). Junção só por competencia ou por município/bairro gera produto
+# cartesiano e fica fora até ser revisada com o GenAI.
+relations:
+  - {left: gold_dim_uc.cod_alimentador, right: gold_continuidade_alimentador_mensal.cod_alimentador, status: proposta, note: "UC -> alimentador que a atende"}
+  - {left: "gold_receita_decomposicao.(municipio, bairro, classe, possui_gd)", right: "gold_dim_uc.(municipio, bairro, classe, possui_gd)", status: a_confirmar, note: "junção composta; revisar com o GenAI quando a decomposição entrar na camada semântica (DEC-018, em aberto)"}
 
 tables:
 
@@ -59,16 +93,17 @@ tables:
     consumers: [UC 360, agente, filtros]
     owner: Dados
     columns:
-      cod_uc:                {type: text,     nullable: false, status: confirmada}
-      municipio:             {type: text,     nullable: false, status: confirmada}
-      bairro:                {type: text,     nullable: false, status: confirmada}
-      classe:                {type: text,     nullable: false, status: confirmada, allowed: [B1, B2, B3, A4]}
-      cod_alimentador:       {type: text,     nullable: false, status: confirmada}
-      possui_gd:             {type: boolean,  nullable: false, status: confirmada}
-      consumo_medio_kwh_12m: {type: energy_kwh, nullable: false, status: confirmada, check: ">= 0"}
-      cod_cliente:           {type: text,     nullable: true,  status: a_confirmar, note: "titular; pode ter várias UCs"}
-      subgrupo:              {type: text,     nullable: true,  status: a_confirmar}
-      potencia_kw:           {type: ratio,    nullable: true,  status: a_confirmar, note: "só para UCs com GD"}
+      cod_uc:                {type: text,       nullable: false, status: confirmada, description: "Código da unidade consumidora (ponto com medidor)"}
+      municipio:             {type: text,       nullable: false, status: confirmada, description: "Município da UC"}
+      bairro:                {type: text,       nullable: false, status: confirmada, description: "Bairro da UC"}
+      classe:                {type: text,       nullable: false, status: confirmada, allowed: [B1, B2, B3, A4], description: "Classe de consumo como no case: B1 residencial, B2 rural, B3 comercial e poder público, A4 industrial MT; define a tarifa"}
+      classe_cadastro:       {type: text,       nullable: false, status: proposta, allowed: [Residencial, Comercial, Industrial, Rural, Poder Público], description: "Classe da UC no cadastro comercial; separa Comercial de Poder Público, que dividem o B3", note: "opção B da DEC-023: acrescenta a coluna sem mudar classe, que backend e agente já usam"}
+      cod_alimentador:       {type: text,       nullable: false, status: confirmada, description: "Alimentador (circuito de média tensão) que atende a UC"}
+      possui_gd:             {type: boolean,    nullable: false, status: confirmada, description: "A UC tem geração própria (ex.: solar)"}
+      consumo_medio_kwh_12m: {type: energy_kwh, nullable: true,  status: confirmada, check: ">= 0", unit: "kWh/mês", description: "Consumo médio mensal da UC nos últimos 12 meses; vazio quando a UC não tem leitura", note: "nulo, e não zero: há UCs do cadastro sem nenhuma leitura (log da Silver), e sem leitura não há média (DEC-023)"}
+      cod_cliente:           {type: text,       nullable: true,  status: a_confirmar, sensitive: true, description: "Titular da UC; um cliente pode ter várias UCs", note: "identifica pessoa: fora do agente"}
+      subgrupo:              {type: text,       nullable: true,  status: a_confirmar, description: "Subgrupo tarifário", note: "redundante com classe (B1/B2/B3/A4); candidata a remoção numa próxima versão, combinada com backend e GenAI"}
+      potencia_kwp:          {type: ratio,      nullable: true,  status: proposta, unit: "kWp", description: "Potência de pico instalada da geração própria; só para UCs com GD", note: "era potencia_kw: a origem só traz potência de pico (kWp), e kW seria outra grandeza (DEC-023); o tratamento dos registros com potência anômala da Silver é decidido na Gold"}
 
   gold_fato_faturamento_mensal:
     description: "Faturamento por UC e competência."
@@ -80,50 +115,94 @@ tables:
     consumers: [KPIs, tela Receita, UC 360, agente]
     owner: Dados
     columns:
-      cod_uc:              {type: text,       nullable: false, status: proposta}
-      competencia:         {type: text,       nullable: false, status: proposta, pattern: '^\d{4}-(0[1-9]|1[0-2])$'}
-      kwh_faturado:        {type: energy_kwh, nullable: false, status: proposta, note: "já líquido de GD"}
-      receita_faturada:    {type: money,      nullable: false, status: proposta}
-      receita_arrecadada:  {type: money,      nullable: true,  status: proposta}
-      tarifa_media:        {type: ratio,      nullable: true,  status: proposta, note: "receita_faturada ÷ kwh_faturado; NULL quando kwh_faturado = 0 (ex.: GD que compensa todo o consumo)"}
-      bandeira:            {type: text,       nullable: true,  status: proposta, allowed: [verde, amarela, vermelha_p1, vermelha_p2]}
+      cod_uc:              {type: text,       nullable: false, status: proposta, description: "Código da unidade consumidora"}
+      competencia:         {type: text,       nullable: false, status: proposta, pattern: '^\d{4}-(0[1-9]|1[0-2])$', description: "Mês de referência do consumo e da fatura (não o mês de pagamento)"}
+      kwh_faturado:        {type: energy_kwh, nullable: false, status: proposta, unit: "kWh", description: "Energia cobrada na fatura, já líquida de GD", note: "regra em origem_kwh, validada contra o kWh implícito da fatura; o consumo da leitura já é líquido de GD, conferido contra a energia injetada (DEC-023)"}
+      kwh_leitura:         {type: energy_kwh, nullable: false, status: proposta, unit: "kWh", description: "Consumo apurado na leitura, sem correção (consumo_kwh da Silver)", note: "pode ser negativo; guardado para rastrear a correção"}
+      origem_kwh:          {type: text,       nullable: false, status: proposta, allowed: [leitura, leitura_atual_troca_medidor, consumo_absoluto], description: "Regra que gerou kwh_faturado: o próprio consumo da leitura (consumo não negativo); a leitura atual quando o consumo é negativo e há medidor instalado na competência (troca de medidor); ou o valor absoluto quando o consumo é negativo sem medidor novo (sinal invertido)"}
+      receita_faturada:    {type: money,      nullable: false, status: proposta, unit: "R$", description: "Valor total emitido na fatura da competência (energia + tributos)"}
+      receita_energia:     {type: money,      nullable: false, status: proposta, unit: "R$", description: "Valor da energia na fatura, sem tributos", note: "base provisória da receita comercial no PVM até a reconciliação (DEC-023)"}
+      tributos:            {type: money,      nullable: false, status: proposta, unit: "R$", description: "Tributos cobrados na fatura"}
+      receita_arrecadada:  {type: money,      nullable: true,  status: proposta, unit: "R$", description: "Valor efetivamente pago"}
+      tarifa_media:        {type: ratio,      nullable: true,  status: proposta, unit: "R$/kWh", description: "Receita de energia dividida pela energia faturada (sem tributos)", note: "receita_energia ÷ kwh_faturado, provisório até a reconciliação (DEC-023); NULL quando kwh_faturado = 0 (ex.: GD que compensa todo o consumo)"}
+      bandeira:            {type: text,       nullable: true,  status: proposta, allowed: [verde, amarela, vermelha_p1, vermelha_p2], description: "Bandeira tarifária da competência (acréscimo mensal)", note: "a Silver usa Verde, Amarela, Vermelha P1 e Vermelha P2; a Gold converte para este formato"}
+    checks:
+      - "receita_faturada = receita_energia + tributos (por linha, diferença máxima de R$ 0,01)"
 
   gold_receita_decomposicao:
     description: "Decomposição da variação de receita entre dois períodos (PVM com efeito mix)."
-    grain: "período × município × bairro × classe"
-    primary_key: [periodo_base, periodo_atual, municipio, bairro, classe]   # a confirmar com a representação do período
+    grain: "par de períodos × município × bairro × classe × possui_gd"
+    primary_key: [periodo_base, periodo_atual, municipio, bairro, classe, possui_gd]   # a tabela guarda todos os pares de períodos analisados
     context: Receita
-    consumers: [tela Receita, insight, diagnóstico]
+    consumers: [tela Receita, insight, diagnóstico, agente]
     owner: Dados
     columns:
-      periodo_base:   {type: text,  nullable: false, status: a_confirmar, note: "primeiros 12 meses da base (docs/arquitetura.md); alinhamento com o planejamento em discussão no grupo"}
-      periodo_atual:  {type: text,  nullable: false, status: a_confirmar, note: "últimos 12 meses (docs/arquitetura.md)"}
-      municipio:      {type: text,  nullable: false, status: proposta}
-      bairro:         {type: text,  nullable: false, status: proposta}
-      classe:         {type: text,  nullable: false, status: proposta, allowed: [B1, B2, B3, A4]}
-      receita_base:   {type: money, nullable: false, status: a_confirmar, note: "receita faturada no período base; nome a definir"}
-      receita_atual:  {type: money, nullable: false, status: a_confirmar, note: "receita faturada no período atual; nome a definir"}
-      efeito_preco:   {type: money, nullable: false, status: proposta}
-      efeito_volume:  {type: money, nullable: false, status: proposta}
-      efeito_mix:     {type: money, nullable: false, status: proposta}
+      periodo_base:   {type: text,  nullable: false, status: a_confirmar, description: "Faixa de meses do período inicial da comparação", note: "faixa AAAA-MM/AAAA-MM; aceita qualquer par de períodos (ex.: primeiros 12 meses, ou os mesmos meses em anos diferentes)"}
+      periodo_atual:  {type: text,  nullable: false, status: a_confirmar, description: "Faixa de meses do período comparado", note: "faixa AAAA-MM/AAAA-MM"}
+      municipio:      {type: text,  nullable: false, status: proposta, description: "Município"}
+      bairro:         {type: text,  nullable: false, status: proposta, description: "Bairro"}
+      classe:         {type: text,  nullable: false, status: proposta, allowed: [B1, B2, B3, A4], description: "Classe de consumo (B1, B2, B3, A4)"}
+      possui_gd:      {type: boolean, nullable: false, status: proposta, description: "A UC tinha geração própria conectada no último mês do período atual; o efeito GD é o efeito volume das linhas com possui_gd = true", note: "DEC-023: separa a queda de volume da GD do restante sem coluna de efeito própria. Definição a confirmar: UCs que conectaram GD entre os dois períodos ficam no grupo com GD"}
+      receita_base:   {type: money, nullable: false, status: a_confirmar, unit: "R$", description: "Receita de energia (sem tributos) no período base", note: "base provisória: receita_energia, até a reconciliação (DEC-023)"}
+      receita_atual:  {type: money, nullable: false, status: a_confirmar, unit: "R$", description: "Receita de energia (sem tributos) no período atual", note: "base provisória: receita_energia, até a reconciliação (DEC-023)"}
+      efeito_preco:   {type: money, nullable: false, status: proposta, unit: "R$", description: "Parte da variação de receita explicada pela mudança de preço: efeito_tarifa + efeito_bandeira"}
+      efeito_tarifa:  {type: money, nullable: false, status: proposta, unit: "R$", description: "Parte do efeito preço explicada pelo reajuste da tarifa base, sem a bandeira"}
+      efeito_bandeira: {type: money, nullable: false, status: proposta, unit: "R$", description: "Parte do efeito preço explicada pelo acréscimo da bandeira tarifária (meses com bandeira amarela ou vermelha)"}
+      efeito_volume:  {type: money, nullable: false, status: proposta, unit: "R$", description: "Parte da variação de receita explicada pela mudança de energia faturada"}
+      efeito_mix:     {type: money, nullable: false, status: proposta, unit: "R$", description: "Parte da variação de receita explicada pela mudança de peso entre classes"}
     checks:
-      - "efeito_preco + efeito_volume + efeito_mix = receita_atual - receita_base (diferença de arredondamento < 0,1%)"
+      - "|efeito_preco - (efeito_tarifa + efeito_bandeira)| <= R$ 0,01 por linha"
+      - "|efeito_preco + efeito_volume + efeito_mix - (receita_atual - receita_base)| <= R$ 0,02 por linha (só o arredondamento dos três efeitos; DEC-014). O mix é calculado, não resíduo."
 
   gold_kpis_mensais:
-    description: "Indicadores executivos por competência."
+    description: "Indicadores executivos por competência: total da empresa, igual à soma de gold_kpis_segmento_mensal por competência."
     grain: "1 linha por competência"
     primary_key: [competencia]
     context: [Receita, Rede, Atendimento]
-    consumers: [dashboard executivo, GET /receita/mensal]
+    consumers: [dashboard executivo, GET /receita/mensal, agente]
     owner: Dados
     columns:
-      competencia:       {type: text,       nullable: false, status: proposta, pattern: '^\d{4}-(0[1-9]|1[0-2])$'}
-      kwh_faturado:      {type: energy_kwh, nullable: false, status: proposta}
-      receita_faturada:  {type: money,      nullable: false, status: proposta}
-      dec:               {type: ratio,      nullable: true,  status: proposta}
-      fec:               {type: ratio,      nullable: true,  status: proposta}
-      n_chamados:        {type: integer,    nullable: true,  status: a_confirmar, note: "volume de chamados; nome a definir"}
-      satisfacao_media:  {type: ratio,      nullable: true,  status: a_confirmar, note: "nome e escala a definir"}
+      competencia:       {type: text,       nullable: false, status: proposta, pattern: '^\d{4}-(0[1-9]|1[0-2])$', description: "Mês de referência"}
+      kwh_faturado:      {type: energy_kwh, nullable: false, status: proposta, unit: "kWh", description: "Energia faturada no mês, somando todas as UCs"}
+      receita_faturada:  {type: money,      nullable: false, status: proposta, unit: "R$", description: "Receita faturada no mês (energia + tributos), somando todas as UCs"}
+      receita_energia:   {type: money,      nullable: false, status: proposta, unit: "R$", description: "Receita de energia no mês (sem tributos), somando todas as UCs"}
+      dec:               {type: ratio,      nullable: true,  status: proposta, unit: "h", description: "DEC do mês: duração equivalente de interrupção por UC"}
+      fec:               {type: ratio,      nullable: true,  status: proposta, unit: "interrupções", description: "FEC do mês: frequência equivalente de interrupção por UC"}
+      n_chamados:        {type: integer,    nullable: true,  status: proposta, unit: "contagem", description: "Chamados de atendimento abertos no mês (pela data de abertura)", note: "vazio quando não há atendimento carregado no período"}
+      satisfacao_media:  {type: ratio,      nullable: true,  status: proposta, unit: "nota", description: "Nota média de satisfação dos chamados abertos no mês, de 1 a 5", note: "soma das notas ÷ chamados com nota; chamados sem nota ficam fora da média (ATD-01)"}
+    checks:
+      - "kwh_faturado, receita_faturada e receita_energia = soma de gold_kpis_segmento_mensal na competência"
+
+  gold_kpis_segmento_mensal:
+    description: "KPIs por recorte (município, bairro, classe e geração própria) e competência, guardados como componentes somáveis. Qualquer período é a soma das competências escolhidas. O portal e o agente somam os componentes do filtro e calculam os índices no final."
+    grain: "competência × município × bairro × classe_cadastro × possui_gd"
+    primary_key: [competencia, municipio, bairro, classe_cadastro, possui_gd]
+    context: [Receita, Rede, Atendimento]
+    consumers: [dashboard executivo, filtros da diretoria, agente]
+    owner: Dados
+    columns:
+      competencia:         {type: text,       nullable: false, status: proposta, pattern: '^\d{4}-(0[1-9]|1[0-2])$', description: "Mês de referência"}
+      municipio:           {type: text,       nullable: false, status: proposta, description: "Município"}
+      bairro:              {type: text,       nullable: false, status: proposta, description: "Bairro (o mesmo nome pode existir em municípios diferentes: sempre junto com o município)"}
+      classe_cadastro:     {type: text,       nullable: false, status: proposta, allowed: [Residencial, Comercial, Industrial, Rural, Poder Público], description: "Classe da UC no cadastro comercial"}
+      classe:              {type: text,       nullable: false, status: proposta, allowed: [B1, B2, B3, A4], description: "Classe de consumo (B1, B2, B3, A4); determinada pela classe do cadastro"}
+      possui_gd:           {type: boolean,    nullable: false, status: proposta, description: "A UC já tinha geração própria conectada na competência (data de conexão até o mês)", note: "por competência, e não o estado atual: antes da conexão a UC conta como sem GD, o que permite comparar antes e depois"}
+      n_uc:                {type: integer,    nullable: false, status: proposta, unit: "contagem", description: "UCs do cadastro no recorte, na competência", note: "é um estoque: some só dentro do mesmo mês. Para um período de vários meses, o DEC e o FEC usam a média mensal (soma de n_uc ÷ número de meses)"}
+      kwh_faturado:        {type: energy_kwh, nullable: false, status: proposta, unit: "kWh", description: "Energia faturada no recorte"}
+      receita_faturada:    {type: money,      nullable: false, status: proposta, unit: "R$", description: "Receita faturada no recorte (energia + tributos)"}
+      receita_energia:     {type: money,      nullable: false, status: proposta, unit: "R$", description: "Receita de energia no recorte (sem tributos)"}
+      tributos:            {type: money,      nullable: false, status: proposta, unit: "R$", description: "Tributos no recorte"}
+      receita_arrecadada:  {type: money,      nullable: true,  status: proposta, unit: "R$", description: "Valor efetivamente pago no recorte"}
+      horas_interrompidas: {type: ratio,      nullable: false, status: proposta, unit: "UC·h", description: "Soma das horas de interrupção das UCs do recorte", note: "DEC de um mês = soma de horas ÷ soma de n_uc do mês; de um período = soma de horas ÷ média mensal de n_uc, calculado no portal e no agente sobre o filtro escolhido"}
+      n_interrupcoes:      {type: integer,    nullable: false, status: proposta, unit: "contagem", description: "Número de ocorrências das UCs do recorte", note: "FEC de um mês = soma de n_interrupcoes ÷ soma de n_uc do mês; de um período = soma de n_interrupcoes ÷ média mensal de n_uc"}
+      n_chamados:          {type: integer,    nullable: false, status: proposta, unit: "contagem", description: "Chamados de atendimento das UCs do recorte, abertos no mês (pela data de abertura)"}
+      soma_notas:          {type: ratio,      nullable: true,  status: proposta, unit: "nota", description: "Soma das notas de satisfação (de 1 a 5) dos chamados avaliados", note: "guardar soma e contagem, e não a média, para agregar corretamente entre recortes"}
+      n_notas:             {type: integer,    nullable: false, status: proposta, unit: "contagem", description: "Chamados com nota de satisfação", note: "satisfação média = soma de soma_notas ÷ soma de n_notas (ATD-01: chamado sem nota fica fora)"}
+    checks:
+      - "soma por competência de kwh_faturado, receita_faturada e receita_energia = gold_kpis_mensais"
+      - "soma por competência de horas_interrompidas e de n_interrupcoes = gold_continuidade_alimentador_mensal (todas as UCs)"
+      - "receita_faturada = receita_energia + tributos por linha (diferença máxima de R$ 0,01)"
+      - "índices (DEC, FEC, satisfação) não são guardados: só componentes somáveis, para qualquer filtro dar o mesmo resultado que a empresa inteira"
 
   gold_continuidade_alimentador_mensal:
     description: "DEC e FEC por alimentador e competência."
@@ -133,13 +212,13 @@ tables:
     consumers: [tela DEC/FEC, agente]
     owner: Dados
     columns:
-      cod_alimentador:     {type: text,    nullable: false, status: proposta}
-      competencia:         {type: text,    nullable: false, status: proposta, pattern: '^\d{4}-(0[1-9]|1[0-2])$'}
-      dec:                 {type: ratio,   nullable: false, status: proposta, note: "soma da duração ÷ UCs atendidas"}
-      fec:                 {type: ratio,   nullable: false, status: proposta, note: "contagem ÷ UCs atendidas"}
-      n_uc:                {type: integer, nullable: false, status: proposta}
-      n_interrupcoes:      {type: integer, nullable: false, status: proposta}
-      horas_interrompidas: {type: ratio,   nullable: false, status: proposta}
+      cod_alimentador:     {type: text,    nullable: false, status: proposta, description: "Alimentador (circuito de média tensão)"}
+      competencia:         {type: text,    nullable: false, status: proposta, pattern: '^\d{4}-(0[1-9]|1[0-2])$', description: "Mês de referência"}
+      dec:                 {type: ratio,   nullable: false, status: proposta, unit: "h", description: "Duração equivalente de interrupção por UC no alimentador", note: "horas_interrompidas ÷ n_uc (DEC-014)"}
+      fec:                 {type: ratio,   nullable: false, status: proposta, unit: "interrupções", description: "Frequência equivalente de interrupção por UC no alimentador", note: "n_interrupcoes ÷ n_uc (DEC-014)"}
+      n_uc:                {type: integer, nullable: false, status: proposta, unit: "contagem", description: "UCs atendidas pelo alimentador (cadastro), e não só as afetadas"}
+      n_interrupcoes:      {type: integer, nullable: false, status: proposta, unit: "contagem", description: "Número de ocorrências das UCs do alimentador no mês", note: "no case, cada ocorrência corresponde a uma UC interrompida; ocorrência que vira o mês entra no mês da abertura (DEC-014)"}
+      horas_interrompidas: {type: ratio,   nullable: false, status: proposta, unit: "UC·h", description: "Soma das durações das ocorrências das UCs do alimentador no mês", note: "consumidor × hora; ocorrência que vira o mês entra no mês da abertura (DEC-014)"}
 
   gold_interrupcoes_uc:
     description: "Interrupções que afetaram cada UC."
@@ -148,10 +227,10 @@ tables:
     foreign_keys:
       - {columns: [cod_uc], references: gold_dim_uc.cod_uc}
     context: Continuidade
-    consumers: [UC 360]
+    consumers: [UC 360, agente]
     owner: Dados
     columns:
-      cod_uc: {type: text, nullable: false, status: proposta}
+      cod_uc: {type: text, nullable: false, status: proposta, description: "Código da unidade consumidora"}
       # demais colunas dependem da Silver de ocorrências
 
   gold_atendimentos_uc:
@@ -164,8 +243,8 @@ tables:
     consumers: [UC 360, agente]
     owner: Dados
     columns:
-      cod_uc: {type: text, nullable: false, status: proposta}
-      # demais colunas dependem da Silver de atendimentos (JSON achatado)
+      cod_uc: {type: text, nullable: false, status: proposta, description: "Código da unidade consumidora"}
+      # demais colunas dependem da Silver de atendimentos; texto livre de chamado, se existir, entra com sensitive: true
 
   gold_medidor_uc:
     description: "Medidor vigente de cada UC."
@@ -174,11 +253,36 @@ tables:
     foreign_keys:
       - {columns: [cod_uc], references: gold_dim_uc.cod_uc}
     context: Relacionamento
-    consumers: [UC 360, score de suspeita]
+    consumers: [UC 360, score de suspeita, agente]
     owner: Dados
     columns:
-      cod_uc: {type: text, nullable: false, status: proposta}
+      cod_uc: {type: text, nullable: false, status: proposta, description: "Código da unidade consumidora"}
       # demais colunas dependem da Silver de medidores (medidor vigente e idade)
+
+  gold_reconciliacao_faturamento:
+    description: "Ponte do faturamento e da energia, do número bruto até o usado nos indicadores, por competência, com cada parcela e o motivo."
+    grain: "1 linha por competência"
+    primary_key: [competencia]
+    context: Receita
+    consumers: [diagnóstico, tela Receita, agente]
+    owner: Dados
+    columns:
+      competencia:                  {type: text,       nullable: false, status: proposta, pattern: '^\d{4}-(0[1-9]|1[0-2])$', description: "Mês de referência"}
+      receita_faturada_total:       {type: money,      nullable: false, status: proposta, unit: "R$", description: "Soma de todas as faturas da competência (energia + tributos), inclusive as de UCs fora do cadastro"}
+      receita_faturada_orfas:       {type: money,      nullable: false, status: proposta, unit: "R$", description: "Parte da receita total em faturas de UCs fora do cadastro", note: "ficam fora do fato por UC, mas nunca são descartadas (FAT-05)"}
+      receita_faturada_cadastro:    {type: money,      nullable: false, status: proposta, unit: "R$", description: "Receita total das UCs do cadastro; igual à soma de receita_faturada em gold_fato_faturamento_mensal"}
+      tributos_cadastro:            {type: money,      nullable: false, status: proposta, unit: "R$", description: "Tributos das faturas das UCs do cadastro"}
+      receita_energia_cadastro:     {type: money,      nullable: false, status: proposta, unit: "R$", description: "Receita de energia das UCs do cadastro, base dos indicadores (base provisória do PVM)"}
+      n_faturas_orfas:              {type: integer,    nullable: false, status: proposta, unit: "contagem", description: "Faturas de UCs fora do cadastro"}
+      kwh_leitura_total:            {type: energy_kwh, nullable: false, status: proposta, unit: "kWh", description: "Soma do consumo apurado nas leituras, sem correção", note: "as UCs fora do cadastro não têm leitura, então a ponte de energia é só do cadastro"}
+      kwh_correcao_troca_medidor:   {type: energy_kwh, nullable: false, status: proposta, unit: "kWh", description: "Ajuste das trocas de medidor: leitura atual no lugar do consumo negativo", note: "soma de (kwh_faturado - kwh_leitura) onde origem_kwh = leitura_atual_troca_medidor"}
+      kwh_correcao_sinal_invertido: {type: energy_kwh, nullable: false, status: proposta, unit: "kWh", description: "Ajuste do consumo com o sinal invertido: valor absoluto no lugar do consumo negativo", note: "soma de (kwh_faturado - kwh_leitura) onde origem_kwh = consumo_absoluto"}
+      kwh_faturado_total:           {type: energy_kwh, nullable: false, status: proposta, unit: "kWh", description: "Energia faturada final, já líquida de GD; igual à soma de kwh_faturado em gold_fato_faturamento_mensal"}
+    checks:
+      - "receita_faturada_total = receita_faturada_cadastro + receita_faturada_orfas (diferença máxima de R$ 0,01)"
+      - "receita_faturada_cadastro = receita_energia_cadastro + tributos_cadastro (diferença máxima de R$ 0,01)"
+      - "kwh_faturado_total = kwh_leitura_total + kwh_correcao_troca_medidor + kwh_correcao_sinal_invertido (diferença máxima de 0,001 kWh)"
+      - "receita_faturada_cadastro, receita_energia_cadastro, tributos_cadastro e kwh_faturado_total = soma por competência de gold_fato_faturamento_mensal"
 
   gold_fila_suspeitas:
     description: "UCs suspeitas de perda não técnica, ordenadas por prioridade."
@@ -187,40 +291,52 @@ tables:
     foreign_keys:
       - {columns: [cod_uc], references: gold_dim_uc.cod_uc}
     context: Perdas
-    consumers: [tela Perdas, ordens de inspeção]
+    consumers: [tela Perdas, ordens de inspeção]   # fora do agente por padrão: decisão de produto (lista de suspeitos)
     owner: Dados
     columns:
-      cod_uc:              {type: text,       nullable: false, status: proposta}
-      score_suspeita:      {type: ratio,      nullable: false, status: proposta}
-      motivos:             {type: text_array, nullable: false, status: proposta, note: "motivos legíveis; no CSV, itens separados por ; na mesma célula"}
-      kwh_recuperavel_est: {type: energy_kwh, nullable: true,  status: proposta}
+      cod_uc:              {type: text,       nullable: false, status: proposta, description: "Código da unidade consumidora suspeita"}
+      score_suspeita:      {type: integer,    nullable: false, status: proposta, unit: "posição", description: "Posição da UC no ranking de suspeita: 1 = mais suspeita", note: "posição no ranking, não nota (decisão da daily de 21/10)"}
+      motivos:             {type: text_array, nullable: false, status: proposta, description: "Regras ou fatores que mais explicam o score, em texto legível", note: "no CSV, itens separados por ; na mesma célula"}
+      kwh_recuperavel_est: {type: energy_kwh, nullable: true,  status: proposta, unit: "kWh/mês", description: "Energia estimada a recuperar por mês se a irregularidade for confirmada"}
 
 # Fora da Gold: app.ordem_inspecao e app.ordem_evento (modelo de escrita da aplicação), que o loader da
 # Gold nunca altera.
 
 open_questions:
   - "Dados (Alisson, Arthur e Gabriel) faz três cópias independentes da transformação Silver -> Gold, todas contra este contrato; as três são comparadas entre si antes de definir a Gold que será exportada."
-  - "Período base: docs/arquitetura.md define primeiros 12 meses (base) e últimos 12 (atual), mas docs/planejamento.md ainda lista a votação (12 meses ou ano-calendário). Alinhar os dois; muda gold_receita_decomposicao."
+  - "Período base: decidido manter qualquer par de períodos em gold_receita_decomposicao. Falta alinhar docs/arquitetura.md e docs/planejamento.md, que ainda falam em primeiros e últimos 12 meses e em votação."
   - "Chave e colunas de gold_interrupcoes_uc, gold_atendimentos_uc e gold_medidor_uc dependem da Silver."
   - "Precisão numérica (energy_kwh, money) e normalização de município/bairro dependem da Silver."
-  - "Escala e nome da satisfação média e do volume de chamados em gold_kpis_mensais."
-  - "DEC-004: confirmar com Dados o formato do CSV; a Gold agregada não vai ao repositório público (a confirmar com a organização)."
+  - "Colunas mascaradas do titular (nome e documento), se a UC 360 precisar: nomes e tipos a definir ao desenhar a Gold."
+  - "DEC-004: a Gold agregada não vai ao repositório público (a confirmar com a organização)."
+  - "classe x subgrupo (DECIDIDO: opção B, DEC-023): o glossário do case chama de 'classe de consumo' os grupos B1, B2, B3 e A4, e o B3 junta comercial e poder público; a diretoria pergunta por 'receita comercial' e 'volume residencial', e a Silver traz as duas informações (classe com 5 nomes e subgrupo_tarifario B1/B2/B3/A4, com cada classe em um só subgrupo). Opção A: classe passa a ter os 5 nomes e subgrupo guarda B1/B2/B3/A4. Opção B: classe continua B1/B2/B3/A4, como no case, e entra uma coluna nova com os 5 nomes. A opção A muda o domínio de classe, que hoje é usado pelo backend (teste do contrato) e pela camada semântica do agente (regra 'classe tem exatamente B1, B2, B3 e A4' e exemplos); a opção B só acrescenta coluna."
+  - "receita (A CONFIRMAR APÓS A RECONCILIAÇÃO): receita_energia é a base provisória do PVM e da tarifa_media (DEC-023). Teste declarado: medir qual definição (com ou sem tributos) reproduz a variação citada pela diretoria e registrar o resultado como hipótese testada, sem ajustar números. Confirmar com o diagnóstico do PR #19 qual coluna foi usada para reproduzir a variação."
+  - "kwh_faturado x consumo_kwh (VALIDADO, DEC-023): a fatura não tem kWh, e a energia faturada vem do consumo_kwh das leituras. O case diz que a energia da GD é abatida do consumo faturado. Teste: para as UCs com GD, a queda do consumo médio depois da conexão (até 12 meses de cada lado, mínimo 6) dividida pela energia injetada média mensal fica em torno de 1 (mediana próxima de 1, todas dentro de 0,7 a 1,3), então o consumo da leitura já é líquido de GD e não precisa de correção."
+  - "Regra de kwh_faturado (VALIDADA contra a fatura, DEC-023): troca de medidor -> leitura_atual; consumo negativo sem troca (sinal invertido) -> valor absoluto; demais -> consumo_kwh. Teste: o kWh implícito da fatura (valor_energia ÷ tarifa mediana do subgrupo na competência, calculada só com leituras limpas) reproduz kwh_faturado dentro de 2% em todos os grupos sinalizados. Os dois grupos de leitura negativa são exclusivos e completos: todas as leituras sinalizadas pelo notebook de Silver são negativas, e cada uma cai em exatamente uma regra."
+  - "Efeito bandeira e efeito GD (DECIDIDO, DEC-023): efeito_preco passa a ser efeito_tarifa + efeito_bandeira, e possui_gd entra no grão de gold_receita_decomposicao, de modo que o efeito GD é o efeito volume das linhas com possui_gd = true. Falta definir o método do cálculo (bandeira: receita com a bandeira do mês menos receita com a tarifa base, mantendo o consumo) e validar que as parcelas fecham com a variação total."
+  - "KPIs por recorte (DECIDIDO, DEC-023): gold_kpis_segmento_mensal guarda componentes somáveis por mês, município, bairro, classe e geração própria (possui_gd), para o filtro da diretoria, do portal e do agente; qualquer período é a soma das competências escolhidas. gold_kpis_mensais continua como total da empresa, e as duas são conferidas entre si. Os componentes de atendimento (n_chamados, soma_notas, n_notas) saem da Silver de atendimentos, que já existe, e contam o chamado pelo mês de abertura."
+  - "possui_gd por competência (A CONFIRMAR): em gold_kpis_segmento_mensal, a UC conta como com GD a partir do mês da conexão; em gold_receita_decomposicao, possui_gd é o estado no último mês do período atual. Confirmar essa definição, porque muda em qual grupo cai a UC que conectou a GD entre os períodos."
+  - "Faturas de UCs fora do cadastro (flag_uc_orfa): ficam fora do fato por UC (não há UC para ligar), mas não são descartadas: entram em gold_reconciliacao_faturamento, que também traz a ponte da energia (DEC-023)."
 
-# Próxima versão (v0.2), combinada na revisão do PR #10 (Portal e GenAI).
+# Versão 0.2, combinada na revisão do PR #10 (Portal e GenAI).
 roadmap_v0_2:
-  sem_dependencia_da_silver:
-    - "consumers: incluir agente em gold_receita_decomposicao, gold_kpis_mensais, gold_interrupcoes_uc e gold_medidor_uc; gold_fila_suspeitas fica fora do agente por padrão (decisão de produto)."
-    - "unit por coluna (R$, R$/kWh, kWh, h, kW, adimensional) nas colunas confirmada e proposta."
-    - "description em linguagem de negócio nas colunas confirmada e proposta, a partir da linguagem ubíqua (docs/arquitetura.md §5)."
-    - "sensitive: true para dado pessoal ou texto livre; colunas sensíveis ficam fora das views do agente. Regra preferida: a Gold só carrega dado pessoal ou texto livre se a UC 360 precisar."
-    - "Relações que não são chave estrangeira (ex.: gold_dim_uc <-> gold_continuidade_alimentador_mensal por cod_alimentador; gold_receita_decomposicao <-> gold_dim_uc por municipio, bairro e classe)."
-    - "Registrar em docs/decisoes.md a suposição 'receita' sem qualificador = receita_faturada."
+  feito_na_parte_1:
+    - "consumers: agente incluído em gold_receita_decomposicao, gold_kpis_mensais, gold_interrupcoes_uc e gold_medidor_uc; gold_fila_suspeitas fora do agente por padrão."
+    - "unit nas colunas numéricas confirmada e proposta (e nas a_confirmar com unidade documentada)."
+    - "description em linguagem de negócio, a partir da linguagem ubíqua (docs/arquitetura.md §5)."
+    - "sensitive e regras do agente em conventions.agent; cod_cliente marcado como sensitive."
+    - "relations: relações que não são chave estrangeira, alinhadas à DEC-018 do GenAI."
+    - "'receita' sem qualificador = receita_faturada (DEC-022)."
+    - "Decisões da daily de 21/10: qualquer par de períodos, score como ranking e dado pessoal só mascarado (DEC-022)."
+    - "Unidades da continuidade (UC·h) e tolerância do PVM, confirmadas na revisão do PR #17 (DEC-014)."
+    - "Componentes de atendimento definidos (n_chamados, soma_notas, n_notas e satisfacao_media), a partir da Silver de atendimentos (DEC-023)."
+    - "Medidas de receita separadas (receita_faturada, receita_energia, tributos), consumo médio nulo sem leitura, potencia_kwp e tabela de reconciliação do faturamento e da energia (DEC-023)."
   depende_da_silver:
-    - "Colunas, chave, unidade e descrição de gold_interrupcoes_uc, gold_atendimentos_uc e gold_medidor_uc."
-    - "Unidade e descrição das colunas a_confirmar (ex.: n_chamados, satisfacao_media, cod_cliente, subgrupo, potencia_kw)."
-    - "Quais colunas são sensitive: depende do que a Silver realmente traz (sem copiar nomes do dataset para o repositório)."
+    - "Colunas, chave, unidade e descrição de gold_interrupcoes_uc, gold_atendimentos_uc e gold_medidor_uc: definidas depois que a Gold estiver pronta (decisão da daily de 21/10); aí o backend implementa (test_contrato_gold.py)."
+    - "Quais colunas novas são sensitive, conforme o que a Silver realmente traz (sem copiar nomes do dataset para o repositório)."
     - "Precisão numérica final e normalização de município e bairro."
   depende_de_decisao:
-    - "Formato de periodo_base e periodo_atual, e se gold_receita_decomposicao terá mais de um par de períodos (votação do período base)."
+    - "Base oficial da receita do PVM, depois da reconciliação e do teste das definições."
+    - "Formato final da faixa de periodo_base e periodo_atual (hoje: texto AAAA-MM/AAAA-MM)."
     - "Quem cria as views sem_* após a carga (Portal e GenAI)."
-  regra: "Renomear ou remover coluna sobe a versão do contrato e é avisado no PR."
+  regra: "Renomear ou remover coluna sobe a versão do contrato e é avisado no PR. Mudança de nome, tipo, nulidade ou coluna exige o ajuste do backend no mesmo PR (DEC-014) e aviso ao GenAI (camada semântica)."
