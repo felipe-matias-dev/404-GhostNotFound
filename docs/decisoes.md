@@ -320,15 +320,22 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Decisão:**
   - O backend implementa toda coluna do contrato com o nome, o tipo, a nulidade e a chave
     do YAML, inclusive as marcadas `a_confirmar`. O teste
-    `backend/tests/test_contrato_gold.py` compara o YAML com os modelos e os schemas e
-    roda no CI.
+    `backend/tests/test_contrato_gold.py` roda no CI e compara o YAML com os modelos (nome,
+    tipo no banco, nulidade e chave) e com os schemas da carga (nome, tipo Python, nulidade
+    e valores permitidos).
   - Entram 6 das 9 tabelas. `gold_interrupcoes_uc`, `gold_atendimentos_uc` e
     `gold_medidor_uc` ficam de fora enquanto a chave estiver `a_confirmar` no contrato
     (dependem da Silver); o mesmo teste falha quando o contrato definir a chave de uma delas.
   - A carga recria as tabelas da Gold (`DROP` e `CREATE`) na mesma transação em que grava
-    os dados, em vez de só apagar as linhas. O schema `app` não é tocado.
+    os dados, em vez de só apagar as linhas. O schema `app` não é tocado. O `DROP` é sem
+    `CASCADE`, de propósito: quando existirem as views `sem_*` do agente, a carga passa a
+    recriá-las depois do `CREATE`, na mesma transação. Até lá, um objeto que dependa de uma
+    tabela da Gold faz a carga falhar sem alterar nada, em vez de sumir em silêncio.
   - Colunas `text[]` do contrato viram `ARRAY(Text)` no banco; no CSV, os itens vão numa
     célula só, separados por `;`, e a carga recusa item vazio.
+  - Mudança no contrato e no backend entram no mesmo PR: quem muda o YAML recebe, no próprio
+    PR, o commit que ajusta o backend. Assim a `main` nunca fica com o teste do contrato
+    vermelho, nem com contrato e backend dizendo coisas diferentes.
 - **Motivo:** quando o time de dados muda o contrato, o CI aponta o que o backend precisa
   acompanhar, antes de a Gold real falhar na carga. Sem migrações, o `create_all` não
   acrescenta coluna em tabela existente; recriar a Gold, que é recarregável, faz a coluna
@@ -337,20 +344,28 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   `backend/tests/test_agent_role.py`).
 - **Alternativas descartadas:** gerar os modelos a partir do YAML, difícil de revisar e de
   explicar; Alembic para a Gold, que seria migração para um dado descartável; modelar as 3
-  tabelas pendentes com colunas inventadas; e implementar só as colunas `confirmada` e
-  `proposta`, que tiraria da `gold_receita_decomposicao` colunas da chave e da conta.
+  tabelas pendentes com colunas inventadas; implementar só as colunas `confirmada` e
+  `proposta`, que tiraria da `gold_receita_decomposicao` colunas da chave e da conta; e
+  `TRUNCATE` + insert em vez de recriar as tabelas (sugerido na revisão do PR #17), que
+  preservaria as views, mas voltaria a exigir apagar tabela à mão a cada coluna nova.
+- **Confirmado com Dados** (revisão do PR #17, 21/10/2026; entra no contrato v0.2):
+  - `horas_interrompidas` é a soma das durações das ocorrências das UCs do alimentador no
+    mês, em UC·h; `n_interrupcoes` é o número de ocorrências; `n_uc` são as UCs atendidas
+    pelo alimentador (cadastro), e não só as afetadas. Ocorrência que vira o mês entra no
+    mês da abertura. DEC e FEC da empresa são os totais sobre o total de UCs atendidas,
+    como na amostra.
+  - A checagem `efeito_preco + efeito_volume + efeito_mix = receita_atual - receita_base`
+    tem tolerância absoluta de R$ 0,02 por linha (só o arredondamento dos três efeitos):
+    porcentagem não serve quando a variação é perto de zero. A checagem é do Data Quality,
+    e não da carga. Na Gold real o mix é calculado, e não resíduo.
+  - `score_suspeita` passa a ser a posição no ranking (inteiro, 1 = mais suspeita), e não
+    uma nota de 0 a 1 (decidido na daily de 21/10). Primeiro caso da regra do mesmo PR:
+    o ajuste do backend vai no PR da v0.2.
 - **Limitações e pendências:**
   - A amostra (`backend/src/venergy_api/amostra.py`) usa fórmulas sintéticas. Nela, os KPIs
     são a soma do faturamento (conferido em teste, depois da carga) e o `efeito_mix` é o
     resíduo do arredondamento, porque cada segmento tem uma UC; a fórmula oficial da
     decomposição é do Diagnóstico.
-  - A checagem `efeito_preco + efeito_volume + efeito_mix = receita_atual - receita_base`
-    não está na carga: é regra de qualidade de dados, e a tolerância do contrato ("< 0,1%")
-    não diz sobre qual valor. A confirmar com Dados.
-  - Unidade de `horas_interrompidas` e `n_interrupcoes` a confirmar com Dados: para
-    `dec = horas_interrompidas ÷ n_uc` sair em horas por consumidor, as horas precisam ser
-    consumidor × hora. A amostra usa essa leitura, e o DEC e o FEC da empresa saem dos
-    totais sobre o total de UCs atendidas, e não da média dos alimentadores.
   - O agente lê todas as tabelas do schema `gold`, inclusive `gold_fila_suspeitas`. O
     roadmap v0.2 do contrato prevê tirá-la do agente por padrão; como (views `sem_*`) está
     em aberto com GenAI.
