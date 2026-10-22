@@ -1,5 +1,6 @@
 import json
 import re
+from collections.abc import Mapping
 
 from venergy_agent.domain.question import Question
 from venergy_agent.domain.semantic import (
@@ -141,4 +142,17 @@ def render_answer_user(question: Question, draft: SqlDraft, result: QueryResult,
     )
     return "\n\n".join(
         [delimited("pergunta", question.text, nonce), delimited("dados", data, nonce)]
+    )
+
+
+def render_insight_system(template: str, nonce: str) -> str:
+    _require(nonce)
+    return _fill(template, nonce=nonce)
+
+
+def render_insight_user(screen: str, metrics: Mapping[str, object], nonce: str) -> str:
+    _require(nonce)
+    data = json.dumps(metrics, ensure_ascii=False, default=str, sort_keys=True)
+    return "\n\n".join(
+        [delimited("pergunta", f"tela: {screen}", nonce), delimited("dados", data, nonce)]
     )
