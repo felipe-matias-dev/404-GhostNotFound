@@ -4,7 +4,7 @@ Problemas encontrados no profiling dos arquivos da landing e a decisão de trata
 
 - **Método:** leitura das tabelas Bronze com todas as colunas como texto; perfil por coluna (nulos, nulos disfarçados, espaços sobrando, valores distintos), distribuição das colunas categóricas e checagem da chave.
 - **Decisões:** `tratar` (corrigir/padronizar), `descartar` (remover o registro) ou `flag` (manter e sinalizar com `flag_<motivo>`).
-- **Confidencialidade:** este arquivo é público. Aqui ficam só ID, coluna, problema e decisão. Contagens, faixas de valores e evidências ficam no relatório privado do time. Nunca colar CPF, nome, linhas reais ou números do dataset.
+- **Confidencialidade:** este arquivo é público e segue a [DEC-024](decisoes.md). Aqui ficam só ID, coluna, problema e decisão; contagens, faixas e evidências detalhadas ficam no relatório privado do time. Nunca colar CPF, nome, linhas reais ou qualquer identificação de pessoa ou de UC.
 
 ## unidades_consumidoras
 

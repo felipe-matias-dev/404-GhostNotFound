@@ -12,9 +12,9 @@ O backlog e os documentos usam códigos por posição no time. A tabela abaixo l
 
 | Código | Frente | Foco | Integrante |
 |---|---|---|---|
-| D1 | Engenharia de Dados | Plataforma de dados (Bronze/Silver, Workflow, qualidade) | A definir |
-| D2 | Engenharia de Dados | Continuidade (DEC/FEC) e Relacionamento (UC 360) | A definir |
-| D3 | Engenharia de Dados | Receita, Perdas e diagnóstico | A definir |
+| D1 | Engenharia de Dados | Plataforma de dados (Bronze/Silver, Workflow, qualidade) | Alisson, Arthur e Gabriel (cada um faz a sua cópia de Silver → Gold, comparadas entre si; DEC-011) |
+| D2 | Engenharia de Dados | Continuidade (DEC/FEC) e Relacionamento (UC 360) | Alisson, Arthur e Gabriel (cada um faz a sua cópia de Silver → Gold, comparadas entre si; DEC-011) |
+| D3 | Engenharia de Dados | Receita, Perdas e diagnóstico | Alisson, Arthur e Gabriel (cada um faz a sua cópia de Silver → Gold, comparadas entre si; DEC-011) |
 | V1 | Portal Web | Backend e ordens de inspeção (API, banco, carga da Gold, telas de Perdas e OIs) | Felipe Matias |
 | V2 | Portal Web | Frontend, integração e DevOps (contrato OpenAPI, `docker-compose`, CI e hooks) | João Euclides |
 | G1 | Inteligência Artificial | Agente Text-to-SQL e segurança da IA | A definir |
@@ -266,9 +266,7 @@ Pontos ainda sem decisão registrada. Ao fechar cada um, registre em [`decisoes.
 | Integrante de cada código (§1.1) | — | Responsáveis no backlog e no board |
 | Responsável pelo score de suspeita (D3-07) | D3, ou G2 como modelo de ML (D3 revisa o backtest) | Carga de D3 na S2 (18 → 13 pts) |
 | Responsável pelos endpoints de DEC/FEC e da fila (V1-07) | V1, ou G1 (já trabalha no router `/ai`) | Carga de V1 e G1 na S2 |
-| Definição de "período base" | Primeiros 12 meses completos da base, ou ano-calendário | Altera os números do diagnóstico |
 | Estados da OI | Lista atual (§5 da arquitetura) ou variação | Máquina de estados do backend (V1-08) |
-| Banco local (ADR-01) | SQLite, PostgreSQL | Role somente leitura, loader, `docker-compose` |
 | Fins de semana | Buffer apenas para quem está no caminho crítico, ou descanso | Capacidade das sprints |
 
 Perguntas para a Visagio:
