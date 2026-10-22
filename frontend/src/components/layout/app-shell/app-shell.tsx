@@ -1,15 +1,17 @@
 // Casca do app no layout `inset` da Sidebar do shadcn: navegação
-// sobre `bg` e o conteúdo num painel `surface-1` com borda e raio `lg`. O trigger do Header
-// recolhe a navegação para ícones (no celular, abre o Sheet).
+// sobre `bg` e o conteúdo num painel `surface-1` com borda e raio `lg`. O trigger fica ao
+// lado da logo com a navegação aberta e vai para o Header quando ela recolhe (no celular,
+// abre o Sheet).
 import { useMatchRoute } from "@tanstack/react-router";
+import { LayoutGroup } from "motion/react";
 import type { ReactNode } from "react";
-import { AppSidebar, NAVEGACAO } from "#/components/layout/app-sidebar";
-import { Header } from "#/components/layout/header";
 import {
-	SidebarInset,
-	SidebarProvider,
-	SidebarTrigger,
-} from "#/components/ui/sidebar";
+	AppSidebar,
+	GatilhoNavegacao,
+	NAVEGACAO,
+} from "#/components/layout/app-sidebar";
+import { Header } from "#/components/layout/header";
+import { SidebarInset, SidebarProvider } from "#/components/ui/sidebar";
 import { ThemeToggle } from "#/components/ui/theme-toggle";
 import { TooltipProvider } from "#/components/ui/tooltip";
 
@@ -28,22 +30,24 @@ export function AppShell({ children }: { children: ReactNode }) {
 				>
 					Pular para o conteúdo
 				</a>
-				<AppSidebar itens={NAVEGACAO} />
-				<SidebarInset className="min-h-0 overflow-hidden">
-					<Header
-						titulo={atual?.rotulo}
-						inicio={<SidebarTrigger className="-ml-1" />}
-						acoes={<ThemeToggle className="size-7" />}
-					/>
-					<div
-						id="conteudo"
-						tabIndex={-1}
-						data-scroll-restoration-id="conteudo"
-						className="min-h-0 flex-1 overflow-y-auto outline-none"
-					>
-						{children}
-					</div>
-				</SidebarInset>
+				<LayoutGroup>
+					<AppSidebar itens={NAVEGACAO} />
+					<SidebarInset className="min-h-0 overflow-hidden">
+						<Header
+							titulo={atual?.rotulo}
+							inicio={<GatilhoNavegacao local="header" className="-ml-1" />}
+							acoes={<ThemeToggle className="size-7" />}
+						/>
+						<div
+							id="conteudo"
+							tabIndex={-1}
+							data-scroll-restoration-id="conteudo"
+							className="min-h-0 flex-1 overflow-y-auto outline-none"
+						>
+							{children}
+						</div>
+					</SidebarInset>
+				</LayoutGroup>
 			</SidebarProvider>
 		</TooltipProvider>
 	);

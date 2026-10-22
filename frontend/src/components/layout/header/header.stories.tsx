@@ -20,7 +20,7 @@ type Story = StoryObj<typeof meta>;
 
 export const Padrao: Story = {};
 
-// No app, `inicio` recebe o SidebarTrigger (recolhe a navegação; no celular abre o Sheet).
+// No app, `inicio` recebe o GatilhoNavegacao quando a navegação está recolhida (no celular abre o Sheet).
 export const ComMenu: Story = {
 	args: {
 		className: "w-96 bg-surface-1",
