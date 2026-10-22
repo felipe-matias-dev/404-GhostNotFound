@@ -260,3 +260,11 @@ def test_all_views_are_listed_when_the_failed_sql_names_none(layer):
     assert "sem_uc" in columns_part
     assert "sem_faturamento_mensal" in columns_part
     assert re.search(r"<\s*/?\s*(dados|pergunta)\s*>", prompt, flags=re.IGNORECASE) is None
+
+
+@pytest.mark.parametrize("blank", ["", "  "])
+def test_blank_nonce_is_rejected(layer, blank):
+    with pytest.raises(ValueError, match="nonce"):
+        render_system_prompt(TEMPLATE, layer, blank)
+    with pytest.raises(ValueError, match="nonce"):
+        render_user_prompt(Question(text="q", session_id="s1"), None, CORRECTION, layer, blank)

@@ -16,6 +16,7 @@ REDACTED = "[redigido]"
 
 
 def render_system_prompt(template: str, layer: SemanticLayer, nonce: str) -> str:
+    _require(nonce)
     sections = [
         _section("Regras de negócio", [f"- {rule.text}" for rule in layer.rules]),
         _section("Glossário", [_glossary_line(term) for term in layer.glossary]),
@@ -43,6 +44,7 @@ def render_user_prompt(
     layer: SemanticLayer,
     nonce: str,
 ) -> str:
+    _require(nonce)
     asked = _delimited("pergunta", question.text, nonce)
     if feedback is None:
         return asked
@@ -99,6 +101,11 @@ def _example_block(example: FewShotExample) -> str:
 
 def _delimited(tag: str, text: str, nonce: str) -> str:
     return f"<{tag}-{nonce}>\n{_redact(text, nonce)}\n</{tag}-{nonce}>"
+
+
+def _require(nonce: str) -> None:
+    if not nonce.strip():
+        raise ValueError("nonce must not be blank")
 
 
 def _redact(text: str, nonce: str) -> str:
