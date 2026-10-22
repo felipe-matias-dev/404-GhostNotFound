@@ -93,6 +93,13 @@ class KpisMensaisSchema(BaseModel):
     satisfacao_media: float | None
 
 
+def _inicio_ate_o_fim(inicio: str | None, fim: str | None) -> None:
+    # Na validação do schema, e não na rota: o erro sai no mesmo formato 422 do formato
+    # inválido, e o client do frontend trata um só. Texto AAAA-MM compara na ordem do calendário.
+    if inicio and fim and inicio > fim:
+        raise ValueError(f"O início do período ({inicio}) é depois do fim ({fim})")
+
+
 class PeriodoSchema(BaseModel):
     """Recorte de competências, inclusivo nas duas pontas. Sem limites, a série inteira."""
 
@@ -101,11 +108,52 @@ class PeriodoSchema(BaseModel):
 
     @model_validator(mode="after")
     def inicio_ate_o_fim(self) -> "PeriodoSchema":
-        # Aqui, e não na rota: o erro sai no mesmo formato 422 do formato inválido, e o
-        # client do frontend trata um só. Texto AAAA-MM compara na ordem do calendário.
-        if self.inicio and self.fim and self.inicio > self.fim:
-            raise ValueError(f"O início do período ({self.inicio}) é depois do fim ({self.fim})")
+        _inicio_ate_o_fim(self.inicio, self.fim)
         return self
+
+
+class ComparacaoFiltroSchema(BaseModel):
+    """Dois períodos e, se quiser, o segmento: município, bairro e classe."""
+
+    base_inicio: Competencia
+    base_fim: Competencia
+    atual_inicio: Competencia
+    atual_fim: Competencia
+    municipio: RequiredText | None = None
+    bairro: RequiredText | None = None
+    classe: Classe | None = None
+
+    @model_validator(mode="after")
+    def periodos_e_segmento_validos(self) -> "ComparacaoFiltroSchema":
+        _inicio_ate_o_fim(self.base_inicio, self.base_fim)
+        _inicio_ate_o_fim(self.atual_inicio, self.atual_fim)
+        # O mesmo nome de bairro pode existir em dois municípios: somar os dois daria um
+        # número que ninguém pediu.
+        if self.bairro and not self.municipio:
+            raise ValueError("Informe o município junto com o bairro")
+        return self
+
+
+class TotaisPeriodoSchema(BaseModel):
+    """kWh e receita faturados, somados num período."""
+
+    inicio: Competencia
+    fim: Competencia
+    kwh_faturado: ExactNumber
+    receita_faturada: ExactNumber
+
+
+class ComparacaoReceitaSchema(BaseModel):
+    """Totais de dois períodos e quanto o atual variou sobre a base."""
+
+    base: TotaisPeriodoSchema
+    atual: TotaisPeriodoSchema
+    variacao_kwh: ExactNumber
+    variacao_receita: ExactNumber
+    # Em %, vazia quando a base é zero (ex.: bairro sem faturamento no período base): não
+    # existe variação percentual sobre nada.
+    variacao_kwh_pct: float | None
+    variacao_receita_pct: float | None
 
 
 class ContinuidadeAlimentadorMensalSchema(BaseModel):

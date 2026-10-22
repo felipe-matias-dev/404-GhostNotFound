@@ -58,6 +58,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/receita/comparacao": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Comparacao
+         * @description kWh e receita de dois períodos, da empresa inteira ou de um segmento, e a variação.
+         */
+        get: operations["get_comparacao_receita_comparacao_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/ordens-inspecao": {
         parameters: {
             query?: never;
@@ -116,6 +136,22 @@ export interface components {
             resultado?: components["schemas"]["ResultadoOrdem"] | null;
             /** Observacao */
             observacao?: string | null;
+        };
+        /**
+         * ComparacaoReceitaSchema
+         * @description Totais de dois períodos e quanto o atual variou sobre a base.
+         */
+        ComparacaoReceitaSchema: {
+            base: components["schemas"]["TotaisPeriodoSchema"];
+            atual: components["schemas"]["TotaisPeriodoSchema"];
+            /** Variacao Kwh */
+            variacao_kwh: number;
+            /** Variacao Receita */
+            variacao_receita: number;
+            /** Variacao Kwh Pct */
+            variacao_kwh_pct: number | null;
+            /** Variacao Receita Pct */
+            variacao_receita_pct: number | null;
         };
         /**
          * CriarOrdensSchema
@@ -253,6 +289,20 @@ export interface components {
          * @enum {string}
          */
         StatusOrdem: "GERADA" | "EM_CAMPO" | "CONCLUIDA" | "CANCELADA";
+        /**
+         * TotaisPeriodoSchema
+         * @description kWh e receita faturados, somados num período.
+         */
+        TotaisPeriodoSchema: {
+            /** Inicio */
+            inicio: string;
+            /** Fim */
+            fim: string;
+            /** Kwh Faturado */
+            kwh_faturado: number;
+            /** Receita Faturada */
+            receita_faturada: number;
+        };
         /** ValidationError */
         ValidationError: {
             /** Location */
@@ -356,6 +406,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["KpisMensaisSchema"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_comparacao_receita_comparacao_get: {
+        parameters: {
+            query: {
+                base_inicio: string;
+                base_fim: string;
+                atual_inicio: string;
+                atual_fim: string;
+                municipio?: string | null;
+                bairro?: string | null;
+                classe?: ("B1" | "B2" | "B3" | "A4") | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ComparacaoReceitaSchema"];
                 };
             };
             /** @description Validation Error */
