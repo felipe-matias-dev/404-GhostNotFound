@@ -24,7 +24,7 @@ Criar o esqueleto multi-camadas do agente: estrutura de pacotes, modelos de dom�
 | Follow-up | Fora deste escopo (diferencial) | Obrigatórios primeiro |
 | Avaliação | Golden set + métricas determinísticas logo após o primeiro `ask()` de ponta a ponta | Nenhuma mudança de prompt, modelo ou contexto entra sem medir (§1.5 e §10.3 do guia) |
 | LLM as a judge | Só para clareza e fidelidade da resposta em português, com modelo diferente do gerador; entra depois dos obrigatórios | Corretude numérica é medida por execução, não por opinião de LLM |
-| "Receita" sem qualificador | `receita_faturada`, com a suposição declarada na resposta | Proposta do GenAI no PR #10 (contrato da Gold), pendente de confirmação do time; entra nas regras de negócio do prompt |
+| "Receita" sem qualificador | `receita_faturada`, com a suposição declarada na resposta | Proposta do GenAI, pendente de confirmação do time. Ainda não consta no contrato da Gold (PR #10); entra nas regras de negócio do prompt quando for confirmada |
 
 ## 3. Estrutura
 

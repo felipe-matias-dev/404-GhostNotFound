@@ -11,15 +11,16 @@ from venergy_agent.domain.semantic import (
 )
 from venergy_agent.domain.sql import AttemptFeedback
 
-DELIMITER_TAG = re.compile(r"<(/?)(dados|pergunta)>", flags=re.IGNORECASE)
 PLACEHOLDER = re.compile(r"\{\{(\w+)\}\}")
+REDACTED = "[redigido]"
 
 
-def render_system_prompt(template: str, layer: SemanticLayer) -> str:
+def render_system_prompt(template: str, layer: SemanticLayer, nonce: str) -> str:
+    _require(nonce)
     sections = [
         _section("Regras de negócio", [f"- {rule.text}" for rule in layer.rules]),
         _section("Glossário", [_glossary_line(term) for term in layer.glossary]),
-        _section("Views disponíveis", [_view_block(view) for view in layer.views]),
+        _section("Views disponíveis", [_view_block(view, nonce) for view in layer.views]),
         _section(
             "Relações",
             [
@@ -29,7 +30,11 @@ def render_system_prompt(template: str, layer: SemanticLayer) -> str:
         ),
         _section("Exemplos", [_example_block(example) for example in layer.examples]),
     ]
-    return _fill(template, contexto="\n\n".join(section for section in sections if section))
+    return _fill(
+        template,
+        contexto="\n\n".join(section for section in sections if section),
+        nonce=nonce,
+    )
 
 
 def render_user_prompt(
@@ -37,8 +42,10 @@ def render_user_prompt(
     feedback: AttemptFeedback | None,
     correction_template: str,
     layer: SemanticLayer,
+    nonce: str,
 ) -> str:
-    asked = f"<pergunta>\n{_escape(question.text)}\n</pergunta>"
+    _require(nonce)
+    asked = _delimited("pergunta", question.text, nonce)
     if feedback is None:
         return asked
     involved = [
@@ -46,9 +53,9 @@ def render_user_prompt(
     ] or list(layer.views)
     correction = _fill(
         correction_template,
-        sql_anterior=feedback.previous_sql,
+        sql_anterior=_delimited("dados", feedback.previous_sql, nonce),
         tipo_erro=feedback.error_kind.value,
-        mensagem=_data(feedback.message),
+        mensagem=_delimited("dados", feedback.message, nonce),
         colunas="\n".join(_columns_line(view) for view in involved),
     )
     return f"{correction}\n\n{asked}"
@@ -63,22 +70,23 @@ def _glossary_line(term: GlossaryTerm) -> str:
     return f"- {words} → {term.maps_to}"
 
 
-def _view_block(view: ViewSpec) -> str:
+def _view_block(view: ViewSpec, nonce: str) -> str:
     lines = [f"### {view.name}", f"{view.description}. Grão: {view.grain}.", "Colunas:"]
-    lines += [_column_line(column) for column in view.columns]
+    lines += [_column_line(column, nonce) for column in view.columns]
     if view.sample_rows:
         rows = "\n".join(
             json.dumps(row, ensure_ascii=False, default=str) for row in view.sample_rows
         )
-        lines += ["Linhas de exemplo:", _data(rows)]
+        lines += ["Linhas de exemplo:", _delimited("dados", rows, nonce)]
     return "\n".join(lines)
 
 
-def _column_line(column: ColumnSpec) -> str:
+def _column_line(column: ColumnSpec, nonce: str) -> str:
     unit = f", {column.unit}" if column.unit else ""
     line = f"- {column.name} ({column.type}{unit}): {column.description}"
     if column.allowed_values:
-        line += f". Valores possíveis: {_data(', '.join(column.allowed_values))}"
+        values = _delimited("dados", ", ".join(column.allowed_values), nonce)
+        line += f". Valores possíveis: {values}"
     return line
 
 
@@ -91,12 +99,17 @@ def _example_block(example: FewShotExample) -> str:
     return f"Pergunta: {example.question}\nStatus esperado: {example.expected_status.value}\n{sql}"
 
 
-def _data(text: str) -> str:
-    return f"<dados>\n{_escape(text)}\n</dados>"
+def _delimited(tag: str, text: str, nonce: str) -> str:
+    return f"<{tag}-{nonce}>\n{_redact(text, nonce)}\n</{tag}-{nonce}>"
 
 
-def _escape(text: str) -> str:
-    return DELIMITER_TAG.sub(r"&lt;\1\2&gt;", text)
+def _require(nonce: str) -> None:
+    if not nonce.strip():
+        raise ValueError("nonce must not be blank")
+
+
+def _redact(text: str, nonce: str) -> str:
+    return text.replace(nonce, REDACTED)
 
 
 def _mentions(sql: str, name: str) -> bool:

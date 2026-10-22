@@ -37,9 +37,16 @@ def scripted_model(*outputs):
     return FunctionModel(respond), calls
 
 
-def generator(model, prompts_dir=SHIPPED_PROMPTS, version="v1"):
+NONCE = "n0nce42"
+
+
+def generator(model, prompts_dir=SHIPPED_PROMPTS, version="v1", nonce=NONCE):
     return PydanticAiSqlGenerator(
-        model=model, prompts_dir=prompts_dir, prompt_version=version, temperature=0.0
+        model=model,
+        prompts_dir=prompts_dir,
+        prompt_version=version,
+        temperature=0.0,
+        nonce=nonce,
     )
 
 
@@ -71,7 +78,8 @@ async def test_request_carries_rendered_system_and_user_prompts():
     user = next(p.content for p in parts if isinstance(p, UserPromptPart))
     assert "### sem_uc" in system and "{{" not in system
     assert "Quantas UCs existem?" not in system
-    assert user == "<pergunta>\nQuantas UCs existem?\n</pergunta>"
+    assert user == f"<pergunta-{NONCE}>\nQuantas UCs existem?\n</pergunta-{NONCE}>"
+    assert f"`<dados-{NONCE}>`" in system
 
 
 async def test_correction_attempt_reaches_the_model():
@@ -91,3 +99,11 @@ def test_unknown_prompt_version_fails_at_construction():
 
     with pytest.raises(FileNotFoundError):
         generator(model, version="v999")
+
+
+def test_each_generator_draws_its_own_tag_label():
+    first = generator(scripted_model({"status": "unknown"})[0], nonce=None)
+    second = generator(scripted_model({"status": "unknown"})[0], nonce=None)
+
+    assert first._nonce != second._nonce
+    assert len(first._nonce) == 16
