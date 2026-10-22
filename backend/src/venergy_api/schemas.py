@@ -156,6 +156,37 @@ class ComparacaoReceitaSchema(BaseModel):
     variacao_receita_pct: float | None
 
 
+class DecomposicaoFiltroSchema(BaseModel):
+    """Onde está o Henrique no drill-down: o nível da resposta é o próximo abaixo do filtro."""
+
+    periodo_base: RequiredText | None = None
+    periodo_atual: RequiredText | None = None
+    municipio: RequiredText | None = None
+    bairro: RequiredText | None = None
+    classe: Classe | None = None
+
+    @model_validator(mode="after")
+    def bairro_com_municipio(self) -> "DecomposicaoFiltroSchema":
+        if self.bairro and not self.municipio:
+            raise ValueError("Informe o município junto com o bairro")
+        return self
+
+
+class DecomposicaoLinhaSchema(BaseModel):
+    """Um segmento da ponte de receita: quanto variou e quanto disso foi preço, volume e mix."""
+
+    nivel: Literal["municipio", "bairro", "classe"]
+    segmento: RequiredText
+    periodo_base: RequiredText
+    periodo_atual: RequiredText
+    receita_base: ExactNumber
+    receita_atual: ExactNumber
+    variacao_receita: ExactNumber
+    efeito_preco: ExactNumber
+    efeito_volume: ExactNumber
+    efeito_mix: ExactNumber
+
+
 class ContinuidadeAlimentadorMensalSchema(BaseModel):
     """DEC e FEC de um alimentador numa competência."""
 

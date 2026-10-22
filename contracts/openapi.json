@@ -284,6 +284,134 @@
         }
       }
     },
+    "/receita/decomposicao": {
+      "get": {
+        "tags": [
+          "receita"
+        ],
+        "summary": "Get Decomposicao",
+        "description": "Ponte de receita por município, por bairro de um município ou por classe de um bairro.\n\nOrdenada da maior queda para a maior alta: o topo é onde a receita mais caiu.",
+        "operationId": "get_decomposicao_receita_decomposicao_get",
+        "parameters": [
+          {
+            "name": "periodo_base",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Periodo Base"
+            }
+          },
+          {
+            "name": "periodo_atual",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Periodo Atual"
+            }
+          },
+          {
+            "name": "municipio",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Municipio"
+            }
+          },
+          {
+            "name": "bairro",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Bairro"
+            }
+          },
+          {
+            "name": "classe",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "B1",
+                    "B2",
+                    "B3",
+                    "A4"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Classe"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DecomposicaoLinhaSchema"
+                  },
+                  "title": "Response Get Decomposicao Receita Decomposicao Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/ordens-inspecao": {
       "post": {
         "tags": [
@@ -634,6 +762,73 @@
         ],
         "title": "CriarOrdensSchema",
         "description": "UCs escolhidas na fila de suspeitas; gera uma OI para cada uma."
+      },
+      "DecomposicaoLinhaSchema": {
+        "properties": {
+          "nivel": {
+            "type": "string",
+            "enum": [
+              "municipio",
+              "bairro",
+              "classe"
+            ],
+            "title": "Nivel"
+          },
+          "segmento": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Segmento"
+          },
+          "periodo_base": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Periodo Base"
+          },
+          "periodo_atual": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Periodo Atual"
+          },
+          "receita_base": {
+            "type": "number",
+            "title": "Receita Base"
+          },
+          "receita_atual": {
+            "type": "number",
+            "title": "Receita Atual"
+          },
+          "variacao_receita": {
+            "type": "number",
+            "title": "Variacao Receita"
+          },
+          "efeito_preco": {
+            "type": "number",
+            "title": "Efeito Preco"
+          },
+          "efeito_volume": {
+            "type": "number",
+            "title": "Efeito Volume"
+          },
+          "efeito_mix": {
+            "type": "number",
+            "title": "Efeito Mix"
+          }
+        },
+        "type": "object",
+        "required": [
+          "nivel",
+          "segmento",
+          "periodo_base",
+          "periodo_atual",
+          "receita_base",
+          "receita_atual",
+          "variacao_receita",
+          "efeito_preco",
+          "efeito_volume",
+          "efeito_mix"
+        ],
+        "title": "DecomposicaoLinhaSchema",
+        "description": "Um segmento da ponte de receita: quanto variou e quanto disso foi preço, volume e mix."
       },
       "DimUcSchema": {
         "properties": {

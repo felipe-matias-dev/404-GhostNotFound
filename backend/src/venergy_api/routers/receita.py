@@ -1,4 +1,4 @@
-"""Rotas de receita: a evolução mensal e a comparação entre períodos que a diretoria acompanha."""
+"""Rotas de receita: a evolução mensal, a comparação entre períodos e a ponte de receita."""
 
 from decimal import Decimal
 from typing import Annotated
@@ -8,10 +8,12 @@ from sqlalchemy import ColumnElement, case, func, or_, select
 from sqlalchemy.orm import InstrumentedAttribute
 
 from venergy_api.database import SessionDep
-from venergy_api.models import DimUc, FatoFaturamentoMensal, KpisMensais
+from venergy_api.models import DimUc, FatoFaturamentoMensal, KpisMensais, ReceitaDecomposicao
 from venergy_api.schemas import (
     ComparacaoFiltroSchema,
     ComparacaoReceitaSchema,
+    DecomposicaoFiltroSchema,
+    DecomposicaoLinhaSchema,
     KpisMensaisSchema,
     PeriodoSchema,
     TotaisPeriodoSchema,
@@ -94,3 +96,62 @@ def get_comparacao(
         variacao_kwh_pct=_variacao_pct(kwh_base, kwh_atual),
         variacao_receita_pct=_variacao_pct(receita_base, receita_atual),
     )
+
+
+@router.get("/decomposicao")
+def get_decomposicao(
+    filtro: Annotated[DecomposicaoFiltroSchema, Query()], session: SessionDep
+) -> list[DecomposicaoLinhaSchema]:
+    """Ponte de receita por município, por bairro de um município ou por classe de um bairro.
+
+    Ordenada da maior queda para a maior alta: o topo é onde a receita mais caiu.
+    """
+    decomposicao = ReceitaDecomposicao
+    # O breadcrumb da tela só acrescenta filtros: o nível da resposta é o próximo abaixo.
+    if filtro.bairro:
+        nivel, coluna = "classe", decomposicao.classe
+    elif filtro.municipio:
+        nivel, coluna = "bairro", decomposicao.bairro
+    else:
+        nivel, coluna = "municipio", decomposicao.municipio
+
+    filtros = [
+        coluna_filtro == valor
+        for coluna_filtro, valor in [
+            (decomposicao.periodo_base, filtro.periodo_base),
+            (decomposicao.periodo_atual, filtro.periodo_atual),
+            (decomposicao.municipio, filtro.municipio),
+            (decomposicao.bairro, filtro.bairro),
+            (decomposicao.classe, filtro.classe),
+        ]
+        if valor is not None
+    ]
+    receita_base = func.sum(decomposicao.receita_base)
+    receita_atual = func.sum(decomposicao.receita_atual)
+    variacao = receita_atual - receita_base
+    consulta = (
+        select(
+            coluna.label("segmento"),
+            decomposicao.periodo_base,
+            decomposicao.periodo_atual,
+            receita_base.label("receita_base"),
+            receita_atual.label("receita_atual"),
+            variacao.label("variacao_receita"),
+            # Soma dos efeitos já calculados pela Gold, e não o PVM refeito no nível de cima:
+            # os efeitos se somam entre segmentos, e preço + volume + mix continua fechando
+            # com a variação. Recalcular seria uma fórmula própria do backend.
+            func.sum(decomposicao.efeito_preco).label("efeito_preco"),
+            func.sum(decomposicao.efeito_volume).label("efeito_volume"),
+            func.sum(decomposicao.efeito_mix).label("efeito_mix"),
+        )
+        .where(*filtros)
+        # O par de períodos entra no agrupamento: se a Gold trouxer mais de um par, cada
+        # comparação sai separada, em vez de somar anos que não se comparam.
+        .group_by(decomposicao.periodo_base, decomposicao.periodo_atual, coluna)
+        .order_by(decomposicao.periodo_base, decomposicao.periodo_atual, variacao, coluna)
+    )
+    # Os labels da consulta são os nomes dos campos do schema.
+    return [
+        DecomposicaoLinhaSchema(nivel=nivel, **linha._mapping)
+        for linha in session.execute(consulta)
+    ]

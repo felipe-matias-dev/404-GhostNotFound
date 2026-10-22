@@ -78,6 +78,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/receita/decomposicao": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Decomposicao
+         * @description Ponte de receita por município, por bairro de um município ou por classe de um bairro.
+         *
+         *     Ordenada da maior queda para a maior alta: o topo é onde a receita mais caiu.
+         */
+        get: operations["get_decomposicao_receita_decomposicao_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/ordens-inspecao": {
         parameters: {
             query?: never;
@@ -160,6 +182,35 @@ export interface components {
         CriarOrdensSchema: {
             /** Cod Ucs */
             cod_ucs: string[];
+        };
+        /**
+         * DecomposicaoLinhaSchema
+         * @description Um segmento da ponte de receita: quanto variou e quanto disso foi preço, volume e mix.
+         */
+        DecomposicaoLinhaSchema: {
+            /**
+             * Nivel
+             * @enum {string}
+             */
+            nivel: "municipio" | "bairro" | "classe";
+            /** Segmento */
+            segmento: string;
+            /** Periodo Base */
+            periodo_base: string;
+            /** Periodo Atual */
+            periodo_atual: string;
+            /** Receita Base */
+            receita_base: number;
+            /** Receita Atual */
+            receita_atual: number;
+            /** Variacao Receita */
+            variacao_receita: number;
+            /** Efeito Preco */
+            efeito_preco: number;
+            /** Efeito Volume */
+            efeito_volume: number;
+            /** Efeito Mix */
+            efeito_mix: number;
         };
         /** DimUcSchema */
         DimUcSchema: {
@@ -443,6 +494,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ComparacaoReceitaSchema"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_decomposicao_receita_decomposicao_get: {
+        parameters: {
+            query?: {
+                periodo_base?: string | null;
+                periodo_atual?: string | null;
+                municipio?: string | null;
+                bairro?: string | null;
+                classe?: ("B1" | "B2" | "B3" | "A4") | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DecomposicaoLinhaSchema"][];
                 };
             };
             /** @description Validation Error */
