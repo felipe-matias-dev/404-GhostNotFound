@@ -1,7 +1,25 @@
 import type { Preview } from "@storybook/react-vite";
+import {
+	createMemoryHistory,
+	createRootRoute,
+	createRoute,
+	createRouter,
+	RouterProvider,
+} from "@tanstack/react-router";
 import { useEffect } from "storybook/preview-api";
 import { themes } from "storybook/theming";
 import "../src/styles.css";
+
+// Componentes com Link (sidebar, app-shell) precisam de um router. A story declara a rota
+// atual em `parameters.rota`; o splat aceita qualquer caminho sem cair no "não encontrado".
+function criarRouter(Story: () => React.ReactNode, rota: string) {
+	const raiz = createRootRoute({ component: Story });
+	const qualquer = createRoute({ getParentRoute: () => raiz, path: "$" });
+	return createRouter({
+		routeTree: raiz.addChildren([qualquer]),
+		history: createMemoryHistory({ initialEntries: [rota] }),
+	});
+}
 
 const preview: Preview = {
 	parameters: {
@@ -35,6 +53,11 @@ const preview: Preview = {
 	},
 	initialGlobals: { tema: "escuro" },
 	decorators: [
+		(Story, { parameters }) => {
+			const rota = parameters.rota as string | undefined;
+			if (!rota) return <Story />;
+			return <RouterProvider router={criarRouter(Story, rota)} />;
+		},
 		(Story, { globals, viewMode }) => {
 			const claro = globals.tema === "claro";
 
