@@ -524,6 +524,10 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   Período: qualquer intervalo é a soma das competências escolhidas. `n_uc` é um estoque, então para
   vários meses o DEC e o FEC usam a média mensal de `n_uc`. O agente e o portal podem cruzar tempo,
   território, classe e GD sobre as mesmas colunas.
+- **Colunas confirmadas e removida:** `periodo_base` e `periodo_atual` ficam como texto `AAAA-MM/AAAA-MM`
+  (qualquer par de períodos), e `receita_base` e `receita_atual` mantêm o nome; os quatro passam a
+  `proposta`. `subgrupo` sai de `gold_dim_uc`: guardava os mesmos valores de `classe` (B1, B2, B3 e A4)
+  e não é usado pelo agente nem pelo portal. A Silver continua com `subgrupo_tarifario`.
 - **Atendimento:** `n_chamados`, `soma_notas`, `n_notas` e `satisfacao_media` passam de `a_confirmar`
   para `proposta`: a Silver de atendimentos já existe (ATD-01 a ATD-03). O chamado conta pelo mês de
   abertura, a nota vai de 1 a 5, e o chamado sem nota fica fora da média.

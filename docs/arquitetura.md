@@ -106,7 +106,7 @@ Estes termos são usados com o mesmo significado no código, no banco, no portal
 | Unidade Consumidora (UC) | Ponto com medidor; entidade central do modelo | `cod_uc` |
 | Cliente | Titular; pode ter várias UCs | `cod_cliente` |
 | Competência | Mês de referência do consumo e da fatura (não o mês de pagamento) | `competencia` (`YYYY-MM`) |
-| Classe / Subgrupo | B1 residencial, B2 rural, B3 comercial/poder público, A4 industrial MT | `classe`, `subgrupo` |
+| Classe de consumo | B1 residencial, B2 rural, B3 comercial/poder público, A4 industrial MT; a classe do cadastro (Residencial, Comercial, Industrial, Rural, Poder Público) separa o comercial do poder público | `classe`, `classe_cadastro` |
 | Alimentador | Circuito de média tensão que atende um conjunto de UCs | `cod_alimentador` |
 | Bandeira | Acréscimo tarifário mensal (verde, amarela, vermelha P1, vermelha P2) | `bandeira` |
 | Energia faturada | kWh cobrados na fatura, já líquidos de GD | `kwh_faturado` |

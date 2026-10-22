@@ -102,7 +102,6 @@ tables:
       possui_gd:             {type: boolean,    nullable: false, status: confirmada, description: "A UC tem geração própria (ex.: solar)"}
       consumo_medio_kwh_12m: {type: energy_kwh, nullable: true,  status: confirmada, check: ">= 0", unit: "kWh/mês", description: "Consumo médio mensal da UC nos últimos 12 meses; vazio quando a UC não tem leitura", note: "nulo, e não zero: há UCs do cadastro sem nenhuma leitura (log da Silver), e sem leitura não há média (DEC-023)"}
       cod_cliente:           {type: text,       nullable: true,  status: a_confirmar, sensitive: true, description: "Titular da UC; um cliente pode ter várias UCs", note: "identifica pessoa: fora do agente"}
-      subgrupo:              {type: text,       nullable: true,  status: a_confirmar, description: "Subgrupo tarifário", note: "redundante com classe (B1/B2/B3/A4); candidata a remoção numa próxima versão, combinada com backend e GenAI"}
       potencia_kwp:          {type: ratio,      nullable: true,  status: proposta, unit: "kWp", description: "Potência de pico instalada da geração própria; só para UCs com GD", note: "era potencia_kw: a origem só traz potência de pico (kWp), e kW seria outra grandeza (DEC-023); o tratamento dos registros com potência anômala da Silver é decidido na Gold"}
 
   gold_fato_faturamento_mensal:
@@ -137,14 +136,14 @@ tables:
     consumers: [tela Receita, insight, diagnóstico, agente]
     owner: Dados
     columns:
-      periodo_base:   {type: text,  nullable: false, status: a_confirmar, description: "Faixa de meses do período inicial da comparação", note: "faixa AAAA-MM/AAAA-MM; aceita qualquer par de períodos (ex.: primeiros 12 meses, ou os mesmos meses em anos diferentes)"}
-      periodo_atual:  {type: text,  nullable: false, status: a_confirmar, description: "Faixa de meses do período comparado", note: "faixa AAAA-MM/AAAA-MM"}
+      periodo_base:   {type: text,  nullable: false, status: proposta, description: "Faixa de meses do período inicial da comparação", note: "texto AAAA-MM/AAAA-MM (ex.: 2022-07/2023-06), formato confirmado; aceita qualquer par de períodos (ex.: os mesmos meses em anos diferentes)"}
+      periodo_atual:  {type: text,  nullable: false, status: proposta, description: "Faixa de meses do período comparado", note: "texto AAAA-MM/AAAA-MM (ex.: 2025-07/2026-06), formato confirmado"}
       municipio:      {type: text,  nullable: false, status: proposta, description: "Município"}
       bairro:         {type: text,  nullable: false, status: proposta, description: "Bairro"}
       classe:         {type: text,  nullable: false, status: proposta, allowed: [B1, B2, B3, A4], description: "Classe de consumo (B1, B2, B3, A4)"}
       possui_gd:      {type: boolean, nullable: false, status: proposta, description: "A UC tinha geração própria conectada no último mês do período atual; o efeito GD é o efeito volume das linhas com possui_gd = true", note: "DEC-023: separa a queda de volume da GD do restante sem coluna de efeito própria. Definição a confirmar: UCs que conectaram GD entre os dois períodos ficam no grupo com GD"}
-      receita_base:   {type: money, nullable: false, status: a_confirmar, unit: "R$", description: "Receita de energia (sem tributos) no período base", note: "base provisória: receita_energia, até a reconciliação (DEC-023)"}
-      receita_atual:  {type: money, nullable: false, status: a_confirmar, unit: "R$", description: "Receita de energia (sem tributos) no período atual", note: "base provisória: receita_energia, até a reconciliação (DEC-023)"}
+      receita_base:   {type: money, nullable: false, status: proposta, unit: "R$", description: "Receita de energia (sem tributos) no período base", note: "base provisória: receita_energia, até a reconciliação (DEC-023)"}
+      receita_atual:  {type: money, nullable: false, status: proposta, unit: "R$", description: "Receita de energia (sem tributos) no período atual", note: "base provisória: receita_energia, até a reconciliação (DEC-023)"}
       efeito_preco:   {type: money, nullable: false, status: proposta, unit: "R$", description: "Parte da variação de receita explicada pela mudança de preço: efeito_tarifa + efeito_bandeira"}
       efeito_tarifa:  {type: money, nullable: false, status: proposta, unit: "R$", description: "Parte do efeito preço explicada pelo reajuste da tarifa base, sem a bandeira"}
       efeito_bandeira: {type: money, nullable: false, status: proposta, unit: "R$", description: "Parte do efeito preço explicada pelo acréscimo da bandeira tarifária (meses com bandeira amarela ou vermelha)"}
@@ -329,6 +328,7 @@ roadmap_v0_2:
     - "'receita' sem qualificador = receita_faturada (DEC-022)."
     - "Decisões da daily de 21/10: qualquer par de períodos, score como ranking e dado pessoal só mascarado (DEC-022)."
     - "Unidades da continuidade (UC·h) e tolerância do PVM, confirmadas na revisão do PR #17 (DEC-014)."
+    - "periodo_base, periodo_atual, receita_base e receita_atual confirmados (formato AAAA-MM/AAAA-MM; nomes mantidos) e subgrupo removido de gold_dim_uc, por ser redundante com classe (DEC-023)."
     - "Componentes de atendimento definidos (n_chamados, soma_notas, n_notas e satisfacao_media), a partir da Silver de atendimentos (DEC-023)."
     - "Medidas de receita separadas (receita_faturada, receita_energia, tributos), consumo médio nulo sem leitura, potencia_kwp e tabela de reconciliação do faturamento e da energia (DEC-023)."
   depende_da_silver:
@@ -337,6 +337,5 @@ roadmap_v0_2:
     - "Precisão numérica final e normalização de município e bairro."
   depende_de_decisao:
     - "Base oficial da receita do PVM, depois da reconciliação e do teste das definições."
-    - "Formato final da faixa de periodo_base e periodo_atual (hoje: texto AAAA-MM/AAAA-MM)."
     - "Quem cria as views sem_* após a carga (Portal e GenAI)."
   regra: "Renomear ou remover coluna sobe a versão do contrato e é avisado no PR. Mudança de nome, tipo, nulidade ou coluna exige o ajuste do backend no mesmo PR (DEC-014) e aviso ao GenAI (camada semântica)."

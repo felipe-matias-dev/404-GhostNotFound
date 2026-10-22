@@ -67,7 +67,6 @@ Dimensão de unidades consumidoras.
 | `possui_gd` | boolean | não |  | confirmada | A UC tem geração própria (ex.: solar). |
 | `consumo_medio_kwh_12m` | numeric(16,3) | sim | kWh/mês | confirmada | Consumo médio mensal da UC nos últimos 12 meses; vazio quando a UC não tem leitura. Nulo, e não zero: há UCs do cadastro sem nenhuma leitura (log da Silver), e sem leitura não há média (DEC-023). |
 | `cod_cliente` | text | sim |  | a confirmar | Titular da UC; um cliente pode ter várias UCs. **Sensível: fora do agente.** Identifica pessoa: fora do agente. |
-| `subgrupo` | text | sim |  | a confirmar | Subgrupo tarifário. Redundante com classe (B1/B2/B3/A4); candidata a remoção numa próxima versão, combinada com backend e GenAI. |
 | `potencia_kwp` | double precision | sim | kWp | proposta | Potência de pico instalada da geração própria; só para UCs com GD. Era potencia_kw: a origem só traz potência de pico (kWp), e kW seria outra grandeza (DEC-023); o tratamento dos registros com potência anômala da Silver é decidido na Gold. |
 
 ### `gold_fato_faturamento_mensal`
@@ -108,14 +107,14 @@ Decomposição da variação de receita entre dois períodos (PVM com efeito mix
 
 | Coluna | Tipo | Nulo | Unidade | Status | Definição |
 |---|---|---|---|---|---|
-| `periodo_base` | text | não |  | a confirmar | Faixa de meses do período inicial da comparação. Faixa AAAA-MM/AAAA-MM; aceita qualquer par de períodos (ex.: primeiros 12 meses, ou os mesmos meses em anos diferentes). |
-| `periodo_atual` | text | não |  | a confirmar | Faixa de meses do período comparado. Faixa AAAA-MM/AAAA-MM. |
+| `periodo_base` | text | não |  | proposta | Faixa de meses do período inicial da comparação. Texto AAAA-MM/AAAA-MM (ex.: 2022-07/2023-06), formato confirmado; aceita qualquer par de períodos (ex.: os mesmos meses em anos diferentes). |
+| `periodo_atual` | text | não |  | proposta | Faixa de meses do período comparado. Texto AAAA-MM/AAAA-MM (ex.: 2025-07/2026-06), formato confirmado. |
 | `municipio` | text | não |  | proposta | Município. |
 | `bairro` | text | não |  | proposta | Bairro. |
 | `classe` | text (B1, B2, B3, A4) | não |  | proposta | Classe de consumo (B1, B2, B3, A4). |
 | `possui_gd` | boolean | não |  | proposta | A UC tinha geração própria conectada no último mês do período atual; o efeito GD é o efeito volume das linhas com possui_gd = true. DEC-023: separa a queda de volume da GD do restante sem coluna de efeito própria. Definição a confirmar: UCs que conectaram GD entre os dois períodos ficam no grupo com GD. |
-| `receita_base` | numeric(14,2) | não | R$ | a confirmar | Receita de energia (sem tributos) no período base. Base provisória: receita_energia, até a reconciliação (DEC-023). |
-| `receita_atual` | numeric(14,2) | não | R$ | a confirmar | Receita de energia (sem tributos) no período atual. Base provisória: receita_energia, até a reconciliação (DEC-023). |
+| `receita_base` | numeric(14,2) | não | R$ | proposta | Receita de energia (sem tributos) no período base. Base provisória: receita_energia, até a reconciliação (DEC-023). |
+| `receita_atual` | numeric(14,2) | não | R$ | proposta | Receita de energia (sem tributos) no período atual. Base provisória: receita_energia, até a reconciliação (DEC-023). |
 | `efeito_preco` | numeric(14,2) | não | R$ | proposta | Parte da variação de receita explicada pela mudança de preço: efeito_tarifa + efeito_bandeira. |
 | `efeito_tarifa` | numeric(14,2) | não | R$ | proposta | Parte do efeito preço explicada pelo reajuste da tarifa base, sem a bandeira. |
 | `efeito_bandeira` | numeric(14,2) | não | R$ | proposta | Parte do efeito preço explicada pelo acréscimo da bandeira tarifária (meses com bandeira amarela ou vermelha). |
