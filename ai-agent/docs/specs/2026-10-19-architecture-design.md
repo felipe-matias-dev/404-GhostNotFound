@@ -15,7 +15,7 @@ Criar o esqueleto multi-camadas do agente: estrutura de pacotes, modelos de dom�
 | Decisão | Escolha | Motivo |
 |---|---|---|
 | Framework de agente (ADR-02) | PydanticAI, atrás de portas próprias | Saída tipada com retry de validação, suporte nativo a OpenRouter, `TestModel` para testes sem custo, troca isolada em um adapter |
-| Provedor de LLM | OpenRouter (`openrouter:google/gemini-3.1-flash-lite`) | Recomendação do case; modelo e fallback trocáveis por variável de ambiente |
+| Provedor de LLM | Gemini direto (`google-gla:gemini-3.1-flash-lite`), com o OpenRouter (`openrouter:...`) como alternativa ou fallback | Modelo recomendado pelo case, gratuito no Free Tier do Google, com cota por projeto (uma chave por pessoa). No OpenRouter o Flash-Lite é pago e os modelos `:free` têm 50 requisições por dia por conta. No Free Tier do Google o conteúdo pode ser usado pelo Google: Gold real só com chave paga ou fornecida pela organização |
 | Banco (ADR-01, DEC-002) | PostgreSQL 17, com o usuário `venergy_agent` (somente leitura) | Decidido pelo time. Só há executor Postgres; SQLite saiu do roadmap |
 | Escopo de dados do agente | Views `sem_*` num schema próprio, com permissão de leitura só nele | A allowlist precisa valer também no banco, e não só no validador (§10, D1) |
 | Organização | Hexagonal em 3 camadas (`domain` ← `application` ← `infrastructure`) | Framework isolado (§14 do guia), cada etapa testável com fakes |
@@ -24,6 +24,7 @@ Criar o esqueleto multi-camadas do agente: estrutura de pacotes, modelos de dom�
 | Follow-up | Fora deste escopo (diferencial) | Obrigatórios primeiro |
 | Avaliação | Golden set + métricas determinísticas logo após o primeiro `ask()` de ponta a ponta | Nenhuma mudança de prompt, modelo ou contexto entra sem medir (§1.5 e §10.3 do guia) |
 | LLM as a judge | Só para clareza e fidelidade da resposta em português, com modelo diferente do gerador; entra depois dos obrigatórios | Corretude numérica é medida por execução, não por opinião de LLM |
+| "Receita" sem qualificador | `receita_faturada`, com a suposição declarada na resposta | Proposta do GenAI, pendente de confirmação do time. Ainda não consta no contrato da Gold (PR #10); entra nas regras de negócio do prompt quando for confirmada |
 
 ## 3. Estrutura
 
@@ -31,6 +32,7 @@ Criar o esqueleto multi-camadas do agente: estrutura de pacotes, modelos de dom�
 ai-agent/
 ├── pyproject.toml
 ├── .env.example
+├── prompts/v1/              # system.md e correction.md, versão em AgentSettings.prompt_version
 ├── src/venergy_agent/
 │   ├── config.py
 │   ├── domain/
@@ -42,7 +44,11 @@ ai-agent/
 │   ├── application/
 │   │   └── ports.py
 │   └── infrastructure/
-│       └── sql_validator.py
+│       ├── sql_validator.py
+│       ├── postgres_executor.py
+│       ├── prompt_renderer.py
+│       ├── sql_generator.py
+│       └── llm.py
 └── tests/unit/
     ├── domain/
     └── infrastructure/
@@ -50,7 +56,7 @@ ai-agent/
 
 **Regra de dependência:** `domain` não importa nada do projeto e não faz I/O. `application` importa apenas `domain`. `infrastructure` implementa as portas de `application`. O composition root (`bootstrap.py`) entra junto com o primeiro caso de uso que liga os adapters.
 
-`prompts/v1/`, `semantic/`, `eval/golden_set.yaml` e `eval/red_team.yaml` nascem com as features que os usam.
+`semantic/`, `eval/golden_set.yaml` e `eval/red_team.yaml` nascem com as features que os usam.
 
 ## 4. Domínio
 
@@ -117,7 +123,7 @@ São `typing.Protocol` assíncronos, exceto `SqlValidator`, que é síncrono por
 |---|---|---|
 | `TextToSqlAgent` | `ask(question: str, session_id: str) -> AgentAnswer` | Contrato de entrada com o backend (Partnership BC6↔BC7) |
 | `SemanticLayerSource` | `load() -> SemanticLayer` | Gerada a partir do contrato/dicionário da Gold |
-| `SqlGenerator` | `generate(question: Question, layer: SemanticLayer, feedback: AttemptFeedback \| None) -> SqlDraft` | Adapter PydanticAI |
+| `SqlGenerator` | `generate(question: Question, layer: SemanticLayer, feedback: AttemptFeedback \| None) -> SqlDraft` | Adapter PydanticAI. Saída inválida volta ao modelo até 2 vezes. Erros transitórios do provedor (429, 503) são repetidos com backoff pelo próprio cliente: no Gemini, via `retry_options` configurado nas settings; no OpenRouter, pelo retry nativo do SDK (2 novas tentativas). Esgotadas as tentativas, ou com erro do provedor, levanta `UnexpectedModelBehavior`/`ModelHTTPError`, que a orquestração converte em `refused_reason` |
 | `SqlValidator` | `validate(sql: str, allowed_views: frozenset[str]) -> ValidatedQuery` | Levanta `SqlRejected`; adapter `SqlglotValidator` (§6) |
 | `QueryExecutor` | `execute(query: ValidatedQuery) -> QueryResult` | Levanta `QueryExecutionError`; conexão read-only |
 | `AnswerWriter` | `write(question: Question, draft: SqlDraft, result: QueryResult) -> str` | Resposta só a partir das linhas |
@@ -155,10 +161,13 @@ O validador é a primeira trava. A segunda é o banco: role somente leitura, com
 
 | Campo | Padrão | Restrição |
 |---|---|---|
-| `llm_model` | `openrouter:google/gemini-3.1-flash-lite` | — |
+| `llm_model` | `google-gla:gemini-3.1-flash-lite` | Prefixo `google-gla:` ou `openrouter:` |
 | `fallback_model` | `None` | — |
-| `openrouter_api_key` | obrigatório | `SecretStr`, nunca no `repr` |
+| `google_api_key` | obrigatório se algum modelo usa `google-gla:` | `SecretStr`, nunca no `repr` |
+| `openrouter_api_key` | obrigatório se algum modelo usa `openrouter:` | `SecretStr`, nunca no `repr` |
 | `temperature` | `0.0` | `0 ≤ t ≤ 0.2` |
+| `llm_retry_attempts` | `3` | `1 ≤ n ≤ 5`; tentativas no total, só para erros transitórios (429, 503) do Gemini |
+| `llm_retry_initial_delay_seconds` | `1` | `> 0`; backoff exponencial com jitter a partir deste valor |
 | `sql_dialect` | `postgres` | Só `postgres` (DEC-002). Usado pelo validador e pelas regras de dialeto do prompt |
 | `database_url` | obrigatório | Usuário `venergy_agent`, nunca as credenciais do backend |
 | `allowed_schema` | `gold` | Passa a ser o schema das views `sem_*` quando D1 for atendido |
@@ -180,13 +189,16 @@ Só regras do projeto; nada de testar enums, Protocols ou a própria biblioteca.
 2. `SemanticLayer`: relação para view ou coluna inexistente é rejeitada; nomes duplicados são rejeitados; `allowed_views` expõe os nomes.
 3. `AgentAnswer`: `row_count < len(rows)` é rejeitado; `refused_reason` com linhas, com `row_count > 0`, com `confidence` diferente de `unknown` ou junto de `clarification` é rejeitado.
 4. `Question`: texto em branco é rejeitado.
-5. `AgentSettings`: variável com prefixo sobrescreve o padrão; falta de `openrouter_api_key` falha; `temperature` e `max_correction_attempts` fora da faixa são rejeitados; a chave não aparece no `repr`.
+5. `AgentSettings`: variável com prefixo sobrescreve o padrão; falta da chave do provedor de `llm_model` ou de `fallback_model` falha, e só ela é exigida; provedor desconhecido é rejeitado; `temperature` e `max_correction_attempts` fora da faixa são rejeitados; a chave não aparece no `repr`.
 6. `SqlglotValidator`: lista parametrizada de SQL malicioso ou inválido (DDL, DML, múltiplos statements, DML em CTE, funções de sistema, tabelas fora da allowlist, schema ou catálogo errado) e de SQL válido (join, CTE, `UNION`, `LIMIT`). Inclui como regressões os desvios encontrados no review do PR #5:
    - CTE com o nome de uma tabela proibida, declarado em outro escopo: `SELECT * FROM gold_dim_uc WHERE EXISTS (WITH gold_dim_uc AS (SELECT 1) SELECT 1 FROM gold_dim_uc)` → rejeitado;
    - `query_to_xml`/`table_to_xml`, inclusive via `LATERAL` → rejeitado;
    - `FOR UPDATE` → rejeitado;
    - `FETCH FIRST 5000 ROWS ONLY` → rejeitado, com motivo que pede `LIMIT`;
    - funções legítimas de data e texto (`date_trunc`, `extract`, `to_char`, `round`) → aceitas, para a regra de funções não bloquear consultas válidas.
+
+7. Gerador e prompt (`FunctionModel`, sem custo de API): o `SqlDraft` do modelo é devolvido; saída inválida volta ao modelo; o prompt de sistema traz a camada semântica inteira e não contém a pergunta (cache); linhas de exemplo e valores permitidos ficam em `<dados>`, e uma tag de fechamento dentro deles é neutralizada; sinais `<` e `>` da pergunta chegam intactos; a correção traz o SQL anterior, o tipo de erro e as colunas válidas (todas as views quando o SQL não cita nenhuma conhecida); versão de prompt inexistente falha na construção.
+8. Fábrica de modelo: `GoogleModel` para `google-gla:` (padrão) e `OpenRouterModel` para `openrouter:`; `FallbackModel` quando há fallback, inclusive misturando os dois provedores; o cliente do Gemini recebe as opções de retry das settings (tentativas, atraso inicial, códigos 429 e 503).
 
 O teste de que o banco recusa escrita é de integração e chega com o executor (§11, item 3).
 
@@ -240,6 +252,8 @@ Pedidos a abrir como issue para a área dona. O GenAI não altera esses arquivos
 | D3 | Dev (G1-06, G1-09) | Persistir a auditoria de cada `AgentAnswer` (com timestamp) e expor `POST /ai/ask` e `GET /ai/audit/{id}` | O agente é somente leitura |
 | D4 | Dados | Publicar na amostra e na Gold as tabelas que o agente usa: `gold_fato_faturamento_mensal`, `gold_continuidade_alimentador_mensal`, `gold_atendimentos_uc` | A amostra atual só tem `gold_dim_uc` |
 | D6 | Dev (`infra/postgres/init/01-init.sh`) | Versionar o script com bit de execução (`git update-index --chmod=+x`) | No Docker Desktop do macOS, o entrypoint tenta executar o script sem o bit e o container sai com `bad interpreter: Permission denied` na primeira subida |
+| D7 | Dev (loader `venergy_api.carga`) | Criar as views `sem_*` com o usuário dono, depois do `create_all` da carga, a partir do SQL gerado pelo GenAI | O usuário do agente é somente leitura. A recarga usa `DELETE` + `INSERT`, então as views sobrevivem a ela; mas o `DROP TABLE gold.gold_dim_uc` sugerido na DEC-010 falha enquanto houver view dependente (precisa de `CASCADE` e de recriar as views) |
+| D8 | Dev (`backend/`, `docker-compose.yml`, CI) | Decidir como o backend instala o agente quando o `/ai` for integrado: *workspace* do uv na raiz (um `uv.lock` e uma `.venv` para backend e agente) ou dependência por caminho no `backend/pyproject.toml` (`venergy-agent = { path = "../ai-agent" }`). Até lá, cada módulo mantém o próprio `uv.lock` e o `make setup` instala tudo | O workspace muda o build da API (`build: ./backend` e `uv sync --frozen` usam o `backend/uv.lock`), o CI e a versão do ruff presa ao `backend/uv.lock` (DEC-007). É uma decisão de arquitetura que afeta o Dev, não só o GenAI |
 | D5 | Time (`docs/arquitetura.md`) | Atualizar o ADR-01 de "em aberto" para "PostgreSQL (DEC-002)" | Documento do time desatualizado |
 
 ## 11. Próximas features (cada uma em sua branch)
@@ -248,8 +262,8 @@ Obrigatórios, nesta ordem:
 1. ~~Hardening do validador~~: feito em `fix/ai-agent-review-pr5`, com as regras da §6 e os testes de regressão do item 6 da §8.
 2. **Contrato `AgentAnswer`**: `refused_reason`, `model`, `latency_ms` e as novas invariantes (§4). Precisa ser combinado com V1, porque o backend depende dele.
 3. ~~Executor read-only Postgres~~: feito em `feat/ai-agent-executor` (`PostgresQueryExecutor`, plano `docs/plans/2026-10-20-postgres-executor.md`), com timeout por consulta, truncamento, classificação por SQLSTATE e teste de integração confirmando que o banco recusa `INSERT`.
-4. Camada semântica + glossário a partir do contrato Gold (amostra), incluindo o SQL das views `sem_*`.
-5. Gerador PydanticAI + prompts versionados, com o conteúdo do banco delimitado como dado (§5).
+4. ~~Gerador PydanticAI~~: feito em `feat/ai-agent-gerador` (`PydanticAiSqlGenerator`, `build_model`, `prompts/v1/`, plano `docs/plans/2026-10-21-sql-generator.md`). Prompts versionados, com o conteúdo do banco delimitado como dado (§5). Vem antes da camada semântica porque não depende do contrato da Gold: recebe um `SemanticLayer` e é testado com um montado no próprio teste.
+5. **Camada semântica** + glossário, depois do merge do PR #10. Fonte: `contracts/gold_schema.yaml` (tabelas com `agente` em `consumers`; só colunas `confirmada` e `proposta`; relações das `foreign_keys` e das `shared_keys`) + um arquivo do GenAI com descrições, unidades, glossário e regras de negócio. Gera também o SQL das views `sem_*` (D7).
 6. **Orquestração `ask()`** com loop de correção, "não sei" e **logs estruturados por etapa**, no mesmo PR. Cada requisição registra `request_id`, `session_id`, a pergunta, o SQL de cada tentativa, o resultado da validação, o erro, o número de linhas, a latência por etapa, os tokens, o modelo e o `prompt_version` (§12 do guia). Sem esse rastreio não dá para diagnosticar as falhas que o golden set vai mostrar.
 7. Golden set + red team + runner com as métricas de §9.3. Os itens podem ser escritos em paralelo desde já, porque não dependem de código.
 8. Verificação numérica e `AnswerWriter`, com o conteúdo do banco delimitado como dado (§5).

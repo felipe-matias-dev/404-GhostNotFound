@@ -1,12 +1,15 @@
+import re
+
 import sqlglot
 from sqlglot import exp
-from sqlglot.errors import ParseError, SqlglotError
+from sqlglot.errors import SqlglotError
 from sqlglot.optimizer.normalize_identifiers import normalize_identifiers
 from sqlglot.optimizer.scope import traverse_scope
 
 from venergy_agent.domain.errors import SqlRejected
 from venergy_agent.domain.sql import ValidatedQuery
 
+TERMINAL_ESCAPE = re.compile(r"\x1b\[[0-9;]*m")
 FORBIDDEN_NODES = (exp.DML, exp.DDL, exp.Command, exp.Set, exp.Copy, exp.Into, exp.Lock)
 FORBIDDEN_FUNCTIONS = (
     exp.Anonymous,
@@ -40,8 +43,8 @@ class SqlglotValidator:
     def _parse(self, sql: str) -> exp.Query:
         try:
             statements = sqlglot.parse(sql, read=self._dialect)
-        except ParseError as error:
-            raise SqlRejected("syntax error") from error
+        except (SqlglotError, RecursionError) as error:
+            raise SqlRejected(f"syntax error: {TERMINAL_ESCAPE.sub('', str(error))}") from error
         if len(statements) != 1 or statements[0] is None:
             raise SqlRejected("exactly one statement is required")
         root = statements[0]
