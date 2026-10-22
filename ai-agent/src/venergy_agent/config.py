@@ -30,6 +30,7 @@ class AgentSettings(BaseSettings):
     prompt_version: str = "v1"
     semantic_layer_path: Path = AGENT_ROOT / "semantic" / "semantic_layer.yaml"
     gold_contract_path: Path = REPO_ROOT / "contracts" / "gold_schema.yaml"
+    answer_sample_rows: int = Field(20, gt=0)
 
     @model_validator(mode="after")
     def check_provider_keys(self) -> Self:

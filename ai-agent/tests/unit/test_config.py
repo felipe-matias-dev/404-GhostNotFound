@@ -109,3 +109,10 @@ def test_semantic_layer_and_contract_paths_resolve_inside_the_repository(require
 
     assert settings.semantic_layer_path.exists()
     assert settings.gold_contract_path.exists()
+
+
+def test_answer_sample_rows_must_be_positive(required_env, monkeypatch):
+    monkeypatch.setenv("VENERGY_AGENT_ANSWER_SAMPLE_ROWS", "0")
+
+    with pytest.raises(ValidationError):
+        AgentSettings(_env_file=None)

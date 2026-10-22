@@ -53,19 +53,28 @@ def generator(model, prompts_dir=SHIPPED_PROMPTS, version="v1", nonce=NONCE):
 async def test_returns_the_draft_produced_by_the_model():
     model, _ = scripted_model({"status": "ok", "sql": "SELECT count(*) FROM sem_uc"})
 
-    draft = await generator(model).generate(QUESTION, LAYER, None)
+    generation = await generator(model).generate(QUESTION, LAYER, None)
 
-    assert draft.status is DraftStatus.OK
-    assert draft.sql == "SELECT count(*) FROM sem_uc"
+    assert generation.draft.status is DraftStatus.OK
+    assert generation.draft.sql == "SELECT count(*) FROM sem_uc"
 
 
 async def test_invalid_draft_is_sent_back_to_the_model():
     model, calls = scripted_model({"status": "ok"}, {"status": "unknown"})
 
-    draft = await generator(model).generate(QUESTION, LAYER, None)
+    generation = await generator(model).generate(QUESTION, LAYER, None)
 
-    assert draft.status is DraftStatus.UNKNOWN
+    assert generation.draft.status is DraftStatus.UNKNOWN
     assert len(calls) == 2
+
+
+async def test_generation_reports_the_model_that_answered_and_its_tokens():
+    model, _ = scripted_model({"status": "unknown"})
+
+    generation = await generator(model).generate(QUESTION, LAYER, None)
+
+    assert generation.model
+    assert generation.input_tokens >= 0 and generation.output_tokens >= 0
 
 
 async def test_request_carries_rendered_system_and_user_prompts():
