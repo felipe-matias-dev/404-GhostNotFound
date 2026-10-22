@@ -527,8 +527,9 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Titular na UC 360:** o case pede que a tela mostre "quem é o cliente", e a Gold traz só
   `titular_mascarado` (iniciais) e `documento_mascarado` (3 últimos dígitos), ambos `sensitive`,
   que substituem `cod_cliente`. Não há código de cliente na origem, e o teste do cadastro mostrou que
-  cada titular tem uma UC só, exceto um documento repetido num grupo de UCs cadastradas sem medidor e
-  sem fatura (a verificar). Ligar UCs do mesmo titular não traria nada ao case. O mascaramento
+  cada titular tem uma UC só, exceto um documento de preenchimento repetido num grupo de UCs
+  cadastradas sem nenhum medidor (verificado: o grupo é exatamente o das UCs sem medidor, e o documento
+  não é nulo). Ligar UCs do mesmo titular não traria nada ao case. O mascaramento
   acontece na criação da Gold, e o original não chega às tabelas.
 - **Colunas confirmadas e removida:** `periodo_base` e `periodo_atual` ficam como texto `AAAA-MM/AAAA-MM`
   (qualquer par de períodos), e `receita_base` e `receita_atual` mantêm o nome; os quatro passam a
