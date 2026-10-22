@@ -307,3 +307,21 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Regras relacionadas** (detalhes no contrato): chaves estrangeiras são lógicas, checadas
   no Data Quality e sem constraint no banco; colunas de lista vão numa célula do CSV,
   separadas por `;`; `tarifa_media` é nula quando `kwh_faturado = 0`.
+
+## DEC-015 · Gold real e plano gratuito do Gemini (proposta)
+
+- **Data:** 21/10/2026 · **Área:** GenAI e Dados · **Autor:** GenAI
+- **Status:** proposta, a decidir na daily.
+- **Decisão proposta:** o plano gratuito do Gemini (Free Tier) recebe só a amostra sintética. A Gold real só é enviada com chave paga ou fornecida pela organização.
+- **Motivo:** no Free Tier, o Google pode usar o conteúdo enviado para melhorar os produtos dele. O dataset é confidencial e nunca vai para o repositório.
+- **Estado atual:** o README orienta o uso do plano gratuito só para a amostra. O código ainda não verifica o tipo de chave, e o modelo padrão do quickstart é o Gemini direto, então nada impede quem segue o README de enviar a Gold real pelo plano gratuito.
+- **Em aberto:** (1) confirmar se a Gold agregada entra no mesmo critério do dataset; (2) definir quem fornece a chave paga; (3) decidir se o código recusa a chave gratuita quando a configuração aponta para a Gold real.
+
+## DEC-016 · Exceção de versionamento do prompt v1 (proposta)
+
+- **Data:** 21/10/2026 · **Área:** GenAI · **Autor:** GenAI
+- **Status:** proposta, a confirmar com o time.
+- **Decisão proposta:** a `prompts/v1/` recebe a delimitação do SQL anterior e das linhas de exemplo (system.md e correction.md) sem virar `prompts/v2/`. Isso vale só para esta mudança, feita antes de a v1 chegar à `main`.
+- **Motivo:** o `ai-agent/CLAUDE.md` pede uma versão nova para cada mudança de prompt, que só entra com golden set sem regressão. Hoje a v1 não está na `main` e o golden set ainda não foi executado com dados. Criar a v2 agora mudaria o `prompt_version` de auditoria sem ganho real.
+- **Consequência:** o `prompt_version='v1'` gravado na auditoria passa a cobrir os dois prompts de correção. Quem olhar uma resposta antiga precisa saber que ela foi gerada antes da delimitação.
+- **Em aberto:** (1) aceitar a exceção ou exigir a v2 antes do merge; (2) a partir de quando o golden set roda como portão para mudanças de prompt. Depois do primeiro merge na `main`, qualquer mudança de prompt vai para `prompts/v2/`.

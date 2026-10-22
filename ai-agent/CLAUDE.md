@@ -24,7 +24,7 @@ Se o agente não souber, diz que não sabe. Resposta inventada é falha crítica
 - **Configuração:**
   - variáveis com prefixo `VENERGY_AGENT_` (`src/venergy_agent/config.py`, modelo em `.env.example`). O `ai-agent/.env` é localizado pelo caminho do pacote, não pelo diretório atual, e as variáveis de ambiente do processo têm precedência sobre ele;
   - quando o agente rodar dentro da API, o serviço `api` do compose precisa receber essas variáveis, porque hoje não recebe;
-  - a chave do OpenRouter nunca vai para log, resposta ou Git.
+  - cada integrante usa a própria chave do Gemini (`VENERGY_AGENT_GOOGLE_API_KEY`) ou do OpenRouter; nenhuma chave vai para log, resposta ou Git.
 - **CI:** o job do `ai-agent` ainda não existe no `ci.yml` (spec §10, D2).
 
 ## Para Dados

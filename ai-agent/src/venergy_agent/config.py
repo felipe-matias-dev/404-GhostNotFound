@@ -1,19 +1,23 @@
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Self
 
-from pydantic import Field, SecretStr
+from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 AGENT_ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
+PROVIDER_KEYS = {"google-gla": "google_api_key", "openrouter": "openrouter_api_key"}
 
 
 class AgentSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="VENERGY_AGENT_", env_file=AGENT_ENV_FILE)
 
-    llm_model: str = "openrouter:google/gemini-3.1-flash-lite"
+    llm_model: str = "google-gla:gemini-3.1-flash-lite"
     fallback_model: str | None = None
-    openrouter_api_key: SecretStr
+    google_api_key: SecretStr | None = None
+    openrouter_api_key: SecretStr | None = None
     temperature: float = Field(0.0, ge=0.0, le=0.2)
+    llm_retry_attempts: int = Field(3, ge=1, le=5)
+    llm_retry_initial_delay_seconds: float = Field(1.0, gt=0)
     sql_dialect: Literal["postgres"] = "postgres"
     database_url: str
     allowed_schema: str = "gold"
@@ -22,3 +26,19 @@ class AgentSettings(BaseSettings):
     query_timeout_seconds: float = Field(10.0, gt=0)
     max_correction_attempts: int = Field(3, ge=1, le=3)
     prompt_version: str = "v1"
+
+    @model_validator(mode="after")
+    def check_provider_keys(self) -> Self:
+        for model in filter(None, (self.llm_model, self.fallback_model)):
+            provider, _, name = model.partition(":")
+            key = PROVIDER_KEYS.get(provider)
+            if key is None:
+                raise ValueError(
+                    f"unsupported provider {provider!r}, use one of {list(PROVIDER_KEYS)}"
+                )
+            if not name:
+                raise ValueError(f"{model!r} has no model name after the provider")
+            secret = getattr(self, key)
+            if secret is None or not secret.get_secret_value().strip():
+                raise ValueError(f"{model!r} requires VENERGY_AGENT_{key.upper()}")
+        return self
