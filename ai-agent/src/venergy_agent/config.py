@@ -4,7 +4,9 @@ from typing import Literal, Self
 from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-AGENT_ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
+AGENT_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = Path(__file__).resolve().parents[3]
+AGENT_ENV_FILE = AGENT_ROOT / ".env"
 PROVIDER_KEYS = {"google-gla": "google_api_key", "openrouter": "openrouter_api_key"}
 
 
@@ -26,6 +28,8 @@ class AgentSettings(BaseSettings):
     query_timeout_seconds: float = Field(10.0, gt=0)
     max_correction_attempts: int = Field(3, ge=1, le=3)
     prompt_version: str = "v1"
+    semantic_layer_path: Path = AGENT_ROOT / "semantic" / "semantic_layer.yaml"
+    gold_contract_path: Path = REPO_ROOT / "contracts" / "gold_schema.yaml"
 
     @model_validator(mode="after")
     def check_provider_keys(self) -> Self:

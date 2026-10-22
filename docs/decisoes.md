@@ -422,3 +422,12 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   - O serviço `api` recebe `VENERGY_AGENT_DATABASE_URL` (usuário `venergy_agent`) e
     `VENERGY_AGENT_GOOGLE_API_KEY`, que vem de `GOOGLE_API_KEY` no `.env` da raiz. A chave é
     opcional até o `/ai` existir e nunca entra em camada da imagem.
+
+## DEC-018 · Relações entre views só por chave (proposta)
+
+- **Data:** 22/10/2026 · **Área:** GenAI · **Autor:** Lucas
+- **Status:** proposta, a confirmar com o time.
+- **Decisão proposta:** a camada semântica monta relações entre views só pelas chaves estrangeiras do contrato e pelas chaves de entidade (`cod_uc` e `cod_alimentador`). `competencia`, `municipio` e `bairro` não viram relação.
+- **Motivo:** a spec (§5, item 5) manda montar relações a partir de `foreign_keys` e `shared_keys`. Juntar duas views só pelo período gera produto cartesiano, e o modelo tende a fazer essa junção quando a relação existe.
+- **Consequência:** `sem_faturamento_mensal` liga a `sem_uc` por `cod_uc`, e `sem_uc` liga a `sem_continuidade_alimentador_mensal` por `cod_alimentador`.
+- **Em aberto:** quando `gold_receita_decomposicao` entrar (contrato v0.2 liga por município, bairro e classe), revisar esta regra.

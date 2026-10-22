@@ -14,6 +14,25 @@ Hexagonal, em três camadas:
 
 Os prompts ficam versionados em `prompts/vN/` (`system.md` e `correction.md`). A versão em uso vem de `VENERGY_AGENT_PROMPT_VERSION`; mudar o prompt é criar uma versão nova e medir no golden set, nunca editar a anterior.
 
+### Camada semântica
+
+`semantic/semantic_layer.yaml` é do GenAI. Ele escolhe as views `sem_*`, as colunas, a descrição, o glossário, as regras e os exemplos. Cada view é validada contra [contracts/gold_schema.yaml](../contracts/gold_schema.yaml):
+
+- a tabela e a coluna existem no contrato;
+- coluna marcada `a_confirmar` não entra;
+- a chave primária da tabela está confirmada ou proposta e aparece na view.
+
+As relações entre views saem das chaves estrangeiras e das chaves de entidade (`cod_uc`, `cod_alimentador`). Competência não vira relação, porque juntar só por período gera produto cartesiano (DEC-018).
+
+Depois de mudar o YAML, regere o SQL das views:
+
+```bash
+uv run python -m venergy_agent.infrastructure.views_sql          # regera semantic/views.sql
+uv run python -m venergy_agent.infrastructure.views_sql --check  # falha se estiver desatualizado
+```
+
+**Recarga da Gold (spec §10, D7):** a carga recria as tabelas, e isso falha enquanto houver view dependente. Antes de recarregar, apague as views `sem_*`, e aplique `semantic/views.sql` de novo depois da carga.
+
 ## Como rodar
 
 Dentro de `ai-agent/`:
