@@ -104,15 +104,17 @@ def test_model_name_is_required_after_the_provider(required_env):
         AgentSettings(_env_file=None, llm_model="google-gla:")
 
 
-def test_semantic_layer_and_contract_paths_resolve_inside_the_repository(required_env):
-    settings = AgentSettings(_env_file=None)
-
-    assert settings.semantic_layer_path.exists()
-    assert settings.gold_contract_path.exists()
-
-
 def test_answer_sample_rows_must_be_positive(required_env, monkeypatch):
     monkeypatch.setenv("VENERGY_AGENT_ANSWER_SAMPLE_ROWS", "0")
 
     with pytest.raises(ValidationError):
         AgentSettings(_env_file=None)
+
+
+def test_semantic_layer_and_contract_paths_resolve_inside_the_repository(required_env):
+    settings = AgentSettings(_env_file=None)
+
+    assert settings.semantic_layer_path.exists()
+    assert settings.gold_contract_path.exists()
+    assert (settings.prompts_dir / settings.prompt_version / "system.md").exists()
+    assert (settings.prompts_dir / "answer" / settings.answer_prompt_version / "answer.md").exists()

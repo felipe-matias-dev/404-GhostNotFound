@@ -670,6 +670,15 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Consequência:** `sem_faturamento_mensal` liga a `sem_uc` por `cod_uc`, e `sem_uc` liga a `sem_continuidade_alimentador_mensal` por `cod_alimentador`.
 - **Em aberto:** quando `gold_receita_decomposicao` entrar (contrato v0.2 liga por município, bairro e classe), revisar esta regra.
 
+## DEC-019 · Verificação numérica da narrativa (proposta)
+
+- **Data:** 22/10/2026 · **Área:** GenAI · **Autor:** Lucas
+- **Status:** proposta, a confirmar com o time.
+- **Decisão proposta:** a narrativa em linguagem natural só é aceita se cada número dela existir nas linhas retornadas ou no total de linhas. Números que aparecem só na pergunta ou nas suposições não contam.
+- **Motivo:** o `CLAUDE.md` do agente diz que todo número da resposta vem das linhas retornadas, e a spec (§8, item 8) exige que um número inexistente nas linhas derrube a narrativa.
+- **Consequência:** uma narrativa que cite um ano da suposição (por exemplo "2025 contra 2024") cai no texto determinístico quando o ano não aparece nas linhas. É menos texto, mas não inventa número.
+- **Em aberto:** a leitura dos números aceita pt-BR e en (`1.234` pode ser mil ou um vírgula dois). Confirmar se essa tolerância é aceitável.
+
 ## DEC-020 · Contrato `AgentAnswer` com status (proposta)
 
 - **Data:** 22/10/2026 · **Área:** GenAI e Backend (V1) · **Autor:** Lucas
