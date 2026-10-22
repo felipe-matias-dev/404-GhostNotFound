@@ -1,6 +1,6 @@
 [project]
 name = "venergy-api"
-version = "0.1.0"
+version = "0.2.0"
 description = "API do portal V-Energy Grid 360"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -32,5 +32,6 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 dev = [
     "httpx2>=2.14.0",
     "pytest>=9.1.1",
+    "pyyaml>=6.0.3",
     "ruff>=0.17.1",
 ]

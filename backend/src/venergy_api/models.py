@@ -4,15 +4,31 @@ from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Index, Numeric, func, text
+from sqlalchemy import (
+    ARRAY,
+    DateTime,
+    Double,
+    Enum,
+    ForeignKey,
+    Index,
+    Numeric,
+    Text,
+    func,
+    text,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from venergy_api.database import Base
 from venergy_api.ordens import STATUS_ATIVOS, ResultadoOrdem, StatusOrdem
 
+# Tipos money e energy_kwh do contrato da Gold. Numeric, nunca float (DEC-010): o agente
+# soma direto em SQL, e a soma exata faz o número dele bater com o do portal.
+_MONEY = Numeric(14, 2)
+_ENERGY = Numeric(16, 3)
+
 
 class DimUc(Base):
-    """Dimensão de unidades consumidoras, uma linha por UC. Colunas provisórias até o contrato."""
+    """Dimensão de unidades consumidoras, uma linha por UC, como em contracts/gold_schema.yaml."""
 
     __tablename__ = "gold_dim_uc"
     # Schema gold: recarregável a partir dos CSVs e o único que o agente de IA consegue ler.
@@ -25,9 +41,93 @@ class DimUc(Base):
     classe: Mapped[str]
     cod_alimentador: Mapped[str]
     possui_gd: Mapped[bool]
-    # numeric(16,3), o tipo de energia do contrato: o agente soma direto em SQL, e a soma
-    # exata faz o número dele bater com o do portal. O Postgres arredonda para 3 casas.
-    consumo_medio_kwh_12m: Mapped[Decimal] = mapped_column(Numeric(16, 3))
+    # O Postgres arredonda para as 3 casas do tipo de energia.
+    consumo_medio_kwh_12m: Mapped[Decimal] = mapped_column(_ENERGY)
+    # Opcionais e ainda "a confirmar" no contrato: o backend espelha o contrato inteiro, e
+    # o teste do contrato aponta o que mudar se o time de dados renomear alguma.
+    cod_cliente: Mapped[str | None]
+    subgrupo: Mapped[str | None]
+    # Double, o tipo "ratio" do contrato: potência é medida, não dinheiro nem energia somada.
+    potencia_kw: Mapped[float | None] = mapped_column(Double)
+
+
+class FatoFaturamentoMensal(Base):
+    """Faturamento por UC e competência: base dos KPIs, da tela de Receita e da UC 360."""
+
+    __tablename__ = "gold_fato_faturamento_mensal"
+    __table_args__ = {"schema": "gold"}
+
+    # Sem chave estrangeira física para gold_dim_uc: a carga recria tabela por tabela, e o
+    # contrato deixa essa checagem para a qualidade de dados (foreign_keys: logical).
+    cod_uc: Mapped[str] = mapped_column(primary_key=True)
+    competencia: Mapped[str] = mapped_column(primary_key=True)
+    kwh_faturado: Mapped[Decimal] = mapped_column(_ENERGY)
+    receita_faturada: Mapped[Decimal] = mapped_column(_MONEY)
+    receita_arrecadada: Mapped[Decimal | None] = mapped_column(_MONEY)
+    tarifa_media: Mapped[float | None] = mapped_column(Double)
+    bandeira: Mapped[str | None]
+
+
+class ReceitaDecomposicao(Base):
+    """Variação da receita entre dois períodos, por município, bairro e classe."""
+
+    __tablename__ = "gold_receita_decomposicao"
+    __table_args__ = {"schema": "gold"}
+
+    periodo_base: Mapped[str] = mapped_column(primary_key=True)
+    periodo_atual: Mapped[str] = mapped_column(primary_key=True)
+    municipio: Mapped[str] = mapped_column(primary_key=True)
+    bairro: Mapped[str] = mapped_column(primary_key=True)
+    classe: Mapped[str] = mapped_column(primary_key=True)
+    receita_base: Mapped[Decimal] = mapped_column(_MONEY)
+    receita_atual: Mapped[Decimal] = mapped_column(_MONEY)
+    efeito_preco: Mapped[Decimal] = mapped_column(_MONEY)
+    efeito_volume: Mapped[Decimal] = mapped_column(_MONEY)
+    efeito_mix: Mapped[Decimal] = mapped_column(_MONEY)
+
+
+class KpisMensais(Base):
+    """Indicadores executivos por competência: o painel da diretoria."""
+
+    __tablename__ = "gold_kpis_mensais"
+    __table_args__ = {"schema": "gold"}
+
+    competencia: Mapped[str] = mapped_column(primary_key=True)
+    kwh_faturado: Mapped[Decimal] = mapped_column(_ENERGY)
+    receita_faturada: Mapped[Decimal] = mapped_column(_MONEY)
+    dec: Mapped[float | None] = mapped_column(Double)
+    fec: Mapped[float | None] = mapped_column(Double)
+    n_chamados: Mapped[int | None]
+    satisfacao_media: Mapped[float | None] = mapped_column(Double)
+
+
+class ContinuidadeAlimentadorMensal(Base):
+    """DEC e FEC por alimentador e competência: a tela de continuidade e o ranking."""
+
+    __tablename__ = "gold_continuidade_alimentador_mensal"
+    __table_args__ = {"schema": "gold"}
+
+    cod_alimentador: Mapped[str] = mapped_column(primary_key=True)
+    competencia: Mapped[str] = mapped_column(primary_key=True)
+    dec: Mapped[float] = mapped_column(Double)
+    fec: Mapped[float] = mapped_column(Double)
+    n_uc: Mapped[int]
+    n_interrupcoes: Mapped[int]
+    horas_interrompidas: Mapped[float] = mapped_column(Double)
+
+
+class FilaSuspeita(Base):
+    """UCs suspeitas de perda não técnica: de onde o gerente de perdas gera as OIs."""
+
+    __tablename__ = "gold_fila_suspeitas"
+    __table_args__ = {"schema": "gold"}
+
+    cod_uc: Mapped[str] = mapped_column(primary_key=True)
+    score_suspeita: Mapped[float] = mapped_column(Double)
+    # Lista nativa do Postgres (text[]), e não uma tabela de motivos à parte: os motivos só
+    # são lidos junto com a UC, e o agente consegue filtrar com ANY() no mesmo SELECT.
+    motivos: Mapped[list[str]] = mapped_column(ARRAY(Text))
+    kwh_recuperavel_est: Mapped[Decimal | None] = mapped_column(_ENERGY)
 
 
 def _enum_como_texto(enum: type[StrEnum], nome_check: str) -> Enum:

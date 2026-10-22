@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "V-Energy Grid 360 API",
-    "version": "0.1.0"
+    "version": "0.2.0"
   },
   "paths": {
     "/health": {
@@ -421,6 +421,41 @@
           "consumo_medio_kwh_12m": {
             "type": "number",
             "title": "Consumo Medio Kwh 12M"
+          },
+          "cod_cliente": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cod Cliente"
+          },
+          "subgrupo": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subgrupo"
+          },
+          "potencia_kw": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Potencia Kw"
           }
         },
         "type": "object",
@@ -431,7 +466,10 @@
           "classe",
           "cod_alimentador",
           "possui_gd",
-          "consumo_medio_kwh_12m"
+          "consumo_medio_kwh_12m",
+          "cod_cliente",
+          "subgrupo",
+          "potencia_kw"
         ],
         "title": "DimUcSchema"
       },

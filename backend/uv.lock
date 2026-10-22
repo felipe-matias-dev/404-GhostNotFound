@@ -753,7 +753,7 @@ wheels = [
 
 [[package]]
 name = "venergy-api"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "." }
 dependencies = [
     { name = "fastapi" },
@@ -767,6 +767,7 @@ dependencies = [
 dev = [
     { name = "httpx2" },
     { name = "pytest" },
+    { name = "pyyaml" },
     { name = "ruff" },
 ]
 
@@ -783,6 +784,7 @@ requires-dist = [
 dev = [
     { name = "httpx2", specifier = ">=2.14.0" },
     { name = "pytest", specifier = ">=9.1.1" },
+    { name = "pyyaml", specifier = ">=6.0.3" },
     { name = "ruff", specifier = ">=0.17.1" },
 ]
 
