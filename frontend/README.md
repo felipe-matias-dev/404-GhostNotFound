@@ -40,6 +40,7 @@ npm run dev                  # http://localhost:3000
 | `npm run check` | Lint + formatação (Biome) |
 | `npx tsc --noEmit` | Checagem de tipos |
 | `npm run gen:api` | Regenera `src/lib/api-schema.gen.ts` a partir de `contracts/openapi.json` |
+| `npm run gen:mapa -- <municípios> <bairros>` | Regenera `src/components/ui/region-map/rmr.gen.ts` e `rmr-bairros.gen.ts` (mapa da RMR) a partir das malhas do IBGE: [municípios](https://www.ibge.gov.br/geociencias/organizacao-do-territorio/malhas-territoriais) (`PE_Municipios_AAAA`) e [bairros do Censo 2022](https://ftp.ibge.gov.br/Censos/Censo_Demografico_2022/Agregados_por_Setores_Censitarios/malha_com_atributos/bairros/shp/UF/PE/) (`PE_bairros_CD2022`); ver DEC-025 |
 | `npm run storybook` | Storybook do design system em http://localhost:6006 |
 | `npm run build-storybook` | Build estático do Storybook em `storybook-static/` |
 
