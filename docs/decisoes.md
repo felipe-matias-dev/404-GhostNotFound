@@ -29,6 +29,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | 21/10/2026 | DEC-022: o agente só lê colunas não sensíveis das tabelas liberadas no contrato, e "receita" sem qualificador é a receita faturada | Dado pessoal e texto livre ficam fora do agente; uma definição única de receita evita respostas divergentes | Alisson |
 | 22/10/2026 | DEC-023: receita da Gold em três medidas (total, energia e tributos), com a energia como base provisória do PVM; consumo médio nulo sem leitura; `potencia_kwp`; reconciliação do faturamento e da energia | Nenhum valor descartado sem explicação; os números da diretoria podem ser conciliados com os da Gold | Alisson |
 | 22/10/2026 | DEC-024: resultados agregados necessários para sustentar uma hipótese podem ir ao repositório; identificação de pessoas e de UCs e dado de LGPD ficam mascarados; linha a linha, amostras e outputs nunca sobem | O diagnóstico precisa mostrar a evidência, mas o dataset é confidencial e há dado pessoal | Alisson |
+| 23/10/2026 | DEC-025 (proposta): mapa da RMR com a malha municipal 2025 e a malha de bairros do Censo 2022 do IBGE, os 15 municípios da LC estadual 382/2018, e município e bairro da Gold casados com os do mapa pelo nome normalizado | O mapa vira o seletor principal de município e bairro sem mudar o contrato da Gold; o que está na Gold é clicável, o resto aparece apagado | João Euclides |
 
 ## DEC-001 · Localização dos arquivos de origem (landing)
 
@@ -678,3 +679,17 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   necessário à hipótese pode subir; os CSVs da Gold continuam fora do Git.
 - **Em aberto:** confirmar com a Visagio que resultados agregados do diagnóstico podem ser públicos
   (o case marca os materiais como confidenciais e pede um repositório público).
+
+## DEC-025 · Mapa da RMR como seletor de município e bairro (proposta)
+
+- **Data:** 23/10/2026 · **Área:** Portal · **Autor:** João Euclides
+- **Status:** proposta, a confirmar com Dados (lista de municípios da Gold).
+- **Contexto:** o log de qualidade registra "14 municípios da RMR" em `unidades_consumidoras`, sem listar quais. A RMR oficial tem 15 desde a LC estadual 382/2018, que incluiu Goiana. As regiões geográficas do IBGE não coincidem com a RMR: a Imediata de Recife inclui Paudalho e Fernando de Noronha e deixa Goiana de fora.
+- **Decisão:**
+  - geometria da Malha Municipal 2025 do IBGE (`PE_Municipios_2025`), filtrada pelos 15 códigos IBGE da RMR, projetada em UTM 25S e simplificada; os municípios vizinhos entram só como contorno de contexto;
+  - bairros da malha de bairros do Censo 2022 (`PE_bairros_CD2022`), na mesma projeção: 315 bairros em 12 municípios. Goiana, Ilha de Itamaracá e Moreno não têm bairros na malha do IBGE e ficam só com a tabela e o menu;
+  - os arquivos gerados (`frontend/src/components/ui/region-map/rmr.gen.ts`, ~20 KB, e `rmr-bairros.gen.ts`, ~140 KB, ~47 KB com gzip, baixado só quando um município é escolhido) são versionados; os shapefiles não. Regerar: `npm run gen:mapa -- <pasta do PE_Municipios_AAAA> <pasta do PE_bairros_CD2022>`;
+  - a Gold não tem código IBGE: município e bairro da Gold casam com os do mapa pelo nome sem acento, caixa e espaço extra. O que não casa aparece apagado e sem link no mapa, mas continua na tabela e no menu do topo.
+  - cor do mapa pela variação da receita sobre a receita base do próprio segmento, em escala contínua: abaixo de 0,5% é neutro, e a cor (vermelho para queda, verde para alta, misturados à superfície) e o brilho do contorno crescem até saturar em 10%. A fração é calculada no frontend só para a cor; nenhum número novo é exibido (o hover mostra a variação em R$ da API).
+- **Motivo:** o mapa funciona com 14 ou 15 municípios sem mudar o contrato; as malhas são públicas e não são dado do case.
+- **Em aberto:** (1) Dados confirmar os 14 nomes de município da Gold e conferir os bairros contra a malha do IBGE (bairro vem do cadastro, em texto livre); (2) avaliar `cod_municipio_ibge` e `cod_bairro_ibge` (`CD_BAIRRO`) na `gold_dim_uc` para casar por código; (3) o bairro do IBGE é agregado de setores censitários e pode não coincidir com o limite oficial da prefeitura; (4) se a variação percentual for exibida, ela passa a vir da API (`variacao_receita_pct` em `/receita/decomposicao`), como já vem em `/receita/comparacao`.
