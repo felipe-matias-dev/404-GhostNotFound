@@ -19,7 +19,8 @@ Os prompts ficam versionados em `prompts/vN/` (`system.md` e `correction.md`). A
 `semantic/semantic_layer.yaml` é do GenAI. Ele escolhe as views `sem_*`, as colunas, a descrição, o glossário, as regras e os exemplos. Cada view é validada contra [contracts/gold_schema.yaml](../contracts/gold_schema.yaml):
 
 - a tabela e a coluna existem no contrato;
-- coluna marcada `a_confirmar` não entra;
+- a tabela tem `agente` em `consumers` (DEC-022);
+- coluna marcada `a_confirmar` ou `sensitive: true` não entra;
 - a chave primária da tabela está confirmada ou proposta e aparece na view.
 
 As relações entre views saem das chaves estrangeiras e das chaves de entidade (`cod_uc`, `cod_alimentador`). Competência não vira relação, porque juntar só por período gera produto cartesiano (DEC-018).

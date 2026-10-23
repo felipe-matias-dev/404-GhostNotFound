@@ -13,7 +13,7 @@
 # As linhas de exemplo são sintéticas, escritas à mão. Nenhum valor real da Gold entra aqui.
 # Depois de cada mudança, gere o views.sql (ver a seção Camada semântica em ai-agent/README.md).
 
-version: "0.1.0"
+version: "0.2.0"
 
 views:
   - name: sem_uc
@@ -29,6 +29,8 @@ views:
         description: "bairro onde fica a UC; o mesmo nome pode existir em municípios diferentes"
       - name: classe
         description: "classe de consumo: B1 residencial, B2 rural, B3 comercial e poder público, A4 industrial"
+      - name: classe_cadastro
+        description: "classe da UC no cadastro comercial; é a única coluna que separa Comercial de Poder Público, que dividem o B3"
       - name: cod_alimentador
         description: "alimentador de média tensão que atende a UC"
       - name: possui_gd
@@ -37,8 +39,8 @@ views:
         unit: "kWh"
         description: "consumo médio da UC nos últimos 12 meses, em kWh; vazio quando a UC não tem nenhuma leitura"
     sample_rows:
-      - {cod_uc: "0001", municipio: "Município Exemplo A", bairro: "Bairro exemplo 1", classe: "B1", cod_alimentador: "AL-01", possui_gd: false, consumo_medio_kwh_12m: 250.5}
-      - {cod_uc: "0002", municipio: "Município Exemplo B", bairro: "Bairro exemplo 2", classe: "A4", cod_alimentador: "AL-02", possui_gd: true, consumo_medio_kwh_12m: 18000.0}
+      - {cod_uc: "0001", municipio: "Município Exemplo A", bairro: "Bairro exemplo 1", classe: "B1", classe_cadastro: "Residencial", cod_alimentador: "AL-01", possui_gd: false, consumo_medio_kwh_12m: 250.5}
+      - {cod_uc: "0002", municipio: "Município Exemplo B", bairro: "Bairro exemplo 2", classe: "A4", classe_cadastro: "Industrial", cod_alimentador: "AL-02", possui_gd: true, consumo_medio_kwh_12m: 18000.0}
 
   - name: sem_faturamento_mensal
     source: gold_fato_faturamento_mensal
@@ -97,19 +99,159 @@ views:
       - {cod_alimentador: "AL-01", competencia: "2025-03", dec: 1.2, fec: 0.4, n_uc: 1500, n_interrupcoes: 3, horas_interrompidas: 2.5}
       - {cod_alimentador: "AL-02", competencia: "2025-03", dec: 0.0, fec: 0.0, n_uc: 800, n_interrupcoes: 0, horas_interrompidas: 0.0}
 
+  - name: sem_kpis_mensais
+    source: gold_kpis_mensais
+    description: "Indicadores da empresa inteira por competência: energia, receita, DEC, FEC, chamados e satisfação"
+    grain: "uma linha por competência"
+    columns:
+      - name: competencia
+        description: "mês de referência, no formato AAAA-MM"
+      - name: kwh_faturado
+        unit: "kWh"
+        description: "energia faturada no mês, somando todas as UCs"
+      - name: receita_faturada
+        unit: "R$"
+        description: "receita faturada no mês (energia e tributos), somando todas as UCs"
+      - name: receita_energia
+        unit: "R$"
+        description: "receita de energia no mês, sem tributos"
+      - name: dec
+        unit: "h"
+        description: "DEC da empresa no mês, já calculado na Gold; não recalcule"
+      - name: fec
+        unit: "interrupções"
+        description: "FEC da empresa no mês, já calculado na Gold; não recalcule"
+      - name: n_chamados
+        unit: "contagem"
+        description: "chamados de atendimento abertos no mês; vazio quando não há atendimento carregado"
+      - name: satisfacao_media
+        unit: "nota"
+        description: "nota média de satisfação, de 1 a 5, dos chamados abertos no mês que receberam nota"
+    sample_rows:
+      - {competencia: "2025-03", kwh_faturado: 1250000.0, receita_faturada: 980000.0, receita_energia: 860000.0, dec: 1.1, fec: 0.6, n_chamados: 420, satisfacao_media: 3.8}
+      - {competencia: "2025-04", kwh_faturado: 1190000.0, receita_faturada: 940000.0, receita_energia: 825000.0, dec: null, fec: null, n_chamados: null, satisfacao_media: null}
+
+  - name: sem_kpis_segmento_mensal
+    source: gold_kpis_segmento_mensal
+    description: "Componentes somáveis dos indicadores por competência, município, bairro, classe e geração própria"
+    grain: "uma linha por competência, município, bairro, classe do cadastro e possui_gd"
+    columns:
+      - name: competencia
+        description: "mês de referência, no formato AAAA-MM"
+      - name: municipio
+        description: "município do recorte"
+      - name: bairro
+        description: "bairro do recorte; o mesmo nome pode existir em municípios diferentes, então filtre sempre junto com o município"
+      - name: classe_cadastro
+        description: "classe da UC no cadastro comercial"
+      - name: classe
+        description: "classe de consumo: B1, B2, B3 ou A4"
+      - name: possui_gd
+        description: "verdadeiro quando as UCs do recorte já tinham geração própria conectada naquela competência"
+      - name: n_uc
+        unit: "contagem"
+        description: "UCs do recorte na competência; é um estoque, some só dentro do mesmo mês"
+      - name: kwh_faturado
+        unit: "kWh"
+        description: "energia faturada no recorte"
+      - name: receita_faturada
+        unit: "R$"
+        description: "receita faturada no recorte (energia e tributos)"
+      - name: receita_energia
+        unit: "R$"
+        description: "receita de energia no recorte, sem tributos"
+      - name: tributos
+        unit: "R$"
+        description: "tributos no recorte"
+      - name: receita_arrecadada
+        unit: "R$"
+        description: "valor efetivamente pago no recorte"
+      - name: horas_interrompidas
+        unit: "UC·h"
+        description: "soma das horas de interrupção das UCs do recorte; componente do DEC"
+      - name: n_interrupcoes
+        unit: "contagem"
+        description: "número de interrupções das UCs do recorte; componente do FEC"
+      - name: n_chamados
+        unit: "contagem"
+        description: "chamados de atendimento abertos no mês pelas UCs do recorte"
+      - name: soma_notas
+        unit: "nota"
+        description: "soma das notas de satisfação dos chamados avaliados; componente da satisfação média"
+      - name: n_notas
+        unit: "contagem"
+        description: "chamados que receberam nota de satisfação; componente da satisfação média"
+    sample_rows:
+      - {competencia: "2025-03", municipio: "Município Exemplo A", bairro: "Bairro exemplo 1", classe_cadastro: "Residencial", classe: "B1", possui_gd: false, n_uc: 1200, kwh_faturado: 300000.0, receita_faturada: 240000.0, receita_energia: 210000.0, tributos: 30000.0, receita_arrecadada: 228000.0, horas_interrompidas: 1800.0, n_interrupcoes: 950, n_chamados: 85, soma_notas: 280.0, n_notas: 70}
+      - {competencia: "2025-03", municipio: "Município Exemplo A", bairro: "Bairro exemplo 1", classe_cadastro: "Poder Público", classe: "B3", possui_gd: true, n_uc: 4, kwh_faturado: 0.0, receita_faturada: 0.0, receita_energia: 0.0, tributos: 0.0, receita_arrecadada: null, horas_interrompidas: 0.0, n_interrupcoes: 0, n_chamados: 0, soma_notas: null, n_notas: 0}
+
+  - name: sem_receita_decomposicao
+    source: gold_receita_decomposicao
+    description: "Decomposição da variação da receita de energia entre dois períodos em efeitos de preço (tarifa e bandeira), volume e mix"
+    grain: "uma linha por par de períodos, município, bairro, classe e possui_gd"
+    columns:
+      - name: periodo_base
+        description: "faixa de meses do período inicial, no formato AAAA-MM/AAAA-MM (ex.: 2024-01/2024-12)"
+      - name: periodo_atual
+        description: "faixa de meses do período comparado, no formato AAAA-MM/AAAA-MM"
+      - name: municipio
+        description: "município do recorte"
+      - name: bairro
+        description: "bairro do recorte; filtre sempre junto com o município"
+      - name: classe
+        description: "classe de consumo: B1, B2, B3 ou A4"
+      - name: possui_gd
+        description: "verdadeiro quando as UCs do recorte tinham geração própria no último mês do período atual; o efeito GD é o efeito_volume dessas linhas"
+      - name: receita_base
+        unit: "R$"
+        description: "receita de energia, sem tributos, no período base"
+      - name: receita_atual
+        unit: "R$"
+        description: "receita de energia, sem tributos, no período atual"
+      - name: efeito_preco
+        unit: "R$"
+        description: "parte da variação explicada pela mudança de preço; é efeito_tarifa + efeito_bandeira"
+      - name: efeito_tarifa
+        unit: "R$"
+        description: "parte do efeito preço explicada pelo reajuste da tarifa base"
+      - name: efeito_bandeira
+        unit: "R$"
+        description: "parte do efeito preço explicada pelo acréscimo das bandeiras amarela e vermelha"
+      - name: efeito_volume
+        unit: "R$"
+        description: "parte da variação explicada pela mudança da energia faturada"
+      - name: efeito_mix
+        unit: "R$"
+        description: "parte da variação explicada pela mudança de peso entre as classes"
+    sample_rows:
+      - {periodo_base: "2024-01/2024-12", periodo_atual: "2025-01/2025-12", municipio: "Município Exemplo A", bairro: "Bairro exemplo 1", classe: "B1", possui_gd: false, receita_base: 1000.0, receita_atual: 1100.0, efeito_preco: 80.0, efeito_tarifa: 60.0, efeito_bandeira: 20.0, efeito_volume: 30.0, efeito_mix: -10.0}
+      - {periodo_base: "2024-01/2024-12", periodo_atual: "2025-01/2025-12", municipio: "Município Exemplo A", bairro: "Bairro exemplo 1", classe: "B1", possui_gd: true, receita_base: 500.0, receita_atual: 420.0, efeito_preco: 40.0, efeito_tarifa: 30.0, efeito_bandeira: 10.0, efeito_volume: -115.0, efeito_mix: -5.0}
+
 glossary:
   - term: "conta de luz"
     synonyms: ["conta", "fatura", "cobrança"]
     maps_to: "receita_faturada em sem_faturamento_mensal"
   - term: "energia faturada"
     synonyms: ["energia cobrada", "kWh faturados"]
-    maps_to: "kwh_faturado em sem_faturamento_mensal"
+    maps_to: "kwh_faturado"
   - term: "falta de luz"
     synonyms: ["apagão", "queda de energia", "interrupção"]
-    maps_to: "horas_interrompidas, dec e fec em sem_continuidade_alimentador_mensal"
+    maps_to: "horas_interrompidas, n_interrupcoes, dec e fec"
   - term: "painel solar"
     synonyms: ["energia solar", "geração distribuída", "GD"]
-    maps_to: "possui_gd em sem_uc"
+    maps_to: "possui_gd"
+  - term: "chamado"
+    synonyms: ["atendimento", "reclamação", "ligação para o call center"]
+    maps_to: "n_chamados em sem_kpis_mensais ou sem_kpis_segmento_mensal"
+  - term: "satisfação"
+    synonyms: ["nota do atendimento", "avaliação do atendimento"]
+    maps_to: "satisfacao_media em sem_kpis_mensais; soma_notas e n_notas em sem_kpis_segmento_mensal"
+  - term: "efeito preço"
+    synonyms: ["reajuste", "aumento de tarifa"]
+    maps_to: "efeito_preco (efeito_tarifa + efeito_bandeira) em sem_receita_decomposicao"
+  - term: "efeito GD"
+    synonyms: ["impacto da geração distribuída", "impacto do solar"]
+    maps_to: "efeito_volume das linhas com possui_gd = true em sem_receita_decomposicao"
   - term: "residencial"
     synonyms: ["residência", "casa"]
     maps_to: "classe = 'B1'"
@@ -117,8 +259,11 @@ glossary:
     synonyms: ["zona rural"]
     maps_to: "classe = 'B2'"
   - term: "comercial"
-    synonyms: ["comércio", "poder público"]
-    maps_to: "classe = 'B3'"
+    synonyms: ["comércio"]
+    maps_to: "classe_cadastro = 'Comercial' (o B3 junta comercial e poder público)"
+  - term: "poder público"
+    synonyms: ["órgão público", "prefeitura"]
+    maps_to: "classe_cadastro = 'Poder Público'"
   - term: "industrial"
     synonyms: ["indústria"]
     maps_to: "classe = 'A4'"
@@ -128,10 +273,15 @@ rules:
   - text: "Tarifa média é receita_energia ÷ kwh_faturado, sem tributos. Leia tarifa_media pronta; não recalcule."
   - text: "Energia faturada é kwh_faturado, já líquida de geração distribuída."
   - text: "Competência é texto no formato AAAA-MM. Filtre por igualdade (competencia = '2025-03') ou por intervalo de texto (competencia BETWEEN '2025-01' AND '2025-03')."
-  - text: "Nesta versão, os dados vão de 2024-01 a 2025-12. Competência fora desse intervalo não existe nas views: responda unknown."
-  - text: "Classe tem exatamente os valores B1, B2, B3 e A4. Não compare com nomes como 'Residencial'."
-  - text: "DEC, FEC, tarifa média, efeitos de preço, volume e mix, e score de suspeita são lidos das views, nunca recalculados."
-  - text: "Perda não técnica, suspeita de irregularidade e satisfação não estão nas views: pergunta sobre elas é unknown."
+  - text: "Não suponha quais competências existem. Consulte as views; se nenhuma linha atender ao filtro, o resultado vazio é a resposta."
+  - text: "classe tem exatamente os valores B1, B2, B3 e A4. classe_cadastro tem Residencial, Comercial, Industrial, Rural e Poder Público, e é a única que separa Comercial de Poder Público."
+  - text: "Bairro só identifica um lugar junto com o município: filtre e agrupe sempre por municipio e bairro."
+  - text: "Totais da empresa por mês (energia, receita, DEC, FEC, chamados e satisfação) vêm prontos de sem_kpis_mensais."
+  - text: "DEC e FEC por alimentador vêm prontos de sem_continuidade_alimentador_mensal; da empresa, de sem_kpis_mensais. Leia; não recalcule."
+  - text: "Por município, bairro, classe ou GD, use sem_kpis_segmento_mensal e some os componentes antes de dividir; nunca faça média de índices. Num mês: DEC = sum(horas_interrompidas) / sum(n_uc) e FEC = sum(n_interrupcoes) / sum(n_uc). Num período de vários meses, divida pela média mensal de UCs: sum(n_uc) dividido pelo número de meses do período pedido (3 num trimestre), e não pelos meses que aparecem no resultado. Satisfação = sum(soma_notas) / sum(n_notas), com NULLIF no divisor."
+  - text: "Efeitos de preço, tarifa, bandeira, volume e mix são lidos de sem_receita_decomposicao e somados sobre o recorte; não recalcule. receita_base e receita_atual são receita de energia, sem tributos."
+  - text: "Em sem_receita_decomposicao, periodo_base e periodo_atual são faixas AAAA-MM/AAAA-MM. Filtre pelo par exato de períodos. Se a pergunta não disser os dois períodos, peça esclarecimento (clarify)."
+  - text: "Score de suspeita, perda não técnica, atendimento por UC, interrupções por UC e medidor não estão nas views: pergunta sobre eles é unknown."
   - text: "Para ligar uma UC ao alimentador use sem_uc.cod_alimentador = sem_continuidade_alimentador_mensal.cod_alimentador."
   - text: "Quando a pergunta compara dois períodos e não diz quais são, peça esclarecimento (clarify). Não escolha os períodos sozinho."
 
@@ -140,9 +290,21 @@ examples:
     sql: "SELECT classe, count(*) AS total FROM sem_uc GROUP BY classe ORDER BY classe"
     expected_status: ok
   - question: "Qual foi a receita faturada em março de 2025?"
-    sql: "SELECT sum(receita_faturada) AS receita FROM sem_faturamento_mensal WHERE competencia = '2025-03'"
+    sql: "SELECT receita_faturada FROM sem_kpis_mensais WHERE competencia = '2025-03'"
     expected_status: ok
   - question: "Quantos chamados do call center foram abertos em março de 2025?"
+    sql: "SELECT n_chamados FROM sem_kpis_mensais WHERE competencia = '2025-03'"
+    expected_status: ok
+  - question: "Qual foi o DEC de cada município no primeiro trimestre de 2025?"
+    sql: "SELECT municipio, sum(horas_interrompidas) / NULLIF(sum(n_uc) / 3.0, 0) AS dec FROM sem_kpis_segmento_mensal WHERE competencia BETWEEN '2025-01' AND '2025-03' GROUP BY municipio ORDER BY dec DESC"
+    expected_status: ok
+  - question: "Quanto da variação da receita entre 2024-01/2024-12 e 2025-01/2025-12 veio do efeito preço?"
+    sql: "SELECT sum(efeito_preco) AS efeito_preco, sum(receita_atual - receita_base) AS variacao FROM sem_receita_decomposicao WHERE periodo_base = '2024-01/2024-12' AND periodo_atual = '2025-01/2025-12'"
+    expected_status: ok
+  - question: "Por que a receita caiu?"
+    sql: null
+    expected_status: clarify
+  - question: "Quais UCs são as mais suspeitas de fraude?"
     sql: null
     expected_status: unknown
   - question: "Qual foi a venda do mês?"

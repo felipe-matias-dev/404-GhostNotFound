@@ -1,11 +1,16 @@
 import asyncio
 from decimal import Decimal
 
+import yaml
+
 from venergy_agent.domain.errors import ErrorKind, QueryExecutionError
 from venergy_agent.infrastructure.postgres_executor import PostgresQueryExecutor
 from venergy_agent.infrastructure.sql_validator import SqlglotValidator
+from venergy_agent.infrastructure.views_sql import LAYER_PATH
 
-ALLOWED = frozenset({"sem_uc", "sem_faturamento_mensal", "sem_continuidade_alimentador_mensal"})
+ALLOWED = frozenset(
+    view["name"] for view in yaml.safe_load(LAYER_PATH.read_text(encoding="utf-8"))["views"]
+)
 
 
 def run(agent_database_url, sql):
@@ -35,13 +40,13 @@ def test_join_between_views_returns_the_fact_rows_of_the_uc(agent_database_url, 
     )
 
 
-def test_column_marked_a_confirmar_is_not_visible_to_the_agent(agent_database_url, gold_views):
+def test_sensitive_column_is_not_visible_to_the_agent(agent_database_url, gold_views):
     try:
-        run(agent_database_url, "SELECT cod_cliente FROM sem_uc")
+        run(agent_database_url, "SELECT documento_mascarado FROM sem_uc")
     except QueryExecutionError as error:
         assert error.kind is ErrorKind.UNKNOWN_OBJECT
     else:
-        raise AssertionError("cod_cliente não deveria estar na view do agente")
+        raise AssertionError("documento_mascarado não deveria estar na view do agente")
 
 
 def test_views_are_created_by_the_owner_and_readable_by_the_agent(agent_database_url, gold_views):
@@ -50,3 +55,30 @@ def test_views_are_created_by_the_owner_and_readable_by_the_agent(agent_database
     )
 
     assert result.rows == ({"total": 3},)
+
+
+def test_segment_dec_divides_summed_hours_by_the_average_over_the_months_asked(
+    agent_database_url, gold_views
+):
+    result = run(
+        agent_database_url,
+        "SELECT municipio, sum(horas_interrompidas) / "
+        "NULLIF(sum(n_uc) / 3.0, 0) AS dec, "
+        "sum(soma_notas) / NULLIF(sum(n_notas), 0) AS satisfacao "
+        "FROM sem_kpis_segmento_mensal WHERE competencia BETWEEN '2025-01' AND '2025-03' "
+        "GROUP BY municipio",
+    )
+
+    assert result.rows[0]["dec"] == 0.6
+    assert round(result.rows[0]["satisfacao"], 4) == 3.8333
+
+
+def test_decomposition_effects_add_up_to_the_revenue_change(agent_database_url, gold_views):
+    result = run(
+        agent_database_url,
+        "SELECT sum(efeito_preco + efeito_volume + efeito_mix) AS efeitos, "
+        "sum(receita_atual - receita_base) AS variacao FROM sem_receita_decomposicao "
+        "WHERE periodo_base = '2024-01/2024-12' AND periodo_atual = '2025-01/2025-12'",
+    )
+
+    assert result.rows == ({"efeitos": Decimal("20.00"), "variacao": Decimal("20.00")},)
