@@ -25,6 +25,7 @@ from venergy_api.models import (
     KpisMensais,
     KpisSegmentoMensal,
     ReceitaDecomposicao,
+    ReconciliacaoFaturamento,
 )
 from venergy_api.schemas import (
     ContinuidadeAlimentadorMensalSchema,
@@ -34,6 +35,7 @@ from venergy_api.schemas import (
     KpisMensaisSchema,
     KpisSegmentoMensalSchema,
     ReceitaDecomposicaoSchema,
+    ReconciliacaoFaturamentoSchema,
 )
 
 FIELDS = list(DimUcSchema.model_fields)
@@ -443,6 +445,53 @@ def _kpis_segmento(
     return tuple(rows)
 
 
+# Faturas de UCs fora do cadastro, em todo mês: valores inventados, para a parcela de órfãs
+# da reconciliação não ficar zerada.
+_FATURAS_ORFAS = (Decimal("187.40"), Decimal("92.15"))
+
+
+def _correcao_kwh(faturas: list[FaturamentoMensalSchema], origem: str) -> Decimal:
+    """Quanto a regra de uma origem somou ao consumo bruto da leitura."""
+    return sum(
+        (
+            fatura.kwh_faturado - fatura.kwh_leitura
+            for fatura in faturas
+            if fatura.origem_kwh == origem
+        ),
+        Decimal(0),
+    )
+
+
+def _reconciliacao(
+    faturamento: tuple[FaturamentoMensalSchema, ...],
+) -> tuple[ReconciliacaoFaturamentoSchema, ...]:
+    # O cadastro é a soma do fato por UC; as órfãs entram só aqui, porque não têm UC para
+    # ligar. As correções de energia vêm da regra que gerou cada kwh_faturado (origem_kwh).
+    rows = []
+    for competencia in COMPETENCIAS:
+        do_mes = [linha for linha in faturamento if linha.competencia == competencia]
+        cadastro = sum((linha.receita_faturada for linha in do_mes), Decimal(0))
+        orfas = sum(_FATURAS_ORFAS, Decimal(0))
+        rows.append(
+            ReconciliacaoFaturamentoSchema(
+                competencia=competencia,
+                receita_faturada_total=cadastro + orfas,
+                receita_faturada_orfas=orfas,
+                receita_faturada_cadastro=cadastro,
+                tributos_cadastro=sum((linha.tributos for linha in do_mes), Decimal(0)),
+                receita_energia_cadastro=sum(
+                    (linha.receita_energia for linha in do_mes), Decimal(0)
+                ),
+                n_faturas_orfas=len(_FATURAS_ORFAS),
+                kwh_leitura_total=sum((linha.kwh_leitura for linha in do_mes), Decimal(0)),
+                kwh_correcao_troca_medidor=_correcao_kwh(do_mes, "leitura_atual_troca_medidor"),
+                kwh_correcao_sinal_invertido=_correcao_kwh(do_mes, "consumo_absoluto"),
+                kwh_faturado_total=sum((linha.kwh_faturado for linha in do_mes), Decimal(0)),
+            )
+        )
+    return tuple(rows)
+
+
 def _decomposicao(
     faturamento: tuple[FaturamentoMensalSchema, ...],
 ) -> tuple[ReceitaDecomposicaoSchema, ...]:
@@ -522,6 +571,7 @@ SAMPLE_FATURAMENTO = _faturamento()
 SAMPLE_CONTINUIDADE = _continuidade()
 SAMPLE_KPIS = _kpis(SAMPLE_FATURAMENTO, SAMPLE_CONTINUIDADE)
 SAMPLE_KPIS_SEGMENTO = _kpis_segmento(SAMPLE_FATURAMENTO)
+SAMPLE_RECONCILIACAO = _reconciliacao(SAMPLE_FATURAMENTO)
 SAMPLE_DECOMPOSICAO = _decomposicao(SAMPLE_FATURAMENTO)
 
 # Linhas por tabela da Gold. A carga exige um CSV para cada tabela de GOLD_TABLES, e o
@@ -532,6 +582,7 @@ SAMPLE: dict[type[Base], tuple[BaseModel, ...]] = {
     ReceitaDecomposicao: SAMPLE_DECOMPOSICAO,
     KpisMensais: SAMPLE_KPIS,
     KpisSegmentoMensal: SAMPLE_KPIS_SEGMENTO,
+    ReconciliacaoFaturamento: SAMPLE_RECONCILIACAO,
     ContinuidadeAlimentadorMensal: SAMPLE_CONTINUIDADE,
     FilaSuspeita: SAMPLE_FILA,
 }

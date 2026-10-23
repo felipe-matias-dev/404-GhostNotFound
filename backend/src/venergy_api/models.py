@@ -155,6 +155,28 @@ class KpisSegmentoMensal(Base):
     n_notas: Mapped[int]
 
 
+class ReconciliacaoFaturamento(Base):
+    """Ponte do faturamento e da energia, do número bruto até o usado nos indicadores."""
+
+    __tablename__ = "gold_reconciliacao_faturamento"
+    __table_args__ = {"schema": "gold"}
+
+    competencia: Mapped[str] = mapped_column(primary_key=True)
+    # Receita: total = cadastro + órfãs, e cadastro = energia + tributos. As faturas de UCs
+    # fora do cadastro ficam fora do fato por UC, mas nunca somem: aparecem aqui (DEC-023).
+    receita_faturada_total: Mapped[Decimal] = mapped_column(_MONEY)
+    receita_faturada_orfas: Mapped[Decimal] = mapped_column(_MONEY)
+    receita_faturada_cadastro: Mapped[Decimal] = mapped_column(_MONEY)
+    tributos_cadastro: Mapped[Decimal] = mapped_column(_MONEY)
+    receita_energia_cadastro: Mapped[Decimal] = mapped_column(_MONEY)
+    n_faturas_orfas: Mapped[int]
+    # Energia: faturada = leitura bruta + correção da troca de medidor + do sinal invertido.
+    kwh_leitura_total: Mapped[Decimal] = mapped_column(_ENERGY)
+    kwh_correcao_troca_medidor: Mapped[Decimal] = mapped_column(_ENERGY)
+    kwh_correcao_sinal_invertido: Mapped[Decimal] = mapped_column(_ENERGY)
+    kwh_faturado_total: Mapped[Decimal] = mapped_column(_ENERGY)
+
+
 class ContinuidadeAlimentadorMensal(Base):
     """DEC e FEC por alimentador e competência: a tela de continuidade e o ranking."""
 

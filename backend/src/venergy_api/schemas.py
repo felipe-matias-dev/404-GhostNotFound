@@ -230,6 +230,22 @@ class KpisSegmentoMensalSchema(BaseModel):
     n_notas: int
 
 
+class ReconciliacaoFaturamentoSchema(BaseModel):
+    """De onde vem a receita e a energia de uma competência, parcela por parcela."""
+
+    competencia: Competencia
+    receita_faturada_total: ExactNumber
+    receita_faturada_orfas: ExactNumber
+    receita_faturada_cadastro: ExactNumber
+    tributos_cadastro: ExactNumber
+    receita_energia_cadastro: ExactNumber
+    n_faturas_orfas: int
+    kwh_leitura_total: ExactNumber
+    kwh_correcao_troca_medidor: ExactNumber
+    kwh_correcao_sinal_invertido: ExactNumber
+    kwh_faturado_total: ExactNumber
+
+
 class ContinuidadeAlimentadorMensalSchema(BaseModel):
     """DEC e FEC de um alimentador numa competência."""
 

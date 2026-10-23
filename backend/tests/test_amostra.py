@@ -14,6 +14,7 @@ from venergy_api.models import (
     KpisMensais,
     KpisSegmentoMensal,
     ReceitaDecomposicao,
+    ReconciliacaoFaturamento,
 )
 
 
@@ -135,6 +136,51 @@ def test_segment_kpis_add_up_to_the_company_and_the_feeders(tmp_path: Path, engi
         assert abs(linha.receita_faturada - linha.receita_energia - linha.tributos) <= Decimal(
             "0.01"
         )
+
+
+def test_reconciliation_bridges_every_invoice_to_the_billing(
+    tmp_path: Path, engine: Engine
+) -> None:
+    # Os quatro checks da gold_reconciliacao_faturamento no contrato: a ponte de cada mês
+    # fecha e bate com a soma do fato por UC.
+    write_sample(tmp_path / "gold", force=False)
+    load_gold(tmp_path / "gold", engine)
+    fato = FatoFaturamentoMensal
+
+    with Session(engine) as session:
+        pontes = session.scalars(select(ReconciliacaoFaturamento)).all()
+        somas_do_fato = {
+            competencia: (faturada, energia, tributos, kwh)
+            for competencia, faturada, energia, tributos, kwh in session.execute(
+                select(
+                    fato.competencia,
+                    func.sum(fato.receita_faturada),
+                    func.sum(fato.receita_energia),
+                    func.sum(fato.tributos),
+                    func.sum(fato.kwh_faturado),
+                ).group_by(fato.competencia)
+            )
+        }
+
+    centavo, um_wh = Decimal("0.01"), Decimal("0.001")
+    assert len(pontes) == len(somas_do_fato)
+    for ponte in pontes:
+        receita = ponte.receita_faturada_cadastro + ponte.receita_faturada_orfas
+        assert abs(ponte.receita_faturada_total - receita) <= centavo
+        cadastro = ponte.receita_energia_cadastro + ponte.tributos_cadastro
+        assert abs(ponte.receita_faturada_cadastro - cadastro) <= centavo
+        correcoes = ponte.kwh_correcao_troca_medidor + ponte.kwh_correcao_sinal_invertido
+        assert abs(ponte.kwh_faturado_total - ponte.kwh_leitura_total - correcoes) <= um_wh
+        assert somas_do_fato[ponte.competencia] == (
+            ponte.receita_faturada_cadastro,
+            ponte.receita_energia_cadastro,
+            ponte.tributos_cadastro,
+            ponte.kwh_faturado_total,
+        )
+    # A amostra tem faturas órfãs e as duas correções de leitura para mostrar.
+    assert all(ponte.n_faturas_orfas > 0 for ponte in pontes)
+    assert any(ponte.kwh_correcao_troca_medidor > 0 for ponte in pontes)
+    assert any(ponte.kwh_correcao_sinal_invertido > 0 for ponte in pontes)
 
 
 def test_kpis_match_the_sum_of_the_billing_in_the_database(tmp_path: Path, engine: Engine) -> None:

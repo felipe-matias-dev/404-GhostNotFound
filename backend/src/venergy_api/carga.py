@@ -25,6 +25,7 @@ from venergy_api.models import (
     KpisMensais,
     KpisSegmentoMensal,
     ReceitaDecomposicao,
+    ReconciliacaoFaturamento,
 )
 from venergy_api.schemas import (
     ContinuidadeAlimentadorMensalSchema,
@@ -34,6 +35,7 @@ from venergy_api.schemas import (
     KpisMensaisSchema,
     KpisSegmentoMensalSchema,
     ReceitaDecomposicaoSchema,
+    ReconciliacaoFaturamentoSchema,
 )
 
 # conventions.delivery.array_separator do contrato da Gold.
@@ -61,6 +63,7 @@ GOLD_TABLES = (
     GoldTable(model=ReceitaDecomposicao, schema=ReceitaDecomposicaoSchema),
     GoldTable(model=KpisMensais, schema=KpisMensaisSchema),
     GoldTable(model=KpisSegmentoMensal, schema=KpisSegmentoMensalSchema),
+    GoldTable(model=ReconciliacaoFaturamento, schema=ReconciliacaoFaturamentoSchema),
     GoldTable(model=ContinuidadeAlimentadorMensal, schema=ContinuidadeAlimentadorMensalSchema),
     GoldTable(model=FilaSuspeita, schema=FilaSuspeitaSchema),
 )
