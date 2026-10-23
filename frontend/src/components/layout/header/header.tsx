@@ -32,13 +32,15 @@ export function Header({
 			{titulo && (
 				<motion.h1
 					layout="position"
-					className="shrink-0 truncate font-medium text-body text-text group-has-[[data-slot=breadcrumb]]/header:text-text-muted"
+					className="min-w-0 truncate font-medium text-body text-text group-has-[[data-slot=breadcrumb]]/header:text-text-muted"
 				>
 					{titulo}
 				</motion.h1>
 			)}
-			{trilhaRef && <div ref={trilhaRef} className="flex min-w-0" />}
-			{acoes && <div className="ml-auto flex items-center gap-1">{acoes}</div>}
+			{trilhaRef && <div ref={trilhaRef} className="flex min-w-0 shrink-[3]" />}
+			{acoes && (
+				<div className="ml-auto flex shrink-0 items-center gap-1">{acoes}</div>
+			)}
 		</header>
 	);
 }
