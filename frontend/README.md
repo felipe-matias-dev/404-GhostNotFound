@@ -138,6 +138,8 @@ export const Route = createFileRoute("/perdas")({
 
 Tela nova na navegação: crie a rota e adicione o item em `NAVEGACAO` (`components/layout/app-sidebar/navegacao.ts`), com o ícone de **Fundamentos/Ícones**. O título do header e o item ativo da sidebar vêm de `useItemAtivo`; rotas filhas que existem (`/uc/$id`) herdam a seção. O conteúdo da página vai dentro de `Pagina` (`components/layout/pagina`), que fixa largura e respiro.
 
+Recorte da tela no topo (ex.: `Receita › Recife ▾ › Boa Viagem ▾`): a página renderiza `<HeaderTrilha>` (`components/layout/header`) com um `Breadcrumb`, e o conteúdo aparece no header logo depois do título, que vira link para a seção sem recorte. Na Receita, cada nível é um `DropdownMenu` para trocar de município ou bairro: é a forma acessível de escolher o que o mapa também escolhe.
+
 ### Features previstas
 
 `visaoGeral` (KPIs), `receita` (preço × volume), `unidadeConsumidora` (visão 360), `perdas` (fila e ordens de inspeção), `operacao` (DEC/FEC), `agente` (chat e insights de IA), `auth` (perfis, quando entrar).

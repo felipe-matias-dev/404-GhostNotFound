@@ -1,8 +1,16 @@
-import { SidebarIcon } from "@phosphor-icons/react";
+import { CaretDownIcon, SidebarIcon } from "@phosphor-icons/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { useState } from "react";
+import {
+	Breadcrumb,
+	BreadcrumbItem,
+	BreadcrumbList,
+	BreadcrumbSeparator,
+} from "#/components/ui/breadcrumb";
 import { Button } from "#/components/ui/button";
 import { ThemeToggle } from "#/components/ui/theme-toggle";
 import { Header } from "./header";
+import { HeaderTrilha, HeaderTrilhaContext } from "./header-trilha";
 
 const meta = {
 	title: "Layout/Header",
@@ -40,3 +48,31 @@ export const TituloLongo: Story = {
 };
 
 export const SemTitulo: Story = { args: { titulo: undefined } };
+
+// A página preenche a trilha com `HeaderTrilha`; o título passa a ser o primeiro nível.
+export const ComTrilha: Story = {
+	render: function Render(args) {
+		const [slot, setSlot] = useState<HTMLDivElement | null>(null);
+		return (
+			<HeaderTrilhaContext value={slot}>
+				<Header {...args} trilhaRef={setSlot} />
+				<HeaderTrilha>
+					<Breadcrumb aria-label="Recorte">
+						<BreadcrumbList className="gap-0.5">
+							<BreadcrumbSeparator className="mx-0.5" />
+							<BreadcrumbItem>
+								<Button variant="ghost" size="sm" className="h-7 px-1.5">
+									Recife
+									<CaretDownIcon
+										aria-hidden
+										className="size-3 text-text-muted"
+									/>
+								</Button>
+							</BreadcrumbItem>
+						</BreadcrumbList>
+					</Breadcrumb>
+				</HeaderTrilha>
+			</HeaderTrilhaContext>
+		);
+	},
+};
