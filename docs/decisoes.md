@@ -670,16 +670,11 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Consequência:** `sem_faturamento_mensal` liga a `sem_uc` por `cod_uc`, e `sem_uc` liga a `sem_continuidade_alimentador_mensal` por `cod_alimentador`.
 - **Decomposição (23/10/2026):** `sem_receita_decomposicao` entra sem relação com outras views. A junção composta com `gold_dim_uc` (município, bairro, classe e GD) continua `a_confirmar` no contrato e repetiria cada efeito uma vez por UC do recorte. As perguntas de recorte se respondem filtrando a própria view.
 
-## DEC-020 · Contrato `AgentAnswer` com status
+## DEC-020 · Contrato `AgentAnswer` com status (aceita)
 
-- **Data:** 22/10/2026 · **Área:** GenAI e Backend (V1) · **Autor:** Lucas · **Atualizada:** 23/10/2026, Luis Felipe
-- **Status:** aceita pelo V1 (Felipe) na revisão do PR #21, mesclado junto com o PR #20.
+- **Data:** 22/10/2026 · **Área:** GenAI e Backend (V1) · **Autor:** Lucas
+- **Status:** aceita pelo V1 (revisão do PR #21, com as respostas abaixo). Mesclada com o PR #21; as invariantes de texto em branco e de `truncated` entraram pelo PR #29.
 - **Decisão:** o `AgentAnswer` ganha `status` (`answered`, `unknown`, `clarify`, `refused`, `failed`), `truncated`, `refused_reason`, `model` e `latency_ms`. Nenhum campo existente é removido. As invariantes por status estão na spec §4 e têm teste no código.
 - **Motivo:** o backend vai expor `POST /ai/ask` e `GET /ai/audit/{id}` (spec §10, D3). Sem `status`, o portal não distingue resposta, "não sei", pedido de esclarecimento e falha técnica, e a auditoria não guarda o modelo que respondeu nem a latência (G1-06). A spec (§4) manda combinar mudanças desse contrato com o V1 antes de implementar.
-- **Consequência:** a spec §4 e o `answer.py` são a referência do contrato.
-- **Respostas do V1 às questões em aberto (PR #21):**
-  1. Os status ficam em inglês; o portal traduz, como já faz com `Confidence`.
-  2. O último SQL gerado vai na resposta de `failed`, para a auditoria. Em `refused` não chega a existir SQL.
-  3. `refused_reason` e `answer` podem repetir o mesmo texto fixo; o portal escolhe qual mostrar.
-  4. O agente mede o `ask()` em `latency_ms`; o backend mede a requisição separado, e os dois vão para a auditoria.
-  5. O backend tem um schema próprio para a resposta do `POST /ai/ask`. Campo novo é versão minor da API; campo removido ou renomeado é combinado antes.
+- **Consequência:** a spec §4 e o `answer.py` são a referência. Regras que o V1 não discutiu diretamente, mas que decorrem do contrato e foram pedidas na revisão do PR #21 (PR #29): `row_count >= 0`; texto em branco recusado em todo campo de texto; `truncated` exige linhas.
+- **Respondido pelo V1 (PR #21):** (1) status em inglês, e o portal traduz; (2) sim, o último SQL vai em `failed`, para auditoria; (3) `refused_reason` e `answer` podem repetir o texto; (4) o agente mede a latência do `ask()` e o backend mede a requisição, e os dois vão para a auditoria; (5) campo novo é mudança menor da API; campo removido ou renomeado precisa ser combinado antes.
