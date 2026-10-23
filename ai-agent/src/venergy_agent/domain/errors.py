@@ -6,6 +6,7 @@ class ErrorKind(StrEnum):
     UNKNOWN_OBJECT = "unknown_object"
     TYPE_MISMATCH = "type_mismatch"
     TIMEOUT = "timeout"
+    REJECTED = "rejected"
 
 
 class SqlRejected(Exception):

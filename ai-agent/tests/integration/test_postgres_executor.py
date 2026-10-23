@@ -92,3 +92,17 @@ async def test_permission_errors_are_not_classified(executor, owner):
             await executor.execute(query("SELECT id FROM app.ordem_executor_probe"))
     finally:
         owner.execute("DROP TABLE app.ordem_executor_probe")
+
+
+@pytest.mark.usefixtures("probe_view")
+async def test_duplicate_column_names_are_a_correctable_error_not_silent_data_loss(executor):
+    query = ValidatedQuery(
+        sql="SELECT a.kwh, b.kwh FROM gold.sem_executor_probe a JOIN gold.sem_executor_probe b "
+        "ON a.cod_uc = b.cod_uc",
+        views=frozenset({"sem_executor_probe"}),
+        applied_limit=200,
+        limit_imposed=False,
+    )
+
+    with pytest.raises(QueryExecutionError, match="mesmo nome"):
+        await executor.execute(query)

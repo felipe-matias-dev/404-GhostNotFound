@@ -36,6 +36,11 @@ class PostgresQueryExecutor:
                 rows = tuple(await cursor.fetchall())
                 columns = tuple(column.name for column in cursor.description)
                 await connection.rollback()
+                if len(set(columns)) != len(columns):
+                    raise QueryExecutionError(
+                        ErrorKind.SYNTAX,
+                        "duas colunas têm o mesmo nome; dê nomes distintos com AS",
+                    )
             except psycopg.Error as error:
                 kind = SQLSTATE_KINDS.get(error.sqlstate or "")
                 if kind is None:

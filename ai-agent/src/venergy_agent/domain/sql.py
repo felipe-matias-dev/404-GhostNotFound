@@ -1,7 +1,7 @@
 from enum import StrEnum
 from typing import Self
 
-from pydantic import BaseModel, ConfigDict, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from venergy_agent.domain.errors import ErrorKind
 
@@ -35,6 +35,15 @@ class SqlDraft(BaseModel):
         if self.status is not DraftStatus.OK and self.sql is not None:
             raise ValueError("sql is only allowed with status ok")
         return self
+
+
+class Generation(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    draft: SqlDraft
+    model: str
+    input_tokens: int = Field(ge=0)
+    output_tokens: int = Field(ge=0)
 
 
 class AttemptFeedback(BaseModel):
