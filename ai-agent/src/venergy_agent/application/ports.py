@@ -4,7 +4,13 @@ from typing import Protocol
 from venergy_agent.domain.answer import AgentAnswer, Insight
 from venergy_agent.domain.question import Question
 from venergy_agent.domain.semantic import SemanticLayer
-from venergy_agent.domain.sql import AttemptFeedback, QueryResult, SqlDraft, ValidatedQuery
+from venergy_agent.domain.sql import (
+    AttemptFeedback,
+    Generation,
+    QueryResult,
+    SqlDraft,
+    ValidatedQuery,
+)
 
 
 class TextToSqlAgent(Protocol):
@@ -18,7 +24,7 @@ class SemanticLayerSource(Protocol):
 class SqlGenerator(Protocol):
     async def generate(
         self, question: Question, layer: SemanticLayer, feedback: AttemptFeedback | None
-    ) -> SqlDraft: ...
+    ) -> Generation: ...
 
 
 class SqlValidator(Protocol):

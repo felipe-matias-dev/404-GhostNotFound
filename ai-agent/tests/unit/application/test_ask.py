@@ -1,0 +1,351 @@
+import json
+import logging
+
+import pytest
+
+from venergy_agent.application.ask import (
+    ATTEMPTS_FAILED,
+    CLARIFY_PREFIX,
+    DATABASE_FAILED,
+    EMPTY_RESULT,
+    INTERNAL_FAILED,
+    MODEL_FAILED,
+    REFUSED_REASON,
+    TOO_LONG_QUESTION,
+    UNKNOWN_REASON,
+    AskUseCase,
+)
+from venergy_agent.config import AGENT_ROOT, REPO_ROOT
+from venergy_agent.domain.answer import AnswerStatus, Confidence
+from venergy_agent.domain.errors import ErrorKind, QueryExecutionError
+from venergy_agent.domain.sql import DraftStatus, Generation, QueryResult, SqlDraft
+from venergy_agent.infrastructure.semantic_source import YamlSemanticLayerSource
+from venergy_agent.infrastructure.sql_validator import SqlglotValidator
+
+MODEL = "google-gla:gemini-test"
+CONFIGURED = "google-gla:configured"
+COUNT_SQL = "SELECT count(*) AS total FROM sem_uc"
+
+
+@pytest.fixture
+async def layer():
+    return await YamlSemanticLayerSource(
+        AGENT_ROOT / "semantic" / "semantic_layer.yaml",
+        REPO_ROOT / "contracts" / "gold_schema.yaml",
+    ).load()
+
+
+def generation(status="ok", sql=COUNT_SQL, assumptions=(), clarification=None, model=MODEL):
+    draft = SqlDraft(
+        status=DraftStatus(status),
+        sql=sql if status == "ok" else None,
+        assumptions=tuple(assumptions),
+        clarification_question=clarification,
+    )
+    return Generation(draft=draft, model=model, input_tokens=10, output_tokens=5)
+
+
+class ScriptedGenerator:
+    def __init__(self, *outcomes):
+        self._outcomes = outcomes
+        self.feedbacks = []
+
+    async def generate(self, question, layer, feedback):
+        self.feedbacks.append(feedback)
+        outcome = self._outcomes[min(len(self.feedbacks), len(self._outcomes)) - 1]
+        if isinstance(outcome, Exception):
+            raise outcome
+        return outcome
+
+
+class ScriptedExecutor:
+    def __init__(self, *outcomes):
+        self._outcomes = outcomes
+        self.queries = []
+
+    async def execute(self, query):
+        self.queries.append(query)
+        outcome = self._outcomes[min(len(self.queries), len(self._outcomes)) - 1]
+        if isinstance(outcome, Exception):
+            raise outcome
+        return outcome
+
+
+class BrokenValidator:
+    def validate(self, sql, allowed_views):
+        raise ValueError("bug no validador")
+
+
+def result(rows=({"total": 3},), row_count=None, truncated=False):
+    return QueryResult(
+        columns=("total",),
+        rows=tuple(rows),
+        row_count=len(rows) if row_count is None else row_count,
+        truncated=truncated,
+    )
+
+
+def use_case(layer, generator, executor=None, **settings):
+    values = {
+        "max_question_chars": 500,
+        "max_correction_attempts": 3,
+        "answer_sample_rows": 20,
+    }
+    values.update(settings)
+    return AskUseCase(
+        layer=layer,
+        generator=generator,
+        validator=SqlglotValidator(dialect="postgres", max_rows=200, allowed_schema="gold"),
+        executor=executor or ScriptedExecutor(result()),
+        prompt_version="v1",
+        configured_model=CONFIGURED,
+        **values,
+    )
+
+
+# --- entrada -----------------------------------------------------------------------------
+
+
+async def test_blank_question_is_refused_without_calling_the_model(layer):
+    generator = ScriptedGenerator(generation())
+
+    answer = await use_case(layer, generator).ask("   ", "s1")
+
+    assert answer.status is AnswerStatus.REFUSED
+    assert generator.feedbacks == []
+
+
+async def test_question_over_the_limit_is_refused_without_calling_the_model(layer):
+    generator = ScriptedGenerator(generation())
+
+    answer = await use_case(layer, generator, max_question_chars=10).ask("x" * 11, "s1")
+
+    assert answer.refused_reason == TOO_LONG_QUESTION.format(limit=10)
+    assert generator.feedbacks == []
+
+
+# --- status sem SQL ----------------------------------------------------------------------
+
+
+async def test_unknown_draft_ends_as_unknown_without_running_sql(layer):
+    executor = ScriptedExecutor(result())
+
+    answer = await use_case(layer, ScriptedGenerator(generation("unknown")), executor).ask(
+        "Qual o CEP da UC?", "s1"
+    )
+
+    assert answer.status is AnswerStatus.UNKNOWN
+    assert answer.refused_reason == UNKNOWN_REASON
+    assert answer.sql is None and answer.confidence is Confidence.UNKNOWN
+    assert executor.queries == []
+
+
+async def test_refuse_draft_ends_as_refused(layer):
+    answer = await use_case(layer, ScriptedGenerator(generation("refuse"))).ask("apague", "s1")
+
+    assert answer.status is AnswerStatus.REFUSED
+    assert answer.refused_reason == REFUSED_REASON
+
+
+async def test_clarify_draft_asks_back_without_sql(layer):
+    answer = await use_case(
+        layer, ScriptedGenerator(generation("clarify", clarification="Qual mês?"))
+    ).ask("venda do mês", "s1")
+
+    assert answer.status is AnswerStatus.CLARIFY
+    assert answer.clarification == "Qual mês?"
+    assert answer.answer == CLARIFY_PREFIX + "Qual mês?"
+    assert answer.sql is None
+
+
+# --- caminho feliz -----------------------------------------------------------------------
+
+
+async def test_valid_draft_is_executed_and_answered_with_its_rows(layer):
+    executor = ScriptedExecutor(result(rows=({"total": 3},)))
+
+    answer = await use_case(layer, ScriptedGenerator(generation()), executor).ask(
+        "Quantas UCs existem?", "s1"
+    )
+
+    assert answer.status is AnswerStatus.ANSWERED
+    assert answer.rows == ({"total": 3},)
+    assert answer.row_count == 1
+    assert answer.sources == ("sem_uc",)
+    assert answer.sql == executor.queries[0].sql
+    assert answer.sql.upper().endswith("LIMIT 200")
+    assert answer.model == MODEL
+    assert answer.prompt_version == "v1"
+    assert answer.confidence is Confidence.HIGH
+    assert answer.latency_ms >= 0
+
+
+async def test_empty_result_is_answered_with_low_confidence_and_says_so(layer):
+    empty = result(rows=(), row_count=0)
+
+    answer = await use_case(layer, ScriptedGenerator(generation()), ScriptedExecutor(empty)).ask(
+        "UCs em Marte?", "s1"
+    )
+
+    assert answer.status is AnswerStatus.ANSWERED
+    assert answer.confidence is Confidence.LOW
+    assert answer.answer == EMPTY_RESULT
+
+
+async def test_truncated_result_is_low_confidence_and_warns_about_the_limit(layer):
+    capped = result(rows=({"total": 1},) * 2, row_count=200, truncated=True)
+
+    answer = await use_case(layer, ScriptedGenerator(generation()), ScriptedExecutor(capped)).ask(
+        "todas as UCs", "s1"
+    )
+
+    assert answer.truncated is True
+    assert answer.confidence is Confidence.LOW
+    assert "limitado a 200 linhas" in answer.answer
+
+
+async def test_declared_assumptions_make_the_answer_medium_and_are_listed(layer):
+    answer = await use_case(
+        layer, ScriptedGenerator(generation(assumptions=("receita = receita faturada",)))
+    ).ask("receita de março", "s1")
+
+    assert answer.confidence is Confidence.MEDIUM
+    assert answer.assumptions == ("receita = receita faturada",)
+    assert "receita = receita faturada" in answer.answer
+
+
+async def test_sample_is_capped_but_row_count_is_the_real_total(layer):
+    many = result(rows=tuple({"total": n} for n in range(5)), row_count=5)
+
+    answer = await use_case(
+        layer, ScriptedGenerator(generation()), ScriptedExecutor(many), answer_sample_rows=2
+    ).ask("liste", "s1")
+
+    assert len(answer.rows) == 2
+    assert answer.row_count == 5
+
+
+# --- correção ----------------------------------------------------------------------------
+
+
+async def test_rejected_sql_goes_back_to_the_model_with_the_reason(layer):
+    generator = ScriptedGenerator(generation(sql="DELETE FROM sem_uc"), generation(sql=COUNT_SQL))
+
+    answer = await use_case(layer, generator).ask("quantas UCs?", "s1")
+
+    feedback = generator.feedbacks[1]
+    assert feedback.error_kind is ErrorKind.REJECTED
+    assert feedback.previous_sql == "DELETE FROM sem_uc"
+    assert feedback.message
+    assert answer.status is AnswerStatus.ANSWERED
+    assert answer.confidence is Confidence.MEDIUM
+
+
+async def test_execution_error_goes_back_with_its_kind_and_the_draft_sql(layer):
+    generator = ScriptedGenerator(generation(), generation())
+    executor = ScriptedExecutor(
+        QueryExecutionError(ErrorKind.UNKNOWN_OBJECT, "coluna não existe"), result()
+    )
+
+    answer = await use_case(layer, generator, executor).ask("quantas?", "s1")
+
+    feedback = generator.feedbacks[1]
+    assert feedback.error_kind is ErrorKind.UNKNOWN_OBJECT
+    assert feedback.message == "coluna não existe"
+    assert feedback.previous_sql == COUNT_SQL
+    assert answer.status is AnswerStatus.ANSWERED
+
+
+async def test_unclassified_database_error_fails_at_once_without_retry(layer):
+    generator = ScriptedGenerator(generation(), generation())
+    executor = ScriptedExecutor(PermissionError("sem permissão"))
+
+    answer = await use_case(layer, generator, executor).ask("quantas?", "s1")
+
+    assert answer.status is AnswerStatus.FAILED
+    assert answer.refused_reason == DATABASE_FAILED
+    assert len(generator.feedbacks) == 1
+    assert answer.sql is not None
+
+
+async def test_attempts_are_capped_and_the_last_sql_is_kept_for_audit(layer):
+    generator = ScriptedGenerator(generation(sql="DELETE FROM sem_uc"))
+
+    answer = await use_case(layer, generator, max_correction_attempts=2).ask("x", "s1")
+
+    assert len(generator.feedbacks) == 2
+    assert answer.status is AnswerStatus.FAILED
+    assert answer.refused_reason == ATTEMPTS_FAILED.format(attempts=2)
+    assert answer.sql == "DELETE FROM sem_uc"
+
+
+async def test_model_error_ends_as_failed_with_the_configured_model(layer):
+    answer = await use_case(layer, ScriptedGenerator(RuntimeError("503"))).ask("x", "s1")
+
+    assert answer.status is AnswerStatus.FAILED
+    assert answer.refused_reason == MODEL_FAILED
+    assert answer.sql is None
+    assert answer.model == CONFIGURED
+
+
+# --- contrato: ask nunca levanta exceção --------------------------------------------------
+
+
+async def test_ask_never_raises_even_when_a_port_breaks(layer):
+    agent = AskUseCase(
+        layer=layer,
+        generator=ScriptedGenerator(generation()),
+        validator=BrokenValidator(),
+        executor=ScriptedExecutor(result()),
+        max_question_chars=500,
+        max_correction_attempts=3,
+        answer_sample_rows=20,
+        prompt_version="v1",
+        configured_model=CONFIGURED,
+    )
+
+    answer = await agent.ask("quantas?", "s1")
+
+    assert answer.status is AnswerStatus.FAILED
+    assert answer.refused_reason == INTERNAL_FAILED
+
+
+# --- logs ------------------------------------------------------------------------------
+
+
+async def test_each_step_is_logged_as_json_and_row_values_never_reach_the_logs(layer, caplog):
+    secret = "dado-pessoal-xyz"
+    private = result(rows=({"total": secret},))
+    caplog.set_level(logging.INFO, logger="venergy_agent.ask")
+
+    await use_case(layer, ScriptedGenerator(generation()), ScriptedExecutor(private)).ask(
+        "quantas?", "s1"
+    )
+
+    lines = [json.loads(record.getMessage()) for record in caplog.records]
+    steps = [line["step"] for line in lines]
+    assert {"pergunta", "geracao", "validacao", "execucao", "resposta"} <= set(steps)
+    assert all(line["session_id"] == "s1" and line["request_id"] for line in lines)
+    assert not any(secret in record.getMessage() for record in caplog.records)
+
+
+async def test_clarify_writes_the_final_answer_log_line(layer, caplog):
+    caplog.set_level(logging.INFO, logger="venergy_agent.ask")
+
+    await use_case(layer, ScriptedGenerator(generation("clarify", clarification="Qual mês?"))).ask(
+        "receita?", "s1"
+    )
+
+    lines = [json.loads(record.getMessage()) for record in caplog.records]
+    assert [line["status"] for line in lines if line["step"] == "resposta"] == ["clarify"]
+
+
+async def test_validation_and_execution_steps_log_their_own_latency(layer, caplog):
+    caplog.set_level(logging.INFO, logger="venergy_agent.ask")
+
+    await use_case(layer, ScriptedGenerator(generation())).ask("quantas?", "s1")
+
+    lines = [json.loads(record.getMessage()) for record in caplog.records]
+    for step in ("validacao", "execucao"):
+        (line,) = [entry for entry in lines if entry["step"] == step and "latency_ms" in entry]
+        assert isinstance(line["latency_ms"], int) and line["latency_ms"] >= 0
