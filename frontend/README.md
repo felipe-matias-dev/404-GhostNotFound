@@ -134,9 +134,9 @@ export const Route = createFileRoute("/perdas")({
 
 ### Casca do app
 
-`src/routes/__root.tsx` envolve todas as rotas no `AppShell` (`components/layout/app-shell`), montado sobre a Sidebar do shadcn (`components/ui/sidebar`, variante `inset`): a navegação recolhe para ícones pelo trigger do header, pelo rail ou com Ctrl/Cmd+B; abaixo de 768px vira um `Sheet`. O header traz o título da seção (o `<h1>` da página) e o painel de conteúdo rola sozinho. Rota sem match cai em `pages/nao-encontrado.tsx`.
+`src/routes/__root.tsx` envolve todas as rotas no `AppShell` (`components/layout/app-shell`), montado sobre a Sidebar do shadcn (`components/ui/sidebar`, variante `inset`): a navegação recolhe para ícones pelo trigger, pelo rail ou com Ctrl/Cmd+B. Com a navegação aberta, o trigger fica ao lado da logo; recolhida, ele passa para o header. Abaixo de 768px a navegação vira um `Sheet` e o trigger fica sempre no header. O header traz o título da seção (o `<h1>` da página) e o painel de conteúdo rola sozinho e volta ao topo a cada tela. Rota sem match cai em `pages/nao-encontrado.tsx`, sem título no header nem item ativo na navegação.
 
-Tela nova na navegação: crie a rota e adicione o item em `NAVEGACAO` (`components/layout/app-sidebar/navegacao.ts`), com o ícone de **Fundamentos/Ícones**. O título do header vem desse item; rotas filhas (`/uc/0042`) herdam o da seção. O conteúdo da página vai dentro de `Pagina` (`components/layout/pagina`), que fixa largura e respiro.
+Tela nova na navegação: crie a rota e adicione o item em `NAVEGACAO` (`components/layout/app-sidebar/navegacao.ts`), com o ícone de **Fundamentos/Ícones**. O título do header e o item ativo da sidebar vêm de `useItemAtivo`; rotas filhas que existem (`/uc/$id`) herdam a seção. O conteúdo da página vai dentro de `Pagina` (`components/layout/pagina`), que fixa largura e respiro.
 
 ### Features previstas
 

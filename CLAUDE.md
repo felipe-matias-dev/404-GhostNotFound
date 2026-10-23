@@ -6,7 +6,7 @@ Plataforma da distribuidora V-Energy: pipeline de dados (Databricks), portal web
 
 - `data-engineering/`: notebooks Bronze, Silver e Gold e o Workflow (Databricks).
 - `backend/`: API FastAPI (`src/venergy_api`), com SQLAlchemy 2.0 e psycopg.
-- `frontend/`: React + TypeScript (Vite). Ver `frontend/AGENTS.md` e `frontend/README.md`.
+- `frontend/`: React + TypeScript (Vite). Ver `frontend/CLAUDE.md` e `frontend/README.md`.
 - `ai-agent/`: agente Text-to-SQL (`src/venergy_agent`): contratos de domínio, portas, configuração e validador SQL. Spec, plano e guia de boas práticas em `ai-agent/docs/`.
 - `infra/postgres/init/`: script que cria os schemas `gold` e `app` e o usuário somente leitura do agente.
 - `docs/`: decisões, dicionário de dados e diagnóstico da receita.
