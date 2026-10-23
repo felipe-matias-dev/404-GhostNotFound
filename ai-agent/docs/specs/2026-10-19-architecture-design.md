@@ -20,7 +20,7 @@ O agente transforma uma pergunta em português numa consulta SQL somente leitura
 - orquestração `ask()`, `bootstrap.py` e comando de terminal (PR #30, item 6);
 - golden set com 66 itens, rascunho até a revisão humana (PR #32, parte do item 7).
 
-**Em revisão:** narração com verificação numérica (item 8, branch `feat/ai-agent-narracao-v2`, DEC-019).
+**Em revisão:** narração com verificação numérica (item 8, PR #36, DEC-019).
 
 **Falta, na ordem da §11:** red team e runner de métricas (item 7), e o `InsightWriter` (item 9, branch `feat/ai-agent-insight`, que faz rebase depois do item 8).
 
