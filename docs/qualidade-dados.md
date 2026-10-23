@@ -21,8 +21,9 @@ Problemas encontrados no profiling dos arquivos da landing e a decisão de trata
 | UC-09 | `cep`, `logradouro` | Espaços sobrando no início/fim | Tratar: remover espaços |
 | UC-10 | `status` | Coluna com valor único (`ATIVA`) | Documentar; não serve como filtro |
 | UC-11 | `latitude`, `longitude` | Precisão baixa de casas decimais | Documentar; limita uso em mapa |
+| UC-12 | `cpf_cnpj` | Mesmo documento de preenchimento (não nulo) repetido num grupo de UCs; o grupo é exatamente o das UCs sem nenhum medidor | Flag `flag_documento_repetido`, mantendo a UC (descartar apagaria o cadastro). O notebook confere que o grupo coincide com as UCs sem medidor |
 
-**Sem problemas:** `municipio`, `subgrupo_tarifario` (B1, B2, B3, A4) e a coerência classe × subgrupo (Residencial = B1, Rural = B2, Comercial e Poder Público = B3, Industrial = A4).
+**Sem problemas:** `municipio`, `bairro` (uma grafia por bairro em cada município, sem nulos), `subgrupo_tarifario` (B1, B2, B3, A4) e a coerência classe × subgrupo (Residencial = B1, Rural = B2, Comercial e Poder Público = B3, Industrial = A4).
 
 **Ponto para o time:** `cpf_cnpj` e `nome_titular` são dados pessoais e não chegam à Gold (campo sensível no contrato).
 
