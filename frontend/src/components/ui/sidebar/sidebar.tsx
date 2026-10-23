@@ -26,6 +26,7 @@ import {
 	TooltipContent,
 	TooltipTrigger,
 } from "#/components/ui/tooltip";
+import { useMediaQuery } from "#/lib/use-media-query";
 import { cn } from "#/lib/utils";
 
 const SIDEBAR_WIDTH = "15rem";
@@ -56,18 +57,6 @@ function useSidebar() {
 
 const CONSULTA_MOBILE = `(max-width: ${MOBILE_BREAKPOINT - 1}px)`;
 
-function useIsMobile() {
-	return React.useSyncExternalStore(
-		(avisar) => {
-			const mql = window.matchMedia(CONSULTA_MOBILE);
-			mql.addEventListener("change", avisar);
-			return () => mql.removeEventListener("change", avisar);
-		},
-		() => window.matchMedia(CONSULTA_MOBILE).matches,
-		() => false,
-	);
-}
-
 function SidebarProvider({
 	defaultOpen = true,
 	open: openProp,
@@ -81,7 +70,7 @@ function SidebarProvider({
 	open?: boolean;
 	onOpenChange?: (open: boolean) => void;
 }) {
-	const isMobile = useIsMobile();
+	const isMobile = useMediaQuery(CONSULTA_MOBILE);
 	const [openMobile, setOpenMobile] = React.useState(false);
 
 	const [_open, _setOpen] = React.useState(defaultOpen);
