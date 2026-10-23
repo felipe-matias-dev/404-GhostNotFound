@@ -4,16 +4,18 @@ import {
 	createRootRoute,
 	createRoute,
 	createRouter,
-	RouterProvider,
+	RouterContextProvider,
 } from "@tanstack/react-router";
-import { useEffect } from "storybook/preview-api";
+import { useEffect, useMemo } from "storybook/preview-api";
 import { themes } from "storybook/theming";
 import "../src/styles.css";
 
 // Componentes com Link (sidebar, app-shell) precisam de um router. A story declara a rota
 // atual em `parameters.rota`; o splat aceita qualquer caminho sem cair no "não encontrado".
-function criarRouter(Story: () => React.ReactNode, rota: string) {
-	const raiz = createRootRoute({ component: Story });
+// O router nasce uma vez por rota e a story fica fora dele, então trocar o tema ou um control
+// não reinicia a navegação nem o estado da story.
+function criarRouter(rota: string) {
+	const raiz = createRootRoute();
 	const qualquer = createRoute({ getParentRoute: () => raiz, path: "$" });
 	return createRouter({
 		routeTree: raiz.addChildren([qualquer]),
@@ -55,8 +57,16 @@ const preview: Preview = {
 	decorators: [
 		(Story, { parameters }) => {
 			const rota = parameters.rota as string | undefined;
-			if (!rota) return <Story />;
-			return <RouterProvider router={criarRouter(Story, rota)} />;
+			const router = useMemo(
+				() => (rota ? criarRouter(rota) : undefined),
+				[rota],
+			);
+			if (!router) return <Story />;
+			return (
+				<RouterContextProvider router={router}>
+					<Story />
+				</RouterContextProvider>
+			);
 		},
 		(Story, { globals, viewMode }) => {
 			const claro = globals.tema === "claro";
