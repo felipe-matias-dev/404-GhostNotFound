@@ -51,3 +51,8 @@ def test_text_without_numbers_is_always_supported():
 
 def test_negative_value_is_supported_when_the_text_cites_its_magnitude():
     assert unsupported_numbers("O efeito mix foi uma queda de 10,5 mil", [Decimal("-10.5")]) == ()
+
+
+@pytest.mark.parametrize("text", ["As classes 1,2,3", "Meses 01,02,03"])
+def test_token_that_is_not_a_pt_br_number_is_reported_instead_of_raising(text):
+    assert unsupported_numbers(text, [1, 2, 3]) == (text.split()[-1],)
