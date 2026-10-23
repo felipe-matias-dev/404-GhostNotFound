@@ -73,9 +73,9 @@ def test_confirmed_column_types_and_allowed_values_come_from_the_contract(docume
 
 def test_column_still_marked_a_confirmar_is_not_allowed(documents):
     layer, contract = documents
-    layer["views"][0]["columns"].append({"name": "cod_cliente", "description": "titular"})
+    contract["tables"]["gold_dim_uc"]["columns"]["municipio"]["status"] = "a_confirmar"
 
-    with pytest.raises(SemanticLayerError, match="cod_cliente.*a_confirmar"):
+    with pytest.raises(SemanticLayerError, match="municipio.*a_confirmar"):
         build_layer(layer, contract)
 
 

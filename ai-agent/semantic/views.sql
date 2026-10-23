@@ -20,6 +20,8 @@ SELECT
     competencia,
     kwh_faturado,
     receita_faturada,
+    receita_energia,
+    tributos,
     receita_arrecadada,
     tarifa_media,
     bandeira

@@ -17,12 +17,13 @@ VALID_ROW = {
     "municipio": "Recife",
     "bairro": "Boa Viagem",
     "classe": "B1",
+    "classe_cadastro": "Residencial",
     "cod_alimentador": "AL-01",
     "possui_gd": "true",
     "consumo_medio_kwh_12m": "152.4",
-    "cod_cliente": "C0001",
-    "subgrupo": "",
-    "potencia_kw": "3.3",
+    "titular_mascarado": "M. S.",
+    "documento_mascarado": "***.***.**1-23",
+    "potencia_kwp": "3.3",
 }
 
 
@@ -99,8 +100,16 @@ def test_invalid_row_keeps_previous_data_untouched(tmp_path: Path, engine: Engin
     assert [uc.cod_uc for uc in stored_ucs(engine)] == ["0001"]
 
 
+def test_unit_without_reading_loads_with_empty_average(tmp_path: Path, engine: Engine) -> None:
+    write_gold_dim_uc(tmp_path / "gold", [{**VALID_ROW, "consumo_medio_kwh_12m": ""}])
+
+    load_gold(tmp_path / "gold", engine)
+
+    assert stored_ucs(engine)[0].consumo_medio_kwh_12m is None
+
+
 class OptionalColumnSchema(BaseModel):
-    # A gold_dim_uc ainda não tem coluna opcional confirmada no contrato.
+    # Coluna opcional genérica: a regra da célula vazia vale para qualquer tabela da Gold.
     cod_uc: str
     receita: float | None
 

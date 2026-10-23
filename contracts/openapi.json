@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "V-Energy Grid 360 API",
-    "version": "0.2.0"
+    "version": "0.4.0"
   },
   "paths": {
     "/health": {
@@ -68,6 +68,336 @@
               }
             },
             "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/receita/mensal": {
+      "get": {
+        "tags": [
+          "receita"
+        ],
+        "summary": "Get Receita Mensal",
+        "description": "Indicadores de cada competência do período, do mês mais antigo ao mais recente.",
+        "operationId": "get_receita_mensal_receita_mensal_get",
+        "parameters": [
+          {
+            "name": "inicio",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^\\d{4}-(0[1-9]|1[0-2])$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Inicio"
+            }
+          },
+          {
+            "name": "fim",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^\\d{4}-(0[1-9]|1[0-2])$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Fim"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/KpisMensaisSchema"
+                  },
+                  "title": "Response Get Receita Mensal Receita Mensal Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/receita/comparacao": {
+      "get": {
+        "tags": [
+          "receita"
+        ],
+        "summary": "Get Comparacao",
+        "description": "kWh e receita de dois períodos, da empresa inteira ou de um segmento, e a variação.",
+        "operationId": "get_comparacao_receita_comparacao_get",
+        "parameters": [
+          {
+            "name": "base_inicio",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+              "title": "Base Inicio"
+            }
+          },
+          {
+            "name": "base_fim",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+              "title": "Base Fim"
+            }
+          },
+          {
+            "name": "atual_inicio",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+              "title": "Atual Inicio"
+            }
+          },
+          {
+            "name": "atual_fim",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+              "title": "Atual Fim"
+            }
+          },
+          {
+            "name": "municipio",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Municipio"
+            }
+          },
+          {
+            "name": "bairro",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Bairro"
+            }
+          },
+          {
+            "name": "classe",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "B1",
+                    "B2",
+                    "B3",
+                    "A4"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Classe"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ComparacaoReceitaSchema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/receita/decomposicao": {
+      "get": {
+        "tags": [
+          "receita"
+        ],
+        "summary": "Get Decomposicao",
+        "description": "Ponte de receita por município, por bairro de um município ou por classe de um bairro.\n\nOrdenada da maior queda para a maior alta: o topo é onde a receita mais caiu.",
+        "operationId": "get_decomposicao_receita_decomposicao_get",
+        "parameters": [
+          {
+            "name": "periodo_base",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Periodo Base"
+            }
+          },
+          {
+            "name": "periodo_atual",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Periodo Atual"
+            }
+          },
+          {
+            "name": "municipio",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Municipio"
+            }
+          },
+          {
+            "name": "bairro",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Bairro"
+            }
+          },
+          {
+            "name": "classe",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "B1",
+                    "B2",
+                    "B3",
+                    "A4"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Classe"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DecomposicaoLinhaSchema"
+                  },
+                  "title": "Response Get Decomposicao Receita Decomposicao Get"
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -362,6 +692,57 @@
         "title": "AtualizarOrdemSchema",
         "description": "Mudança de status de uma OI. Cancelar é mudar para CANCELADA."
       },
+      "ComparacaoReceitaSchema": {
+        "properties": {
+          "base": {
+            "$ref": "#/components/schemas/TotaisPeriodoSchema"
+          },
+          "atual": {
+            "$ref": "#/components/schemas/TotaisPeriodoSchema"
+          },
+          "variacao_kwh": {
+            "type": "number",
+            "title": "Variacao Kwh"
+          },
+          "variacao_receita": {
+            "type": "number",
+            "title": "Variacao Receita"
+          },
+          "variacao_kwh_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variacao Kwh Pct"
+          },
+          "variacao_receita_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variacao Receita Pct"
+          }
+        },
+        "type": "object",
+        "required": [
+          "base",
+          "atual",
+          "variacao_kwh",
+          "variacao_receita",
+          "variacao_kwh_pct",
+          "variacao_receita_pct"
+        ],
+        "title": "ComparacaoReceitaSchema",
+        "description": "Totais de dois períodos e quanto o atual variou sobre a base."
+      },
       "CriarOrdensSchema": {
         "properties": {
           "cod_ucs": {
@@ -381,6 +762,83 @@
         ],
         "title": "CriarOrdensSchema",
         "description": "UCs escolhidas na fila de suspeitas; gera uma OI para cada uma."
+      },
+      "DecomposicaoLinhaSchema": {
+        "properties": {
+          "nivel": {
+            "type": "string",
+            "enum": [
+              "municipio",
+              "bairro",
+              "classe"
+            ],
+            "title": "Nivel"
+          },
+          "segmento": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Segmento"
+          },
+          "periodo_base": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Periodo Base"
+          },
+          "periodo_atual": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Periodo Atual"
+          },
+          "receita_base": {
+            "type": "number",
+            "title": "Receita Base"
+          },
+          "receita_atual": {
+            "type": "number",
+            "title": "Receita Atual"
+          },
+          "variacao_receita": {
+            "type": "number",
+            "title": "Variacao Receita"
+          },
+          "efeito_preco": {
+            "type": "number",
+            "title": "Efeito Preco"
+          },
+          "efeito_tarifa": {
+            "type": "number",
+            "title": "Efeito Tarifa"
+          },
+          "efeito_bandeira": {
+            "type": "number",
+            "title": "Efeito Bandeira"
+          },
+          "efeito_volume": {
+            "type": "number",
+            "title": "Efeito Volume"
+          },
+          "efeito_mix": {
+            "type": "number",
+            "title": "Efeito Mix"
+          }
+        },
+        "type": "object",
+        "required": [
+          "nivel",
+          "segmento",
+          "periodo_base",
+          "periodo_atual",
+          "receita_base",
+          "receita_atual",
+          "variacao_receita",
+          "efeito_preco",
+          "efeito_tarifa",
+          "efeito_bandeira",
+          "efeito_volume",
+          "efeito_mix"
+        ],
+        "title": "DecomposicaoLinhaSchema",
+        "description": "Um segmento da ponte de receita: quanto variou e quanto disso foi preço, volume e mix."
       },
       "DimUcSchema": {
         "properties": {
@@ -409,6 +867,17 @@
             ],
             "title": "Classe"
           },
+          "classe_cadastro": {
+            "type": "string",
+            "enum": [
+              "Residencial",
+              "Comercial",
+              "Industrial",
+              "Rural",
+              "Poder Público"
+            ],
+            "title": "Classe Cadastro"
+          },
           "cod_alimentador": {
             "type": "string",
             "minLength": 1,
@@ -419,34 +888,6 @@
             "title": "Possui Gd"
           },
           "consumo_medio_kwh_12m": {
-            "type": "number",
-            "title": "Consumo Medio Kwh 12M"
-          },
-          "cod_cliente": {
-            "anyOf": [
-              {
-                "type": "string",
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Cod Cliente"
-          },
-          "subgrupo": {
-            "anyOf": [
-              {
-                "type": "string",
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Subgrupo"
-          },
-          "potencia_kw": {
             "anyOf": [
               {
                 "type": "number"
@@ -455,7 +896,42 @@
                 "type": "null"
               }
             ],
-            "title": "Potencia Kw"
+            "title": "Consumo Medio Kwh 12M"
+          },
+          "titular_mascarado": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Titular Mascarado"
+          },
+          "documento_mascarado": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Documento Mascarado"
+          },
+          "potencia_kwp": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Potencia Kwp"
           }
         },
         "type": "object",
@@ -464,12 +940,13 @@
           "municipio",
           "bairro",
           "classe",
+          "classe_cadastro",
           "cod_alimentador",
           "possui_gd",
           "consumo_medio_kwh_12m",
-          "cod_cliente",
-          "subgrupo",
-          "potencia_kw"
+          "titular_mascarado",
+          "documento_mascarado",
+          "potencia_kwp"
         ],
         "title": "DimUcSchema"
       },
@@ -540,6 +1017,84 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "KpisMensaisSchema": {
+        "properties": {
+          "competencia": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+            "title": "Competencia"
+          },
+          "kwh_faturado": {
+            "type": "number",
+            "title": "Kwh Faturado"
+          },
+          "receita_faturada": {
+            "type": "number",
+            "title": "Receita Faturada"
+          },
+          "receita_energia": {
+            "type": "number",
+            "title": "Receita Energia"
+          },
+          "dec": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dec"
+          },
+          "fec": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fec"
+          },
+          "n_chamados": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "N Chamados"
+          },
+          "satisfacao_media": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Satisfacao Media"
+          }
+        },
+        "type": "object",
+        "required": [
+          "competencia",
+          "kwh_faturado",
+          "receita_faturada",
+          "receita_energia",
+          "dec",
+          "fec",
+          "n_chamados",
+          "satisfacao_media"
+        ],
+        "title": "KpisMensaisSchema",
+        "description": "Indicadores executivos de uma competência."
       },
       "OrdemDetalheSchema": {
         "properties": {
@@ -682,6 +1237,37 @@
           "CANCELADA"
         ],
         "title": "StatusOrdem"
+      },
+      "TotaisPeriodoSchema": {
+        "properties": {
+          "inicio": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+            "title": "Inicio"
+          },
+          "fim": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+            "title": "Fim"
+          },
+          "kwh_faturado": {
+            "type": "number",
+            "title": "Kwh Faturado"
+          },
+          "receita_faturada": {
+            "type": "number",
+            "title": "Receita Faturada"
+          }
+        },
+        "type": "object",
+        "required": [
+          "inicio",
+          "fim",
+          "kwh_faturado",
+          "receita_faturada"
+        ],
+        "title": "TotaisPeriodoSchema",
+        "description": "kWh e receita faturados, somados num período."
       },
       "ValidationError": {
         "properties": {

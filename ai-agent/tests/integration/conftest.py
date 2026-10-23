@@ -49,7 +49,8 @@ GOLD_TABLES = (
         potencia_kw double precision)""",
     """CREATE TABLE gold.gold_fato_faturamento_mensal (
         cod_uc text NOT NULL, competencia text NOT NULL, kwh_faturado numeric(16,3) NOT NULL,
-        receita_faturada numeric(14,2) NOT NULL, receita_arrecadada numeric(14,2),
+        receita_faturada numeric(14,2) NOT NULL, receita_energia numeric(14,2) NOT NULL,
+        tributos numeric(14,2) NOT NULL, receita_arrecadada numeric(14,2),
         tarifa_media double precision, bandeira text, PRIMARY KEY (cod_uc, competencia))""",
     """CREATE TABLE gold.gold_continuidade_alimentador_mensal (
         cod_alimentador text NOT NULL, competencia text NOT NULL, dec double precision NOT NULL,
@@ -63,10 +64,10 @@ GOLD_ROWS = (
     "('0002','Recife','Bairro 2','A4','AL-03',true,18000,'C-2',NULL,NULL),"
     "('0003','Olinda','Bairro 1','B1','AL-07',false,300,'C-3',NULL,NULL)",
     "INSERT INTO gold.gold_fato_faturamento_mensal VALUES "
-    "('0001','2024-01',230,180.40,180.40,0.78,'verde'),"
-    "('0001','2025-03',240,190.10,190.10,0.79,'verde'),"
-    "('0002','2025-03',9000,7100.00,7100.00,0.79,'amarela'),"
-    "('0003','2025-06',260,200.00,195.00,0.77,'verde')",
+    "('0001','2024-01',230,180.40,160.00,20.40,180.40,0.70,'verde'),"
+    "('0001','2025-03',240,190.10,170.00,20.10,190.10,0.71,'verde'),"
+    "('0002','2025-03',9000,7100.00,6300.00,800.00,7100.00,0.70,'amarela'),"
+    "('0003','2025-06',260,200.00,180.00,20.00,195.00,0.69,'verde')",
     "INSERT INTO gold.gold_continuidade_alimentador_mensal VALUES "
     "('AL-07','2024-03',1.2,0.4,1500,3,2.5),"
     "('AL-07','2025-03',0.8,0.3,1500,2,1.5),"

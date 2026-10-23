@@ -38,6 +38,68 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/receita/mensal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Receita Mensal
+         * @description Indicadores de cada competência do período, do mês mais antigo ao mais recente.
+         */
+        get: operations["get_receita_mensal_receita_mensal_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/receita/comparacao": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Comparacao
+         * @description kWh e receita de dois períodos, da empresa inteira ou de um segmento, e a variação.
+         */
+        get: operations["get_comparacao_receita_comparacao_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/receita/decomposicao": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Decomposicao
+         * @description Ponte de receita por município, por bairro de um município ou por classe de um bairro.
+         *
+         *     Ordenada da maior queda para a maior alta: o topo é onde a receita mais caiu.
+         */
+        get: operations["get_decomposicao_receita_decomposicao_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/ordens-inspecao": {
         parameters: {
             query?: never;
@@ -98,12 +160,61 @@ export interface components {
             observacao?: string | null;
         };
         /**
+         * ComparacaoReceitaSchema
+         * @description Totais de dois períodos e quanto o atual variou sobre a base.
+         */
+        ComparacaoReceitaSchema: {
+            base: components["schemas"]["TotaisPeriodoSchema"];
+            atual: components["schemas"]["TotaisPeriodoSchema"];
+            /** Variacao Kwh */
+            variacao_kwh: number;
+            /** Variacao Receita */
+            variacao_receita: number;
+            /** Variacao Kwh Pct */
+            variacao_kwh_pct: number | null;
+            /** Variacao Receita Pct */
+            variacao_receita_pct: number | null;
+        };
+        /**
          * CriarOrdensSchema
          * @description UCs escolhidas na fila de suspeitas; gera uma OI para cada uma.
          */
         CriarOrdensSchema: {
             /** Cod Ucs */
             cod_ucs: string[];
+        };
+        /**
+         * DecomposicaoLinhaSchema
+         * @description Um segmento da ponte de receita: quanto variou e quanto disso foi preço, volume e mix.
+         */
+        DecomposicaoLinhaSchema: {
+            /**
+             * Nivel
+             * @enum {string}
+             */
+            nivel: "municipio" | "bairro" | "classe";
+            /** Segmento */
+            segmento: string;
+            /** Periodo Base */
+            periodo_base: string;
+            /** Periodo Atual */
+            periodo_atual: string;
+            /** Receita Base */
+            receita_base: number;
+            /** Receita Atual */
+            receita_atual: number;
+            /** Variacao Receita */
+            variacao_receita: number;
+            /** Efeito Preco */
+            efeito_preco: number;
+            /** Efeito Tarifa */
+            efeito_tarifa: number;
+            /** Efeito Bandeira */
+            efeito_bandeira: number;
+            /** Efeito Volume */
+            efeito_volume: number;
+            /** Efeito Mix */
+            efeito_mix: number;
         };
         /** DimUcSchema */
         DimUcSchema: {
@@ -118,18 +229,23 @@ export interface components {
              * @enum {string}
              */
             classe: "B1" | "B2" | "B3" | "A4";
+            /**
+             * Classe Cadastro
+             * @enum {string}
+             */
+            classe_cadastro: "Residencial" | "Comercial" | "Industrial" | "Rural" | "Poder Público";
             /** Cod Alimentador */
             cod_alimentador: string;
             /** Possui Gd */
             possui_gd: boolean;
             /** Consumo Medio Kwh 12M */
-            consumo_medio_kwh_12m: number;
-            /** Cod Cliente */
-            cod_cliente: string | null;
-            /** Subgrupo */
-            subgrupo: string | null;
-            /** Potencia Kw */
-            potencia_kw: number | null;
+            consumo_medio_kwh_12m: number | null;
+            /** Titular Mascarado */
+            titular_mascarado: string | null;
+            /** Documento Mascarado */
+            documento_mascarado: string | null;
+            /** Potencia Kwp */
+            potencia_kwp: number | null;
         };
         /**
          * ErroSchema
@@ -155,6 +271,28 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /**
+         * KpisMensaisSchema
+         * @description Indicadores executivos de uma competência.
+         */
+        KpisMensaisSchema: {
+            /** Competencia */
+            competencia: string;
+            /** Kwh Faturado */
+            kwh_faturado: number;
+            /** Receita Faturada */
+            receita_faturada: number;
+            /** Receita Energia */
+            receita_energia: number;
+            /** Dec */
+            dec: number | null;
+            /** Fec */
+            fec: number | null;
+            /** N Chamados */
+            n_chamados: number | null;
+            /** Satisfacao Media */
+            satisfacao_media: number | null;
         };
         /**
          * OrdemDetalheSchema
@@ -213,6 +351,20 @@ export interface components {
          * @enum {string}
          */
         StatusOrdem: "GERADA" | "EM_CAMPO" | "CONCLUIDA" | "CANCELADA";
+        /**
+         * TotaisPeriodoSchema
+         * @description kWh e receita faturados, somados num período.
+         */
+        TotaisPeriodoSchema: {
+            /** Inicio */
+            inicio: string;
+            /** Fim */
+            fim: string;
+            /** Kwh Faturado */
+            kwh_faturado: number;
+            /** Receita Faturada */
+            receita_faturada: number;
+        };
         /** ValidationError */
         ValidationError: {
             /** Location */
@@ -284,6 +436,110 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErroSchema"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_receita_mensal_receita_mensal_get: {
+        parameters: {
+            query?: {
+                inicio?: string | null;
+                fim?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KpisMensaisSchema"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_comparacao_receita_comparacao_get: {
+        parameters: {
+            query: {
+                base_inicio: string;
+                base_fim: string;
+                atual_inicio: string;
+                atual_fim: string;
+                municipio?: string | null;
+                bairro?: string | null;
+                classe?: ("B1" | "B2" | "B3" | "A4") | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ComparacaoReceitaSchema"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_decomposicao_receita_decomposicao_get: {
+        parameters: {
+            query?: {
+                periodo_base?: string | null;
+                periodo_atual?: string | null;
+                municipio?: string | null;
+                bairro?: string | null;
+                classe?: ("B1" | "B2" | "B3" | "A4") | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DecomposicaoLinhaSchema"][];
                 };
             };
             /** @description Validation Error */

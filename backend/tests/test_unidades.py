@@ -11,12 +11,23 @@ STORED_UC = {
     "municipio": "Recife",
     "bairro": "Boa Viagem",
     "classe": "B1",
+    "classe_cadastro": "Residencial",
     "cod_alimentador": "AL-01",
     "possui_gd": True,
     "consumo_medio_kwh_12m": 152.4,
-    "cod_cliente": "C0001",
-    "subgrupo": None,
-    "potencia_kw": 3.3,
+    "titular_mascarado": "M. S.",
+    "documento_mascarado": "***.***.**1-23",
+    "potencia_kwp": 3.3,
+}
+
+UC_WITHOUT_READING = {
+    **STORED_UC,
+    "cod_uc": "0002",
+    "possui_gd": False,
+    "consumo_medio_kwh_12m": None,
+    "titular_mascarado": None,
+    "documento_mascarado": None,
+    "potencia_kwp": None,
 }
 
 
@@ -24,7 +35,7 @@ STORED_UC = {
 def stored_uc(engine: Engine) -> None:
     Base.metadata.create_all(engine)
     with Session(engine) as session, session.begin():
-        session.add(DimUc(**STORED_UC))
+        session.add_all([DimUc(**STORED_UC), DimUc(**UC_WITHOUT_READING)])
 
 
 def test_returns_the_consumer_unit_when_it_exists(client: TestClient) -> None:
@@ -32,6 +43,14 @@ def test_returns_the_consumer_unit_when_it_exists(client: TestClient) -> None:
 
     assert response.status_code == 200
     assert response.json() == STORED_UC
+
+
+def test_unit_without_reading_has_no_average_consumption(client: TestClient) -> None:
+    # Vazio, e não zero: zero diria que a UC não consumiu, quando na verdade não há leitura.
+    response = client.get("/unidades-consumidoras/0002")
+
+    assert response.status_code == 200
+    assert response.json() == UC_WITHOUT_READING
 
 
 def test_returns_404_when_the_consumer_unit_does_not_exist(client: TestClient) -> None:

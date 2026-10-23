@@ -167,7 +167,7 @@
 - **História:** Como engenheiro de dados, quero o parque de medidores e a GD padronizados, para saber o medidor vigente e se a UC gera energia própria.
 - **Aceite:**
   - Medidor vigente por UC derivado (instalação/retirada); idade do medidor calculada.
-  - GD com `potencia_kw` numérica e data de conexão.
+  - GD com `potencia_kwp` numérica (potência de pico, como vem da origem) e data de conexão.
 
 #### D2-06 · DEC e FEC por alimentador
 - **Épico** EP10 · **Sprint** S2 · **Must** · **5 pts**
@@ -207,6 +207,7 @@
 - **Aceite:**
   - `contracts/gold_schema.yaml` com tabelas, colunas, tipos, grão e chaves ([Arquitetura §6](arquitetura.md#6-modelo-da-camada-gold)).
   - Revisado por V1 e G1; versão `0.1.0`.
+- **Situação:** feito. A v0.1.0 foi mergeada (PR #10) e a v0.2.0 está em andamento (DEC-022 e DEC-023).
 
 #### D3-02 · Gold de receita mensal (walking skeleton)
 - **Épico** EP07 · **Sprint** S1 · **Must** · **2 pts**

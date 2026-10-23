@@ -89,7 +89,7 @@ flowchart LR
 | Gold → Assistente | Anticorruption Layer (camada semântica) | Views `sem_*` com descrições e sinônimos ("conta de luz" → fatura; "falta de luz" → ocorrência) | G1 |
 | Assistente ↔ Portal | Partnership | Interface Python `ask(question, session_id) -> AgentAnswer{answer, sql, rows, confidence, sources, refused_reason}` | G1 e V1 |
 | Portal API → Frontend | Open Host Service + Conformist | OpenAPI gerado pelo FastAPI (`contracts/openapi.json`) → client TypeScript gerado | V1 (API) e V2 (integração) |
-| Chaves compartilhadas | Shared Kernel | `cod_uc`, `competencia` (`YYYY-MM`), `classe`/`subgrupo` (B1, B2, B3, A4), `cod_alimentador`, `municipio`, `bairro` normalizados | Todos: PR com um revisor de cada frente |
+| Chaves compartilhadas | Shared Kernel | `cod_uc`, `competencia` (`YYYY-MM`), `classe` (B1, B2, B3, A4) e `classe_cadastro` (Residencial, Comercial, Industrial, Rural, Poder Público), `cod_alimentador`, `municipio`, `bairro` normalizados | Todos: PR com um revisor de cada frente |
 
 Toda mudança em `contracts/` exige PR, aviso no grupo geral e incremento de versão.
 
@@ -104,9 +104,9 @@ Estes termos são usados com o mesmo significado no código, no banco, no portal
 | Termo | Definição | Nome técnico |
 |---|---|---|
 | Unidade Consumidora (UC) | Ponto com medidor; entidade central do modelo | `cod_uc` |
-| Cliente | Titular; pode ter várias UCs | `cod_cliente` |
+| Cliente | Titular da UC; o glossário do case prevê que um cliente pode ter várias UCs, mas no dataset cada titular tem uma UC só. A Gold traz só o titular mascarado | `titular_mascarado`, `documento_mascarado` |
 | Competência | Mês de referência do consumo e da fatura (não o mês de pagamento) | `competencia` (`YYYY-MM`) |
-| Classe / Subgrupo | B1 residencial, B2 rural, B3 comercial/poder público, A4 industrial MT | `classe`, `subgrupo` |
+| Classe de consumo | B1 residencial, B2 rural, B3 comercial/poder público, A4 industrial MT; a classe do cadastro (Residencial, Comercial, Industrial, Rural, Poder Público) separa o comercial do poder público | `classe`, `classe_cadastro` |
 | Alimentador | Circuito de média tensão que atende um conjunto de UCs | `cod_alimentador` |
 | Bandeira | Acréscimo tarifário mensal (verde, amarela, vermelha P1, vermelha P2) | `bandeira` |
 | Energia faturada | kWh cobrados na fatura, já líquidos de GD | `kwh_faturado` |
@@ -114,7 +114,7 @@ Estes termos são usados com o mesmo significado no código, no banco, no portal
 | Receita arrecadada | Valor em R$ efetivamente pago | `receita_arrecadada` |
 | Tarifa média | Receita faturada ÷ energia faturada | `tarifa_media` |
 | Efeito preço / volume / mix | Decomposição da variação de receita entre dois períodos | `efeito_preco`, `efeito_volume`, `efeito_mix` |
-| Período base / atual | Primeiros 12 meses da base / últimos 12 meses | `periodo_base`, `periodo_atual` |
+| Período base / atual | Faixas de meses comparadas; qualquer par de períodos serve (ex.: jul/2022 a jun/2023 contra jul/2025 a jun/2026, ou os mesmos meses em anos diferentes) | `periodo_base`, `periodo_atual` |
 | Perda não técnica | Energia entregue e não faturada (furto, fraude, erro) | — |
 | Score de suspeita | Prioridade de irregularidade de uma UC | `score_suspeita` |
 | Motivo da suspeita | Regra ou feature que mais contribui para o score, em texto legível | `motivos[]` |
@@ -123,7 +123,7 @@ Estes termos são usados com o mesmo significado no código, no banco, no portal
 | Status da OI | `GERADA → EM_CAMPO → CONCLUIDA`, ou `CANCELADA` | `status` |
 | Resultado da OI | `IRREGULAR_CONFIRMADA`, `REGULAR` ou `NAO_REALIZADA` | `resultado` |
 | DEC / FEC | Duração e frequência equivalentes de interrupção por UC (definição simplificada do case) | `dec`, `fec` |
-| GD | UC com geração própria (solar) | `possui_gd`, `potencia_kw` |
+| GD | UC com geração própria (solar); a potência é a de pico, em kWp | `possui_gd`, `potencia_kwp` |
 
 ## 6. Modelo da camada Gold
 
@@ -133,8 +133,10 @@ Proposta v0 que serve de base para `contracts/gold_schema.yaml`. O contrato é a
 |---|---|---|---|
 | `gold_dim_uc` | 1 linha por UC | Relacionamento | UC 360, agente, filtros |
 | `gold_fato_faturamento_mensal` | UC × competência | Receita | KPIs, Receita, UC 360, agente |
-| `gold_receita_decomposicao` | período × município × bairro × classe | Receita | Tela Receita, insight, diagnóstico |
-| `gold_kpis_mensais` | competência | Receita, Rede, Atendimento | Dashboard executivo |
+| `gold_receita_decomposicao` | par de períodos × município × bairro × classe × GD | Receita | Tela Receita, insight, diagnóstico, agente |
+| `gold_kpis_mensais` | competência | Receita, Rede, Atendimento | Dashboard executivo (total da empresa) |
+| `gold_kpis_segmento_mensal` | competência × município × bairro × classe × GD | Receita, Rede, Atendimento | Filtros da diretoria, portal, agente |
+| `gold_reconciliacao_faturamento` | competência | Receita | Diagnóstico, tela Receita, agente (ponte do faturamento e da energia) |
 | `gold_continuidade_alimentador_mensal` | alimentador × competência | Continuidade | Tela DEC/FEC, agente |
 | `gold_interrupcoes_uc` | UC × ocorrência | Continuidade | UC 360 |
 | `gold_atendimentos_uc` | UC × chamado | Relacionamento | UC 360, agente |
@@ -148,11 +150,11 @@ Decisões estruturais do projeto. Cada uma, ao ser fechada, ganha uma entrada `D
 
 | ID | Tema | Opções avaliadas | Escolha | Justificativa | Status |
 |---|---|---|---|---|---|
-| ADR-01 | Banco local | SQLite, PostgreSQL | PostgreSQL (Docker) | Role somente leitura nativa para o agente, concorrência nas OIs, schemas `gold`/`app` separados | Em aberto: o agente suporta os dois dialetos ([spec do agente](../ai-agent/docs/specs/2026-10-19-architecture-design.md)) |
+| ADR-01 | Banco local | SQLite, PostgreSQL | PostgreSQL (Docker) | Role somente leitura nativa para o agente, concorrência nas OIs, schemas `gold`/`app` separados | Adotada ([DEC-002](decisoes.md)) |
 | ADR-02 | Framework do agente | PydanticAI, LangGraph, LangChain | PydanticAI | Saída tipada (`AgentAnswer`), mesma stack Pydantic do FastAPI, comportamento auditável | Adotada ([spec do agente](../ai-agent/docs/specs/2026-10-19-architecture-design.md)) |
 | ADR-03 | Estratégia do agente | SQL livre, SQL sobre views semânticas, ferramentas parametrizadas | SQL apenas sobre views `sem_*`, validado por parser (um único `SELECT`, `LIMIT` obrigatório, allowlist de views), executado com role somente leitura | Defesa em profundidade: mesmo com o prompt manipulado, o banco não aceita escrita | Adotada ([spec do agente](../ai-agent/docs/specs/2026-10-19-architecture-design.md)) |
 | ADR-04 | Insights embutidos | LLM calcula, LLM só narra números prontos | LLM só narra um JSON de métricas da Gold e cita os números | Fidelidade ao dado verificável; nenhuma aritmética no LLM | Adotada ([spec do agente](../ai-agent/docs/specs/2026-10-19-architecture-design.md)) |
-| ADR-05 | Score de suspeita | Regras, ML supervisionado, híbrido | Híbrido: regras explicáveis (queda brusca de consumo, consumo zero com medidor ativo, desvio em relação a vizinhos/classe, histórico de irregularidade) + modelo simples treinado nas ~1,4 mil inspeções | Motivo legível e precisão mensurável (backtest: acerto do top-200 vs ~50% atual) | Proposta |
-| ADR-06 | Decomposição de receita | Preço/volume (2 fatores), PVM com mix de classe | PVM com efeito mix por classe e drill-down por município/bairro | Separa reajuste e bandeira (preço), queda de kWh (volume) e mudança de perfil (mix) | Proposta |
+| ADR-05 | Score de suspeita | Regras, ML supervisionado, híbrido | Híbrido: regras explicáveis (queda brusca de consumo, consumo zero com medidor ativo, desvio em relação a vizinhos/classe, histórico de irregularidade) + modelo simples treinado nas ~1,4 mil inspeções; o resultado é a posição da UC no ranking (1 = mais suspeita), e não uma nota | Motivo legível e precisão mensurável (backtest: acerto do top-200 vs ~50% atual) | Proposta; posição no ranking decidida na daily de 21/10 |
+| ADR-06 | Decomposição de receita | Preço/volume (2 fatores), PVM com mix de classe | PVM com efeito mix por classe e drill-down por município/bairro; o efeito preço se divide em `efeito_tarifa` e `efeito_bandeira`, e `possui_gd` entra no grão para isolar o efeito GD | Separa reajuste e bandeira (preço), queda de kWh (volume, com a GD à parte) e mudança de perfil (mix) | Proposta; colunas decididas (DEC-023), método do efeito bandeira a validar |
 | ADR-07 | Agendamento do Workflow | Diário, mensal, por evento | Mensal, após o fechamento do ciclo de faturamento (ex.: D+5), com ingestão incremental por competência | A origem muda mensalmente; execução diária gastaria compute sem dado novo | Proposta |
-| ADR-08 | Leitura do XLSX no Databricks | `openpyxl` + pandas → Spark, `spark-excel` | pandas/openpyxl → Spark | Volume pequeno (~1,4 mil linhas), menos dependências no cluster | Proposta |
+| ADR-08 | Leitura do XLSX no Databricks | `openpyxl` + pandas → Spark, `spark-excel` | Leitor nativo `format("excel")` do Databricks, conferido célula a célula contra o XML da planilha | O `openpyxl` não existe no Databricks Serverless e não se instala nada; a conferência garante que nenhum valor muda | Adotada ([DEC-008](decisoes.md)) |

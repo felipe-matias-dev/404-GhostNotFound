@@ -35,7 +35,7 @@ views:
         description: "verdadeiro quando a UC tem geração própria (painel solar)"
       - name: consumo_medio_kwh_12m
         unit: "kWh"
-        description: "consumo médio da UC nos últimos 12 meses, em kWh"
+        description: "consumo médio da UC nos últimos 12 meses, em kWh; vazio quando a UC não tem nenhuma leitura"
     sample_rows:
       - {cod_uc: "0001", municipio: "Município Exemplo A", bairro: "Bairro exemplo 1", classe: "B1", cod_alimentador: "AL-01", possui_gd: false, consumo_medio_kwh_12m: 250.5}
       - {cod_uc: "0002", municipio: "Município Exemplo B", bairro: "Bairro exemplo 2", classe: "A4", cod_alimentador: "AL-02", possui_gd: true, consumo_medio_kwh_12m: 18000.0}
@@ -54,18 +54,24 @@ views:
         description: "energia cobrada na fatura, já líquida de geração distribuída"
       - name: receita_faturada
         unit: "R$"
-        description: "valor emitido na fatura da competência; é a receita quando a pergunta não qualifica"
+        description: "valor total emitido na fatura da competência (energia e tributos); é a receita quando a pergunta não qualifica (DEC-022)"
+      - name: receita_energia
+        unit: "R$"
+        description: "valor da energia na fatura, sem tributos; base da tarifa média"
+      - name: tributos
+        unit: "R$"
+        description: "tributos cobrados na fatura"
       - name: receita_arrecadada
         unit: "R$"
         description: "valor efetivamente pago da fatura"
       - name: tarifa_media
         unit: "R$/kWh"
-        description: "receita faturada dividida pela energia faturada; vazia quando a energia é zero"
+        description: "receita de energia dividida pela energia faturada, sem tributos; vazia quando a energia é zero"
       - name: bandeira
         description: "bandeira tarifária da competência"
     sample_rows:
-      - {cod_uc: "0001", competencia: "2025-03", kwh_faturado: 230.0, receita_faturada: 180.4, receita_arrecadada: 180.4, tarifa_media: 0.78, bandeira: "verde"}
-      - {cod_uc: "0002", competencia: "2025-03", kwh_faturado: 0.0, receita_faturada: 0.0, receita_arrecadada: 0.0, tarifa_media: null, bandeira: "amarela"}
+      - {cod_uc: "0001", competencia: "2025-03", kwh_faturado: 230.0, receita_faturada: 180.4, receita_energia: 160.0, tributos: 20.4, receita_arrecadada: 180.4, tarifa_media: 0.70, bandeira: "verde"}
+      - {cod_uc: "0002", competencia: "2025-03", kwh_faturado: 0.0, receita_faturada: 0.0, receita_energia: 0.0, tributos: 0.0, receita_arrecadada: 0.0, tarifa_media: null, bandeira: "amarela"}
 
   - name: sem_continuidade_alimentador_mensal
     source: gold_continuidade_alimentador_mensal
@@ -118,7 +124,8 @@ glossary:
     maps_to: "classe = 'A4'"
 
 rules:
-  - text: "Receita, sem qualificador, é receita_faturada. A resposta declara essa suposição."
+  - text: "Receita, sem qualificador, é receita_faturada (energia e tributos). A resposta declara essa suposição."
+  - text: "Tarifa média é receita_energia ÷ kwh_faturado, sem tributos. Leia tarifa_media pronta; não recalcule."
   - text: "Energia faturada é kwh_faturado, já líquida de geração distribuída."
   - text: "Competência é texto no formato AAAA-MM. Filtre por igualdade (competencia = '2025-03') ou por intervalo de texto (competencia BETWEEN '2025-01' AND '2025-03')."
   - text: "Nesta versão, os dados vão de 2024-01 a 2025-12. Competência fora desse intervalo não existe nas views: responda unknown."
