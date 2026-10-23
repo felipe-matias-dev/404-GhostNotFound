@@ -17,6 +17,7 @@ Hexagonal: `domain` ← `application` ← `infrastructure`.
 | domain | `question.py` | `Question` (texto limpo e limitado) | pronto |
 | domain | `sql.py` | `SqlDraft` (`ok`, `unknown`, `clarify`, `refuse`), `AttemptFeedback`, `ValidatedQuery`, `QueryResult` | pronto |
 | domain | `errors.py` | `ErrorKind`, `SqlRejected`, `QueryExecutionError` | pronto, com `ErrorKind.REJECTED` (item 6) |
+| domain | `events.py` | `Stage`, `StageEvent` (código, rótulo em português, tentativa) e `AnswerEvent`, para o stream SSE | item 10 |
 | domain | `numbers.py` | `unsupported_numbers`: números da narrativa (lidos em pt-BR) que não estão nos valores das linhas (DEC-019) | item 8 |
 | domain | `semantic.py` | `SemanticLayer`, `ViewSpec`, `ColumnSpec`, `Relation`, glossário, regras, exemplos | pronto |
 | domain | `answer.py` | `AgentAnswer` com `status` e invariantes por status (DEC-020), `Insight` | pronto (PR #21; texto em branco e `row_count >= 0` no PR #29) |
@@ -42,7 +43,7 @@ pergunta → Question → SemanticLayer (carregada uma vez)
         → AgentAnswer
 ```
 
-Detalhes, confiança e logs: spec §5.1. O backend monta o agente uma vez por processo com `build_agent(AgentSettings())`.
+Detalhes, confiança e logs: spec §5.1. O `stream()` emite as etapas `understanding`, `querying`, `correcting` e `writing` e termina com o `AnswerEvent`; o `ask()` consome o `stream()`. O backend monta o agente uma vez por processo com `build_agent(AgentSettings())`.
 
 Em branch: `InsightWriter` (`feat/ai-agent-insight`, prompt em `prompts/insight/v1/`, item 9). O golden set está em `eval/golden_set.yaml` (66 itens, alinhado à camada v0.2, rascunho até a revisão humana).
 

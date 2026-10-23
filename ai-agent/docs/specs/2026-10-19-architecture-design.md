@@ -20,7 +20,7 @@ O agente transforma uma pergunta em português numa consulta SQL somente leitura
 - orquestração `ask()`, `bootstrap.py` e comando de terminal (PR #30, item 6);
 - golden set com 66 itens, rascunho até a revisão humana (PR #32, parte do item 7).
 
-**Em revisão:** narração com verificação numérica (item 8, PR #36, DEC-019).
+**Em revisão:** narração com verificação numérica (item 8, PR #36, DEC-019); eventos de progresso para SSE (item 10, diferencial, branch `feat/ai-agent-stream`, sobre o #36).
 
 **Falta, na ordem da §11:** red team e runner de métricas (item 7), e o `InsightWriter` (item 9, branch `feat/ai-agent-insight`, que faz rebase depois do item 8).
 
@@ -126,6 +126,12 @@ Invariantes:
 
 O timestamp da auditoria é registrado pelo backend ao persistir; o agente não lê relógio no domínio.
 
+### `events.py` (item 10)
+- `Stage`: `understanding`, `querying`, `correcting`, `writing`.
+- `StageEvent(type="stage", stage, attempt >= 1)` com `label` calculado, em português. A tabela de rótulos está na §5.1. O evento não traz SQL, linhas nem mensagem de erro.
+- `AnswerEvent(type="answer", answer: AgentAnswer)`: o mesmo `AgentAnswer` do `ask()`.
+- `AgentEvent`: união discriminada por `type`. É o que o backend serializa em cada mensagem SSE (`event.model_dump_json()`).
+
 Todos os modelos de domínio são imutáveis (`frozen`).
 
 ## 5. Portas (`application/ports.py`)
@@ -135,6 +141,7 @@ São `typing.Protocol` assíncronos, exceto `SqlValidator`, que é síncrono por
 | Porta | Assinatura | Observação |
 |---|---|---|
 | `TextToSqlAgent` | `ask(question: str, session_id: str) -> AgentAnswer` | Contrato de entrada com o backend (Partnership BC6↔BC7). Implementada pelo `ask()` do item 6. Nunca levanta exceção: toda falha vira `AgentAnswer` com `status` |
+| `TextToSqlAgent` (stream) | `stream(question: str, session_id: str) -> AsyncIterator[AgentEvent]` | Item 10. Zero ou mais `StageEvent` e, por último, exatamente um `AnswerEvent`. Nunca levanta exceção. O `ask()` consome o `stream()`, então os dois sempre devolvem a mesma resposta. Fechar o iterador (`aclose()`) cancela o que estiver rodando |
 | `SemanticLayerSource` | `load() -> SemanticLayer` | Item 5. Monta a camada a partir do arquivo do GenAI e do contrato. Erro de configuração falha na subida, não na primeira pergunta |
 | `SqlGenerator` | `generate(question: Question, layer: SemanticLayer, feedback: AttemptFeedback \| None) -> SqlDraft` | Adapter PydanticAI. O item 6 muda o retorno para `Generation` (§4). Saída inválida volta ao modelo até 2 vezes. Erros transitórios do provedor (429, 503) são repetidos com backoff pelo próprio cliente: no Gemini, via `retry_options` das settings; no OpenRouter, pelo retry nativo do SDK. Esgotadas as tentativas, ou com erro do provedor, levanta `UnexpectedModelBehavior`, `ModelHTTPError` ou `ModelAPIError` |
 | `SqlValidator` | `validate(sql: str, allowed_views: frozenset[str]) -> ValidatedQuery` | Levanta `SqlRejected`; adapter `SqlglotValidator` (§6) |
@@ -166,6 +173,16 @@ O caso de uso `application/ask.py` implementa `TextToSqlAgent` encadeando as por
    - Item 8: o `AnswerWriter` substitui esse texto por uma narrativa. Se a verificação numérica falhar (§7.3 do guia), volta para o texto determinístico.
 8. **Mensagens de `unknown`, `refused` e `failed`:** textos fixos em português, sem LLM, em `refused_reason` e em `answer`. O modelo não escreve o motivo de não ter respondido.
 9. **Logs estruturados:** uma linha JSON por etapa (stdlib `logging`), com `request_id`, `session_id`, número da tentativa, etapa, status, SQL, motivo ou tipo de erro, número de linhas, latência da etapa, modelo, tokens e `prompt_version` (§12 do guia). Sem a amostra de linhas, para não levar dado pessoal aos logs.
+10. **Etapas (item 10):** o `stream()` emite um `StageEvent` em cada ponto abaixo, com o número da tentativa. Pergunta recusada antes da geração (vazia ou longa demais) gera só o `AnswerEvent`.
+
+| Código | Rótulo | Quando |
+|---|---|---|
+| `understanding` | Entendendo a pergunta | Antes da geração na tentativa 1 |
+| `correcting` | Ajustando a consulta | Antes da geração nas tentativas seguintes |
+| `querying` | Consultando os dados | Antes de validar e executar um rascunho `ok` |
+| `writing` | Escrevendo a resposta | Antes da narração |
+
+A narrativa não é transmitida aos poucos: ela só chega no `AnswerEvent`, depois da verificação numérica (DEC-019). Um número inventado nunca aparece na tela, nem por um instante.
 
 ### 5.2 Dados não são instruções
 
@@ -299,6 +316,7 @@ Pedidos a abrir como issue para a área dona. O GenAI não altera esses arquivos
 | D7 | Dev (loader `venergy_api.carga`) | Na mesma transação da carga: apagar as views `sem_*` antes do `drop_all` e rodar o `ai-agent/semantic/views.sql` (gerado pelo item 5) com o usuário dono depois do `create_all` | O usuário do agente é somente leitura. Desde a DEC-014 a carga recria as tabelas da Gold (`drop_all` sem `CASCADE`), e o `DROP TABLE` falha enquanto houver view dependente; sem esse passo, a primeira carga depois do item 5 quebra | Aberto; depende do item 5 |
 | D8 | Dev (`backend/`, `docker-compose.yml`, CI) | Instalar o agente na API: workspace do uv com um único `uv.lock` na raiz, build da API com contexto na raiz e as variáveis `VENERGY_AGENT_*` no serviço `api` | O backend precisa importar o agente para o `/ai` (G1-09) | **Feito** (DEC-017, issue #18). A imagem já leva `ai-agent/` (com `prompts/` e, no item 5, `semantic/`) e `contracts/` |
 | D9 | Dev (G2-04, G2-05) | Montar o JSON de métricas de cada tela, chamar o `InsightWriter` e guardar o insight em cache por combinação de filtros; quando o agente devolver `None`, mostrar a tela sem o insight | O LLM só narra números prontos (ADR-04); o agente não guarda estado no processo (§14 do guia) | Aberto; depende do item 9 |
+| D10 | Dev (backend e portal) | Rota `POST /ai/ask/stream` em SSE, que repassa os `AgentEvent` do `stream()`, grava a auditoria no `AnswerEvent` e cancela o agente quando o cliente desconecta. No portal, mostrar o `label` da etapa atual até a resposta, lendo o stream com `fetch` | Melhorar a espera da resposta (UX) sem mostrar texto antes da verificação | Aberto (issue #38); depende do item 10 e do D3 |
 
 ## 11. Próximas features (cada uma em sua branch, com plano próprio)
 
@@ -341,6 +359,9 @@ Pedidos a abrir como issue para a área dona. O GenAI não altera esses arquivos
 
 **9. `InsightWriter`.** Narra o JSON de métricas de uma tela (G2-04, tela de Receita; G2-05, "conta alta" na UC 360, Should) em 2 a 4 frases, sem conclusões causais que o JSON não sustenta (§9 do guia), e devolve `None` se algum número do texto não estiver no JSON. O cache por filtros e a montagem do JSON são do backend (D9).
 - Estado: branch `feat/ai-agent-insight`, sem PR, empilhada sobre a narração. Rebase depois do item 8.
+
+**10. Eventos de progresso para SSE (diferencial).** Pedido em 23/10/2026, à frente do item 7 por decisão do time. `domain/events.py` e `stream()` no `AskUseCase` (§4, §5 e §5.1), com o `ask()` montado sobre o `stream()`. A rota e a tela são do Dev (D10). Muda o contrato com o backend (§4), então o merge espera o aceite do V1 na issue.
+- Estado: branch `feat/ai-agent-stream`, sobre o PR #36. Plano em `docs/plans/2026-10-23-stream-events.md`. Pedido ao Dev: issue #38.
 
 **Diferenciais, só depois dos obrigatórios:**
 - follow-up com memória (G1-10; o histórico fica fora do processo, §8 do guia);
