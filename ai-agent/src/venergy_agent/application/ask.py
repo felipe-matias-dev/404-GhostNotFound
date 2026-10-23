@@ -79,31 +79,36 @@ class AskUseCase:
         self._configured_model = configured_model
 
     async def ask(self, question: str, session_id: str) -> AgentAnswer:
+        started = time.perf_counter()
         async with contextlib.aclosing(self.stream(question, session_id)) as events:
             async for event in events:
                 if isinstance(event, AnswerEvent):
                     return event.answer
-        raise RuntimeError("stream ended without an answer")
+        return self._internal_failure(uuid4().hex, session_id, started)
 
     async def stream(self, question: str, session_id: str) -> AsyncIterator[AgentEvent]:
-        queue: asyncio.Queue[AgentEvent] = asyncio.Queue()
-
-        async def produce() -> None:
-            answer = await self._run(question, session_id, queue.put_nowait)
-            queue.put_nowait(AnswerEvent(answer=answer))
-
-        task = asyncio.create_task(produce())
+        started = time.perf_counter()
+        queue: asyncio.Queue[StageEvent | None] = asyncio.Queue()
+        task = asyncio.create_task(self._run(question, session_id, queue.put_nowait))
+        task.add_done_callback(lambda _: queue.put_nowait(None))
         try:
-            while True:
-                event = await queue.get()
+            while (event := await queue.get()) is not None:
                 yield event
-                if isinstance(event, AnswerEvent):
-                    return
+            yield AnswerEvent(answer=self._outcome(task, session_id, started))
         finally:
             if not task.done():
                 task.cancel()
-                with contextlib.suppress(asyncio.CancelledError):
-                    await task
+                await asyncio.gather(task, return_exceptions=True)
+
+    def _outcome(
+        self, task: asyncio.Task[AgentAnswer], session_id: str, started: float
+    ) -> AgentAnswer:
+        if not task.cancelled() and task.exception() is None:
+            return task.result()
+        request_id = uuid4().hex
+        error = None if task.cancelled() else task.exception()
+        self._log(request_id, session_id, step="ask", status="internal_error", error=repr(error))
+        return self._internal_failure(request_id, session_id, started)
 
     async def _run(
         self, question: str, session_id: str, emit: Callable[[StageEvent], None]
@@ -116,13 +121,16 @@ class AskUseCase:
             self._log(
                 request_id, session_id, step="ask", status="internal_error", error=repr(error)
             )
-            return self._unanswered(
-                AnswerStatus.FAILED,
-                INTERNAL_FAILED,
-                request_id=request_id,
-                session_id=session_id,
-                started=started,
-            )
+            return self._internal_failure(request_id, session_id, started)
+
+    def _internal_failure(self, request_id: str, session_id: str, started: float) -> AgentAnswer:
+        return self._unanswered(
+            AnswerStatus.FAILED,
+            INTERNAL_FAILED,
+            request_id=request_id,
+            session_id=session_id,
+            started=started,
+        )
 
     async def _answer(
         self,

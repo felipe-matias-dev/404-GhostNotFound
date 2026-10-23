@@ -105,12 +105,31 @@ async def test_client_disconnect_cancels_the_run(layer):
     executor = ScriptedExecutor(result())
     events = use_case(layer, generator, executor).stream("quantas UCs?", "s1")
 
-    first = await anext(events)
-    await events.aclose()
+    async with asyncio.timeout(1):
+        first = await anext(events)
+        await events.aclose()
 
     assert first.stage is Stage.UNDERSTANDING
     assert generator.cancelled is True
     assert executor.queries == []
+
+
+async def test_failure_outside_the_guard_still_ends_with_one_failed_answer(layer, monkeypatch):
+    agent = use_case(layer, ScriptedGenerator(generation()))
+
+    async def broken_run(question, session_id, emit):
+        emit(StageEvent(stage=Stage.UNDERSTANDING, attempt=1))
+        raise RuntimeError("bug fora da guarda")
+
+    monkeypatch.setattr(agent, "_run", broken_run)
+
+    async with asyncio.timeout(1):
+        events = await collect(agent)
+
+    assert stages(events) == [Stage.UNDERSTANDING]
+    assert [type(event) for event in events].count(AnswerEvent) == 1
+    assert events[-1].answer.status is AnswerStatus.FAILED
+    assert events[-1].answer.refused_reason == INTERNAL_FAILED
 
 
 async def test_ask_returns_the_answer_the_stream_ends_with(layer, monkeypatch):
