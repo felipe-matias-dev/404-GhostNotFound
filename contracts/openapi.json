@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "V-Energy Grid 360 API",
-    "version": "0.3.0"
+    "version": "0.4.0"
   },
   "paths": {
     "/health": {
@@ -805,6 +805,14 @@
             "type": "number",
             "title": "Efeito Preco"
           },
+          "efeito_tarifa": {
+            "type": "number",
+            "title": "Efeito Tarifa"
+          },
+          "efeito_bandeira": {
+            "type": "number",
+            "title": "Efeito Bandeira"
+          },
           "efeito_volume": {
             "type": "number",
             "title": "Efeito Volume"
@@ -824,6 +832,8 @@
           "receita_atual",
           "variacao_receita",
           "efeito_preco",
+          "efeito_tarifa",
+          "efeito_bandeira",
           "efeito_volume",
           "efeito_mix"
         ],
@@ -857,6 +867,17 @@
             ],
             "title": "Classe"
           },
+          "classe_cadastro": {
+            "type": "string",
+            "enum": [
+              "Residencial",
+              "Comercial",
+              "Industrial",
+              "Rural",
+              "Poder Público"
+            ],
+            "title": "Classe Cadastro"
+          },
           "cod_alimentador": {
             "type": "string",
             "minLength": 1,
@@ -867,34 +888,6 @@
             "title": "Possui Gd"
           },
           "consumo_medio_kwh_12m": {
-            "type": "number",
-            "title": "Consumo Medio Kwh 12M"
-          },
-          "cod_cliente": {
-            "anyOf": [
-              {
-                "type": "string",
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Cod Cliente"
-          },
-          "subgrupo": {
-            "anyOf": [
-              {
-                "type": "string",
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Subgrupo"
-          },
-          "potencia_kw": {
             "anyOf": [
               {
                 "type": "number"
@@ -903,7 +896,42 @@
                 "type": "null"
               }
             ],
-            "title": "Potencia Kw"
+            "title": "Consumo Medio Kwh 12M"
+          },
+          "titular_mascarado": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Titular Mascarado"
+          },
+          "documento_mascarado": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Documento Mascarado"
+          },
+          "potencia_kwp": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Potencia Kwp"
           }
         },
         "type": "object",
@@ -912,12 +940,13 @@
           "municipio",
           "bairro",
           "classe",
+          "classe_cadastro",
           "cod_alimentador",
           "possui_gd",
           "consumo_medio_kwh_12m",
-          "cod_cliente",
-          "subgrupo",
-          "potencia_kw"
+          "titular_mascarado",
+          "documento_mascarado",
+          "potencia_kwp"
         ],
         "title": "DimUcSchema"
       },
@@ -1004,6 +1033,10 @@
             "type": "number",
             "title": "Receita Faturada"
           },
+          "receita_energia": {
+            "type": "number",
+            "title": "Receita Energia"
+          },
           "dec": {
             "anyOf": [
               {
@@ -1054,6 +1087,7 @@
           "competencia",
           "kwh_faturado",
           "receita_faturada",
+          "receita_energia",
           "dec",
           "fec",
           "n_chamados",

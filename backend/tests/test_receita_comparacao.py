@@ -1,3 +1,4 @@
+from datetime import date
 from decimal import Decimal
 from pathlib import Path
 
@@ -23,6 +24,7 @@ UCS = [
     ("0002", "Recife", "Casa Forte", "B3"),
     ("0003", "Olinda", "Carmo", "B1"),
 ]
+REGISTRY_CLASS = {"B1": "Residencial", "B3": "Comercial"}
 
 # (cod_uc, competencia, kwh_faturado, receita_faturada). A UC 0003 foi ligada em 2025.
 BILLING = [
@@ -44,6 +46,7 @@ def store_billing(engine: Engine) -> None:
                 municipio=municipio,
                 bairro=bairro,
                 classe=classe,
+                classe_cadastro=REGISTRY_CLASS[classe],
                 cod_alimentador="AL-01",
                 possui_gd=False,
                 consumo_medio_kwh_12m=Decimal("100"),
@@ -55,7 +58,13 @@ def store_billing(engine: Engine) -> None:
                 cod_uc=cod_uc,
                 competencia=competencia,
                 kwh_faturado=Decimal(kwh),
+                kwh_leitura=Decimal(kwh),
+                origem_kwh="leitura",
                 receita_faturada=Decimal(receita),
+                receita_energia=Decimal(receita),
+                tributos=Decimal("0.00"),
+                data_vencimento=date(2026, 1, 10),
+                status_pagamento="paga",
             )
             for cod_uc, competencia, kwh, receita in BILLING
         )

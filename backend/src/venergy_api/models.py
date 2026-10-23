@@ -1,6 +1,6 @@
 """Tabelas do banco local: as da Gold (só leitura) e as da aplicação (ordens de inspeção)."""
 
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from enum import StrEnum
 
@@ -39,16 +39,20 @@ class DimUc(Base):
     municipio: Mapped[str]
     bairro: Mapped[str]
     classe: Mapped[str]
+    # As 5 classes do cadastro, ao lado da classe de consumo: separa Comercial de Poder
+    # Público, que dividem o B3 (DEC-023).
+    classe_cadastro: Mapped[str]
     cod_alimentador: Mapped[str]
     possui_gd: Mapped[bool]
-    # O Postgres arredonda para as 3 casas do tipo de energia.
-    consumo_medio_kwh_12m: Mapped[Decimal] = mapped_column(_ENERGY)
-    # Opcionais e ainda "a confirmar" no contrato: o backend espelha o contrato inteiro, e
-    # o teste do contrato aponta o que mudar se o time de dados renomear alguma.
-    cod_cliente: Mapped[str | None]
-    subgrupo: Mapped[str | None]
-    # Double, o tipo "ratio" do contrato: potência é medida, não dinheiro nem energia somada.
-    potencia_kw: Mapped[float | None] = mapped_column(Double)
+    # O Postgres arredonda para as 3 casas do tipo de energia. Vazio, e não zero, para a UC
+    # sem nenhuma leitura: sem leitura não há média (DEC-023).
+    consumo_medio_kwh_12m: Mapped[Decimal | None] = mapped_column(_ENERGY)
+    # Só o mascarado chega à Gold, para o atendente confirmar a identidade na UC 360. São
+    # sensitive no contrato: ficam fora das views do agente (DEC-022).
+    titular_mascarado: Mapped[str | None]
+    documento_mascarado: Mapped[str | None]
+    # Double, o tipo "ratio" do contrato. Potência de pico em kWp, como vem da origem.
+    potencia_kwp: Mapped[float | None] = mapped_column(Double)
 
 
 class FatoFaturamentoMensal(Base):
@@ -62,14 +66,27 @@ class FatoFaturamentoMensal(Base):
     cod_uc: Mapped[str] = mapped_column(primary_key=True)
     competencia: Mapped[str] = mapped_column(primary_key=True)
     kwh_faturado: Mapped[Decimal] = mapped_column(_ENERGY)
+    # O consumo da leitura antes da correção, e a regra que gerou o kwh_faturado: rastreia
+    # a troca de medidor e o sinal invertido até a origem (DEC-023).
+    kwh_leitura: Mapped[Decimal] = mapped_column(_ENERGY)
+    origem_kwh: Mapped[str]
+    # Total da fatura = energia + tributos. A energia é a base provisória do PVM (DEC-023).
     receita_faturada: Mapped[Decimal] = mapped_column(_MONEY)
+    receita_energia: Mapped[Decimal] = mapped_column(_MONEY)
+    tributos: Mapped[Decimal] = mapped_column(_MONEY)
     receita_arrecadada: Mapped[Decimal | None] = mapped_column(_MONEY)
     tarifa_media: Mapped[float | None] = mapped_column(Double)
     bandeira: Mapped[str | None]
+    # Uma fatura por UC e competência (conferido pelo time de Dados), então a situação da
+    # fatura mora no fato. O status é calculado na Gold, e não aqui.
+    data_vencimento: Mapped[date]
+    data_pagamento: Mapped[date | None]
+    status_pagamento: Mapped[str]
+    dias_em_atraso: Mapped[int | None]
 
 
 class ReceitaDecomposicao(Base):
-    """Variação da receita entre dois períodos, por município, bairro e classe."""
+    """Variação da receita entre dois períodos, por município, bairro, classe e GD."""
 
     __tablename__ = "gold_receita_decomposicao"
     __table_args__ = {"schema": "gold"}
@@ -79,9 +96,15 @@ class ReceitaDecomposicao(Base):
     municipio: Mapped[str] = mapped_column(primary_key=True)
     bairro: Mapped[str] = mapped_column(primary_key=True)
     classe: Mapped[str] = mapped_column(primary_key=True)
+    # Na chave para isolar o efeito da geração própria: é o efeito volume das linhas com GD,
+    # sem coluna de efeito própria (DEC-023).
+    possui_gd: Mapped[bool] = mapped_column(primary_key=True)
     receita_base: Mapped[Decimal] = mapped_column(_MONEY)
     receita_atual: Mapped[Decimal] = mapped_column(_MONEY)
+    # efeito_preco = efeito_tarifa (reajuste) + efeito_bandeira (acréscimo da bandeira).
     efeito_preco: Mapped[Decimal] = mapped_column(_MONEY)
+    efeito_tarifa: Mapped[Decimal] = mapped_column(_MONEY)
+    efeito_bandeira: Mapped[Decimal] = mapped_column(_MONEY)
     efeito_volume: Mapped[Decimal] = mapped_column(_MONEY)
     efeito_mix: Mapped[Decimal] = mapped_column(_MONEY)
 
@@ -95,10 +118,63 @@ class KpisMensais(Base):
     competencia: Mapped[str] = mapped_column(primary_key=True)
     kwh_faturado: Mapped[Decimal] = mapped_column(_ENERGY)
     receita_faturada: Mapped[Decimal] = mapped_column(_MONEY)
+    receita_energia: Mapped[Decimal] = mapped_column(_MONEY)
     dec: Mapped[float | None] = mapped_column(Double)
     fec: Mapped[float | None] = mapped_column(Double)
     n_chamados: Mapped[int | None]
     satisfacao_media: Mapped[float | None] = mapped_column(Double)
+
+
+class KpisSegmentoMensal(Base):
+    """KPIs por recorte e competência, em componentes somáveis: o filtro da diretoria."""
+
+    __tablename__ = "gold_kpis_segmento_mensal"
+    __table_args__ = {"schema": "gold"}
+
+    competencia: Mapped[str] = mapped_column(primary_key=True)
+    municipio: Mapped[str] = mapped_column(primary_key=True)
+    bairro: Mapped[str] = mapped_column(primary_key=True)
+    classe_cadastro: Mapped[str] = mapped_column(primary_key=True)
+    # Por competência: antes da conexão, a UC conta como sem GD.
+    possui_gd: Mapped[bool] = mapped_column(primary_key=True)
+    classe: Mapped[str]
+    # Estoque: soma só dentro do mesmo mês. Os demais componentes são fluxos e somam entre
+    # meses. Os índices (DEC, FEC, satisfação) não são guardados: calculam-se no fim, sobre
+    # o filtro escolhido, para qualquer recorte dar o mesmo resultado que a empresa inteira.
+    n_uc: Mapped[int]
+    kwh_faturado: Mapped[Decimal] = mapped_column(_ENERGY)
+    receita_faturada: Mapped[Decimal] = mapped_column(_MONEY)
+    receita_energia: Mapped[Decimal] = mapped_column(_MONEY)
+    tributos: Mapped[Decimal] = mapped_column(_MONEY)
+    receita_arrecadada: Mapped[Decimal | None] = mapped_column(_MONEY)
+    horas_interrompidas: Mapped[float] = mapped_column(Double)
+    n_interrupcoes: Mapped[int]
+    n_chamados: Mapped[int]
+    # Soma e contagem das notas, e não a média: média de médias daria peso errado.
+    soma_notas: Mapped[float | None] = mapped_column(Double)
+    n_notas: Mapped[int]
+
+
+class ReconciliacaoFaturamento(Base):
+    """Ponte do faturamento e da energia, do número bruto até o usado nos indicadores."""
+
+    __tablename__ = "gold_reconciliacao_faturamento"
+    __table_args__ = {"schema": "gold"}
+
+    competencia: Mapped[str] = mapped_column(primary_key=True)
+    # Receita: total = cadastro + órfãs, e cadastro = energia + tributos. As faturas de UCs
+    # fora do cadastro ficam fora do fato por UC, mas nunca somem: aparecem aqui (DEC-023).
+    receita_faturada_total: Mapped[Decimal] = mapped_column(_MONEY)
+    receita_faturada_orfas: Mapped[Decimal] = mapped_column(_MONEY)
+    receita_faturada_cadastro: Mapped[Decimal] = mapped_column(_MONEY)
+    tributos_cadastro: Mapped[Decimal] = mapped_column(_MONEY)
+    receita_energia_cadastro: Mapped[Decimal] = mapped_column(_MONEY)
+    n_faturas_orfas: Mapped[int]
+    # Energia: faturada = leitura bruta + correção da troca de medidor + do sinal invertido.
+    kwh_leitura_total: Mapped[Decimal] = mapped_column(_ENERGY)
+    kwh_correcao_troca_medidor: Mapped[Decimal] = mapped_column(_ENERGY)
+    kwh_correcao_sinal_invertido: Mapped[Decimal] = mapped_column(_ENERGY)
+    kwh_faturado_total: Mapped[Decimal] = mapped_column(_ENERGY)
 
 
 class ContinuidadeAlimentadorMensal(Base):
@@ -123,7 +199,8 @@ class FilaSuspeita(Base):
     __table_args__ = {"schema": "gold"}
 
     cod_uc: Mapped[str] = mapped_column(primary_key=True)
-    score_suspeita: Mapped[float] = mapped_column(Double)
+    # Posição no ranking, e não nota: 1 = mais suspeita (decisão da daily de 21/10).
+    score_suspeita: Mapped[int]
     # Lista nativa do Postgres (text[]), e não uma tabela de motivos à parte: os motivos só
     # são lidos junto com a UC, e o agente consegue filtrar com ANY() no mesmo SELECT.
     motivos: Mapped[list[str]] = mapped_column(ARRAY(Text))

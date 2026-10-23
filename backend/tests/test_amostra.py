@@ -1,3 +1,4 @@
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
@@ -6,7 +7,15 @@ from sqlalchemy.orm import Session
 
 from venergy_api.amostra import SAMPLE, SAMPLE_FILA, write_sample
 from venergy_api.carga import load_gold
-from venergy_api.models import FatoFaturamentoMensal, FilaSuspeita, KpisMensais
+from venergy_api.models import (
+    ContinuidadeAlimentadorMensal,
+    FatoFaturamentoMensal,
+    FilaSuspeita,
+    KpisMensais,
+    KpisSegmentoMensal,
+    ReceitaDecomposicao,
+    ReconciliacaoFaturamento,
+)
 
 
 def test_generated_sample_passes_the_gold_load(tmp_path: Path, engine: Engine) -> None:
@@ -16,6 +25,162 @@ def test_generated_sample_passes_the_gold_load(tmp_path: Path, engine: Engine) -
 
     # A carga exige um CSV por tabela da Gold: se faltar amostra de uma, ela falha antes.
     assert counts == {model.__tablename__: len(rows) for model, rows in SAMPLE.items()}
+
+
+def test_billing_follows_the_contract_checks(tmp_path: Path, engine: Engine) -> None:
+    # As validações do fato no contrato (checks) e a regra do kwh_faturado da DEC-023, depois
+    # de CSV, carga e banco: é o que a Gold real também terá que cumprir.
+    write_sample(tmp_path / "gold", force=False)
+    load_gold(tmp_path / "gold", engine)
+
+    with Session(engine) as session:
+        faturas = session.scalars(select(FatoFaturamentoMensal)).all()
+
+    for fatura in faturas:
+        assert abs(fatura.receita_faturada - fatura.receita_energia - fatura.tributos) <= Decimal(
+            "0.01"
+        )
+        nao_paga = fatura.status_pagamento in ("em_aberto", "em_atraso")
+        assert (fatura.data_pagamento is None) == nao_paga
+        sem_atraso = fatura.status_pagamento in ("paga", "em_aberto")
+        assert (fatura.dias_em_atraso is None) == sem_atraso
+        if fatura.origem_kwh == "leitura":
+            assert fatura.kwh_faturado == fatura.kwh_leitura
+        else:
+            assert fatura.kwh_leitura < 0
+        if fatura.origem_kwh == "consumo_absoluto":
+            assert fatura.kwh_faturado == -fatura.kwh_leitura
+    # A amostra exercita todos os valores que o contrato prevê.
+    assert {f.status_pagamento for f in faturas} == {
+        "paga",
+        "paga_com_atraso",
+        "em_aberto",
+        "em_atraso",
+    }
+    assert {f.origem_kwh for f in faturas} == {
+        "leitura",
+        "leitura_atual_troca_medidor",
+        "consumo_absoluto",
+    }
+
+
+def test_revenue_bridge_follows_the_contract_checks(tmp_path: Path, engine: Engine) -> None:
+    # As duas validações da decomposição no contrato, com as tolerâncias de arredondamento.
+    write_sample(tmp_path / "gold", force=False)
+    load_gold(tmp_path / "gold", engine)
+
+    with Session(engine) as session:
+        linhas = session.scalars(select(ReceitaDecomposicao)).all()
+
+    for linha in linhas:
+        preco = linha.efeito_tarifa + linha.efeito_bandeira
+        assert abs(linha.efeito_preco - preco) <= Decimal("0.01")
+        efeitos = linha.efeito_preco + linha.efeito_volume + linha.efeito_mix
+        assert abs(efeitos - (linha.receita_atual - linha.receita_base)) <= Decimal("0.02")
+    # A amostra separa as linhas com GD e tem acréscimo de bandeira para mostrar.
+    assert {linha.possui_gd for linha in linhas} == {True, False}
+    assert all(linha.efeito_bandeira > 0 for linha in linhas)
+
+
+def test_segment_kpis_add_up_to_the_company_and_the_feeders(tmp_path: Path, engine: Engine) -> None:
+    # Os checks da gold_kpis_segmento_mensal no contrato: somados por mês, os recortes batem
+    # com o total da empresa e com a continuidade por alimentador.
+    write_sample(tmp_path / "gold", force=False)
+    load_gold(tmp_path / "gold", engine)
+    segmento = KpisSegmentoMensal
+
+    with Session(engine) as session:
+        recortes = session.execute(
+            select(
+                segmento.competencia,
+                func.sum(segmento.kwh_faturado),
+                func.sum(segmento.receita_faturada),
+                func.sum(segmento.receita_energia),
+            ).group_by(segmento.competencia)
+        )
+        empresa = session.execute(
+            select(
+                KpisMensais.competencia,
+                KpisMensais.kwh_faturado,
+                KpisMensais.receita_faturada,
+                KpisMensais.receita_energia,
+            )
+        )
+        assert set(recortes) == set(empresa)
+
+        recortes_rede = session.execute(
+            select(
+                segmento.competencia,
+                func.sum(segmento.horas_interrompidas),
+                func.sum(segmento.n_interrupcoes),
+            ).group_by(segmento.competencia)
+        ).all()
+        alimentadores = {
+            competencia: (horas, interrupcoes)
+            for competencia, horas, interrupcoes in session.execute(
+                select(
+                    ContinuidadeAlimentadorMensal.competencia,
+                    func.sum(ContinuidadeAlimentadorMensal.horas_interrompidas),
+                    func.sum(ContinuidadeAlimentadorMensal.n_interrupcoes),
+                ).group_by(ContinuidadeAlimentadorMensal.competencia)
+            )
+        }
+        linhas = session.scalars(select(segmento)).all()
+
+    assert len(recortes_rede) == len(alimentadores)
+    for competencia, horas, interrupcoes in recortes_rede:
+        # Horas são double precision: a ordem da soma muda a última casa.
+        assert horas == pytest.approx(alimentadores[competencia][0])
+        assert interrupcoes == alimentadores[competencia][1]
+    for linha in linhas:
+        assert abs(linha.receita_faturada - linha.receita_energia - linha.tributos) <= Decimal(
+            "0.01"
+        )
+
+
+def test_reconciliation_bridges_every_invoice_to_the_billing(
+    tmp_path: Path, engine: Engine
+) -> None:
+    # Os quatro checks da gold_reconciliacao_faturamento no contrato: a ponte de cada mês
+    # fecha e bate com a soma do fato por UC.
+    write_sample(tmp_path / "gold", force=False)
+    load_gold(tmp_path / "gold", engine)
+    fato = FatoFaturamentoMensal
+
+    with Session(engine) as session:
+        pontes = session.scalars(select(ReconciliacaoFaturamento)).all()
+        somas_do_fato = {
+            competencia: (faturada, energia, tributos, kwh)
+            for competencia, faturada, energia, tributos, kwh in session.execute(
+                select(
+                    fato.competencia,
+                    func.sum(fato.receita_faturada),
+                    func.sum(fato.receita_energia),
+                    func.sum(fato.tributos),
+                    func.sum(fato.kwh_faturado),
+                ).group_by(fato.competencia)
+            )
+        }
+
+    centavo, um_wh = Decimal("0.01"), Decimal("0.001")
+    assert len(pontes) == len(somas_do_fato)
+    for ponte in pontes:
+        receita = ponte.receita_faturada_cadastro + ponte.receita_faturada_orfas
+        assert abs(ponte.receita_faturada_total - receita) <= centavo
+        cadastro = ponte.receita_energia_cadastro + ponte.tributos_cadastro
+        assert abs(ponte.receita_faturada_cadastro - cadastro) <= centavo
+        correcoes = ponte.kwh_correcao_troca_medidor + ponte.kwh_correcao_sinal_invertido
+        assert abs(ponte.kwh_faturado_total - ponte.kwh_leitura_total - correcoes) <= um_wh
+        assert somas_do_fato[ponte.competencia] == (
+            ponte.receita_faturada_cadastro,
+            ponte.receita_energia_cadastro,
+            ponte.tributos_cadastro,
+            ponte.kwh_faturado_total,
+        )
+    # A amostra tem faturas órfãs e as duas correções de leitura para mostrar.
+    assert all(ponte.n_faturas_orfas > 0 for ponte in pontes)
+    assert any(ponte.kwh_correcao_troca_medidor > 0 for ponte in pontes)
+    assert any(ponte.kwh_correcao_sinal_invertido > 0 for ponte in pontes)
 
 
 def test_kpis_match_the_sum_of_the_billing_in_the_database(tmp_path: Path, engine: Engine) -> None:
@@ -30,10 +195,16 @@ def test_kpis_match_the_sum_of_the_billing_in_the_database(tmp_path: Path, engin
                 FatoFaturamentoMensal.competencia,
                 func.sum(FatoFaturamentoMensal.kwh_faturado),
                 func.sum(FatoFaturamentoMensal.receita_faturada),
+                func.sum(FatoFaturamentoMensal.receita_energia),
             ).group_by(FatoFaturamentoMensal.competencia)
         )
         kpis = session.execute(
-            select(KpisMensais.competencia, KpisMensais.kwh_faturado, KpisMensais.receita_faturada)
+            select(
+                KpisMensais.competencia,
+                KpisMensais.kwh_faturado,
+                KpisMensais.receita_faturada,
+                KpisMensais.receita_energia,
+            )
         )
         assert set(kpis) == set(billing)
 
@@ -50,6 +221,13 @@ def test_queue_reasons_come_back_as_a_list_from_the_database(
 
     assert stored is not None
     assert stored.motivos == SAMPLE_FILA[0].motivos
+
+
+def test_queue_positions_start_at_one_without_gaps() -> None:
+    # O score é a posição no ranking (1 = mais suspeita), e não uma nota.
+    positions = sorted(suspeita.score_suspeita for suspeita in SAMPLE_FILA)
+
+    assert positions == list(range(1, len(SAMPLE_FILA) + 1))
 
 
 def test_does_not_overwrite_existing_csv_without_force(tmp_path: Path) -> None:

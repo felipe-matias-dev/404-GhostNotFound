@@ -8,6 +8,7 @@ Uso: uv run python -m venergy_api.amostra [--force]
 
 import argparse
 import csv
+from datetime import date
 from decimal import Decimal
 from pathlib import Path
 
@@ -22,7 +23,9 @@ from venergy_api.models import (
     FatoFaturamentoMensal,
     FilaSuspeita,
     KpisMensais,
+    KpisSegmentoMensal,
     ReceitaDecomposicao,
+    ReconciliacaoFaturamento,
 )
 from venergy_api.schemas import (
     ContinuidadeAlimentadorMensalSchema,
@@ -30,28 +33,128 @@ from venergy_api.schemas import (
     FaturamentoMensalSchema,
     FilaSuspeitaSchema,
     KpisMensaisSchema,
+    KpisSegmentoMensalSchema,
     ReceitaDecomposicaoSchema,
+    ReconciliacaoFaturamentoSchema,
 )
 
 FIELDS = list(DimUcSchema.model_fields)
 
-# Cobre todas as classes de consumo, UCs com e sem painel solar e municípios citados pelas
-# lideranças. Os códigos são fixos para que o time possa citá-los ("busque a UC 0003").
-# O titular C0001 tem duas UCs (casa e comércio), caso que o contrato prevê. A potência só
-# existe para UCs com painel solar. O subgrupo fica vazio: o domínio ainda não foi definido.
+# Cobre as 4 classes de consumo e as 5 do cadastro (o B3 aparece como Poder Público e como
+# Comercial), UCs com e sem painel solar e municípios citados pelas lideranças. Os códigos
+# são fixos para que o time possa citá-los ("busque a UC 0003"). Titular e documento são
+# inventados e já mascarados, como chegam da Gold. A potência só existe com painel solar.
 _JABOATAO = "Jaboatão dos Guararapes"
 _CABO = "Cabo de Santo Agostinho"
+_CPF = "***.***.**{}-{}"
+_CNPJ = "**.***.***/***{}-{}"
 _ROWS = [
-    # cod_uc, municipio, bairro, classe, cod_alimentador, possui_gd, consumo_medio_kwh_12m,
-    # cod_cliente, subgrupo, potencia_kw
-    ("0001", "Recife", "Boa Viagem", "B1", "AL-01", False, 162.5, "C0001", None, None),
-    ("0002", "Recife", "Casa Amarela", "B1", "AL-02", True, 48.0, "C0002", None, 3.3),
-    ("0003", "Olinda", "Casa Caiada", "B1", "AL-03", True, 95.3, "C0003", None, 5.0),
-    ("0004", _JABOATAO, "Piedade", "B3", "AL-04", False, 1240.0, "C0004", None, None),
-    ("0005", "Paulista", "Janga", "B1", "AL-05", False, 210.7, "C0005", None, None),
-    ("0006", _CABO, "Zona Rural", "B2", "AL-06", True, 380.0, "C0006", None, 10.0),
-    ("0007", "Recife", "Santo Amaro", "B3", "AL-01", False, 2850.0, "C0001", None, None),
-    ("0008", _JABOATAO, "Prazeres", "A4", "AL-07", False, 48500.0, "C0008", None, None),
+    # cod_uc, municipio, bairro, classe, classe_cadastro, cod_alimentador, possui_gd,
+    # consumo_medio_kwh_12m, titular_mascarado, documento_mascarado, potencia_kwp
+    (
+        "0001",
+        "Recife",
+        "Boa Viagem",
+        "B1",
+        "Residencial",
+        "AL-01",
+        False,
+        162.5,
+        "M. S.",
+        _CPF.format(1, "23"),
+        None,
+    ),
+    (
+        "0002",
+        "Recife",
+        "Casa Amarela",
+        "B1",
+        "Residencial",
+        "AL-02",
+        True,
+        48.0,
+        "A. L. P.",
+        _CPF.format(4, "56"),
+        3.3,
+    ),
+    (
+        "0003",
+        "Olinda",
+        "Casa Caiada",
+        "B1",
+        "Residencial",
+        "AL-03",
+        True,
+        95.3,
+        "J. C.",
+        _CPF.format(7, "89"),
+        5.0,
+    ),
+    (
+        "0004",
+        _JABOATAO,
+        "Piedade",
+        "B3",
+        "Poder Público",
+        "AL-04",
+        False,
+        1240.0,
+        "E. M. P.",
+        _CNPJ.format(0, "11"),
+        None,
+    ),
+    (
+        "0005",
+        "Paulista",
+        "Janga",
+        "B1",
+        "Residencial",
+        "AL-05",
+        False,
+        210.7,
+        "R. F.",
+        _CPF.format(2, "34"),
+        None,
+    ),
+    (
+        "0006",
+        _CABO,
+        "Zona Rural",
+        "B2",
+        "Rural",
+        "AL-06",
+        True,
+        380.0,
+        "S. B. A.",
+        _CPF.format(5, "67"),
+        10.0,
+    ),
+    (
+        "0007",
+        "Recife",
+        "Santo Amaro",
+        "B3",
+        "Comercial",
+        "AL-01",
+        False,
+        2850.0,
+        "P. N. L.",
+        _CNPJ.format(8, "90"),
+        None,
+    ),
+    (
+        "0008",
+        _JABOATAO,
+        "Prazeres",
+        "A4",
+        "Industrial",
+        "AL-07",
+        False,
+        48500.0,
+        "M. I. N.",
+        _CNPJ.format(3, "45"),
+        None,
+    ),
 ]
 
 # Montar pelo schema faz a própria amostra falhar se sair do contrato.
@@ -74,8 +177,10 @@ _TARIFA = {
 }
 _REAJUSTE = {2024: Decimal("1.00"), 2025: Decimal("1.08")}
 _VOLUME = {2024: Decimal("1.03"), 2025: Decimal("1.00")}
-# Bandeira de janeiro a dezembro: vermelha na seca, quando as térmicas entram.
-_BANDEIRAS = (
+# Bandeiras de 2025, de janeiro a dezembro: vermelha na seca, quando as térmicas entram.
+# 2024 fica todo em verde, como o período base do diagnóstico, para a decomposição ter
+# efeito bandeira.
+_BANDEIRAS_2025 = (
     "verde",
     "verde",
     "amarela",
@@ -89,12 +194,59 @@ _BANDEIRAS = (
     "verde",
     "verde",
 )
-# Formato do período ainda "a confirmar" no contrato.
+# Acréscimo por kWh em cada bandeira, na ordem de grandeza das bandeiras tarifárias.
+_ADICIONAL_BANDEIRA = {
+    "verde": Decimal("0"),
+    "amarela": Decimal("0.019"),
+    "vermelha_p1": Decimal("0.045"),
+    "vermelha_p2": Decimal("0.079"),
+}
+# Formato confirmado no contrato v0.2: AAAA-MM/AAAA-MM.
 _PERIODO = {2024: "2024-01/2024-12", 2025: "2025-01/2025-12"}
 
 
+def _bandeira(competencia: str) -> str:
+    if competencia < "2025-01":
+        return "verde"
+    return _BANDEIRAS_2025[int(competencia[5:]) - 1]
+
+
+# Tributos sobre a energia numa alíquota única inventada: na fatura real ela varia.
+_ALIQUOTA_TRIBUTOS = Decimal("0.25")
+# Um caso de cada regra de leitura negativa que o contrato prevê (DEC-023).
+_TROCA_MEDIDOR = ("0003", "2025-03")
+_SINAL_INVERTIDO = ("0006", "2024-08")
+_PAGOU_COM_ATRASO = ("0001", "2025-03")
+
+
+def _mes_seguinte(competencia: str, dia: int) -> date:
+    ano, mes = int(competencia[:4]), int(competencia[5:])
+    return date(ano + mes // 12, mes % 12 + 1, dia)
+
+
+def _leitura(cod_uc: str, competencia: str, kwh_faturado: Decimal) -> tuple[Decimal, str]:
+    """Consumo da leitura antes da correção e a regra que leva ao kwh_faturado."""
+    if (cod_uc, competencia) == _TROCA_MEDIDOR:
+        # O medidor novo parte do zero, a diferença das leituras sai negativa, e vale a
+        # leitura atual.
+        return kwh_faturado - Decimal("5000.000"), "leitura_atual_troca_medidor"
+    if (cod_uc, competencia) == _SINAL_INVERTIDO:
+        return -kwh_faturado, "consumo_absoluto"
+    return kwh_faturado, "leitura"
+
+
+def _situacao(vencimento: date, pagamento: date | None, corte: date) -> tuple[str, int | None]:
+    """Status e dias de atraso da fatura, pela regra do contrato (conventions.invoice_status)."""
+    if pagamento is not None:
+        atraso = (pagamento - vencimento).days
+        return ("paga_com_atraso", atraso) if atraso > 0 else ("paga", None)
+    if vencimento < corte:
+        return "em_atraso", (corte - vencimento).days
+    return "em_aberto", None
+
+
 def _faturamento() -> tuple[FaturamentoMensalSchema, ...]:
-    rows = []
+    faturas = []
     for uc in SAMPLE_UCS:
         for competencia in COMPETENCIAS:
             ano, mes = int(competencia[:4]), int(competencia[5:])
@@ -104,57 +256,113 @@ def _faturamento() -> tuple[FaturamentoMensalSchema, ...]:
             if uc.cod_uc == "0002" and mes == 1:
                 kwh = Decimal(0)
             kwh = kwh.quantize(_KWH)
-            receita = (kwh * _TARIFA[uc.classe] * _REAJUSTE[ano]).quantize(_CENTAVO)
-            # A UC 0005 não pagou as três últimas faturas: arrecadado zero, e não vazio,
-            # porque "não pagou" é um fato.
-            nao_pagou = uc.cod_uc == "0005" and competencia >= "2025-10"
-            rows.append(
-                FaturamentoMensalSchema(
-                    cod_uc=uc.cod_uc,
-                    competencia=competencia,
-                    kwh_faturado=kwh,
-                    receita_faturada=receita,
-                    receita_arrecadada=Decimal("0.00") if nao_pagou else receita,
-                    tarifa_media=float(receita / kwh) if kwh else None,
-                    bandeira=_BANDEIRAS[mes - 1],
-                )
+            tarifa = (
+                _TARIFA[uc.classe] * _REAJUSTE[ano] + _ADICIONAL_BANDEIRA[_bandeira(competencia)]
             )
+            energia = (kwh * tarifa).quantize(_CENTAVO)
+            tributos = (energia * _ALIQUOTA_TRIBUTOS).quantize(_CENTAVO)
+            # A UC 0005 não pagou as três últimas faturas: arrecadado zero, e não vazio,
+            # porque "não pagou" é um fato. As demais pagam no dia 8, antes do vencimento.
+            nao_pagou = uc.cod_uc == "0005" and competencia >= "2025-10"
+            dia_pagamento = 20 if (uc.cod_uc, competencia) == _PAGOU_COM_ATRASO else 8
+            faturas.append(
+                {
+                    "uc": uc,
+                    "competencia": competencia,
+                    "kwh": kwh,
+                    "energia": energia,
+                    "tributos": tributos,
+                    "emissao": _mes_seguinte(competencia, 1),
+                    "vencimento": _mes_seguinte(competencia, 10),
+                    "pagamento": None if nao_pagou else _mes_seguinte(competencia, dia_pagamento),
+                }
+            )
+
+    # Data de corte: a maior data presente nas faturas, de emissão ou de pagamento, porque o
+    # dado é uma extração única. A fatura de dezembro da UC 0005 vence depois dela e fica em
+    # aberto; as de outubro e novembro, em atraso.
+    corte = max(max(f["emissao"], f["pagamento"] or f["emissao"]) for f in faturas)
+    rows = []
+    for f in faturas:
+        kwh_leitura, origem_kwh = _leitura(f["uc"].cod_uc, f["competencia"], f["kwh"])
+        status, dias_em_atraso = _situacao(f["vencimento"], f["pagamento"], corte)
+        total = f["energia"] + f["tributos"]
+        rows.append(
+            FaturamentoMensalSchema(
+                cod_uc=f["uc"].cod_uc,
+                competencia=f["competencia"],
+                kwh_faturado=f["kwh"],
+                kwh_leitura=kwh_leitura,
+                origem_kwh=origem_kwh,
+                receita_faturada=total,
+                receita_energia=f["energia"],
+                tributos=f["tributos"],
+                receita_arrecadada=total if f["pagamento"] else Decimal("0.00"),
+                # Sem tributos, como o contrato redefiniu (DEC-023).
+                tarifa_media=float(f["energia"] / f["kwh"]) if f["kwh"] else None,
+                bandeira=_bandeira(f["competencia"]),
+                data_vencimento=f["vencimento"],
+                data_pagamento=f["pagamento"],
+                status_pagamento=status,
+                dias_em_atraso=dias_em_atraso,
+            )
+        )
     return tuple(rows)
 
 
-# UCs atendidas e DEC/FEC de referência por alimentador. O AL-06, rural e de rede longa, é
-# o pior, para o ranking de continuidade ter um destaque claro.
+# DEC e FEC de referência de cada alimentador, por UC e por mês. O AL-06, rural e de rede
+# longa, é o pior, para o ranking de continuidade ter um destaque claro.
 _ALIMENTADORES = {
-    # cod_alimentador: (n_uc, DEC de referência em horas, FEC de referência)
-    "AL-01": (4200, 0.8, 0.5),
-    "AL-02": (3100, 1.1, 0.7),
-    "AL-03": (2800, 0.9, 0.6),
-    "AL-04": (5200, 1.4, 0.9),
-    "AL-05": (3600, 1.0, 0.6),
-    "AL-06": (1300, 3.2, 1.8),
-    "AL-07": (900, 0.6, 0.4),
+    # cod_alimentador: (DEC de referência em horas, FEC de referência)
+    "AL-01": (0.8, 0.5),
+    "AL-02": (1.1, 0.7),
+    "AL-03": (0.9, 0.6),
+    "AL-04": (1.4, 0.9),
+    "AL-05": (1.0, 0.6),
+    "AL-06": (3.2, 1.8),
+    "AL-07": (0.6, 0.4),
 }
 # Interrupções de cada mês, de janeiro a dezembro, em % da referência: mais na estação chuvosa.
 _CHUVA_PCT = (85, 85, 95, 115, 130, 140, 125, 100, 90, 85, 80, 85)
 
 
+def _interrupcoes(uc: DimUcSchema, competencia: str) -> tuple[int, float]:
+    """Interrupções e horas sem energia de uma UC num mês (no case, cada ocorrência é uma UC)."""
+    dec_referencia, fec_referencia = _ALIMENTADORES[uc.cod_alimentador]
+    chuva = _CHUVA_PCT[int(competencia[5:]) - 1] / 100
+    interrupcoes = round(fec_referencia * chuva)
+    # Cada interrupção dura a média do alimentador: sem interrupção, sem hora parada.
+    return interrupcoes, round(interrupcoes * dec_referencia / fec_referencia, 1)
+
+
+def _chamados(uc: DimUcSchema, competencia: str) -> tuple[int, int | None]:
+    """Chamados abertos pela UC no mês e a nota do atendimento, de 1 a 5."""
+    mes, numero = int(competencia[5:]), int(uc.cod_uc)
+    if (mes + numero) % 4:
+        return 0, None
+    # Parte dos chamados fica sem nota, e fica fora da média (ATD-01).
+    nota = None if mes % 3 == 0 else 1 + (mes + 2 * numero) % 5
+    return 1, nota
+
+
 def _continuidade() -> tuple[ContinuidadeAlimentadorMensalSchema, ...]:
-    # Pelo contrato, dec = horas_interrompidas ÷ n_uc e fec = n_interrupcoes ÷ n_uc. Para o
-    # DEC sair em horas por consumidor, horas e interrupções somam o que cada UC afetada
-    # sofreu (consumidor × hora), e não o tempo de relógio da ocorrência.
+    # Somada das UCs da amostra, para bater com os KPIs por recorte: n_uc é o número de UCs
+    # do cadastro que o alimentador atende. Pelo contrato, dec = horas_interrompidas ÷ n_uc
+    # e fec = n_interrupcoes ÷ n_uc, com as horas em consumidor × hora.
     rows = []
-    for cod_alimentador, (n_uc, dec_referencia, fec_referencia) in _ALIMENTADORES.items():
+    for cod_alimentador in _ALIMENTADORES:
+        ucs = [uc for uc in SAMPLE_UCS if uc.cod_alimentador == cod_alimentador]
         for competencia in COMPETENCIAS:
-            chuva = _CHUVA_PCT[int(competencia[5:]) - 1] / 100
-            horas = round(n_uc * dec_referencia * chuva, 1)
-            interrupcoes = round(n_uc * fec_referencia * chuva)
+            ocorrencias = [_interrupcoes(uc, competencia) for uc in ucs]
+            interrupcoes = sum(n for n, _ in ocorrencias)
+            horas = sum(h for _, h in ocorrencias)
             rows.append(
                 ContinuidadeAlimentadorMensalSchema(
                     cod_alimentador=cod_alimentador,
                     competencia=competencia,
-                    dec=horas / n_uc,
-                    fec=interrupcoes / n_uc,
-                    n_uc=n_uc,
+                    dec=horas / len(ucs),
+                    fec=interrupcoes / len(ucs),
+                    n_uc=len(ucs),
                     n_interrupcoes=interrupcoes,
                     horas_interrompidas=horas,
                 )
@@ -167,7 +375,6 @@ def _kpis(
     continuidade: tuple[ContinuidadeAlimentadorMensalSchema, ...],
 ) -> tuple[KpisMensaisSchema, ...]:
     # Somas do faturamento, para que o painel da diretoria bata com a soma das UCs.
-    # Chamados e satisfação ainda não têm definição no contrato.
     rows = []
     for competencia in COMPETENCIAS:
         do_mes = [linha for linha in faturamento if linha.competencia == competencia]
@@ -175,15 +382,111 @@ def _kpis(
         # DEC e FEC da empresa: totais sobre o total de UCs atendidas, e não a média dos
         # alimentadores, que daria o mesmo peso a um rural pequeno e a um urbano grande.
         n_uc = sum(linha.n_uc for linha in rede)
+        chamados = [_chamados(uc, competencia) for uc in SAMPLE_UCS]
+        notas = [nota for _, nota in chamados if nota is not None]
         rows.append(
             KpisMensaisSchema(
                 competencia=competencia,
                 kwh_faturado=sum((linha.kwh_faturado for linha in do_mes), Decimal(0)),
                 receita_faturada=sum((linha.receita_faturada for linha in do_mes), Decimal(0)),
+                receita_energia=sum((linha.receita_energia for linha in do_mes), Decimal(0)),
                 dec=sum(linha.horas_interrompidas for linha in rede) / n_uc,
                 fec=sum(linha.n_interrupcoes for linha in rede) / n_uc,
-                n_chamados=None,
-                satisfacao_media=None,
+                n_chamados=sum(n for n, _ in chamados),
+                # Soma das notas ÷ chamados com nota; vazia no mês sem nenhuma avaliação.
+                satisfacao_media=sum(notas) / len(notas) if notas else None,
+            )
+        )
+    return tuple(rows)
+
+
+def _kpis_segmento(
+    faturamento: tuple[FaturamentoMensalSchema, ...],
+) -> tuple[KpisSegmentoMensalSchema, ...]:
+    # Somados das UCs com as mesmas regras do faturamento, da continuidade e dos chamados:
+    # a soma de cada mês bate com os KPIs da empresa e com a continuidade por alimentador.
+    fatura = {(linha.cod_uc, linha.competencia): linha for linha in faturamento}
+    recortes: dict[tuple[str, str, str, bool], list[DimUcSchema]] = {}
+    for uc in SAMPLE_UCS:
+        # Na amostra, os painéis solares já estavam conectados antes de 2024, então o GD de
+        # cada competência é o do cadastro.
+        chave = (uc.municipio, uc.bairro, uc.classe_cadastro, uc.possui_gd)
+        recortes.setdefault(chave, []).append(uc)
+
+    rows = []
+    for competencia in COMPETENCIAS:
+        for (municipio, bairro, classe_cadastro, possui_gd), ucs in sorted(recortes.items()):
+            faturas = [fatura[(uc.cod_uc, competencia)] for uc in ucs]
+            ocorrencias = [_interrupcoes(uc, competencia) for uc in ucs]
+            chamados = [_chamados(uc, competencia) for uc in ucs]
+            notas = [nota for _, nota in chamados if nota is not None]
+            arrecadado = [f.receita_arrecadada for f in faturas if f.receita_arrecadada is not None]
+            rows.append(
+                KpisSegmentoMensalSchema(
+                    competencia=competencia,
+                    municipio=municipio,
+                    bairro=bairro,
+                    classe_cadastro=classe_cadastro,
+                    classe=ucs[0].classe,
+                    possui_gd=possui_gd,
+                    n_uc=len(ucs),
+                    kwh_faturado=sum((f.kwh_faturado for f in faturas), Decimal(0)),
+                    receita_faturada=sum((f.receita_faturada for f in faturas), Decimal(0)),
+                    receita_energia=sum((f.receita_energia for f in faturas), Decimal(0)),
+                    tributos=sum((f.tributos for f in faturas), Decimal(0)),
+                    receita_arrecadada=sum(arrecadado, Decimal(0)) if arrecadado else None,
+                    horas_interrompidas=sum(h for _, h in ocorrencias),
+                    n_interrupcoes=sum(n for n, _ in ocorrencias),
+                    n_chamados=sum(n for n, _ in chamados),
+                    soma_notas=float(sum(notas)) if notas else None,
+                    n_notas=len(notas),
+                )
+            )
+    return tuple(rows)
+
+
+# Faturas de UCs fora do cadastro, em todo mês: valores inventados, para a parcela de órfãs
+# da reconciliação não ficar zerada.
+_FATURAS_ORFAS = (Decimal("187.40"), Decimal("92.15"))
+
+
+def _correcao_kwh(faturas: list[FaturamentoMensalSchema], origem: str) -> Decimal:
+    """Quanto a regra de uma origem somou ao consumo bruto da leitura."""
+    return sum(
+        (
+            fatura.kwh_faturado - fatura.kwh_leitura
+            for fatura in faturas
+            if fatura.origem_kwh == origem
+        ),
+        Decimal(0),
+    )
+
+
+def _reconciliacao(
+    faturamento: tuple[FaturamentoMensalSchema, ...],
+) -> tuple[ReconciliacaoFaturamentoSchema, ...]:
+    # O cadastro é a soma do fato por UC; as órfãs entram só aqui, porque não têm UC para
+    # ligar. As correções de energia vêm da regra que gerou cada kwh_faturado (origem_kwh).
+    rows = []
+    for competencia in COMPETENCIAS:
+        do_mes = [linha for linha in faturamento if linha.competencia == competencia]
+        cadastro = sum((linha.receita_faturada for linha in do_mes), Decimal(0))
+        orfas = sum(_FATURAS_ORFAS, Decimal(0))
+        rows.append(
+            ReconciliacaoFaturamentoSchema(
+                competencia=competencia,
+                receita_faturada_total=cadastro + orfas,
+                receita_faturada_orfas=orfas,
+                receita_faturada_cadastro=cadastro,
+                tributos_cadastro=sum((linha.tributos for linha in do_mes), Decimal(0)),
+                receita_energia_cadastro=sum(
+                    (linha.receita_energia for linha in do_mes), Decimal(0)
+                ),
+                n_faturas_orfas=len(_FATURAS_ORFAS),
+                kwh_leitura_total=sum((linha.kwh_leitura for linha in do_mes), Decimal(0)),
+                kwh_correcao_troca_medidor=_correcao_kwh(do_mes, "leitura_atual_troca_medidor"),
+                kwh_correcao_sinal_invertido=_correcao_kwh(do_mes, "consumo_absoluto"),
+                kwh_faturado_total=sum((linha.kwh_faturado for linha in do_mes), Decimal(0)),
             )
         )
     return tuple(rows)
@@ -192,21 +495,32 @@ def _kpis(
 def _decomposicao(
     faturamento: tuple[FaturamentoMensalSchema, ...],
 ) -> tuple[ReceitaDecomposicaoSchema, ...]:
-    # Totais de kWh e receita por segmento (município, bairro, classe) e ano.
-    segmento_da_uc = {uc.cod_uc: (uc.municipio, uc.bairro, uc.classe) for uc in SAMPLE_UCS}
-    totais: dict[tuple[tuple[str, str, str], int], list[Decimal]] = {}
+    # Totais de kWh, receita de energia e acréscimo de bandeira por segmento e ano. A base é a
+    # receita de energia, sem tributos (DEC-023).
+    segmento_da_uc = {
+        uc.cod_uc: (uc.municipio, uc.bairro, uc.classe, uc.possui_gd) for uc in SAMPLE_UCS
+    }
+    totais: dict[tuple[tuple[str, str, str, bool], int], list[Decimal]] = {}
     for linha in faturamento:
         chave = (segmento_da_uc[linha.cod_uc], int(linha.competencia[:4]))
-        kwh, receita = totais.get(chave, [Decimal(0), Decimal(0)])
-        totais[chave] = [kwh + linha.kwh_faturado, receita + linha.receita_faturada]
+        kwh, receita, bandeira = totais.get(chave, [Decimal(0), Decimal(0), Decimal(0)])
+        totais[chave] = [
+            kwh + linha.kwh_faturado,
+            receita + linha.receita_energia,
+            bandeira + linha.kwh_faturado * _ADICIONAL_BANDEIRA[linha.bandeira],
+        ]
 
     rows = []
-    for municipio, bairro, classe in sorted({segmento for segmento, _ in totais}):
-        kwh_base, receita_base = totais[((municipio, bairro, classe), 2024)]
-        kwh_atual, receita_atual = totais[((municipio, bairro, classe), 2025)]
+    for segmento in sorted({segmento for segmento, _ in totais}):
+        municipio, bairro, classe, possui_gd = segmento
+        kwh_base, receita_base, bandeira_base = totais[(segmento, 2024)]
+        kwh_atual, receita_atual, bandeira_atual = totais[(segmento, 2025)]
         tarifa_base, tarifa_atual = receita_base / kwh_base, receita_atual / kwh_atual
         efeito_preco = ((tarifa_atual - tarifa_base) * kwh_atual).quantize(_CENTAVO)
-        efeito_volume = ((kwh_atual - kwh_base) * tarifa_base).quantize(_CENTAVO)
+        # A parte do preço que veio da bandeira: o acréscimo médio por kWh mudou entre os
+        # períodos. O resto do efeito preço é o reajuste da tarifa base.
+        adicional_base, adicional_atual = bandeira_base / kwh_base, bandeira_atual / kwh_atual
+        efeito_bandeira = ((adicional_atual - adicional_base) * kwh_atual).quantize(_CENTAVO)
         rows.append(
             ReceitaDecomposicaoSchema(
                 periodo_base=_PERIODO[2024],
@@ -214,37 +528,40 @@ def _decomposicao(
                 municipio=municipio,
                 bairro=bairro,
                 classe=classe,
+                possui_gd=possui_gd,
                 receita_base=receita_base,
                 receita_atual=receita_atual,
                 efeito_preco=efeito_preco,
-                efeito_volume=efeito_volume,
-                # Num segmento só, preço e volume já explicam toda a variação: aqui o mix é
-                # o resíduo do arredondamento, e a conta fecha. A fórmula oficial, com o mix
-                # entre segmentos, é do Diagnóstico.
-                efeito_mix=receita_atual - receita_base - efeito_preco - efeito_volume,
+                efeito_tarifa=efeito_preco - efeito_bandeira,
+                efeito_bandeira=efeito_bandeira,
+                efeito_volume=((kwh_atual - kwh_base) * tarifa_base).quantize(_CENTAVO),
+                # Calculado, e não resíduo (contrato v0.2): num segmento de uma classe só, o
+                # peso entre classes não muda, então o mix é zero. Preço e volume fecham com a
+                # variação dentro da tolerância de arredondamento (R$ 0,02 por linha).
+                efeito_mix=Decimal("0.00"),
             )
         )
     return tuple(rows)
 
 
-# Fila de suspeitas, da maior para a menor prioridade. A UC 0004 ainda não tem estimativa
+# Fila de suspeitas, pela posição no ranking (1 = mais suspeita). A UC 0004 ainda não tem estimativa
 # de energia recuperável: o gerente de perdas vê a suspeita mesmo sem o valor.
 SAMPLE_FILA = (
     FilaSuspeitaSchema(
         cod_uc="0005",
-        score_suspeita=0.91,
+        score_suspeita=1,
         motivos=["leituras estimadas em 3 dos últimos 6 meses", "medidor com mais de 15 anos"],
         kwh_recuperavel_est=Decimal("1850.000"),
     ),
     FilaSuspeitaSchema(
         cod_uc="0007",
-        score_suspeita=0.78,
+        score_suspeita=2,
         motivos=["inspeção anterior encontrou irregularidade"],
         kwh_recuperavel_est=Decimal("4200.000"),
     ),
     FilaSuspeitaSchema(
         cod_uc="0004",
-        score_suspeita=0.64,
+        score_suspeita=3,
         motivos=["leituras estimadas em 2 dos últimos 6 meses"],
         kwh_recuperavel_est=None,
     ),
@@ -253,6 +570,8 @@ SAMPLE_FILA = (
 SAMPLE_FATURAMENTO = _faturamento()
 SAMPLE_CONTINUIDADE = _continuidade()
 SAMPLE_KPIS = _kpis(SAMPLE_FATURAMENTO, SAMPLE_CONTINUIDADE)
+SAMPLE_KPIS_SEGMENTO = _kpis_segmento(SAMPLE_FATURAMENTO)
+SAMPLE_RECONCILIACAO = _reconciliacao(SAMPLE_FATURAMENTO)
 SAMPLE_DECOMPOSICAO = _decomposicao(SAMPLE_FATURAMENTO)
 
 # Linhas por tabela da Gold. A carga exige um CSV para cada tabela de GOLD_TABLES, e o
@@ -262,6 +581,8 @@ SAMPLE: dict[type[Base], tuple[BaseModel, ...]] = {
     FatoFaturamentoMensal: SAMPLE_FATURAMENTO,
     ReceitaDecomposicao: SAMPLE_DECOMPOSICAO,
     KpisMensais: SAMPLE_KPIS,
+    KpisSegmentoMensal: SAMPLE_KPIS_SEGMENTO,
+    ReconciliacaoFaturamento: SAMPLE_RECONCILIACAO,
     ContinuidadeAlimentadorMensal: SAMPLE_CONTINUIDADE,
     FilaSuspeita: SAMPLE_FILA,
 }

@@ -13,6 +13,7 @@ UC_BASE = {
     "municipio": "Recife",
     "bairro": "Boa Viagem",
     "classe": "B1",
+    "classe_cadastro": "Residencial",
     "cod_alimentador": "AL-01",
     "possui_gd": False,
     "consumo_medio_kwh_12m": 150.0,

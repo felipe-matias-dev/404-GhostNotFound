@@ -1,6 +1,6 @@
 """Contrato dos dados: o formato que a Gold entrega e que a API recebe e devolve."""
 
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Annotated, Literal
 
@@ -26,7 +26,10 @@ ExactNumber = Annotated[Decimal, PlainSerializer(float, return_type=float, when_
 # Competência em texto AAAA-MM (DEC-011): não depende de como CSV, Delta e Postgres leem datas.
 Competencia = Annotated[str, StringConstraints(pattern=r"^\d{4}-(0[1-9]|1[0-2])$")]
 Classe = Literal["B1", "B2", "B3", "A4"]
+ClasseCadastro = Literal["Residencial", "Comercial", "Industrial", "Rural", "Poder Público"]
 Bandeira = Literal["verde", "amarela", "vermelha_p1", "vermelha_p2"]
+OrigemKwh = Literal["leitura", "leitura_atual_troca_medidor", "consumo_absoluto"]
+StatusPagamento = Literal["paga", "paga_com_atraso", "em_aberto", "em_atraso"]
 
 # Teto por pedido na ordem da capacidade mensal da equipe de campo (~200 inspeções):
 # acima disso é engano de seleção, e o limite evita um pedido gigante travar o banco.
@@ -41,13 +44,14 @@ class DimUcSchema(BaseModel):
     municipio: RequiredText
     bairro: RequiredText
     classe: Classe
+    classe_cadastro: ClasseCadastro
     cod_alimentador: RequiredText
     possui_gd: bool
-    consumo_medio_kwh_12m: ExactNumber = Field(ge=0)
     # Sem valor padrão de propósito: a coluna precisa existir no CSV, mesmo vazia.
-    cod_cliente: RequiredText | None
-    subgrupo: RequiredText | None
-    potencia_kw: float | None
+    consumo_medio_kwh_12m: Annotated[ExactNumber, Field(ge=0)] | None
+    titular_mascarado: RequiredText | None
+    documento_mascarado: RequiredText | None
+    potencia_kwp: float | None
 
 
 class FaturamentoMensalSchema(BaseModel):
@@ -56,11 +60,20 @@ class FaturamentoMensalSchema(BaseModel):
     cod_uc: RequiredText
     competencia: Competencia
     kwh_faturado: ExactNumber
+    # Pode ser negativo: é a leitura antes da correção.
+    kwh_leitura: ExactNumber
+    origem_kwh: OrigemKwh
     receita_faturada: ExactNumber
+    receita_energia: ExactNumber
+    tributos: ExactNumber
     receita_arrecadada: ExactNumber | None
     # Vazia quando kwh_faturado é zero (ex.: painel solar compensando todo o consumo).
     tarifa_media: float | None
     bandeira: Bandeira | None
+    data_vencimento: date
+    data_pagamento: date | None
+    status_pagamento: StatusPagamento
+    dias_em_atraso: int | None
 
 
 class ReceitaDecomposicaoSchema(BaseModel):
@@ -71,10 +84,13 @@ class ReceitaDecomposicaoSchema(BaseModel):
     municipio: RequiredText
     bairro: RequiredText
     classe: Classe
+    possui_gd: bool
     receita_base: ExactNumber
     receita_atual: ExactNumber
     # Sem limite de sinal: queda de preço ou de volume é efeito negativo.
     efeito_preco: ExactNumber
+    efeito_tarifa: ExactNumber
+    efeito_bandeira: ExactNumber
     efeito_volume: ExactNumber
     efeito_mix: ExactNumber
 
@@ -86,7 +102,10 @@ class KpisMensaisSchema(BaseModel):
 
     competencia: Competencia
     kwh_faturado: ExactNumber
+    # Total da fatura (com tributos) e só a energia: a variação percentual é a mesma, mas os
+    # valores absolutos não (DEC-023).
     receita_faturada: ExactNumber
+    receita_energia: ExactNumber
     dec: float | None
     fec: float | None
     n_chamados: int | None
@@ -183,8 +202,48 @@ class DecomposicaoLinhaSchema(BaseModel):
     receita_atual: ExactNumber
     variacao_receita: ExactNumber
     efeito_preco: ExactNumber
+    efeito_tarifa: ExactNumber
+    efeito_bandeira: ExactNumber
     efeito_volume: ExactNumber
     efeito_mix: ExactNumber
+
+
+class KpisSegmentoMensalSchema(BaseModel):
+    """Componentes somáveis de um recorte (município, bairro, classe e GD) numa competência."""
+
+    competencia: Competencia
+    municipio: RequiredText
+    bairro: RequiredText
+    classe_cadastro: ClasseCadastro
+    classe: Classe
+    possui_gd: bool
+    n_uc: int
+    kwh_faturado: ExactNumber
+    receita_faturada: ExactNumber
+    receita_energia: ExactNumber
+    tributos: ExactNumber
+    receita_arrecadada: ExactNumber | None
+    horas_interrompidas: float
+    n_interrupcoes: int
+    n_chamados: int
+    soma_notas: float | None
+    n_notas: int
+
+
+class ReconciliacaoFaturamentoSchema(BaseModel):
+    """De onde vem a receita e a energia de uma competência, parcela por parcela."""
+
+    competencia: Competencia
+    receita_faturada_total: ExactNumber
+    receita_faturada_orfas: ExactNumber
+    receita_faturada_cadastro: ExactNumber
+    tributos_cadastro: ExactNumber
+    receita_energia_cadastro: ExactNumber
+    n_faturas_orfas: int
+    kwh_leitura_total: ExactNumber
+    kwh_correcao_troca_medidor: ExactNumber
+    kwh_correcao_sinal_invertido: ExactNumber
+    kwh_faturado_total: ExactNumber
 
 
 class ContinuidadeAlimentadorMensalSchema(BaseModel):
@@ -203,7 +262,8 @@ class FilaSuspeitaSchema(BaseModel):
     """Uma UC suspeita de perda não técnica, com o porquê e o quanto vale inspecionar."""
 
     cod_uc: RequiredText
-    score_suspeita: float
+    # Posição no ranking: 1 = mais suspeita.
+    score_suspeita: Annotated[int, Field(ge=1)]
     # Motivos legíveis para o gerente de perdas decidir; no CSV, separados por ";".
     motivos: list[RequiredText]
     kwh_recuperavel_est: ExactNumber | None
