@@ -15,8 +15,12 @@ O agente transforma uma pergunta em português numa consulta SQL somente leitura
 - executor somente leitura no Postgres (PR #8);
 - gerador de SQL com PydanticAI (PRs #13 e #14);
 - job do agente no CI (PR #8).
+- camada semântica validada contra o contrato da Gold (PR #20, item 5);
+- contrato `AgentAnswer` com status e invariantes (PR #21 e PR #29, item 2).
 
-**Falta, na ordem da §11:** camada semântica (item 5), contrato final do `AgentAnswer` (item 2), orquestração `ask()` (item 6), avaliação (item 7), redação da resposta (item 8) e insights (item 9).
+**Em revisão:** orquestração `ask()` (item 6, PR #30).
+
+**Falta, na ordem da §11:** redação da resposta (item 8, branch pronta, PR depois do item 6), insights (item 9, branch pronta) e avaliação (item 7, golden set sem revisão humana).
 
 **Critério de sucesso de cada feature:** `uv run pytest` e `uv run ruff check` passam em `ai-agent/` (inclusive no CI), os contratos desta spec batem com o código e os testes da §8 cobrem as regras novas.
 
