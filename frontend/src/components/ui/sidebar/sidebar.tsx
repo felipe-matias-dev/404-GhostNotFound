@@ -54,18 +54,18 @@ function useSidebar() {
 	return context;
 }
 
+const CONSULTA_MOBILE = `(max-width: ${MOBILE_BREAKPOINT - 1}px)`;
+
 function useIsMobile() {
-	const [isMobile, setIsMobile] = React.useState(false);
-
-	React.useEffect(() => {
-		const mql = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`);
-		const onChange = () => setIsMobile(mql.matches);
-		mql.addEventListener("change", onChange);
-		onChange();
-		return () => mql.removeEventListener("change", onChange);
-	}, []);
-
-	return isMobile;
+	return React.useSyncExternalStore(
+		(avisar) => {
+			const mql = window.matchMedia(CONSULTA_MOBILE);
+			mql.addEventListener("change", avisar);
+			return () => mql.removeEventListener("change", avisar);
+		},
+		() => window.matchMedia(CONSULTA_MOBILE).matches,
+		() => false,
+	);
 }
 
 function SidebarProvider({
@@ -190,13 +190,14 @@ function Sidebar({
 					data-sidebar="sidebar"
 					data-slot="sidebar"
 					data-mobile="true"
-					className="w-(--sidebar-width) gap-0 p-0 sm:max-w-(--sidebar-width) [&>button]:hidden"
+					className="gap-0 p-0 data-[side=left]:w-(--sidebar-width) data-[side=right]:w-(--sidebar-width) data-[side=left]:sm:max-w-(--sidebar-width) data-[side=right]:sm:max-w-(--sidebar-width)"
 					style={
 						{
 							"--sidebar-width": SIDEBAR_WIDTH_MOBILE,
 						} as React.CSSProperties
 					}
 					side={side}
+					showCloseButton={false}
 				>
 					<SheetHeader className="sr-only">
 						<SheetTitle>Navegação</SheetTitle>
