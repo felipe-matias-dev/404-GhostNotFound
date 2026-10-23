@@ -28,6 +28,7 @@ class AgentSettings(BaseSettings):
     query_timeout_seconds: float = Field(10.0, gt=0)
     max_correction_attempts: int = Field(3, ge=1, le=3)
     prompt_version: str = "v1"
+    prompts_dir: Path = AGENT_ROOT / "prompts"
     semantic_layer_path: Path = AGENT_ROOT / "semantic" / "semantic_layer.yaml"
     gold_contract_path: Path = REPO_ROOT / "contracts" / "gold_schema.yaml"
     answer_sample_rows: int = Field(20, gt=0)

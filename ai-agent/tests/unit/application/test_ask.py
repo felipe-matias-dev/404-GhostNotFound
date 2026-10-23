@@ -329,6 +329,17 @@ async def test_each_step_is_logged_as_json_and_row_values_never_reach_the_logs(l
     assert not any(secret in record.getMessage() for record in caplog.records)
 
 
+async def test_clarify_writes_the_final_answer_log_line(layer, caplog):
+    caplog.set_level(logging.INFO, logger="venergy_agent.ask")
+
+    await use_case(layer, ScriptedGenerator(generation("clarify", clarification="Qual mês?"))).ask(
+        "receita?", "s1"
+    )
+
+    lines = [json.loads(record.getMessage()) for record in caplog.records]
+    assert [line["status"] for line in lines if line["step"] == "resposta"] == ["clarify"]
+
+
 async def test_validation_and_execution_steps_log_their_own_latency(layer, caplog):
     caplog.set_level(logging.INFO, logger="venergy_agent.ask")
 

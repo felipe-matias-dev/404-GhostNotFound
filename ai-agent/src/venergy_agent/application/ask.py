@@ -47,8 +47,6 @@ EMPTY_RESULT = (
 
 
 class AskUseCase:
-    """Implementa TextToSqlAgent: gera, valida, executa e responde. Nunca levanta exceção."""
-
     def __init__(
         self,
         *,
@@ -150,6 +148,7 @@ class AskUseCase:
                     model=generation.model,
                 )
             if draft.status is DraftStatus.CLARIFY:
+                self._log(request_id, session_id, step="resposta", status="clarify")
                 return self._clarify(
                     draft.clarification_question or "", request_id, started, model=generation.model
                 )

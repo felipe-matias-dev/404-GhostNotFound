@@ -109,6 +109,7 @@ def test_semantic_layer_and_contract_paths_resolve_inside_the_repository(require
 
     assert settings.semantic_layer_path.exists()
     assert settings.gold_contract_path.exists()
+    assert (settings.prompts_dir / settings.prompt_version / "system.md").exists()
 
 
 def test_answer_sample_rows_must_be_positive(required_env, monkeypatch):

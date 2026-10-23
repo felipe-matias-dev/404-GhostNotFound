@@ -44,6 +44,14 @@ uv run pytest          # os testes de integração precisam do banco: docker com
 uv run ruff check . && uv run ruff format --check .
 ```
 
+Para fazer uma pergunta pelo terminal, com a chave do modelo no `.env` e as views `sem_*` aplicadas no banco:
+
+```bash
+uv run python -m venergy_agent "Quantas UCs existem em cada classe de consumo?"
+```
+
+O backend monta o agente com `venergy_agent.bootstrap.build_agent(AgentSettings())`, uma vez por processo: erro na camada semântica, no contrato ou no prompt falha na subida.
+
 As configurações são lidas de variáveis com prefixo `VENERGY_AGENT_` (ou do `.env`), conforme `src/venergy_agent/config.py`. O `.env` não vai para o Git.
 
 ## Chave do modelo

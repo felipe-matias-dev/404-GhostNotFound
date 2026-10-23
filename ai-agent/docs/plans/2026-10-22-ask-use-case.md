@@ -1,6 +1,6 @@
 # ask() Use Case Implementation Plan
 
-> **Status (2026-10-22): implemented on branch `feat/ai-agent-ask`, not merged.** Based on `feat/ai-agent-contrato-answer` (item 2). Bootstrap and the terminal command are in item 8, because they need the answer writer.
+> **Status (2026-10-22): implemented on branch `feat/ai-agent-ask`, not merged.** Based on `feat/ai-agent-contrato-answer` (item 2). Bootstrap and the terminal command moved here from item 8 after the review on PR #30 (2026-10-23): `build_agent` wires the use case with the deterministic answer text, so the backend can start D3; item 8 only injects the answer writer.
 
 **Goal:** implement `TextToSqlAgent.ask()` with the flow of spec §5.1: size limit, statuses without SQL, correction after rejection and correctable errors, unclassified errors that fail at once, exhausted attempts, provider errors, confidence, and one log line per step. The answer text is deterministic in this branch.
 
