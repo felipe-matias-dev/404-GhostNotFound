@@ -262,6 +262,17 @@ async def test_narrative_with_an_invented_number_falls_back_to_the_deterministic
     assert answer.answer.startswith("A consulta devolveu 1 linha(s).")
 
 
+async def test_narrative_with_an_unreadable_number_falls_back_instead_of_failing(layer):
+    writer = FixedWriter(text="Classes 1,2,3 com 3 UCs.")
+
+    answer = await use_case(layer, ScriptedGenerator(generation()), writer=writer).ask(
+        "quantas?", "s1"
+    )
+
+    assert answer.status is AnswerStatus.ANSWERED
+    assert answer.answer.startswith("A consulta devolveu 1 linha(s).")
+
+
 async def test_writer_error_falls_back_to_the_deterministic_text(layer):
     writer = FixedWriter(error=RuntimeError("provedor caiu"))
 
