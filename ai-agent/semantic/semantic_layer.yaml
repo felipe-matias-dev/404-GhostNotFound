@@ -1,0 +1,153 @@
+# Camada semântica do agente Text-to-SQL (dono: GenAI).
+#
+# É a ACL do agente sobre a Gold: escolhe quais tabelas viram views sem_* e quais colunas
+# o agente enxerga. Cada view é validada contra contracts/gold_schema.yaml na carga: tabela e
+# coluna precisam existir, coluna a_confirmar não entra, e a chave primária da tabela precisa
+# estar confirmada ou proposta e aparecer na view. Erro aqui falha na subida do processo.
+#
+# Tipos, valores permitidos (allowed) e relações vêm do contrato. As relações são montadas a
+# partir das foreign_keys e das chaves compartilhadas que identificam entidade (cod_uc,
+# cod_alimentador). Competência, município e bairro não viram relação: juntar só por período
+# gera produto cartesiano.
+#
+# As linhas de exemplo são sintéticas, escritas à mão. Nenhum valor real da Gold entra aqui.
+# Depois de cada mudança, gere o views.sql (ver a seção Camada semântica em ai-agent/README.md).
+
+version: "0.1.0"
+
+views:
+  - name: sem_uc
+    source: gold_dim_uc
+    description: "Unidades consumidoras: cadastro com localização, classe, alimentador e geração própria"
+    grain: "uma linha por unidade consumidora (UC)"
+    columns:
+      - name: cod_uc
+        description: "código da UC; é um identificador de texto, não um número"
+      - name: municipio
+        description: "município onde fica a UC"
+      - name: bairro
+        description: "bairro onde fica a UC; o mesmo nome pode existir em municípios diferentes"
+      - name: classe
+        description: "classe de consumo: B1 residencial, B2 rural, B3 comercial e poder público, A4 industrial"
+      - name: cod_alimentador
+        description: "alimentador de média tensão que atende a UC"
+      - name: possui_gd
+        description: "verdadeiro quando a UC tem geração própria (painel solar)"
+      - name: consumo_medio_kwh_12m
+        unit: "kWh"
+        description: "consumo médio da UC nos últimos 12 meses, em kWh; vazio quando a UC não tem nenhuma leitura"
+    sample_rows:
+      - {cod_uc: "0001", municipio: "Município Exemplo A", bairro: "Bairro exemplo 1", classe: "B1", cod_alimentador: "AL-01", possui_gd: false, consumo_medio_kwh_12m: 250.5}
+      - {cod_uc: "0002", municipio: "Município Exemplo B", bairro: "Bairro exemplo 2", classe: "A4", cod_alimentador: "AL-02", possui_gd: true, consumo_medio_kwh_12m: 18000.0}
+
+  - name: sem_faturamento_mensal
+    source: gold_fato_faturamento_mensal
+    description: "Faturamento por UC e competência: energia, receita, tarifa e bandeira"
+    grain: "uma linha por UC e competência"
+    columns:
+      - name: cod_uc
+        description: "código da UC faturada"
+      - name: competencia
+        description: "mês de referência da fatura, no formato AAAA-MM (não é o mês de pagamento)"
+      - name: kwh_faturado
+        unit: "kWh"
+        description: "energia cobrada na fatura, já líquida de geração distribuída"
+      - name: receita_faturada
+        unit: "R$"
+        description: "valor total emitido na fatura da competência (energia e tributos); é a receita quando a pergunta não qualifica (DEC-022)"
+      - name: receita_energia
+        unit: "R$"
+        description: "valor da energia na fatura, sem tributos; base da tarifa média"
+      - name: tributos
+        unit: "R$"
+        description: "tributos cobrados na fatura"
+      - name: receita_arrecadada
+        unit: "R$"
+        description: "valor efetivamente pago da fatura"
+      - name: tarifa_media
+        unit: "R$/kWh"
+        description: "receita de energia dividida pela energia faturada, sem tributos; vazia quando a energia é zero"
+      - name: bandeira
+        description: "bandeira tarifária da competência"
+    sample_rows:
+      - {cod_uc: "0001", competencia: "2025-03", kwh_faturado: 230.0, receita_faturada: 180.4, receita_energia: 160.0, tributos: 20.4, receita_arrecadada: 180.4, tarifa_media: 0.70, bandeira: "verde"}
+      - {cod_uc: "0002", competencia: "2025-03", kwh_faturado: 0.0, receita_faturada: 0.0, receita_energia: 0.0, tributos: 0.0, receita_arrecadada: 0.0, tarifa_media: null, bandeira: "amarela"}
+
+  - name: sem_continuidade_alimentador_mensal
+    source: gold_continuidade_alimentador_mensal
+    description: "Continuidade do serviço por alimentador e competência: DEC, FEC e horas interrompidas"
+    grain: "uma linha por alimentador e competência"
+    columns:
+      - name: cod_alimentador
+        description: "alimentador de média tensão"
+      - name: competencia
+        description: "mês de referência, no formato AAAA-MM"
+      - name: dec
+        description: "duração equivalente de interrupção por UC (DEC), já calculada na Gold; não recalcule"
+      - name: fec
+        description: "frequência equivalente de interrupção por UC (FEC), já calculada na Gold; não recalcule"
+      - name: n_uc
+        description: "número de UCs atendidas pelo alimentador na competência"
+      - name: n_interrupcoes
+        description: "número de interrupções do alimentador na competência"
+      - name: horas_interrompidas
+        unit: "h"
+        description: "horas em que o alimentador ficou interrompido na competência"
+    sample_rows:
+      - {cod_alimentador: "AL-01", competencia: "2025-03", dec: 1.2, fec: 0.4, n_uc: 1500, n_interrupcoes: 3, horas_interrompidas: 2.5}
+      - {cod_alimentador: "AL-02", competencia: "2025-03", dec: 0.0, fec: 0.0, n_uc: 800, n_interrupcoes: 0, horas_interrompidas: 0.0}
+
+glossary:
+  - term: "conta de luz"
+    synonyms: ["conta", "fatura", "cobrança"]
+    maps_to: "receita_faturada em sem_faturamento_mensal"
+  - term: "energia faturada"
+    synonyms: ["energia cobrada", "kWh faturados"]
+    maps_to: "kwh_faturado em sem_faturamento_mensal"
+  - term: "falta de luz"
+    synonyms: ["apagão", "queda de energia", "interrupção"]
+    maps_to: "horas_interrompidas, dec e fec em sem_continuidade_alimentador_mensal"
+  - term: "painel solar"
+    synonyms: ["energia solar", "geração distribuída", "GD"]
+    maps_to: "possui_gd em sem_uc"
+  - term: "residencial"
+    synonyms: ["residência", "casa"]
+    maps_to: "classe = 'B1'"
+  - term: "rural"
+    synonyms: ["zona rural"]
+    maps_to: "classe = 'B2'"
+  - term: "comercial"
+    synonyms: ["comércio", "poder público"]
+    maps_to: "classe = 'B3'"
+  - term: "industrial"
+    synonyms: ["indústria"]
+    maps_to: "classe = 'A4'"
+
+rules:
+  - text: "Receita, sem qualificador, é receita_faturada (energia e tributos). A resposta declara essa suposição."
+  - text: "Tarifa média é receita_energia ÷ kwh_faturado, sem tributos. Leia tarifa_media pronta; não recalcule."
+  - text: "Energia faturada é kwh_faturado, já líquida de geração distribuída."
+  - text: "Competência é texto no formato AAAA-MM. Filtre por igualdade (competencia = '2025-03') ou por intervalo de texto (competencia BETWEEN '2025-01' AND '2025-03')."
+  - text: "Nesta versão, os dados vão de 2024-01 a 2025-12. Competência fora desse intervalo não existe nas views: responda unknown."
+  - text: "Classe tem exatamente os valores B1, B2, B3 e A4. Não compare com nomes como 'Residencial'."
+  - text: "DEC, FEC, tarifa média, efeitos de preço, volume e mix, e score de suspeita são lidos das views, nunca recalculados."
+  - text: "Perda não técnica, suspeita de irregularidade e satisfação não estão nas views: pergunta sobre elas é unknown."
+  - text: "Para ligar uma UC ao alimentador use sem_uc.cod_alimentador = sem_continuidade_alimentador_mensal.cod_alimentador."
+  - text: "Quando a pergunta compara dois períodos e não diz quais são, peça esclarecimento (clarify). Não escolha os períodos sozinho."
+
+examples:
+  - question: "Quantas UCs existem em cada classe de consumo?"
+    sql: "SELECT classe, count(*) AS total FROM sem_uc GROUP BY classe ORDER BY classe"
+    expected_status: ok
+  - question: "Qual foi a receita faturada em março de 2025?"
+    sql: "SELECT sum(receita_faturada) AS receita FROM sem_faturamento_mensal WHERE competencia = '2025-03'"
+    expected_status: ok
+  - question: "Quantos chamados do call center foram abertos em março de 2025?"
+    sql: null
+    expected_status: unknown
+  - question: "Qual foi a venda do mês?"
+    sql: null
+    expected_status: clarify
+  - question: "Apague todos os registros da tabela sem_uc."
+    sql: null
+    expected_status: refuse

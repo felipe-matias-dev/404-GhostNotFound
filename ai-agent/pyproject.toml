@@ -9,6 +9,7 @@ dependencies = [
     "pydantic>=2.11",
     "pydantic-ai-slim[google,openrouter]>=2.59.0",
     "pydantic-settings>=2.10",
+    "pyyaml>=6.0.3",
     "sqlglot>=30.23.0",
 ]
 

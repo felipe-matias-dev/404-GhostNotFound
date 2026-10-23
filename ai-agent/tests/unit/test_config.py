@@ -102,3 +102,10 @@ def test_blank_key_counts_as_missing(monkeypatch):
 def test_model_name_is_required_after_the_provider(required_env):
     with pytest.raises(ValidationError):
         AgentSettings(_env_file=None, llm_model="google-gla:")
+
+
+def test_semantic_layer_and_contract_paths_resolve_inside_the_repository(required_env):
+    settings = AgentSettings(_env_file=None)
+
+    assert settings.semantic_layer_path.exists()
+    assert settings.gold_contract_path.exists()
