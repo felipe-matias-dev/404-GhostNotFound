@@ -1,8 +1,8 @@
 // Barra do topo do painel de conteúdo: 44px, título da seção em
 // `text-body` e ações à direita. O título é o <h1> da página e desliza (layout do motion)
 // quando o `inicio` aparece ou some; dentro de um LayoutGroup ele acompanha mudanças de
-// outros componentes do grupo.
-import { motion, useReducedMotion } from "motion/react";
+// outros componentes do grupo. A transição vem do MotionConfig do AppShell.
+import { motion } from "motion/react";
 import type { ReactNode } from "react";
 import { cn } from "#/lib/utils";
 
@@ -17,8 +17,6 @@ export function Header({
 	acoes?: ReactNode;
 	className?: string;
 }) {
-	const duration = useReducedMotion() ? 0 : 0.2;
-
 	return (
 		<header
 			className={cn(
@@ -30,7 +28,6 @@ export function Header({
 			{titulo && (
 				<motion.h1
 					layout="position"
-					transition={{ duration, ease: "linear" }}
 					className="truncate font-medium text-body text-text"
 				>
 					{titulo}

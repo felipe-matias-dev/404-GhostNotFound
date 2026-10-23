@@ -6,7 +6,11 @@ import {
 	type Icon,
 	LightningSlashIcon,
 } from "@phosphor-icons/react";
-import type { LinkProps } from "@tanstack/react-router";
+import {
+	type LinkProps,
+	useMatches,
+	useMatchRoute,
+} from "@tanstack/react-router";
 
 export type ItemNavegacao = {
 	to: NonNullable<LinkProps["to"]>;
@@ -22,3 +26,15 @@ export const NAVEGACAO: ItemNavegacao[] = [
 	{ to: "/perdas", rotulo: "Perdas", icone: LightningSlashIcon },
 	{ to: "/rede", rotulo: "Rede", icone: GaugeIcon },
 ];
+
+// Item ativo do Header e da sidebar. Rotas filhas mantêm a seção (fuzzy), mas um caminho sem
+// rota (o "não encontrado") não marca nenhuma.
+export function useItemAtivo(itens: ItemNavegacao[]) {
+	const matchRoute = useMatchRoute();
+	const naoEncontrado = useMatches({
+		select: (matches) =>
+			matches.some((match) => match._notFound || match.status === "notFound"),
+	});
+	if (naoEncontrado) return undefined;
+	return itens.find(({ to }) => matchRoute({ to, fuzzy: to !== "/" }));
+}
