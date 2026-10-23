@@ -22,8 +22,8 @@ O agente transforma uma pergunta em português numa consulta SQL somente leitura
 1. PR #29: invariantes do `AgentAnswer` pedidas na revisão do PR #21 (texto em branco, `row_count >= 0`, `truncated` exige linhas).
 2. PR #31: ordem da DEC-018 e da DEC-020 no `decisoes.md`.
 3. Branch `feat/ai-agent-camada-semantica-v0.2`: camada semântica alinhada ao contrato v0.2.0 (já integra os PRs #29 e #31).
-4. PR #30: orquestração `ask()` (item 6).
-5. PR #32 (rascunho): golden set (item 7). Antes do merge, os itens G026, G027, G040, G058, G059 e G060 precisam seguir a camada v0.2 (§11, item 7), e todo item precisa de revisão humana.
+4. PR #30: orquestração `ask()` (item 6), com o `bootstrap.py` e o comando de terminal.
+5. PR #32: golden set (item 7), já alinhado à camada v0.2. Continua rascunho até a revisão humana de cada item.
 
 **Branches prontas, sem PR:** `feat/ai-agent-narracao` (item 8) e `feat/ai-agent-insight` (item 9), empilhadas sobre o contrato anterior; fazem rebase na `main` depois do PR #30.
 
@@ -329,11 +329,11 @@ Pedidos a abrir como issue para a área dona. O GenAI não altera esses arquivos
 
 **6. Orquestração `ask()` + logs estruturados**, no mesmo PR: o fluxo da §5.1, `ErrorKind.REJECTED`, `Generation` no `SqlGenerator`, `answer_sample_rows` e o `bootstrap.py`. Inclui um teste rápido com o modelo real, fora do `pytest`, como o feito para o gerador.
 - Estado: PR #30, em revisão. Entregou o fluxo, a confiança, os logs por etapa, `Generation`, `ErrorKind.REJECTED` e `answer_sample_rows`, mais um ajuste no executor (colunas com o mesmo nome viram erro corrigível).
-- Desvio a decidir: o PR deixou o `bootstrap.py` para o item 8. Sem ele, o backend não tem como montar o agente e o D3 (`POST /ai/ask`) fica parado até a narração. A proposta é trazer o `bootstrap.py` para o item 6, com o texto determinístico, e o item 8 só trocar o redator.
+- O `bootstrap.py` (`build_agent(settings)`) e o comando `python -m venergy_agent` entraram no item 6, com o texto determinístico, depois da revisão do PR #30. O backend já pode montar o agente para o D3; o item 8 só injeta o `AnswerWriter`.
 
 **7. Golden set + red team + runner** com as métricas de §9.3. Os itens do golden set e do red team podem ser escritos desde já, porque não dependem de código; o `reference_sql` precisa da amostra (D4).
-- Estado: golden set com 64 itens no PR #32 (rascunho, sem revisão humana), escrito sobre a camada do PR #20. Red team e runner ainda não começaram.
-- Antes do merge, alinhar com a camada v0.2:
+- Estado: golden set com 66 itens no PR #32 (versão 0.2.0, rascunho, sem revisão humana): 37 `answered`, 11 `unknown`, 9 `clarify` e 9 `refused`. Red team e runner ainda não começaram.
+- Alinhado à camada v0.2 na revisão do PR #32, mais G065 (DEC de um município num trimestre) e G066 (efeito bandeira entre dois períodos explícitos):
   - G026 (satisfação) e G027 (chamados) passam de `unknown` para `answered`, com `sem_kpis_mensais`;
   - G040 continua `clarify`, mas a nota muda: os períodos da decomposição já estão definidos no contrato, só não estão na pergunta;
   - G058 e G059: "comercial" é `classe_cadastro = 'Comercial'`, não `classe = 'B3'`, que junta comercial e poder público;
