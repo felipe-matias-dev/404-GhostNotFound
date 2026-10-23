@@ -83,6 +83,11 @@ export type DataTableProps<T> = {
 	columns: DataTableColumn<T>[];
 	/** Linhas na ordem da API; `undefined` enquanto não chegaram. */
 	rows: T[] | undefined;
+	/**
+	 * Identifica o conjunto de linhas (ex.: o filtro). Quando muda, a tabela volta para a
+	 * primeira página; uma recarga do mesmo conjunto mantém a página.
+	 */
+	resetKey?: string;
 	getRowId: (row: T) => string;
 	/** Nome da linha para leitor de tela (seleção, abrir). Padrão: valor da 1ª coluna. */
 	getRowLabel?: (row: T) => string;
@@ -310,6 +315,7 @@ export function DataTable<T>({
 	label,
 	columns,
 	rows,
+	resetKey,
 	getRowId,
 	getRowLabel,
 	loading = false,
@@ -338,10 +344,10 @@ export function DataTable<T>({
 
 	const data = useMemo(() => rows ?? [], [rows]);
 
-	// Novo conjunto de linhas (outro filtro): volta para a primeira página.
-	const [previousRows, setPreviousRows] = useState(rows);
-	if (rows !== previousRows) {
-		setPreviousRows(rows);
+	// Outro conjunto de linhas (outro filtro): volta para a primeira página.
+	const [previousResetKey, setPreviousResetKey] = useState(resetKey);
+	if (resetKey !== previousResetKey) {
+		setPreviousResetKey(resetKey);
 		setPage(0);
 	}
 

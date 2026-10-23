@@ -84,6 +84,7 @@ export function DecomposicaoTable({
 				label={`Ponte de receita por ${NIVEL_ROTULO[nivel].toLowerCase()}`}
 				columns={colunas}
 				rows={data}
+				resetKey={JSON.stringify(filtro)}
 				getRowId={(l) => `${l.periodo_base}|${l.periodo_atual}|${l.segmento}`}
 				loading={isPending || isPlaceholderData}
 				error={isError ? "Não foi possível carregar a ponte de receita." : null}

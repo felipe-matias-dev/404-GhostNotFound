@@ -59,16 +59,18 @@ const COLUNAS: DataTableColumn<Ordem>[] = [
 ];
 
 export function OrdensTable({ status }: { status: StatusOrdem | undefined }) {
-	const { data, isPending, isFetching, isError, refetch } = useOrdens(status);
+	const { data, isPending, isPlaceholderData, isError, refetch } =
+		useOrdens(status);
 
 	return (
 		<DataTable
 			label="Ordens de inspeção"
 			columns={COLUNAS}
 			rows={data}
+			resetKey={status ?? "todas"}
 			getRowId={(o) => String(o.id)}
 			getRowLabel={(o) => `OI ${o.id} da UC ${o.cod_uc}`}
-			loading={isPending || isFetching}
+			loading={isPending || isPlaceholderData}
 			error={
 				isError ? "Não foi possível carregar as ordens de inspeção." : null
 			}
