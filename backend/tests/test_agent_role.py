@@ -83,6 +83,37 @@ def test_agent_still_reads_the_gold_after_a_reload(
     assert total == len(SAMPLE_UCS)
 
 
+def test_agent_reads_the_views_after_a_reload(
+    tmp_path: Path, engine: Engine, agent_engine: Engine
+) -> None:
+    # As views são recriadas pela carga com o usuário dono: o agente só as enxerga se o
+    # ALTER DEFAULT PRIVILEGES do schema também valer para elas.
+    write_sample(tmp_path / "gold", force=True)
+    load_gold(tmp_path / "gold", engine)
+    load_gold(tmp_path / "gold", engine)
+
+    with agent_engine.connect() as connection:
+        total = connection.execute(text("SELECT count(*) FROM gold.sem_uc")).scalar_one()
+
+    assert total == len(SAMPLE_UCS)
+
+
+def test_agent_cannot_write_through_a_view(
+    tmp_path: Path, engine: Engine, agent_engine: Engine
+) -> None:
+    write_sample(tmp_path / "gold", force=True)
+    load_gold(tmp_path / "gold", engine)
+
+    # Com o modo somente leitura desligado, só a permissão (SELECT) segura a escrita.
+    autocommit = agent_engine.execution_options(isolation_level="AUTOCOMMIT")
+    with autocommit.connect() as connection:
+        connection.execute(text("SET default_transaction_read_only = off"))
+        with pytest.raises(DBAPIError) as error:
+            connection.execute(text("DELETE FROM gold.sem_uc"))
+
+    assert sqlstate_of(error) == INSUFFICIENT_PRIVILEGE
+
+
 @pytest.mark.usefixtures("gold_with_one_uc")
 @pytest.mark.parametrize(
     "statement",
