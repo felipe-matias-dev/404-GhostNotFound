@@ -1,7 +1,7 @@
 from enum import StrEnum
 from typing import Self
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class AnswerStatus(StrEnum):
@@ -26,7 +26,7 @@ class AgentAnswer(BaseModel):
     status: AnswerStatus
     sql: str | None
     rows: tuple[dict[str, object], ...]
-    row_count: int
+    row_count: int = Field(ge=0)
     truncated: bool
     confidence: Confidence
     sources: tuple[str, ...]
@@ -37,6 +37,13 @@ class AgentAnswer(BaseModel):
     model: str
     prompt_version: str
     latency_ms: int = Field(ge=0)
+
+    @field_validator("sql", "clarification", "refused_reason")
+    @classmethod
+    def reject_blank_text(cls, value: str | None) -> str | None:
+        if value is not None and not value.strip():
+            raise ValueError("text must not be blank; use null instead")
+        return value
 
     @model_validator(mode="after")
     def check_status_invariants(self) -> Self:

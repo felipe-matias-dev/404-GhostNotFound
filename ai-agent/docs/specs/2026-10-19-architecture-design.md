@@ -110,12 +110,13 @@ ai-agent/
 | `latency_ms` | `int` | **Item 2.** `≥ 0` (G1-06) |
 
 Invariantes:
-- Hoje: `row_count >= len(rows)`, porque `rows` é uma amostra.
+- Hoje: `row_count >= len(rows)`, porque `rows` é uma amostra; `row_count >= 0`.
 - Item 2:
-  - `answered`: sem `refused_reason` e sem `clarification`.
+  - `answered`: exige `sql` e `confidence` diferente de `unknown`; sem `refused_reason` e sem `clarification`.
   - `clarify`: exige `clarification`; `sql` nulo, `rows` vazio, `row_count == 0`, `confidence == unknown`.
   - `unknown`, `refused` e `failed`: exigem `refused_reason`; sem `clarification`; `rows` vazio, `row_count == 0`, `confidence == unknown`. Isso impede devolver resultado parcial como se fosse resposta (§6 do guia).
   - `truncated` só é verdadeiro com `answered`.
+  - `sql`, `clarification` e `refused_reason` são nulos ou texto não vazio; texto em branco é recusado, não tratado como preenchido.
 
 O timestamp da auditoria é registrado pelo backend ao persistir; o agente não lê relógio no domínio.
 
