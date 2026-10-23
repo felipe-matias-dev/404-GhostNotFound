@@ -107,6 +107,13 @@ export type DataTableProps<T> = {
 	onSelectedChange?: (next: Set<string>) => void;
 	onRowClick?: (row: T) => void;
 	/**
+	 * Ações da linha (botões). Na tabela, última coluna; no card, rodapé. Não disparam
+	 * `onRowClick`.
+	 */
+	rowActions?: (row: T) => ReactNode;
+	/** Trilha do grid da coluna de ações (ex.: `"200px"`). Padrão: `"160px"`. */
+	rowActionsWidth?: string;
+	/**
 	 * Linha sob o ponteiro ou com foco do teclado (`null` ao sair), para destacar o mesmo
 	 * item em outro lugar da tela (ex.: a região no mapa).
 	 */
@@ -330,6 +337,8 @@ export function DataTable<T>({
 	selected,
 	onSelectedChange,
 	onRowClick,
+	rowActions,
+	rowActionsWidth = "160px",
 	onRowHover,
 	cardsBelow = "3xl",
 	className,
@@ -383,9 +392,11 @@ export function DataTable<T>({
 	const allOnPage = pageRows.length > 0 && chosenOnPage === pageRows.length;
 	const someOnPage = chosenOnPage > 0 && !allOnPage;
 
-	const template =
-		(selectable ? "16px " : "") +
-		columns.map((c) => c.width ?? "minmax(0, 1fr)").join(" ");
+	const template = [
+		...(selectable ? ["16px"] : []),
+		...columns.map((c) => c.width ?? "minmax(0, 1fr)"),
+		...(rowActions ? [rowActionsWidth] : []),
+	].join(" ");
 
 	const isSortable = (column: DataTableColumn<T>) =>
 		column.sortable ?? column.value !== undefined;
@@ -492,7 +503,9 @@ export function DataTable<T>({
 				<table
 					aria-label={label}
 					aria-rowcount={data.length + 1}
-					aria-colcount={columns.length + (selectable ? 1 : 0)}
+					aria-colcount={
+						columns.length + (selectable ? 1 : 0) + (rowActions ? 1 : 0)
+					}
 					className="block w-full"
 				>
 					<thead className="block">
@@ -554,6 +567,13 @@ export function DataTable<T>({
 									</th>
 								);
 							})}
+							{rowActions && (
+								<th scope="col" className="min-w-0 font-normal">
+									<span className="block truncate px-1.5 text-small text-text-muted uppercase tracking-[0.04em]">
+										Ações
+									</span>
+								</th>
+							)}
 						</tr>
 					</thead>
 
@@ -598,6 +618,14 @@ export function DataTable<T>({
 											/>
 										</td>
 									))}
+									{rowActions && (
+										<td className="flex px-1.5">
+											<div
+												className="h-2 rounded-sm bg-pressed"
+												style={{ width: "60%" }}
+											/>
+										</td>
+									)}
 								</motion.tr>
 							))}
 						</tbody>
@@ -681,6 +709,11 @@ export function DataTable<T>({
 													</td>
 												);
 											})}
+											{rowActions && (
+												<td className="relative z-10 flex min-w-0 items-center px-1.5">
+													{rowActions(row)}
+												</td>
+											)}
 										</motion.tr>
 									);
 								})}
@@ -877,6 +910,11 @@ export function DataTable<T>({
 													</div>
 												))}
 											</dl>
+										)}
+										{rowActions && (
+											<div className="relative z-10 mt-2.5 flex flex-wrap items-center gap-1">
+												{rowActions(row)}
+											</div>
 										)}
 									</motion.li>
 								);

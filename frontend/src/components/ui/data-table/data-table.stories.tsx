@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
 import { Badge } from "#/components/ui/badge";
+import { Button } from "#/components/ui/button";
 import { formatBRL, formatKWh } from "#/lib/format";
 import { DataTable, type DataTableColumn } from "./data-table";
 
@@ -121,6 +122,48 @@ export const LinhaClicavel: Story = {
 				<p className="text-small text-text-muted">
 					Última aberta: {aberta ? `UC ${aberta}` : "nenhuma"}
 				</p>
+			</div>
+		);
+	},
+};
+
+function AcoesDaUc() {
+	return (
+		<>
+			<Button size="xs" variant="outline">
+				Inspecionar
+			</Button>
+			<Button size="xs" variant="ghost">
+				Ignorar
+			</Button>
+		</>
+	);
+}
+
+// Ações por linha: última coluna na tabela e rodapé nos cards; o clique no botão não abre a linha.
+export const ComAcoes: Story = {
+	args: { rowActionsWidth: "200px", pageSize: 5 },
+	render: function Render(args) {
+		const [aberta, setAberta] = useState<string | null>(null);
+		return (
+			<div className="flex flex-col gap-6">
+				<DataTable
+					{...args}
+					onRowClick={(u) => setAberta(u.cod_uc)}
+					rowActions={() => <AcoesDaUc />}
+				/>
+				<p className="text-small text-text-muted">
+					Última aberta: {aberta ? `UC ${aberta}` : "nenhuma"}
+				</p>
+				<div className="mx-auto w-[360px]">
+					<DataTable
+						{...args}
+						label="Unidades consumidoras em container estreito"
+						pageSize={3}
+						onRowClick={(u) => setAberta(u.cod_uc)}
+						rowActions={() => <AcoesDaUc />}
+					/>
+				</div>
 			</div>
 		);
 	},
