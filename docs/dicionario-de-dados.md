@@ -55,7 +55,7 @@ Dimensão de unidades consumidoras.
 - **Grão:** 1 linha por UC
 - **Chave:** `cod_uc`
 - **Consumidores:** UC 360, agente, filtros
-- **Decisões de limpeza que afetam esta tabela:** UC-01 a UC-11 (cadastro), MED-01 a MED-06 (medidores), GD-01 e GD-02 (potência)
+- **Decisões de limpeza que afetam esta tabela:** UC-01 a UC-12 (cadastro; a flag `flag_documento_repetido` da UC-12 fica só na Silver, DEC-023), MED-01 a MED-06 (medidores), GD-01 e GD-02 (potência)
 
 | Coluna | Tipo | Nulo | Unidade | Status | Definição |
 |---|---|---|---|---|---|

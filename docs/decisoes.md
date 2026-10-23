@@ -548,6 +548,9 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
     receita da diretoria e a nossa (tributos, órfãs ou período). Validações permanentes: total = cadastro
     + órfãs, cadastro = energia + tributos, energia final = leitura + correções, e tudo bate com a soma
     do fato por competência. Entra no agente.
+  - **Documento repetido (UC-12):** `flag_documento_repetido` existe só na Silver de
+    `unidades_consumidoras`. A Gold não traz essa coluna (nem `gold_dim_uc`): a flag entra como
+    filtro na construção da Gold, não como atributo. Confirmado por Arthur (Dados) em 23/10/2026.
   - `consumo_medio_kwh_12m` passa a aceitar nulo: há UCs do cadastro sem nenhuma leitura, e sem
     leitura não há média. Zero seria inventar dado.
   - `potencia_kw` passa a ser `potencia_kwp`, em kWp: a origem só traz potência de pico, e kW
