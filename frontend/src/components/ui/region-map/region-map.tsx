@@ -32,6 +32,7 @@ import {
 	type MouseEvent,
 	type PointerEvent,
 	useEffect,
+	useEffectEvent,
 	useId,
 	useRef,
 	useState,
@@ -294,25 +295,27 @@ export function RegionMap({
 	};
 
 	// Ctrl+roda: listener nativo, porque o React registra `wheel` como passivo e o
-	// preventDefault (que impede o zoom da página) seria ignorado.
+	// preventDefault (que impede o zoom da página) seria ignorado. Registrado uma vez; o
+	// Effect Event lê o `full` atual.
+	const onWheel = useEffectEvent((event: WheelEvent) => {
+		if (!event.ctrlKey && !event.metaKey) return;
+		event.preventDefault();
+		setInstant(true);
+		setView((v) => {
+			const p = toViewPoint(event.clientX, event.clientY, v);
+			// Pinça do trackpad manda deltas pequenos; a roda do mouse, ~100 por clique:
+			// o teto deixa cada clique em ~1,6× sem travar a pinça.
+			const delta = Math.max(-50, Math.min(50, event.deltaY));
+			return zoomAt(v, Math.exp(-delta * 0.01), p.x, p.y, full);
+		});
+	});
 	useEffect(() => {
 		const svg = svgRef.current;
 		if (!svg) return;
-		const onWheel = (event: WheelEvent) => {
-			if (!event.ctrlKey && !event.metaKey) return;
-			event.preventDefault();
-			setInstant(true);
-			setView((v) => {
-				const p = toViewPoint(event.clientX, event.clientY, v);
-				// Pinça do trackpad manda deltas pequenos; a roda do mouse, ~100 por clique:
-				// o teto deixa cada clique em ~1,6× sem travar a pinça.
-				const delta = Math.max(-50, Math.min(50, event.deltaY));
-				return zoomAt(v, Math.exp(-delta * 0.01), p.x, p.y, full);
-			});
-		};
-		svg.addEventListener("wheel", onWheel, { passive: false });
-		return () => svg.removeEventListener("wheel", onWheel);
-	});
+		const ouvir = (event: WheelEvent) => onWheel(event);
+		svg.addEventListener("wheel", ouvir, { passive: false });
+		return () => svg.removeEventListener("wheel", ouvir);
+	}, []);
 
 	const onPointerDown = (event: PointerEvent<SVGSVGElement>) => {
 		if (event.button !== 0 || event.pointerType === "touch") return;
@@ -327,7 +330,10 @@ export function RegionMap({
 
 	const onPointerMove = (event: PointerEvent<SVGSVGElement>) => {
 		const d = drag.current;
-		if (d && d.id === event.pointerId) {
+		// Sem botão apertado o arrasto já acabou, mesmo que o pointerup não tenha chegado.
+		if (d && d.id === event.pointerId && event.buttons === 0) {
+			drag.current = null;
+		} else if (d && d.id === event.pointerId) {
 			const dx = event.clientX - d.x;
 			const dy = event.clientY - d.y;
 			if (!d.moved && Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
@@ -362,6 +368,11 @@ export function RegionMap({
 		if (!drag.current.moved) drag.current = null;
 	};
 
+	// Depois de um pointercancel não vem clique, então o arrasto acaba aqui.
+	const cancelDrag = (event: PointerEvent<SVGSVGElement>) => {
+		if (drag.current?.id === event.pointerId) drag.current = null;
+	};
+
 	const onClickCapture = (event: MouseEvent<SVGSVGElement>) => {
 		if (drag.current?.moved) {
 			event.preventDefault();
@@ -384,10 +395,10 @@ export function RegionMap({
 	const comDado = shapes.filter((s) => isEnabled(s.id));
 	const semDado = shapes.filter((s) => !isEnabled(s.id));
 	const overlays = [
-		{ id: selectedId, cls: "stroke-accent", px: 2 },
-		{ id: highlightId, cls: "stroke-text", px: 2 },
-		{ id: hover?.shape.id, cls: "stroke-text", px: 1.5 },
-		{ id: focused, cls: "stroke-focus-ring", px: 2.5 },
+		{ nome: "selecionado", id: selectedId, cls: "stroke-accent", px: 2 },
+		{ nome: "destaque", id: highlightId, cls: "stroke-text", px: 2 },
+		{ nome: "hover", id: hover?.shape.id, cls: "stroke-text", px: 1.5 },
+		{ nome: "foco", id: focused, cls: "stroke-focus-ring", px: 2.5 },
 	];
 	const apagado = (id: string) => focusIds !== undefined && !focusIds.has(id);
 
@@ -409,7 +420,7 @@ export function RegionMap({
 				onPointerDown={onPointerDown}
 				onPointerMove={onPointerMove}
 				onPointerUp={endDrag}
-				onPointerCancel={endDrag}
+				onPointerCancel={cancelDrag}
 				onPointerLeave={() => setHover(null)}
 				onClickCapture={onClickCapture}
 			>
@@ -515,11 +526,11 @@ export function RegionMap({
 							}}
 						/>
 					))}
-				{overlays.map(({ id, cls, px }) => {
+				{overlays.map(({ nome, id, cls, px }) => {
 					const shape = id ? shapeById.get(id) : undefined;
 					return shape ? (
 						<path
-							key={cls}
+							key={nome}
 							aria-hidden
 							d={shape.d}
 							className={cn("pointer-events-none fill-none", cls)}
