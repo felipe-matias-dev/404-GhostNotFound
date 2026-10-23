@@ -27,6 +27,7 @@ function NivelMenu({
 	valor,
 	opcoes,
 	carregando,
+	atual,
 	onEscolher,
 }: {
 	nivel: string;
@@ -34,6 +35,8 @@ function NivelMenu({
 	valor: string | undefined;
 	opcoes: string[];
 	carregando: boolean;
+	/** Último nível da trilha: é o recorte que a página mostra. */
+	atual: boolean;
 	onEscolher: (valor: string | undefined) => void;
 }) {
 	const rotulo = valor ?? todos;
@@ -43,7 +46,7 @@ function NivelMenu({
 				aria-label={`${nivel}: ${rotulo}. Trocar`}
 				className="flex h-7 min-w-0 cursor-pointer items-center gap-1 rounded-md px-1.5 font-medium text-text outline-none transition-colors hover:bg-hover focus-visible:ring-3 focus-visible:ring-focus-ring/50 data-popup-open:bg-hover"
 			>
-				<span className="truncate" aria-current={valor ? undefined : "page"}>
+				<span className="truncate" aria-current={atual ? "page" : undefined}>
 					{rotulo}
 				</span>
 				<CaretDownIcon
@@ -102,6 +105,7 @@ export function RecorteTrilha({
 							valor={recorte.municipio}
 							opcoes={ordenar(municipios.data?.map((l) => l.segmento) ?? [])}
 							carregando={municipios.isPending}
+							atual={!recorte.municipio}
 							onEscolher={(municipio) => onChange({ municipio })}
 						/>
 					</BreadcrumbItem>
@@ -119,6 +123,7 @@ export function RecorteTrilha({
 											: ordenar(bairros.data?.map((l) => l.segmento) ?? [])
 									}
 									carregando={bairros.isPending || bairros.isPlaceholderData}
+									atual
 									onEscolher={(bairro) =>
 										onChange({ municipio: recorte.municipio, bairro })
 									}
