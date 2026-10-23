@@ -38,7 +38,7 @@ def writer(model):
 
 
 async def test_returns_an_insight_when_every_number_is_in_the_metrics():
-    model, _ = narrating_model("A receita faturada foi de 1234.5, com variação de -4.0%.")
+    model, _ = narrating_model("A receita faturada foi de R$ 1.234,5, com queda de 4,0%.")
 
     insight = await writer(model).narrate("Receita", METRICS)
 
@@ -50,6 +50,21 @@ async def test_a_number_outside_the_metrics_drops_the_insight():
     model, _ = narrating_model("A receita caiu 999%.")
 
     assert await writer(model).narrate("Receita", METRICS) is None
+
+
+async def test_number_written_in_english_format_drops_the_insight():
+    model, _ = narrating_model("A receita faturada foi de 1234.5.")
+
+    assert await writer(model).narrate("Receita", METRICS) is None
+
+
+async def test_numbers_inside_nested_metrics_and_their_keys_are_supported():
+    metrics = {"dec_por_municipio": {"Olinda": 0.6}, "competencias": ["2025-01", "2025-03"]}
+    model, _ = narrating_model("Entre 2025-01 e 2025-03, Olinda teve DEC de 0,6 hora.")
+
+    insight = await writer(model).narrate("Continuidade", metrics)
+
+    assert insight is not None
 
 
 async def test_provider_error_returns_none_so_the_screen_shows_without_insight():

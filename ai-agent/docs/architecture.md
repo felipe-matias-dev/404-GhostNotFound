@@ -44,7 +44,7 @@ pergunta → Question → SemanticLayer (carregada uma vez)
 
 Detalhes, confiança e logs: spec §5.1. O backend monta o agente uma vez por processo com `build_agent(AgentSettings())`.
 
-Em branch: `InsightWriter` (`feat/ai-agent-insight`, prompt em `prompts/insight/v1/`, item 9). O golden set está em `eval/golden_set.yaml` (66 itens, alinhado à camada v0.2, rascunho até a revisão humana).
+`InsightWriter` (item 9, `infrastructure/insight_writer.py`, prompt em `prompts/insight/v1/`): narra o JSON de métricas de uma tela e devolve `None` se algum número do texto não estiver no JSON. O backend monta o JSON, guarda o insight em cache e liga o redator (D9). O golden set está em `eval/golden_set.yaml` (66 itens, alinhado à camada v0.2, rascunho até a revisão humana).
 
 ## 4. Camada semântica hoje
 
