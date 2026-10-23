@@ -673,8 +673,8 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 ## DEC-020 · Contrato `AgentAnswer` com status (aceita)
 
 - **Data:** 22/10/2026 · **Área:** GenAI e Backend (V1) · **Autor:** Lucas
-- **Status:** aceita pelo V1 na revisão do PR #21 (respostas às cinco perguntas em aberto, abaixo). Entra no `main` com o PR #21.
-- **Decisão proposta:** o `AgentAnswer` ganha `status` (`answered`, `unknown`, `clarify`, `refused`, `failed`), `truncated`, `refused_reason`, `model` e `latency_ms`. Nenhum campo existente é removido. As invariantes por status estão na spec §4 e têm teste no código.
+- **Status:** aceita pelo V1 (revisão do PR #21, com as respostas abaixo). Mesclada com o PR #21; as invariantes de texto em branco e de `truncated` entraram pelo PR #29.
+- **Decisão:** o `AgentAnswer` ganha `status` (`answered`, `unknown`, `clarify`, `refused`, `failed`), `truncated`, `refused_reason`, `model` e `latency_ms`. Nenhum campo existente é removido. As invariantes por status estão na spec §4 e têm teste no código.
 - **Motivo:** o backend vai expor `POST /ai/ask` e `GET /ai/audit/{id}` (spec §10, D3). Sem `status`, o portal não distingue resposta, "não sei", pedido de esclarecimento e falha técnica, e a auditoria não guarda o modelo que respondeu nem a latência (G1-06). A spec (§4) manda combinar mudanças desse contrato com o V1 antes de implementar.
-- **Consequência:** a implementação fica em branch até o V1 aceitar. Depois do aceite, a spec §4 e o `answer.py` são a referência, e esta DEC passa para "aceita".
+- **Consequência:** a spec §4 e o `answer.py` são a referência. Regras que o V1 não discutiu diretamente, mas que decorrem do contrato e foram pedidas na revisão do PR #21 (PR #29): `row_count >= 0`; texto em branco recusado em todo campo de texto; `truncated` exige linhas.
 - **Respondido pelo V1 (PR #21):** (1) status em inglês, e o portal traduz; (2) sim, o último SQL vai em `failed`, para auditoria; (3) `refused_reason` e `answer` podem repetir o texto; (4) o agente mede a latência do `ask()` e o backend mede a requisição, e os dois vão para a auditoria; (5) campo novo é mudança menor da API; campo removido ou renomeado precisa ser combinado antes.
