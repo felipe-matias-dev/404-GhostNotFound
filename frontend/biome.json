@@ -13,6 +13,7 @@
 			"**/.storybook/**/*.ts",
 			"**/index.html",
 			"**/vite.config.ts",
+			"**/vitest.config.ts",
 			"!**/storybook-static",
 			"!**/src/**/*.gen.ts",
 			"!**/src/styles.css"
@@ -27,8 +28,15 @@
 		"enabled": true,
 		"rules": {
 			"recommended": true
-		}
+		},
+		"domains": { "react": "recommended", "test": "none" }
 	},
+	"overrides": [
+		{
+			"includes": ["**/__tests__/**"],
+			"linter": { "domains": { "test": "recommended" } }
+		}
+	],
 	"javascript": {
 		"formatter": {
 			"quoteStyle": "double"
