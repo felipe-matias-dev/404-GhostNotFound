@@ -30,6 +30,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | 22/10/2026 | DEC-023: receita da Gold em três medidas (total, energia e tributos), com a energia como base provisória do PVM; consumo médio nulo sem leitura; `potencia_kwp`; reconciliação do faturamento e da energia | Nenhum valor descartado sem explicação; os números da diretoria podem ser conciliados com os da Gold | Alisson |
 | 22/10/2026 | DEC-024: resultados agregados necessários para sustentar uma hipótese podem ir ao repositório; identificação de pessoas e de UCs e dado de LGPD ficam mascarados; linha a linha, amostras e outputs nunca sobem | O diagnóstico precisa mostrar a evidência, mas o dataset é confidencial e há dado pessoal | Alisson |
 | 23/10/2026 | DEC-025 (proposta): mapa da RMR com a malha municipal 2025 e a malha de bairros do Censo 2022 do IBGE, os 15 municípios da LC estadual 382/2018, e município e bairro da Gold casados com os do mapa pelo nome normalizado | O mapa vira o seletor principal de município e bairro sem mudar o contrato da Gold; o que está na Gold é clicável, o resto aparece apagado | João Euclides |
+| 23/10/2026 | DEC-026: ações das OIs na tela de perdas (enviar a campo, concluir, cancelar, histórico, gerar) com Kanban das ativas e troca Kanban ⇄ tabela lembrada no navegador | O gerente acompanha e move as OIs sem sair da tela; o backend continua sendo o dono da máquina de estados | João Euclides |
 
 ## DEC-001 · Localização dos arquivos de origem (landing)
 
@@ -693,3 +694,20 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   - cor do mapa pela variação da receita sobre a receita base do próprio segmento, em escala contínua: abaixo de 0,5% é neutro, e a cor (vermelho para queda, verde para alta, misturados à superfície) e o brilho do contorno crescem até saturar em 10%. A fração é calculada no frontend só para a cor; nenhum número novo é exibido (o hover mostra a variação em R$ da API).
 - **Motivo:** o mapa funciona com 14 ou 15 municípios sem mudar o contrato; as malhas são públicas e não são dado do case.
 - **Em aberto:** (1) Dados confirmar os 14 nomes de município da Gold e conferir os bairros contra a malha do IBGE (bairro vem do cadastro, em texto livre); (2) avaliar `cod_municipio_ibge` e `cod_bairro_ibge` (`CD_BAIRRO`) na `gold_dim_uc` para casar por código; (3) o bairro do IBGE é agregado de setores censitários e pode não coincidir com o limite oficial da prefeitura; (4) se a variação percentual for exibida, ela passa a vir da API (`variacao_receita_pct` em `/receita/decomposicao`), como já vem em `/receita/comparacao`.
+
+## DEC-026 · Ações das OIs, Kanban e troca de visão na tela de perdas
+
+- **Data:** 23/10/2026 · **Área:** Portal · **Autor:** João Euclides
+- **Contexto:** o backend já expõe `PATCH`, `GET /{id}` (histórico) e `POST` das ordens de inspeção (DEC-009), mas a tela de perdas só listava as OIs.
+- **Decisão:**
+  - a tela mostra só os botões das transições permitidas, a partir de uma cópia das `TRANSICOES` do backend (`ACOES_POR_STATUS` em `features/perdas/conversions.ts`). A cópia serve só para exibir: quem decide é o backend, que responde 409 a uma transição inválida, e a tela mostra a mensagem dele;
+  - enviar a campo é sem formulário (a observação é opcional e a OI ainda pode ser cancelada), mas o PATCH só sai depois de 6 s: um aviso embaixo da tela oferece "Desfazer" e "Enviar agora", e o tempo para enquanto o ponteiro ou o foco estão no aviso. É o único desfazer: o backend continua sem a volta Em campo → Gerada (DEC-009), e Concluída e Cancelada continuam finais. Sair da tela envia na hora o que estava agendado; fechar a aba pede confirmação do navegador;
+  - concluir e cancelar abrem um modal (Modal do interior.dev): concluir pede o resultado, cancelar pede segurar o botão (HoldToConfirm), porque não tem volta. O histórico, que é consulta, abre no painel lateral (Sheet);
+  - Kanban e tabela ocupam a largura toda da tela, sem a descrição da tela no topo (o layout da tela de perdas será ajustado quando a fila de suspeitas entrar); o Kanban também estica até o fim da altura. Cada ação tem a cor do status a que leva (enviar = info, concluir = success, cancelar = danger);
+  - Kanban com as ativas (Gerada, Em campo) completas e as finalizadas (Concluída, Cancelada) limitadas às últimas N por `atualizada_em`, com N pela altura da viewport: 3 abaixo de 900 px (notebook), 5 até 1299 px (PC 1080p), 8 a partir de 1300 px (desktop grande). "Ver todas" leva à tabela filtrada pelo status;
+  - cada cartão tem botões de ação; arrastar entre colunas (HTML5 Drag and Drop, sem biblioteca) é só atalho para a mesma ação;
+  - a visão (Kanban ou tabela) é preferência do usuário, não filtro: fica no `localStorage` (`perdas:visao-ordens`, padrão Kanban), não na URL. Abaixo de 48rem a tela mostra sempre a tabela em cards, sem mexer na preferência salva;
+  - gerar OIs por códigos de UC digitados (repetidos ignorados, até 200 por pedido), enquanto não existe endpoint da fila de suspeitas;
+  - Vitest no frontend só para funções puras (`src/**/__tests__/*.test.ts`, sem DOM).
+- **Motivo:** cobre o ciclo de vida da OI sem regra de negócio nova no frontend; o Kanban dá a visão do trabalho em andamento sem a lista de finalizadas crescer sem limite.
+- **Em aberto:** (1) gerar a partir da fila de suspeitas quando houver `GET` da `gold_fila_suspeitas`; (2) autoria das mudanças no histórico quando houver autenticação.
