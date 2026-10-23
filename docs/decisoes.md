@@ -337,9 +337,9 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
     (dependem da Silver); o mesmo teste falha quando o contrato definir a chave de uma delas.
   - A carga recria as tabelas da Gold (`DROP` e `CREATE`) na mesma transação em que grava
     os dados, em vez de só apagar as linhas. O schema `app` não é tocado. O `DROP` é sem
-    `CASCADE`, de propósito: quando existirem as views `sem_*` do agente, a carga passa a
-    recriá-las depois do `CREATE`, na mesma transação. Até lá, um objeto que dependa de uma
-    tabela da Gold faz a carga falhar sem alterar nada, em vez de sumir em silêncio.
+    `CASCADE`, de propósito: um objeto que dependa de uma tabela da Gold e que ninguém
+    previu faz a carga falhar sem alterar nada, em vez de sumir em silêncio. As views
+    `sem_*` do agente são tratadas à parte (atualização de 23/10/2026, abaixo).
   - Colunas `text[]` do contrato viram `ARRAY(Text)` no banco; no CSV, os itens vão numa
     célula só, separados por `;`, e a carga recusa item vazio.
   - Mudança no contrato e no backend entram no mesmo PR: quem muda o YAML recebe, no próprio
@@ -351,6 +351,22 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   nova entrar na próxima carga. A permissão de leitura do agente vem do `ALTER DEFAULT
   PRIVILEGES` do schema `gold` e vale para a tabela recriada (testado em
   `backend/tests/test_agent_role.py`).
+- **Atualização (23/10/2026, D7 da spec do agente):** a carga passou a recriar as views
+  `sem_*`, na mesma transação, com o usuário dono:
+  - antes do `drop_all`, apaga toda view `sem_*` do schema `gold` **lendo o catálogo do
+    banco** (`pg_views`), e não a lista de nomes do `ai-agent/semantic/views.sql`: uma view
+    que o GenAI renomeou ou tirou do arquivo continuaria presa à tabela e quebraria a carga;
+  - depois do `create_all` e dos `INSERT`, executa o `views.sql` inteiro;
+  - se o arquivo citar coluna ou tabela que a Gold não tem mais, a carga é cancelada com
+    "as views do agente não batem com a Gold" e nada muda (Gold e views anteriores
+    ficam). Ignorar a view quebrada deixaria o agente sem consulta, sem aviso;
+  - arquivo ausente cancela a carga antes de tocar no banco;
+  - o `views.sql` é lido por caminho fixo a partir da raiz do repositório, sem variável
+    de ambiente, e o backend não importa nada de `venergy_agent`.
+  - Alternativa descartada: `DROP ... CASCADE`, que apagaria as views em silêncio.
+  - Testes: `test_carga.py` (views criadas, recarga com views no lugar, view antiga
+    removida, views incompatíveis) e `test_agent_role.py` (o agente lê e não escreve
+    pelas views depois da recarga).
 - **Alternativas descartadas:** gerar os modelos a partir do YAML, difícil de revisar e de
   explicar; Alembic para a Gold, que seria migração para um dado descartável; modelar as 3
   tabelas pendentes com colunas inventadas; implementar só as colunas `confirmada` e
