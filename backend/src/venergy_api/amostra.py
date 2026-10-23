@@ -346,6 +346,7 @@ def _kpis(
                 competencia=competencia,
                 kwh_faturado=sum((linha.kwh_faturado for linha in do_mes), Decimal(0)),
                 receita_faturada=sum((linha.receita_faturada for linha in do_mes), Decimal(0)),
+                receita_energia=sum((linha.receita_energia for linha in do_mes), Decimal(0)),
                 dec=sum(linha.horas_interrompidas for linha in rede) / n_uc,
                 fec=sum(linha.n_interrupcoes for linha in rede) / n_uc,
                 n_chamados=None,

@@ -279,6 +279,8 @@ export interface components {
             kwh_faturado: number;
             /** Receita Faturada */
             receita_faturada: number;
+            /** Receita Energia */
+            receita_energia: number;
             /** Dec */
             dec: number | null;
             /** Fec */

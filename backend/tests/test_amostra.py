@@ -68,10 +68,16 @@ def test_kpis_match_the_sum_of_the_billing_in_the_database(tmp_path: Path, engin
                 FatoFaturamentoMensal.competencia,
                 func.sum(FatoFaturamentoMensal.kwh_faturado),
                 func.sum(FatoFaturamentoMensal.receita_faturada),
+                func.sum(FatoFaturamentoMensal.receita_energia),
             ).group_by(FatoFaturamentoMensal.competencia)
         )
         kpis = session.execute(
-            select(KpisMensais.competencia, KpisMensais.kwh_faturado, KpisMensais.receita_faturada)
+            select(
+                KpisMensais.competencia,
+                KpisMensais.kwh_faturado,
+                KpisMensais.receita_faturada,
+                KpisMensais.receita_energia,
+            )
         )
         assert set(kpis) == set(billing)
 

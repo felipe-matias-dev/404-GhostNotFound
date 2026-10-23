@@ -1023,6 +1023,10 @@
             "type": "number",
             "title": "Receita Faturada"
           },
+          "receita_energia": {
+            "type": "number",
+            "title": "Receita Energia"
+          },
           "dec": {
             "anyOf": [
               {
@@ -1073,6 +1077,7 @@
           "competencia",
           "kwh_faturado",
           "receita_faturada",
+          "receita_energia",
           "dec",
           "fec",
           "n_chamados",

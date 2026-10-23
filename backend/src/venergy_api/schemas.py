@@ -99,7 +99,10 @@ class KpisMensaisSchema(BaseModel):
 
     competencia: Competencia
     kwh_faturado: ExactNumber
+    # Total da fatura (com tributos) e só a energia: a variação percentual é a mesma, mas os
+    # valores absolutos não (DEC-023).
     receita_faturada: ExactNumber
+    receita_energia: ExactNumber
     dec: float | None
     fec: float | None
     n_chamados: int | None

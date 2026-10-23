@@ -112,6 +112,7 @@ class KpisMensais(Base):
     competencia: Mapped[str] = mapped_column(primary_key=True)
     kwh_faturado: Mapped[Decimal] = mapped_column(_ENERGY)
     receita_faturada: Mapped[Decimal] = mapped_column(_MONEY)
+    receita_energia: Mapped[Decimal] = mapped_column(_MONEY)
     dec: Mapped[float | None] = mapped_column(Double)
     fec: Mapped[float | None] = mapped_column(Double)
     n_chamados: Mapped[int | None]
