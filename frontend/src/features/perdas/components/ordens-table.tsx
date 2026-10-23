@@ -4,6 +4,8 @@ import { formatDataHora } from "#/lib/format";
 import { RESULTADO_ORDEM_ROTULO, STATUS_ORDEM_VISUAL } from "../conversions";
 import { useOrdens } from "../hooks/use-ordens";
 import { type Ordem, STATUS_ORDEM, type StatusOrdem } from "../types";
+import { useAcoesOrdem } from "./acoes-ordem";
+import { OrdemAcoesBotoes } from "./ordem-acoes-botoes";
 
 const COLUNAS: DataTableColumn<Ordem>[] = [
 	{
@@ -61,6 +63,7 @@ const COLUNAS: DataTableColumn<Ordem>[] = [
 export function OrdensTable({ status }: { status: StatusOrdem | undefined }) {
 	const { data, isPending, isPlaceholderData, isError, refetch } =
 		useOrdens(status);
+	const { abrir, abrirHistorico, pendente } = useAcoesOrdem();
 
 	return (
 		<DataTable
@@ -75,6 +78,11 @@ export function OrdensTable({ status }: { status: StatusOrdem | undefined }) {
 				isError ? "Não foi possível carregar as ordens de inspeção." : null
 			}
 			onRetry={() => refetch()}
+			onRowClick={abrirHistorico}
+			rowActions={(o) => (
+				<OrdemAcoesBotoes ordem={o} onAcao={abrir} pendente={pendente(o.id)} />
+			)}
+			rowActionsWidth="13rem"
 			emptyMessage={
 				status
 					? `Nenhuma ordem com status ${STATUS_ORDEM_VISUAL[status].rotulo.toLowerCase()}.`
