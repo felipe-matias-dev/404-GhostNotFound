@@ -1,14 +1,4 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Logo } from "#/components/layout/logo";
-import { ThemeToggle } from "#/components/ui/theme-toggle";
+import { VisaoGeralPage } from "#/features/visaoGeral";
 
-export const Route = createFileRoute("/")({ component: Home });
-
-function Home() {
-	return (
-		<header className="flex items-center justify-between p-6">
-			<Logo />
-			<ThemeToggle />
-		</header>
-	);
-}
+export const Route = createFileRoute("/")({ component: VisaoGeralPage });
