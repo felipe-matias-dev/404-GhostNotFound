@@ -38,6 +38,13 @@ conventions:
     "null": ""                          # campo vazio é nulo (entre aspas: sem elas o YAML lê null como chave nula)
     array_separator: ";"                # colunas text[] (ex.: motivos) vão numa célula só, itens separados por ;
     location: data/gold/                # fora do Git: os dados e a Gold agregada não são versionados
+  invoice_status:                       # situação da fatura, calculada pela Gold contra uma data de corte
+    data_corte: "maior data presente nas faturas (emissão ou pagamento), calculada a cada carga; o dado é uma extração única"
+    paga: "paga até a data de vencimento"
+    paga_com_atraso: "paga depois do vencimento"
+    em_aberto: "não paga, com vencimento igual ou posterior à data de corte (ainda no prazo)"
+    em_atraso: "não paga, com vencimento anterior à data de corte"
+    note: "uma UC tem uma única fatura por competência (conferido), então a situação da fatura vive no fato, sem tabela própria. No dataset do case todas as faturas não pagas estão em atraso, porque a data de corte é posterior a todos os vencimentos; em_aberto passa a existir quando a Gold recebe dados novos"
   foreign_keys: logical                 # chaves estrangeiras são lógicas: checadas no Data Quality, sem constraint no banco,
                                         # porque o loader recarrega tabela por tabela e uma FK física faria a recarga falhar
   types:                                # tipos do contrato -> PostgreSQL
@@ -62,6 +69,7 @@ conventions:
     "adimensional": "número sem unidade (índice)"
     "nota": "nota de satisfação do atendimento, de 1 a 5"
     "posição": "posição em um ranking (1 = primeira)"
+    "dias": "dias corridos"
   agent:                                # regras da camada semântica do agente (views sem_*)
     tables: "só as tabelas com agente em consumers"
     columns: "só colunas com status confirmada ou proposta e sensitive diferente de true"
@@ -126,8 +134,13 @@ tables:
       receita_arrecadada:  {type: money,      nullable: true,  status: proposta, unit: "R$", description: "Valor efetivamente pago"}
       tarifa_media:        {type: ratio,      nullable: true,  status: proposta, unit: "R$/kWh", description: "Receita de energia dividida pela energia faturada (sem tributos)", note: "receita_energia ÷ kwh_faturado, provisório até a reconciliação (DEC-023); NULL quando kwh_faturado = 0 (ex.: GD que compensa todo o consumo)"}
       bandeira:            {type: text,       nullable: true,  status: proposta, allowed: [verde, amarela, vermelha_p1, vermelha_p2], description: "Bandeira tarifária da competência (acréscimo mensal)", note: "a Silver usa Verde, Amarela, Vermelha P1 e Vermelha P2; a Gold converte para este formato"}
+      data_vencimento:     {type: date,       nullable: false, status: proposta, description: "Data de vencimento da fatura"}
+      data_pagamento:      {type: date,       nullable: true,  status: proposta, description: "Data em que a fatura foi paga; vazia quando não foi paga", note: "a Silver converte o ano 9999 (código de não pago) em nulo (FAT-04)"}
+      status_pagamento:    {type: text,       nullable: false, status: proposta, allowed: [paga, paga_com_atraso, em_aberto, em_atraso], description: "Situação da fatura na data de corte: paga (até o vencimento), paga com atraso, em aberto (não paga e ainda no prazo) ou em atraso (não paga e vencida)", note: "regra em conventions.invoice_status; a Silver só distingue paga, paga com atraso e em aberto"}
+      dias_em_atraso:      {type: integer,    nullable: true,  status: proposta, unit: "dias", description: "Dias de atraso: da data de pagamento depois do vencimento (paga com atraso) ou da data de corte depois do vencimento (em atraso); vazio nos demais casos", note: "dá ao portal a gravidade do atraso sem precisar conhecer a data de corte"}
     checks:
       - "receita_faturada = receita_energia + tributos (por linha, diferença máxima de R$ 0,01)"
+      - "data_pagamento vazia se e somente se status_pagamento é em_aberto ou em_atraso; dias_em_atraso vazio quando a fatura foi paga até o vencimento ou está em aberto"
 
   gold_receita_decomposicao:
     description: "Decomposição da variação de receita entre dois períodos (PVM com efeito mix)."

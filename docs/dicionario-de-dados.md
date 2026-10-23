@@ -19,7 +19,7 @@ Definição de cada tabela, coluna e métrica da Gold, com a fórmula e as decis
 | Dado pessoal | Só entra mascarado, com `sensitive: true`; o original não chega à Gold ([DEC-022](decisoes.md)). |
 | Classe | `classe` guarda B1, B2, B3 ou A4, como o case define "classe de consumo"; `classe_cadastro` guarda as cinco classes do cadastro e separa Comercial de Poder Público, que dividem o B3 ([DEC-023](decisoes.md)). |
 
-Unidades usadas: `R$` (reais); `R$/kWh` (reais por quilowatt-hora); `kWh` (quilowatt-hora); `kWh/mês` (quilowatt-hora por mês); `kWp` (quilowatt-pico (potência de pico da geração solar)); `h` (horas); `UC·h` (consumidor × hora: soma das horas de interrupção de cada UC afetada); `interrupções` (número de interrupções); `contagem` (número de itens (UCs, chamados, interrupções)); `adimensional` (número sem unidade (índice)); `nota` (nota de satisfação do atendimento, de 1 a 5); `posição` (posição em um ranking (1 = primeira)).
+Unidades usadas: `R$` (reais); `R$/kWh` (reais por quilowatt-hora); `kWh` (quilowatt-hora); `kWh/mês` (quilowatt-hora por mês); `kWp` (quilowatt-pico (potência de pico da geração solar)); `h` (horas); `UC·h` (consumidor × hora: soma das horas de interrupção de cada UC afetada); `interrupções` (número de interrupções); `contagem` (número de itens (UCs, chamados, interrupções)); `adimensional` (número sem unidade (índice)); `nota` (nota de satisfação do atendimento, de 1 a 5); `posição` (posição em um ranking (1 = primeira)); `dias` (dias corridos).
 
 ## 2. Métricas e fórmulas
 
@@ -39,6 +39,7 @@ Unidades usadas: `R$` (reais); `R$/kWh` (reais por quilowatt-hora); `kWh` (quilo
 | Score de suspeita | Posição da UC na fila de suspeitas: 1 = mais suspeita. | Posição no ranking, e não uma nota. Abordagem híbrida: regras explicáveis e modelo simples treinado nas inspeções. |
 | `possui_gd` | A UC tem geração própria conectada. Em `gold_kpis_segmento_mensal`, vale por competência (a partir do mês da conexão); em `gold_receita_decomposicao`, é o estado no último mês do período atual. | Definição da UC que conectou entre os períodos a confirmar. |
 | Potência | Potência de pico instalada, em kWp. | A origem só traz potência de pico. Registros com potência muito acima do normal (GD-02) seguem a decisão da Gold. |
+| Situação da fatura (`status_pagamento`) | Calculada na Gold contra a **data de corte** (a maior data presente nas faturas): `paga` (paga até o vencimento), `paga_com_atraso`, `em_aberto` (não paga e ainda no prazo) e `em_atraso` (não paga e vencida). `dias_em_atraso` = dias entre o vencimento e o pagamento (ou a data de corte). | Uma UC tem uma única fatura por competência, então a situação vive no fato. A Silver só distingue paga, paga com atraso e em aberto. No dataset do case todas as faturas não pagas estão em atraso, porque o corte é posterior a todos os vencimentos. Limpeza: FAT-04. |
 | Reconciliação | Ponte do número bruto até o usado nos indicadores, por competência. Receita: total de todas as faturas = cadastro + UCs fora do cadastro; cadastro = energia + tributos. Energia: consumo apurado nas leituras + correção das trocas de medidor + correção do sinal invertido = energia faturada. | Tabela `gold_reconciliacao_faturamento`. As faturas de UCs fora do cadastro (FAT-05) ficam fora do fato por UC, mas nunca são descartadas: aparecem ali. Responde qual receita é considerada, quanto vem de faturas sem cadastro e de onde vem a diferença entre a receita da diretoria e a nossa. |
 
 ### KPIs por recorte: como agregar
@@ -93,9 +94,14 @@ Faturamento por UC e competência.
 | `receita_arrecadada` | numeric(14,2) | sim | R$ | proposta | Valor efetivamente pago. |
 | `tarifa_media` | double precision | sim | R$/kWh | proposta | Receita de energia dividida pela energia faturada (sem tributos). Receita_energia ÷ kwh_faturado, provisório até a reconciliação (DEC-023); NULL quando kwh_faturado = 0 (ex.: GD que compensa todo o consumo). |
 | `bandeira` | text (verde, amarela, vermelha_p1, vermelha_p2) | sim |  | proposta | Bandeira tarifária da competência (acréscimo mensal). A Silver usa Verde, Amarela, Vermelha P1 e Vermelha P2; a Gold converte para este formato. |
+| `data_vencimento` | date | não |  | proposta | Data de vencimento da fatura. |
+| `data_pagamento` | date | sim |  | proposta | Data em que a fatura foi paga; vazia quando não foi paga. A Silver converte o ano 9999 (código de não pago) em nulo (FAT-04). |
+| `status_pagamento` | text (paga, paga_com_atraso, em_aberto, em_atraso) | não |  | proposta | Situação da fatura na data de corte: paga (até o vencimento), paga com atraso, em aberto (não paga e ainda no prazo) ou em atraso (não paga e vencida). Regra em conventions.invoice_status; a Silver só distingue paga, paga com atraso e em aberto. |
+| `dias_em_atraso` | integer | sim | dias | proposta | Dias de atraso: da data de pagamento depois do vencimento (paga com atraso) ou da data de corte depois do vencimento (em atraso); vazio nos demais casos. Dá ao portal a gravidade do atraso sem precisar conhecer a data de corte. |
 
 **Validações:**
 - receita_faturada = receita_energia + tributos (por linha, diferença máxima de R$ 0,01)
+- data_pagamento vazia se e somente se status_pagamento é em_aberto ou em_atraso; dias_em_atraso vazio quando a fatura foi paga até o vencimento ou está em aberto
 
 ### `gold_receita_decomposicao`
 

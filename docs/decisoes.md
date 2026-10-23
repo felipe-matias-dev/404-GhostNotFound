@@ -524,6 +524,14 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   Período: qualquer intervalo é a soma das competências escolhidas. `n_uc` é um estoque, então para
   vários meses o DEC e o FEC usam a média mensal de `n_uc`. O agente e o portal podem cruzar tempo,
   território, classe e GD sobre as mesmas colunas.
+- **Situação da fatura na UC 360 (sugestão do João Euclides, PR #23):** `gold_fato_faturamento_mensal`
+  ganha `data_vencimento`, `data_pagamento`, `status_pagamento` e `dias_em_atraso`, sem tabela nova. Uma
+  UC tem uma única fatura por competência (conferido: nenhum par UC × mês com mais de uma fatura), então
+  o grão do fato já é o da fatura. O status tem quatro valores (`paga`, `paga_com_atraso`, `em_aberto` e
+  `em_atraso`) e é calculado na Gold, e não no backend, contra uma data de corte: a maior data presente
+  nas faturas, já que o dado é uma extração única. No dataset do case todas as faturas não pagas estão em
+  atraso (a data de corte é posterior a todos os vencimentos); `em_aberto` passa a existir quando a Gold
+  receber dados novos.
 - **Titular na UC 360:** o case pede que a tela mostre "quem é o cliente", e a Gold traz só
   `titular_mascarado` (iniciais) e `documento_mascarado` (3 últimos dígitos), ambos `sensitive`,
   que substituem `cod_cliente`. Não há código de cliente na origem, e o teste do cadastro mostrou que
