@@ -443,9 +443,15 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Data:** 22/10/2026 · **Área:** GenAI · **Autor:** Lucas · **Atualizada:** 23/10/2026, Luis Felipe
 - **Status:** aceita.
 - **Decisão:** a narrativa em linguagem natural só é aceita se cada número dela existir nas linhas que o redator recebeu ou no total de linhas. Números que aparecem só na pergunta ou nas suposições não contam. Se a verificação falhar, ou o redator der erro, a resposta volta ao texto determinístico.
-- **Leitura dos números:** o texto da narrativa é lido só em pt-BR (ponto separa milhar, vírgula separa decimal). Os valores do banco são lidos no próprio tipo: `Decimal`, `int` e `float` pelo valor, datas e textos pelos números que contêm. A proposta inicial aceitava pt-BR e en ao mesmo tempo, e aí `1.234` valia como 1234 e como 1,234: um número errado podia passar na verificação. Número escrito em formato en derruba a narrativa, o que é seguro.
+- **Leitura dos números (decidido em 23/10/2026, PR #36):**
+  - O texto é lido só em pt-BR: ponto separa milhar, vírgula separa decimal.
+  - Os valores do banco são lidos no próprio tipo: `Decimal`, `int` e `float` pelo valor, e datas e textos pelos números que contêm. Valores negativos contam pela magnitude ("queda de 10,5 mil" vale para `-10.5`).
+  - A proposta inicial aceitava pt-BR e en ao mesmo tempo. Aí `1.234` valia como 1234 e como 1,234, e um número errado podia passar na verificação.
+  - **Consequência aceita:** um número no formato en é rejeitado mesmo que exista nas linhas. `152.4` no texto é lido como 1524 e derruba a narrativa, ainda que `152.4` esteja no resultado. É o lado seguro: o usuário vê o texto determinístico, nunca um número mal lido.
+  - Um trecho que não forma número em pt-BR (por exemplo `1,2,3` ou `01,02,03`) conta como número não verificado. A narrativa cai no texto determinístico, e a resposta continua `answered`: a verificação nunca levanta erro.
+- **Insight (item 9):** o `InsightWriter` usa a mesma verificação, com o JSON de métricas da tela como fonte dos números. Um insight com número fora do JSON, em formato en (por exemplo `1234.5` copiado do JSON) ou ilegível vira `None`, e a tela aparece sem insight. O prompt `prompts/insight/v1` pede o formato brasileiro.
 - **Motivo:** o `CLAUDE.md` do agente diz que todo número da resposta vem das linhas retornadas, e a spec (§8, item 8) exige que um número inexistente nas linhas derrube a narrativa.
-- **Consequência:** uma narrativa que cite um ano ou um limite da pergunta ("acima de 300 kWh") cai no texto determinístico quando o número não está nas linhas. O prompt do redator (`prompts/answer/v1`) pede para não repetir esses números e para escrever no formato brasileiro.
+- **Consequência:** uma narrativa que cite um ano ou um limite da pergunta ("acima de 300 kWh") cai no texto determinístico quando o número não está nas linhas. O prompt do redator (`prompts/answer/v1`) pede para não repetir esses números e para escrever no formato brasileiro. A verificação fica em `domain/numbers.py` (`unsupported_numbers`) e serve à narrativa e ao insight.
 
 ## DEC-020 · Contrato `AgentAnswer` com status (aceita)
 

@@ -1,13 +1,16 @@
 import re
 from collections.abc import Iterable
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 PT_BR_NUMBER = re.compile(r"\d+(?:[.,]\d+)*")
 MACHINE_NUMBER = re.compile(r"\d+(?:\.\d+)?")
 
 
-def _from_pt_br(token: str) -> Decimal:
-    return Decimal(token.replace(".", "").replace(",", "."))
+def _from_pt_br(token: str) -> Decimal | None:
+    try:
+        return Decimal(token.replace(".", "").replace(",", "."))
+    except InvalidOperation:
+        return None
 
 
 def _numbers_in_value(value: object) -> set[Decimal]:
@@ -22,4 +25,8 @@ def unsupported_numbers(text: str, values: Iterable[object]) -> tuple[str, ...]:
     known: set[Decimal] = set()
     for value in values:
         known |= _numbers_in_value(value)
-    return tuple(token for token in PT_BR_NUMBER.findall(text) if _from_pt_br(token) not in known)
+    return tuple(
+        token
+        for token in PT_BR_NUMBER.findall(text)
+        if (number := _from_pt_br(token)) is None or number not in known
+    )
