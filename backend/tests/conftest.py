@@ -10,6 +10,7 @@ from sqlalchemy import Engine, text
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
+from venergy_api.carga import drop_agent_views
 from venergy_api.config import Settings
 from venergy_api.database import Base, create_db_engine, get_session
 from venergy_api.main import create_app
@@ -40,11 +41,18 @@ def engine() -> Iterator[Engine]:
             pytrace=False,
         )
 
-    # Limpa antes, para não herdar sobras de uma execução interrompida, e depois.
-    Base.metadata.drop_all(engine)
+    # Limpa antes, para não herdar sobras de uma execução interrompida, e depois. As views do
+    # agente saem primeiro: com elas, o banco não deixa apagar as tabelas da Gold.
+    drop_test_database(engine)
     yield engine
-    Base.metadata.drop_all(engine)
+    drop_test_database(engine)
     engine.dispose()
+
+
+def drop_test_database(engine: Engine) -> None:
+    with engine.begin() as connection:
+        drop_agent_views(connection)
+        Base.metadata.drop_all(connection)
 
 
 @pytest.fixture

@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import get_args, get_origin
 
 from pydantic import BaseModel, ValidationError
-from sqlalchemy import Engine, insert
+from sqlalchemy import Connection, Engine, insert, text
 
 from venergy_api.config import get_settings
 from venergy_api.database import Base, get_engine
@@ -40,6 +40,11 @@ from venergy_api.schemas import (
 
 # conventions.delivery.array_separator do contrato da Gold.
 ARRAY_SEPARATOR = ";"
+
+# Views da camada semântica do agente de IA: o GenAI gera o arquivo, e a carga o aplica a
+# cada execução, porque as views dependem das tabelas que ela recria (spec do agente, D7).
+# backend/src/venergy_api/carga.py → raiz do repositório, como em openapi.py.
+AGENT_VIEWS_SQL = Path(__file__).resolve().parents[3] / "ai-agent" / "semantic" / "views.sql"
 
 
 class GoldLoadError(Exception):
@@ -117,6 +122,21 @@ def read_rows(csv_path: Path, schema: type[BaseModel]) -> list[dict[str, object]
     return rows
 
 
+def drop_agent_views(connection: Connection) -> None:
+    """Apaga as views sem_* do agente no schema gold, para as tabelas poderem ser recriadas."""
+    # Pelo catálogo, e não pelos nomes do views.sql: uma view que o GenAI renomeou ou tirou
+    # do arquivo ainda estaria presa à tabela, e o DROP da tabela falharia.
+    nomes = connection.scalars(
+        text(r"SELECT viewname FROM pg_views WHERE schemaname = 'gold' AND viewname LIKE 'sem\_%'")
+    ).all()
+    if not nomes:
+        return
+    # Um DROP só, com todas: se uma view ler de outra, o Postgres resolve a ordem. Os nomes
+    # vêm do catálogo, e não de entrada de usuário.
+    quote = connection.dialect.identifier_preparer.quote
+    connection.execute(text(f"DROP VIEW {', '.join(f'gold.{quote(nome)}' for nome in nomes)}"))
+
+
 def load_gold(gold_dir: Path, engine: Engine) -> dict[str, int]:
     """Substitui as tabelas da Gold pelo conteúdo dos CSVs e devolve as linhas por tabela."""
     # Valida tudo antes de gravar: um arquivo ruim não pode deixar o banco pela metade.
@@ -126,11 +146,18 @@ def load_gold(gold_dir: Path, engine: Engine) -> dict[str, int]:
         if not csv_path.exists():
             raise GoldLoadError(f"arquivo não encontrado: {csv_path}")
         validated[table] = read_rows(csv_path, table.schema)
+    if not AGENT_VIEWS_SQL.exists():
+        raise GoldLoadError(f"views do agente não encontradas: {AGENT_VIEWS_SQL}")
+    views_sql = AGENT_VIEWS_SQL.read_text(encoding="utf-8")
 
     gold_tables = [table.model.__table__ for table in GOLD_TABLES]
     # Tudo numa transação (no Postgres, DROP e CREATE também voltam atrás): rodar duas
     # vezes não duplica, e uma falha no meio desfaz tudo, inclusive o DROP.
     with engine.begin() as connection:
+        # As views do agente prendem as tabelas: saem antes e voltam no fim. O drop_all
+        # continua sem CASCADE, para uma dependência que ninguém previu falhar a carga em vez
+        # de sumir em silêncio (DEC-014).
+        drop_agent_views(connection)
         # Recria a Gold em vez de só apagar as linhas: sem migrações, o create_all não
         # acrescenta coluna em tabela que já existe, e cada mudança do contrato exigiria
         # apagar a tabela à mão. O drop só passa por GOLD_TABLES: nunca apaga uma OI.
@@ -140,6 +167,7 @@ def load_gold(gold_dir: Path, engine: Engine) -> dict[str, int]:
         for table, rows in validated.items():
             if rows:
                 connection.execute(insert(table.model), rows)
+        connection.exec_driver_sql(views_sql)
 
     return {table.model.__tablename__: len(rows) for table, rows in validated.items()}
 

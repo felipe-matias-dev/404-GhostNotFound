@@ -1,4 +1,5 @@
 import csv
+import re
 from decimal import Decimal
 from pathlib import Path
 
@@ -8,7 +9,7 @@ from sqlalchemy import Engine, inspect, select, text
 from sqlalchemy.orm import Session
 
 from venergy_api.amostra import write_sample
-from venergy_api.carga import GoldLoadError, load_gold, read_rows
+from venergy_api.carga import AGENT_VIEWS_SQL, GoldLoadError, load_gold, read_rows
 from venergy_api.models import DimUc
 from venergy_api.schemas import RequiredText
 
@@ -62,6 +63,54 @@ def test_loading_twice_does_not_duplicate_rows(tmp_path: Path, engine: Engine) -
     load_gold(tmp_path / "gold", engine)
 
     assert len(stored_ucs(engine)) == 1
+
+
+# As views que o GenAI pôs no views.sql: o teste acompanha o arquivo, e não uma lista à mão.
+AGENT_VIEWS = set(
+    re.findall(r"CREATE OR REPLACE VIEW gold\.(\w+)", AGENT_VIEWS_SQL.read_text("utf-8"))
+)
+
+
+def gold_views(engine: Engine) -> set[str]:
+    with engine.connect() as connection:
+        return set(
+            connection.scalars(text("SELECT viewname FROM pg_views WHERE schemaname = 'gold'"))
+        )
+
+
+def test_load_creates_the_agent_views(tmp_path: Path, engine: Engine) -> None:
+    write_sample(tmp_path / "gold", force=True)
+
+    load_gold(tmp_path / "gold", engine)
+
+    assert AGENT_VIEWS
+    assert gold_views(engine) == AGENT_VIEWS
+
+
+def test_reload_with_the_agent_views_in_place(tmp_path: Path, engine: Engine) -> None:
+    # Sem tirar as views antes, o DROP das tabelas falha e o banco fica preso na Gold anterior.
+    write_sample(tmp_path / "gold", force=True)
+    load_gold(tmp_path / "gold", engine)
+
+    load_gold(tmp_path / "gold", engine)
+
+    assert gold_views(engine) == AGENT_VIEWS
+
+
+def test_reload_drops_an_agent_view_that_left_the_views_file(
+    tmp_path: Path, engine: Engine
+) -> None:
+    # Uma view renomeada ou removida pelo GenAI continua no banco até a próxima carga.
+    write_sample(tmp_path / "gold", force=True)
+    load_gold(tmp_path / "gold", engine)
+    with engine.begin() as connection:
+        connection.execute(
+            text("CREATE VIEW gold.sem_antiga AS SELECT cod_uc FROM gold.gold_dim_uc")
+        )
+
+    load_gold(tmp_path / "gold", engine)
+
+    assert gold_views(engine) == AGENT_VIEWS
 
 
 def test_reload_recreates_table_with_columns_added_to_the_contract(
