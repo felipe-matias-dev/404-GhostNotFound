@@ -79,3 +79,9 @@ async def test_metrics_reach_the_model_as_delimited_data_with_the_label():
     user = next(part.content for part in calls[0][0].parts if part.part_kind == "user-prompt")
     assert f"<dados-{NONCE}>" in user and f"</dados-{NONCE}>" in user
     assert '"variacao_percentual": -4.0' in user
+
+
+async def test_unreadable_number_drops_the_insight_instead_of_raising():
+    model, _ = narrating_model("As classes 1,2,3 tiveram queda de 4,0%.")
+
+    assert await writer(model).narrate("Receita", METRICS) is None
