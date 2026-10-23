@@ -23,6 +23,7 @@ from venergy_api.models import (
     FatoFaturamentoMensal,
     FilaSuspeita,
     KpisMensais,
+    KpisSegmentoMensal,
     ReceitaDecomposicao,
 )
 from venergy_api.schemas import (
@@ -31,6 +32,7 @@ from venergy_api.schemas import (
     FaturamentoMensalSchema,
     FilaSuspeitaSchema,
     KpisMensaisSchema,
+    KpisSegmentoMensalSchema,
     ReceitaDecomposicaoSchema,
 )
 
@@ -306,39 +308,59 @@ def _faturamento() -> tuple[FaturamentoMensalSchema, ...]:
     return tuple(rows)
 
 
-# UCs atendidas e DEC/FEC de referência por alimentador. O AL-06, rural e de rede longa, é
-# o pior, para o ranking de continuidade ter um destaque claro.
+# DEC e FEC de referência de cada alimentador, por UC e por mês. O AL-06, rural e de rede
+# longa, é o pior, para o ranking de continuidade ter um destaque claro.
 _ALIMENTADORES = {
-    # cod_alimentador: (n_uc, DEC de referência em horas, FEC de referência)
-    "AL-01": (4200, 0.8, 0.5),
-    "AL-02": (3100, 1.1, 0.7),
-    "AL-03": (2800, 0.9, 0.6),
-    "AL-04": (5200, 1.4, 0.9),
-    "AL-05": (3600, 1.0, 0.6),
-    "AL-06": (1300, 3.2, 1.8),
-    "AL-07": (900, 0.6, 0.4),
+    # cod_alimentador: (DEC de referência em horas, FEC de referência)
+    "AL-01": (0.8, 0.5),
+    "AL-02": (1.1, 0.7),
+    "AL-03": (0.9, 0.6),
+    "AL-04": (1.4, 0.9),
+    "AL-05": (1.0, 0.6),
+    "AL-06": (3.2, 1.8),
+    "AL-07": (0.6, 0.4),
 }
 # Interrupções de cada mês, de janeiro a dezembro, em % da referência: mais na estação chuvosa.
 _CHUVA_PCT = (85, 85, 95, 115, 130, 140, 125, 100, 90, 85, 80, 85)
 
 
+def _interrupcoes(uc: DimUcSchema, competencia: str) -> tuple[int, float]:
+    """Interrupções e horas sem energia de uma UC num mês (no case, cada ocorrência é uma UC)."""
+    dec_referencia, fec_referencia = _ALIMENTADORES[uc.cod_alimentador]
+    chuva = _CHUVA_PCT[int(competencia[5:]) - 1] / 100
+    interrupcoes = round(fec_referencia * chuva)
+    # Cada interrupção dura a média do alimentador: sem interrupção, sem hora parada.
+    return interrupcoes, round(interrupcoes * dec_referencia / fec_referencia, 1)
+
+
+def _chamados(uc: DimUcSchema, competencia: str) -> tuple[int, int | None]:
+    """Chamados abertos pela UC no mês e a nota do atendimento, de 1 a 5."""
+    mes, numero = int(competencia[5:]), int(uc.cod_uc)
+    if (mes + numero) % 4:
+        return 0, None
+    # Parte dos chamados fica sem nota, e fica fora da média (ATD-01).
+    nota = None if mes % 3 == 0 else 1 + (mes + 2 * numero) % 5
+    return 1, nota
+
+
 def _continuidade() -> tuple[ContinuidadeAlimentadorMensalSchema, ...]:
-    # Pelo contrato, dec = horas_interrompidas ÷ n_uc e fec = n_interrupcoes ÷ n_uc. Para o
-    # DEC sair em horas por consumidor, horas e interrupções somam o que cada UC afetada
-    # sofreu (consumidor × hora), e não o tempo de relógio da ocorrência.
+    # Somada das UCs da amostra, para bater com os KPIs por recorte: n_uc é o número de UCs
+    # do cadastro que o alimentador atende. Pelo contrato, dec = horas_interrompidas ÷ n_uc
+    # e fec = n_interrupcoes ÷ n_uc, com as horas em consumidor × hora.
     rows = []
-    for cod_alimentador, (n_uc, dec_referencia, fec_referencia) in _ALIMENTADORES.items():
+    for cod_alimentador in _ALIMENTADORES:
+        ucs = [uc for uc in SAMPLE_UCS if uc.cod_alimentador == cod_alimentador]
         for competencia in COMPETENCIAS:
-            chuva = _CHUVA_PCT[int(competencia[5:]) - 1] / 100
-            horas = round(n_uc * dec_referencia * chuva, 1)
-            interrupcoes = round(n_uc * fec_referencia * chuva)
+            ocorrencias = [_interrupcoes(uc, competencia) for uc in ucs]
+            interrupcoes = sum(n for n, _ in ocorrencias)
+            horas = sum(h for _, h in ocorrencias)
             rows.append(
                 ContinuidadeAlimentadorMensalSchema(
                     cod_alimentador=cod_alimentador,
                     competencia=competencia,
-                    dec=horas / n_uc,
-                    fec=interrupcoes / n_uc,
-                    n_uc=n_uc,
+                    dec=horas / len(ucs),
+                    fec=interrupcoes / len(ucs),
+                    n_uc=len(ucs),
                     n_interrupcoes=interrupcoes,
                     horas_interrompidas=horas,
                 )
@@ -351,7 +373,6 @@ def _kpis(
     continuidade: tuple[ContinuidadeAlimentadorMensalSchema, ...],
 ) -> tuple[KpisMensaisSchema, ...]:
     # Somas do faturamento, para que o painel da diretoria bata com a soma das UCs.
-    # Chamados e satisfação ainda não têm definição no contrato.
     rows = []
     for competencia in COMPETENCIAS:
         do_mes = [linha for linha in faturamento if linha.competencia == competencia]
@@ -359,6 +380,8 @@ def _kpis(
         # DEC e FEC da empresa: totais sobre o total de UCs atendidas, e não a média dos
         # alimentadores, que daria o mesmo peso a um rural pequeno e a um urbano grande.
         n_uc = sum(linha.n_uc for linha in rede)
+        chamados = [_chamados(uc, competencia) for uc in SAMPLE_UCS]
+        notas = [nota for _, nota in chamados if nota is not None]
         rows.append(
             KpisMensaisSchema(
                 competencia=competencia,
@@ -367,10 +390,56 @@ def _kpis(
                 receita_energia=sum((linha.receita_energia for linha in do_mes), Decimal(0)),
                 dec=sum(linha.horas_interrompidas for linha in rede) / n_uc,
                 fec=sum(linha.n_interrupcoes for linha in rede) / n_uc,
-                n_chamados=None,
-                satisfacao_media=None,
+                n_chamados=sum(n for n, _ in chamados),
+                # Soma das notas ÷ chamados com nota; vazia no mês sem nenhuma avaliação.
+                satisfacao_media=sum(notas) / len(notas) if notas else None,
             )
         )
+    return tuple(rows)
+
+
+def _kpis_segmento(
+    faturamento: tuple[FaturamentoMensalSchema, ...],
+) -> tuple[KpisSegmentoMensalSchema, ...]:
+    # Somados das UCs com as mesmas regras do faturamento, da continuidade e dos chamados:
+    # a soma de cada mês bate com os KPIs da empresa e com a continuidade por alimentador.
+    fatura = {(linha.cod_uc, linha.competencia): linha for linha in faturamento}
+    recortes: dict[tuple[str, str, str, bool], list[DimUcSchema]] = {}
+    for uc in SAMPLE_UCS:
+        # Na amostra, os painéis solares já estavam conectados antes de 2024, então o GD de
+        # cada competência é o do cadastro.
+        chave = (uc.municipio, uc.bairro, uc.classe_cadastro, uc.possui_gd)
+        recortes.setdefault(chave, []).append(uc)
+
+    rows = []
+    for competencia in COMPETENCIAS:
+        for (municipio, bairro, classe_cadastro, possui_gd), ucs in sorted(recortes.items()):
+            faturas = [fatura[(uc.cod_uc, competencia)] for uc in ucs]
+            ocorrencias = [_interrupcoes(uc, competencia) for uc in ucs]
+            chamados = [_chamados(uc, competencia) for uc in ucs]
+            notas = [nota for _, nota in chamados if nota is not None]
+            arrecadado = [f.receita_arrecadada for f in faturas if f.receita_arrecadada is not None]
+            rows.append(
+                KpisSegmentoMensalSchema(
+                    competencia=competencia,
+                    municipio=municipio,
+                    bairro=bairro,
+                    classe_cadastro=classe_cadastro,
+                    classe=ucs[0].classe,
+                    possui_gd=possui_gd,
+                    n_uc=len(ucs),
+                    kwh_faturado=sum((f.kwh_faturado for f in faturas), Decimal(0)),
+                    receita_faturada=sum((f.receita_faturada for f in faturas), Decimal(0)),
+                    receita_energia=sum((f.receita_energia for f in faturas), Decimal(0)),
+                    tributos=sum((f.tributos for f in faturas), Decimal(0)),
+                    receita_arrecadada=sum(arrecadado, Decimal(0)) if arrecadado else None,
+                    horas_interrompidas=sum(h for _, h in ocorrencias),
+                    n_interrupcoes=sum(n for n, _ in ocorrencias),
+                    n_chamados=sum(n for n, _ in chamados),
+                    soma_notas=float(sum(notas)) if notas else None,
+                    n_notas=len(notas),
+                )
+            )
     return tuple(rows)
 
 
@@ -452,6 +521,7 @@ SAMPLE_FILA = (
 SAMPLE_FATURAMENTO = _faturamento()
 SAMPLE_CONTINUIDADE = _continuidade()
 SAMPLE_KPIS = _kpis(SAMPLE_FATURAMENTO, SAMPLE_CONTINUIDADE)
+SAMPLE_KPIS_SEGMENTO = _kpis_segmento(SAMPLE_FATURAMENTO)
 SAMPLE_DECOMPOSICAO = _decomposicao(SAMPLE_FATURAMENTO)
 
 # Linhas por tabela da Gold. A carga exige um CSV para cada tabela de GOLD_TABLES, e o
@@ -461,6 +531,7 @@ SAMPLE: dict[type[Base], tuple[BaseModel, ...]] = {
     FatoFaturamentoMensal: SAMPLE_FATURAMENTO,
     ReceitaDecomposicao: SAMPLE_DECOMPOSICAO,
     KpisMensais: SAMPLE_KPIS,
+    KpisSegmentoMensal: SAMPLE_KPIS_SEGMENTO,
     ContinuidadeAlimentadorMensal: SAMPLE_CONTINUIDADE,
     FilaSuspeita: SAMPLE_FILA,
 }

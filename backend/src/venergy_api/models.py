@@ -125,6 +125,36 @@ class KpisMensais(Base):
     satisfacao_media: Mapped[float | None] = mapped_column(Double)
 
 
+class KpisSegmentoMensal(Base):
+    """KPIs por recorte e competência, em componentes somáveis: o filtro da diretoria."""
+
+    __tablename__ = "gold_kpis_segmento_mensal"
+    __table_args__ = {"schema": "gold"}
+
+    competencia: Mapped[str] = mapped_column(primary_key=True)
+    municipio: Mapped[str] = mapped_column(primary_key=True)
+    bairro: Mapped[str] = mapped_column(primary_key=True)
+    classe_cadastro: Mapped[str] = mapped_column(primary_key=True)
+    # Por competência: antes da conexão, a UC conta como sem GD.
+    possui_gd: Mapped[bool] = mapped_column(primary_key=True)
+    classe: Mapped[str]
+    # Estoque: soma só dentro do mesmo mês. Os demais componentes são fluxos e somam entre
+    # meses. Os índices (DEC, FEC, satisfação) não são guardados: calculam-se no fim, sobre
+    # o filtro escolhido, para qualquer recorte dar o mesmo resultado que a empresa inteira.
+    n_uc: Mapped[int]
+    kwh_faturado: Mapped[Decimal] = mapped_column(_ENERGY)
+    receita_faturada: Mapped[Decimal] = mapped_column(_MONEY)
+    receita_energia: Mapped[Decimal] = mapped_column(_MONEY)
+    tributos: Mapped[Decimal] = mapped_column(_MONEY)
+    receita_arrecadada: Mapped[Decimal | None] = mapped_column(_MONEY)
+    horas_interrompidas: Mapped[float] = mapped_column(Double)
+    n_interrupcoes: Mapped[int]
+    n_chamados: Mapped[int]
+    # Soma e contagem das notas, e não a média: média de médias daria peso errado.
+    soma_notas: Mapped[float | None] = mapped_column(Double)
+    n_notas: Mapped[int]
+
+
 class ContinuidadeAlimentadorMensal(Base):
     """DEC e FEC por alimentador e competência: a tela de continuidade e o ranking."""
 

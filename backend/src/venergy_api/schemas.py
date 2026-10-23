@@ -208,6 +208,28 @@ class DecomposicaoLinhaSchema(BaseModel):
     efeito_mix: ExactNumber
 
 
+class KpisSegmentoMensalSchema(BaseModel):
+    """Componentes somáveis de um recorte (município, bairro, classe e GD) numa competência."""
+
+    competencia: Competencia
+    municipio: RequiredText
+    bairro: RequiredText
+    classe_cadastro: ClasseCadastro
+    classe: Classe
+    possui_gd: bool
+    n_uc: int
+    kwh_faturado: ExactNumber
+    receita_faturada: ExactNumber
+    receita_energia: ExactNumber
+    tributos: ExactNumber
+    receita_arrecadada: ExactNumber | None
+    horas_interrompidas: float
+    n_interrupcoes: int
+    n_chamados: int
+    soma_notas: float | None
+    n_notas: int
+
+
 class ContinuidadeAlimentadorMensalSchema(BaseModel):
     """DEC e FEC de um alimentador numa competência."""
 

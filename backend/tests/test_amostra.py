@@ -8,9 +8,11 @@ from sqlalchemy.orm import Session
 from venergy_api.amostra import SAMPLE, SAMPLE_FILA, write_sample
 from venergy_api.carga import load_gold
 from venergy_api.models import (
+    ContinuidadeAlimentadorMensal,
     FatoFaturamentoMensal,
     FilaSuspeita,
     KpisMensais,
+    KpisSegmentoMensal,
     ReceitaDecomposicao,
 )
 
@@ -77,6 +79,62 @@ def test_revenue_bridge_follows_the_contract_checks(tmp_path: Path, engine: Engi
     # A amostra separa as linhas com GD e tem acréscimo de bandeira para mostrar.
     assert {linha.possui_gd for linha in linhas} == {True, False}
     assert all(linha.efeito_bandeira > 0 for linha in linhas)
+
+
+def test_segment_kpis_add_up_to_the_company_and_the_feeders(tmp_path: Path, engine: Engine) -> None:
+    # Os checks da gold_kpis_segmento_mensal no contrato: somados por mês, os recortes batem
+    # com o total da empresa e com a continuidade por alimentador.
+    write_sample(tmp_path / "gold", force=False)
+    load_gold(tmp_path / "gold", engine)
+    segmento = KpisSegmentoMensal
+
+    with Session(engine) as session:
+        recortes = session.execute(
+            select(
+                segmento.competencia,
+                func.sum(segmento.kwh_faturado),
+                func.sum(segmento.receita_faturada),
+                func.sum(segmento.receita_energia),
+            ).group_by(segmento.competencia)
+        )
+        empresa = session.execute(
+            select(
+                KpisMensais.competencia,
+                KpisMensais.kwh_faturado,
+                KpisMensais.receita_faturada,
+                KpisMensais.receita_energia,
+            )
+        )
+        assert set(recortes) == set(empresa)
+
+        recortes_rede = session.execute(
+            select(
+                segmento.competencia,
+                func.sum(segmento.horas_interrompidas),
+                func.sum(segmento.n_interrupcoes),
+            ).group_by(segmento.competencia)
+        ).all()
+        alimentadores = {
+            competencia: (horas, interrupcoes)
+            for competencia, horas, interrupcoes in session.execute(
+                select(
+                    ContinuidadeAlimentadorMensal.competencia,
+                    func.sum(ContinuidadeAlimentadorMensal.horas_interrompidas),
+                    func.sum(ContinuidadeAlimentadorMensal.n_interrupcoes),
+                ).group_by(ContinuidadeAlimentadorMensal.competencia)
+            )
+        }
+        linhas = session.scalars(select(segmento)).all()
+
+    assert len(recortes_rede) == len(alimentadores)
+    for competencia, horas, interrupcoes in recortes_rede:
+        # Horas são double precision: a ordem da soma muda a última casa.
+        assert horas == pytest.approx(alimentadores[competencia][0])
+        assert interrupcoes == alimentadores[competencia][1]
+    for linha in linhas:
+        assert abs(linha.receita_faturada - linha.receita_energia - linha.tributos) <= Decimal(
+            "0.01"
+        )
 
 
 def test_kpis_match_the_sum_of_the_billing_in_the_database(tmp_path: Path, engine: Engine) -> None:
