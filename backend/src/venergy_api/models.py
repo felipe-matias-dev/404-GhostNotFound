@@ -1,6 +1,6 @@
 """Tabelas do banco local: as da Gold (só leitura) e as da aplicação (ordens de inspeção)."""
 
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from enum import StrEnum
 
@@ -66,10 +66,23 @@ class FatoFaturamentoMensal(Base):
     cod_uc: Mapped[str] = mapped_column(primary_key=True)
     competencia: Mapped[str] = mapped_column(primary_key=True)
     kwh_faturado: Mapped[Decimal] = mapped_column(_ENERGY)
+    # O consumo da leitura antes da correção, e a regra que gerou o kwh_faturado: rastreia
+    # a troca de medidor e o sinal invertido até a origem (DEC-023).
+    kwh_leitura: Mapped[Decimal] = mapped_column(_ENERGY)
+    origem_kwh: Mapped[str]
+    # Total da fatura = energia + tributos. A energia é a base provisória do PVM (DEC-023).
     receita_faturada: Mapped[Decimal] = mapped_column(_MONEY)
+    receita_energia: Mapped[Decimal] = mapped_column(_MONEY)
+    tributos: Mapped[Decimal] = mapped_column(_MONEY)
     receita_arrecadada: Mapped[Decimal | None] = mapped_column(_MONEY)
     tarifa_media: Mapped[float | None] = mapped_column(Double)
     bandeira: Mapped[str | None]
+    # Uma fatura por UC e competência (conferido pelo time de Dados), então a situação da
+    # fatura mora no fato. O status é calculado na Gold, e não aqui.
+    data_vencimento: Mapped[date]
+    data_pagamento: Mapped[date | None]
+    status_pagamento: Mapped[str]
+    dias_em_atraso: Mapped[int | None]
 
 
 class ReceitaDecomposicao(Base):

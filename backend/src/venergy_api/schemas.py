@@ -1,6 +1,6 @@
 """Contrato dos dados: o formato que a Gold entrega e que a API recebe e devolve."""
 
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Annotated, Literal
 
@@ -28,6 +28,8 @@ Competencia = Annotated[str, StringConstraints(pattern=r"^\d{4}-(0[1-9]|1[0-2])$
 Classe = Literal["B1", "B2", "B3", "A4"]
 ClasseCadastro = Literal["Residencial", "Comercial", "Industrial", "Rural", "Poder Público"]
 Bandeira = Literal["verde", "amarela", "vermelha_p1", "vermelha_p2"]
+OrigemKwh = Literal["leitura", "leitura_atual_troca_medidor", "consumo_absoluto"]
+StatusPagamento = Literal["paga", "paga_com_atraso", "em_aberto", "em_atraso"]
 
 # Teto por pedido na ordem da capacidade mensal da equipe de campo (~200 inspeções):
 # acima disso é engano de seleção, e o limite evita um pedido gigante travar o banco.
@@ -58,11 +60,20 @@ class FaturamentoMensalSchema(BaseModel):
     cod_uc: RequiredText
     competencia: Competencia
     kwh_faturado: ExactNumber
+    # Pode ser negativo: é a leitura antes da correção.
+    kwh_leitura: ExactNumber
+    origem_kwh: OrigemKwh
     receita_faturada: ExactNumber
+    receita_energia: ExactNumber
+    tributos: ExactNumber
     receita_arrecadada: ExactNumber | None
     # Vazia quando kwh_faturado é zero (ex.: painel solar compensando todo o consumo).
     tarifa_media: float | None
     bandeira: Bandeira | None
+    data_vencimento: date
+    data_pagamento: date | None
+    status_pagamento: StatusPagamento
+    dias_em_atraso: int | None
 
 
 class ReceitaDecomposicaoSchema(BaseModel):

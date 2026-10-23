@@ -8,6 +8,7 @@ Uso: uv run python -m venergy_api.amostra [--force]
 
 import argparse
 import csv
+from datetime import date
 from decimal import Decimal
 from pathlib import Path
 
@@ -191,8 +192,42 @@ _BANDEIRAS = (
 _PERIODO = {2024: "2024-01/2024-12", 2025: "2025-01/2025-12"}
 
 
+# Tributos sobre a energia numa alíquota única inventada: na fatura real ela varia.
+_ALIQUOTA_TRIBUTOS = Decimal("0.25")
+# Um caso de cada regra de leitura negativa que o contrato prevê (DEC-023).
+_TROCA_MEDIDOR = ("0003", "2025-03")
+_SINAL_INVERTIDO = ("0006", "2024-08")
+_PAGOU_COM_ATRASO = ("0001", "2025-03")
+
+
+def _mes_seguinte(competencia: str, dia: int) -> date:
+    ano, mes = int(competencia[:4]), int(competencia[5:])
+    return date(ano + mes // 12, mes % 12 + 1, dia)
+
+
+def _leitura(cod_uc: str, competencia: str, kwh_faturado: Decimal) -> tuple[Decimal, str]:
+    """Consumo da leitura antes da correção e a regra que leva ao kwh_faturado."""
+    if (cod_uc, competencia) == _TROCA_MEDIDOR:
+        # O medidor novo parte do zero, a diferença das leituras sai negativa, e vale a
+        # leitura atual.
+        return kwh_faturado - Decimal("5000.000"), "leitura_atual_troca_medidor"
+    if (cod_uc, competencia) == _SINAL_INVERTIDO:
+        return -kwh_faturado, "consumo_absoluto"
+    return kwh_faturado, "leitura"
+
+
+def _situacao(vencimento: date, pagamento: date | None, corte: date) -> tuple[str, int | None]:
+    """Status e dias de atraso da fatura, pela regra do contrato (conventions.invoice_status)."""
+    if pagamento is not None:
+        atraso = (pagamento - vencimento).days
+        return ("paga_com_atraso", atraso) if atraso > 0 else ("paga", None)
+    if vencimento < corte:
+        return "em_atraso", (corte - vencimento).days
+    return "em_aberto", None
+
+
 def _faturamento() -> tuple[FaturamentoMensalSchema, ...]:
-    rows = []
+    faturas = []
     for uc in SAMPLE_UCS:
         for competencia in COMPETENCIAS:
             ano, mes = int(competencia[:4]), int(competencia[5:])
@@ -202,21 +237,54 @@ def _faturamento() -> tuple[FaturamentoMensalSchema, ...]:
             if uc.cod_uc == "0002" and mes == 1:
                 kwh = Decimal(0)
             kwh = kwh.quantize(_KWH)
-            receita = (kwh * _TARIFA[uc.classe] * _REAJUSTE[ano]).quantize(_CENTAVO)
+            energia = (kwh * _TARIFA[uc.classe] * _REAJUSTE[ano]).quantize(_CENTAVO)
+            tributos = (energia * _ALIQUOTA_TRIBUTOS).quantize(_CENTAVO)
             # A UC 0005 não pagou as três últimas faturas: arrecadado zero, e não vazio,
-            # porque "não pagou" é um fato.
+            # porque "não pagou" é um fato. As demais pagam no dia 8, antes do vencimento.
             nao_pagou = uc.cod_uc == "0005" and competencia >= "2025-10"
-            rows.append(
-                FaturamentoMensalSchema(
-                    cod_uc=uc.cod_uc,
-                    competencia=competencia,
-                    kwh_faturado=kwh,
-                    receita_faturada=receita,
-                    receita_arrecadada=Decimal("0.00") if nao_pagou else receita,
-                    tarifa_media=float(receita / kwh) if kwh else None,
-                    bandeira=_BANDEIRAS[mes - 1],
-                )
+            dia_pagamento = 20 if (uc.cod_uc, competencia) == _PAGOU_COM_ATRASO else 8
+            faturas.append(
+                {
+                    "uc": uc,
+                    "competencia": competencia,
+                    "kwh": kwh,
+                    "energia": energia,
+                    "tributos": tributos,
+                    "emissao": _mes_seguinte(competencia, 1),
+                    "vencimento": _mes_seguinte(competencia, 10),
+                    "pagamento": None if nao_pagou else _mes_seguinte(competencia, dia_pagamento),
+                }
             )
+
+    # Data de corte: a maior data presente nas faturas, de emissão ou de pagamento, porque o
+    # dado é uma extração única. A fatura de dezembro da UC 0005 vence depois dela e fica em
+    # aberto; as de outubro e novembro, em atraso.
+    corte = max(max(f["emissao"], f["pagamento"] or f["emissao"]) for f in faturas)
+    rows = []
+    for f in faturas:
+        kwh_leitura, origem_kwh = _leitura(f["uc"].cod_uc, f["competencia"], f["kwh"])
+        status, dias_em_atraso = _situacao(f["vencimento"], f["pagamento"], corte)
+        total = f["energia"] + f["tributos"]
+        rows.append(
+            FaturamentoMensalSchema(
+                cod_uc=f["uc"].cod_uc,
+                competencia=f["competencia"],
+                kwh_faturado=f["kwh"],
+                kwh_leitura=kwh_leitura,
+                origem_kwh=origem_kwh,
+                receita_faturada=total,
+                receita_energia=f["energia"],
+                tributos=f["tributos"],
+                receita_arrecadada=total if f["pagamento"] else Decimal("0.00"),
+                # Sem tributos, como o contrato redefiniu (DEC-023).
+                tarifa_media=float(f["energia"] / f["kwh"]) if f["kwh"] else None,
+                bandeira=_BANDEIRAS[int(f["competencia"][5:]) - 1],
+                data_vencimento=f["vencimento"],
+                data_pagamento=f["pagamento"],
+                status_pagamento=status,
+                dias_em_atraso=dias_em_atraso,
+            )
+        )
     return tuple(rows)
 
 

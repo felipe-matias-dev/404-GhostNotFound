@@ -1,3 +1,4 @@
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
@@ -16,6 +17,43 @@ def test_generated_sample_passes_the_gold_load(tmp_path: Path, engine: Engine) -
 
     # A carga exige um CSV por tabela da Gold: se faltar amostra de uma, ela falha antes.
     assert counts == {model.__tablename__: len(rows) for model, rows in SAMPLE.items()}
+
+
+def test_billing_follows_the_contract_checks(tmp_path: Path, engine: Engine) -> None:
+    # As validações do fato no contrato (checks) e a regra do kwh_faturado da DEC-023, depois
+    # de CSV, carga e banco: é o que a Gold real também terá que cumprir.
+    write_sample(tmp_path / "gold", force=False)
+    load_gold(tmp_path / "gold", engine)
+
+    with Session(engine) as session:
+        faturas = session.scalars(select(FatoFaturamentoMensal)).all()
+
+    for fatura in faturas:
+        assert abs(fatura.receita_faturada - fatura.receita_energia - fatura.tributos) <= Decimal(
+            "0.01"
+        )
+        nao_paga = fatura.status_pagamento in ("em_aberto", "em_atraso")
+        assert (fatura.data_pagamento is None) == nao_paga
+        sem_atraso = fatura.status_pagamento in ("paga", "em_aberto")
+        assert (fatura.dias_em_atraso is None) == sem_atraso
+        if fatura.origem_kwh == "leitura":
+            assert fatura.kwh_faturado == fatura.kwh_leitura
+        else:
+            assert fatura.kwh_leitura < 0
+        if fatura.origem_kwh == "consumo_absoluto":
+            assert fatura.kwh_faturado == -fatura.kwh_leitura
+    # A amostra exercita todos os valores que o contrato prevê.
+    assert {f.status_pagamento for f in faturas} == {
+        "paga",
+        "paga_com_atraso",
+        "em_aberto",
+        "em_atraso",
+    }
+    assert {f.origem_kwh for f in faturas} == {
+        "leitura",
+        "leitura_atual_troca_medidor",
+        "consumo_absoluto",
+    }
 
 
 def test_kpis_match_the_sum_of_the_billing_in_the_database(tmp_path: Path, engine: Engine) -> None:

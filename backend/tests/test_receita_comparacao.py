@@ -1,3 +1,4 @@
+from datetime import date
 from decimal import Decimal
 from pathlib import Path
 
@@ -57,7 +58,13 @@ def store_billing(engine: Engine) -> None:
                 cod_uc=cod_uc,
                 competencia=competencia,
                 kwh_faturado=Decimal(kwh),
+                kwh_leitura=Decimal(kwh),
+                origem_kwh="leitura",
                 receita_faturada=Decimal(receita),
+                receita_energia=Decimal(receita),
+                tributos=Decimal("0.00"),
+                data_vencimento=date(2026, 1, 10),
+                status_pagamento="paga",
             )
             for cod_uc, competencia, kwh, receita in BILLING
         )
