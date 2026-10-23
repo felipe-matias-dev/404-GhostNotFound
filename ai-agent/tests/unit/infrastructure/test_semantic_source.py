@@ -20,11 +20,18 @@ def documents():
     return copy.deepcopy(layer), copy.deepcopy(contract)
 
 
-async def test_real_files_load_the_three_agent_views():
+async def test_real_files_load_the_agent_views():
     layer = await YamlSemanticLayerSource(LAYER_PATH, CONTRACT_PATH).load()
 
     assert layer.allowed_views == frozenset(
-        {"sem_uc", "sem_faturamento_mensal", "sem_continuidade_alimentador_mensal"}
+        {
+            "sem_uc",
+            "sem_faturamento_mensal",
+            "sem_continuidade_alimentador_mensal",
+            "sem_kpis_mensais",
+            "sem_kpis_segmento_mensal",
+            "sem_receita_decomposicao",
+        }
     )
 
 
@@ -76,6 +83,30 @@ def test_column_still_marked_a_confirmar_is_not_allowed(documents):
     contract["tables"]["gold_dim_uc"]["columns"]["municipio"]["status"] = "a_confirmar"
 
     with pytest.raises(SemanticLayerError, match="municipio.*a_confirmar"):
+        build_layer(layer, contract)
+
+
+def test_table_not_released_to_the_agent_is_rejected(documents):
+    layer, contract = documents
+    contract["tables"]["gold_dim_uc"]["consumers"] = ["UC 360"]
+
+    with pytest.raises(SemanticLayerError, match="gold_dim_uc.*agente"):
+        build_layer(layer, contract)
+
+
+def test_column_with_a_status_outside_confirmada_or_proposta_is_rejected(documents):
+    layer, contract = documents
+    contract["tables"]["gold_dim_uc"]["columns"]["bairro"]["status"] = "descontinuada"
+
+    with pytest.raises(SemanticLayerError, match="bairro.*descontinuada"):
+        build_layer(layer, contract)
+
+
+def test_sensitive_column_is_rejected(documents):
+    layer, contract = documents
+    contract["tables"]["gold_dim_uc"]["columns"]["bairro"]["sensitive"] = True
+
+    with pytest.raises(SemanticLayerError, match="bairro.*sensível"):
         build_layer(layer, contract)
 
 

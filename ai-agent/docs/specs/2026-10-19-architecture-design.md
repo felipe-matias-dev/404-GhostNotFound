@@ -1,6 +1,6 @@
 # Arquitetura do agente Text-to-SQL — estrutura e contratos
 
-- **Data:** 2026-10-19 · **Revisada:** 2026-10-22 (estado depois dos PRs #5, #7, #8, #13, #14 e #15; contrato da Gold v0.1.0; decisões sobre status da resposta, seleção da camada semântica e linhas de exemplo).
+- **Data:** 2026-10-19 · **Revisada:** 2026-10-23 (estado depois dos PRs #20, #21 e #23; contrato da Gold v0.2.0; camada semântica v0.2).
 - **Escopo:** apenas `ai-agent/` (BC6 Assistente Analítico). O que depende de backend, infra ou dados fica registrado como pedido na §10.
 - **Base:** case Rocket Lab 2026.2 (Módulo 3), `docs/arquitetura.md`, `docs/decisoes.md`, `docs/backlog.md` (G1, G2), `contracts/gold_schema.yaml` e o [guia de boas práticas do agente](../contexto-agente-text-to-sql.md), citado como "§x do guia".
 - **Convenção:** "hoje" descreve o que está na `main`; "item N" aponta para a feature da §11 que vai implementar o que ainda não existe.
@@ -14,9 +14,20 @@ O agente transforma uma pergunta em português numa consulta SQL somente leitura
 - validador SQL endurecido (PRs #7 e #15);
 - executor somente leitura no Postgres (PR #8);
 - gerador de SQL com PydanticAI (PRs #13 e #14);
-- job do agente no CI (PR #8).
+- job do agente no CI (PR #8);
+- camada semântica validada contra o contrato da Gold (PR #20, item 5);
+- contrato `AgentAnswer` com status e invariantes (PR #21, item 2).
 
-**Falta, na ordem da §11:** camada semântica (item 5), contrato final do `AgentAnswer` (item 2), orquestração `ask()` (item 6), avaliação (item 7), redação da resposta (item 8) e insights (item 9).
+**Em revisão, na ordem de merge** (cada uma sobre a anterior):
+1. PR #29: invariantes do `AgentAnswer` pedidas na revisão do PR #21 (texto em branco, `row_count >= 0`, `truncated` exige linhas).
+2. PR #31: ordem da DEC-018 e da DEC-020 no `decisoes.md`.
+3. Branch `feat/ai-agent-camada-semantica-v0.2`: camada semântica alinhada ao contrato v0.2.0 (já integra os PRs #29 e #31).
+4. PR #30: orquestração `ask()` (item 6).
+5. PR #32 (rascunho): golden set (item 7). Antes do merge, os itens G026, G027, G040, G058, G059 e G060 precisam seguir a camada v0.2 (§11, item 7), e todo item precisa de revisão humana.
+
+**Branches prontas, sem PR:** `feat/ai-agent-narracao` (item 8) e `feat/ai-agent-insight` (item 9), empilhadas sobre o contrato anterior; fazem rebase na `main` depois do PR #30.
+
+**Falta, na ordem da §11:** red team e runner de métricas (item 7), e os PRs dos itens 8 e 9.
 
 **Critério de sucesso de cada feature:** `uv run pytest` e `uv run ruff check` passam em `ai-agent/` (inclusive no CI), os contratos desta spec batem com o código e os testes da §8 cobrem as regras novas.
 
@@ -28,7 +39,7 @@ O agente transforma uma pergunta em português numa consulta SQL somente leitura
 | Provedor de LLM | Gemini direto (`google-gla:gemini-3.1-flash-lite`), com o OpenRouter (`openrouter:...`) como alternativa ou fallback | Modelo recomendado pelo case, gratuito no Free Tier do Google, com cota por projeto (uma chave por pessoa). No OpenRouter o Flash-Lite é pago e os modelos `:free` têm 50 requisições por dia por conta. No Free Tier o Google pode usar o conteúdo enviado: Gold real só com chave paga ou fornecida pela organização (DEC-015, proposta) |
 | Banco (ADR-01, DEC-002) | PostgreSQL 17, com o usuário `venergy_agent` (somente leitura) | Decidido pelo time. Só há executor Postgres |
 | Escopo de dados do agente | Views `sem_*` num schema próprio, com permissão de leitura só nele | A allowlist precisa valer também no banco, e não só no validador (§10, D1) |
-| Seleção da camada semântica | Um arquivo do GenAI (`semantic/semantic_layer.yaml`) escolhe tabelas e colunas, validado contra o contrato da Gold | A camada semântica é a ACL do GenAI sobre a Gold (`docs/arquitetura.md`). O campo `consumers` do contrato é informativo e não decide o que o agente enxerga |
+| Seleção da camada semântica | Um arquivo do GenAI (`semantic/semantic_layer.yaml`) escolhe tabelas e colunas, validado contra o contrato da Gold | A camada semântica é a ACL do GenAI sobre a Gold (`docs/arquitetura.md`). Desde o contrato v0.2.0 (DEC-022), o `SemanticLayerSource` também exige `agente` em `consumers` e recusa coluna com `sensitive: true`: o arquivo do GenAI escolhe dentro do que o contrato libera |
 | Linhas de exemplo no prompt | Sintéticas, escritas à mão no arquivo do GenAI; os valores possíveis de colunas categóricas vêm do `allowed` do contrato | O prompt de sistema nunca leva dado real da Gold, nem para o Free Tier (DEC-015) |
 | Status da resposta | O `AgentAnswer` declara `status`: `answered`, `unknown`, `clarify`, `refused` ou `failed` | "Não sei", recusa e falha técnica são coisas diferentes para o usuário, para o golden set (G1-07) e para o red team (G1-11) |
 | Organização | Hexagonal em 3 camadas (`domain` ← `application` ← `infrastructure`) | Framework isolado (§14 do guia), cada etapa testável com fakes |
@@ -38,7 +49,7 @@ O agente transforma uma pergunta em português numa consulta SQL somente leitura
 | Follow-up | Fora do escopo dos obrigatórios (diferencial) | Obrigatórios primeiro |
 | Avaliação | Golden set + métricas determinísticas logo depois do primeiro `ask()` de ponta a ponta | Nenhuma mudança de prompt, modelo ou contexto entra sem medir (§1.5 e §10.3 do guia) |
 | LLM as a judge | Só para clareza e fidelidade da resposta em português, com modelo diferente do gerador; entra depois dos obrigatórios | Corretude numérica é medida por execução, não por opinião de LLM |
-| "Receita" sem qualificador | `receita_faturada`, com a suposição declarada na resposta | Proposta do GenAI, pendente de confirmação do time; o contrato v0.1.0 não define. Entra nas regras de negócio do arquivo da camada semântica (item 5) |
+| "Receita" sem qualificador | `receita_faturada`, com a suposição declarada na resposta | Confirmado na DEC-022 (`conventions.agent.receita_sem_qualificador` do contrato v0.2.0). Está nas regras de negócio da camada semântica |
 
 ## 3. Estrutura
 
@@ -89,33 +100,34 @@ ai-agent/
 ### `answer.py`
 - `Confidence`: `high`, `medium`, `low`, `unknown`. O mapeamento para os rótulos em português fica no portal.
 - `Insight(text, metrics_used)`.
-- `AgentAnswer` é o contrato com o backend (`docs/arquitetura.md`, G1-04). **Hoje** tem `answer`, `sql`, `rows`, `row_count`, `confidence`, `sources`, `assumptions`, `clarification`, `request_id` e `prompt_version`. **O item 2** acrescenta os campos marcados abaixo, combinado com o V1:
+- `AgentAnswer` é o contrato com o backend (`docs/arquitetura.md`, G1-04). Tem os campos da tabela abaixo. Os campos `status`, `truncated`, `refused_reason`, `model` e `latency_ms` foram acrescentados pelo item 2, combinados com o V1 (DEC-020):
 
 | Campo | Tipo | Observação |
 |---|---|---|
 | `answer` | `str` | Texto para o usuário |
-| `status` | `AnswerStatus` | **Item 2.** `answered`, `unknown` (a informação não existe nas views), `clarify` (precisa de esclarecimento), `refused` (pedido fora do escopo, de escrita ou de manipulação) ou `failed` (tentativas esgotadas ou erro técnico) |
+| `status` | `AnswerStatus` | `answered`, `unknown` (a informação não existe nas views), `clarify` (precisa de esclarecimento), `refused` (pedido fora do escopo, de escrita ou de manipulação) ou `failed` (tentativas esgotadas ou erro técnico) |
 | `sql` | `str \| None` | Último SQL gerado, mesmo se rejeitado ou com erro, para auditoria |
 | `rows` | `tuple[dict, ...]` | Amostra das linhas, até `answer_sample_rows` (§7) |
 | `row_count` | `int` | Total de linhas que a consulta devolveu |
-| `truncated` | `bool` | **Item 2.** O validador impôs o `LIMIT` e o resultado o atingiu; a resposta precisa avisar (§7.3 do guia) |
+| `truncated` | `bool` | O validador impôs o `LIMIT` e o resultado o atingiu; a resposta precisa avisar (§7.3 do guia) |
 | `confidence` | `Confidence` | Regra na §5.1 |
 | `sources` | `tuple[str, ...]` | Views consultadas |
 | `assumptions` | `tuple[str, ...]` | Suposições declaradas |
 | `clarification` | `str \| None` | Pergunta de esclarecimento |
-| `refused_reason` | `str \| None` | **Item 2.** Motivo, em português, de não ter respondido |
+| `refused_reason` | `str \| None` | Motivo, em português, de não ter respondido |
 | `request_id` | `str` | — |
-| `model` | `str` | **Item 2.** Modelo que respondeu de fato (G1-06) |
+| `model` | `str` | Modelo que respondeu de fato (G1-06) |
 | `prompt_version` | `str` | — |
-| `latency_ms` | `int` | **Item 2.** `≥ 0` (G1-06) |
+| `latency_ms` | `int` | `≥ 0` (G1-06) |
 
 Invariantes:
-- Hoje: `row_count >= len(rows)`, porque `rows` é uma amostra.
-- Item 2:
-  - `answered`: sem `refused_reason` e sem `clarification`.
+- Hoje: `row_count >= len(rows)`, porque `rows` é uma amostra; `row_count >= 0`.
+- Por status:
+  - `answered`: exige `sql` e `confidence` diferente de `unknown`; sem `refused_reason` e sem `clarification`.
   - `clarify`: exige `clarification`; `sql` nulo, `rows` vazio, `row_count == 0`, `confidence == unknown`.
   - `unknown`, `refused` e `failed`: exigem `refused_reason`; sem `clarification`; `rows` vazio, `row_count == 0`, `confidence == unknown`. Isso impede devolver resultado parcial como se fosse resposta (§6 do guia).
-  - `truncated` só é verdadeiro com `answered`.
+  - `truncated` só é verdadeiro com `answered`, e exige linhas (`row_count > 0`).
+  - `answer`, `sql`, `clarification`, `refused_reason`, `model`, `request_id` e `prompt_version` são texto não vazio (ou nulos, nos opcionais); texto em branco é recusado, não tratado como preenchido.
 
 O timestamp da auditoria é registrado pelo backend ao persistir; o agente não lê relógio no domínio.
 
@@ -232,7 +244,7 @@ Só regras do projeto; nada de testar enums, Protocols ou a própria biblioteca.
 
 **Com as próximas features:**
 - Item 5: o arquivo da camada semântica é validado contra o contrato (coluna inexistente, coluna `a_confirmar`, view sem chave primária confirmada → falha na carga); relações saem das `foreign_keys` e das `shared_keys`; `allowed_values` vem do `allowed`; o `views.sql` versionado é igual ao gerado; as views funcionam no `venergy_test` pelo validador e pelo executor.
-- Item 2: as invariantes de status do `AgentAnswer` (§4).
+- Invariantes de status do `AgentAnswer` (§4): um teste por violação.
 - Item 6: com fakes de todas as portas, cada linha da §5.1 (limite de tamanho, os três status sem SQL, correção depois de rejeição e de erro de execução, erro não classificado vira `failed` sem nova tentativa, tentativas esgotadas, erro do provedor, regra de confiança, resultado vazio); o `ask()` nunca levanta exceção; um log por etapa sem a amostra de linhas.
 - Item 8: verificação numérica (número inexistente nas linhas derruba a narrativa e volta ao texto determinístico).
 - Item 9: insight com número fora do JSON de métricas é descartado.
@@ -286,7 +298,7 @@ Pedidos a abrir como issue para a área dona. O GenAI não altera esses arquivos
 | D1 | Dev (V1-02, `infra/postgres/init`) | Criar um schema para as views `sem_*` (sugestão: `semantic`) e dar ao `venergy_agent` `USAGE` e `SELECT` só nele. Tirar o `ALTER DEFAULT PRIVILEGES … GRANT SELECT` em `gold`, que hoje libera todas as tabelas da Gold. Definir `statement_timeout` na role | Hoje o agente lê qualquer tabela de `gold`, inclusive colunas que as views removeriam (§2.1 e §5.1 do guia) | Aberto |
 | D2 | Dev (DEC-007, `.github/workflows/ci.yml`) | Job do `ai-agent` no CI | Uma regressão do validador passaria sem ser vista | **Feito** (PR #8) |
 | D3 | Dev (G1-06, G1-09) | Persistir a auditoria de cada `AgentAnswer` (com timestamp) e expor `POST /ai/ask` e `GET /ai/audit/{id}` | O agente é somente leitura | Aberto; depende do item 6 |
-| D4 | Dados | Publicar na amostra e na Gold as tabelas que o agente usa: `gold_fato_faturamento_mensal`, `gold_continuidade_alimentador_mensal`, `gold_receita_decomposicao` | A amostra só tem `gold_dim_uc` | Em andamento (PR #17 traz as tabelas do contrato ao backend) |
+| D4 | Dados | Publicar na amostra e na Gold as tabelas que o agente usa: `gold_fato_faturamento_mensal`, `gold_continuidade_alimentador_mensal`, `gold_receita_decomposicao` | A amostra só tinha `gold_dim_uc` | Amostra **feita** (PRs #17 e #23: as tabelas do agente estão no backend e na amostra sintética). Falta a Gold real, que fixa o gabarito do golden set |
 | D5 | Time (`docs/arquitetura.md`) | Atualizar o ADR-01 de "em aberto" para "PostgreSQL (DEC-002)" | Documento do time desatualizado | Aberto |
 | D6 | Dev (`infra/postgres/init/01-init.sh`) | Versionar o script com bit de execução (`git update-index --chmod=+x`) | No Docker Desktop do macOS, a primeira subida do banco falha com `bad interpreter: Permission denied` | Aberto |
 | D7 | Dev (loader `venergy_api.carga`) | Na mesma transação da carga: apagar as views `sem_*` antes do `drop_all` e rodar o `ai-agent/semantic/views.sql` (gerado pelo item 5) com o usuário dono depois do `create_all` | O usuário do agente é somente leitura. Desde a DEC-014 a carga recria as tabelas da Gold (`drop_all` sem `CASCADE`), e o `DROP TABLE` falha enquanto houver view dependente; sem esse passo, a primeira carga depois do item 5 quebra | Aberto; depende do item 5 |
@@ -295,9 +307,9 @@ Pedidos a abrir como issue para a área dona. O GenAI não altera esses arquivos
 
 ## 11. Próximas features (cada uma em sua branch, com plano próprio)
 
-**Feitas:** 1. hardening do validador (PRs #7 e #15) · 3. executor somente leitura (PR #8) · 4. gerador PydanticAI e prompts v1 (PRs #13 e #14).
+**Feitas:** 1. hardening do validador (PRs #7 e #15) · 3. executor somente leitura (PR #8) · 4. gerador PydanticAI e prompts v1 (PRs #13 e #14) · 5. camada semântica (PR #20; v0.2 na branch `feat/ai-agent-camada-semantica-v0.2`) · 2. contrato `AgentAnswer` (PR #21).
 
-**Ordem de execução das próximas: 5 → 2 → 6 → 7 → 8 → 9.** Os números são identificadores estáveis, citados nesta spec e nos planos; a ordem acima é a que vale.
+**Ordem de execução das próximas: 6 → 7 → 8 → 9.** Os números são identificadores estáveis, citados nesta spec e nos planos; a ordem acima é a que vale.
 
 **5. Camada semântica + glossário.** Desbloqueada pelo merge do contrato v0.1.0.
 - `semantic/semantic_layer.yaml`, do GenAI. Para cada view: nome `sem_*`, tabela de origem, descrição, grão, colunas escolhidas com descrição e unidade, e linhas de exemplo sintéticas. Mais o glossário de sinônimos (G1-08, G2-02), as regras de negócio (definição de "receita", competência, períodos base e atual) e os exemplos few-shot.
@@ -307,19 +319,33 @@ Pedidos a abrir como issue para a área dona. O GenAI não altera esses arquivos
   - a view só entra se todas as colunas da chave primária estiverem confirmadas ou propostas.
 
   Ele também traz o tipo e o `allowed` do contrato e monta as relações a partir das `foreign_keys` e das `shared_keys` entre as views escolhidas.
-- Primeira versão: `gold_dim_uc`, `gold_fato_faturamento_mensal` e `gold_continuidade_alimentador_mensal`. `gold_receita_decomposicao` entra assim que `periodo_base` e `periodo_atual` deixarem de ser `a_confirmar`; `gold_atendimentos_uc`, quando a Silver definir as colunas.
+- Primeira versão (PR #20): `gold_dim_uc`, `gold_fato_faturamento_mensal` e `gold_continuidade_alimentador_mensal`.
+- Versão 0.2 (contrato v0.2.0): mais `gold_kpis_mensais`, `gold_kpis_segmento_mensal` e `gold_receita_decomposicao`, e `classe_cadastro` em `sem_uc`. A decomposição não tem relação com outras views (DEC-018). Em `sem_kpis_segmento_mensal`, DEC, FEC e satisfação de um recorte são somas dos componentes divididas no final, como o contrato manda; a regra e um exemplo estão no YAML. `gold_fila_suspeitas` fica fora (DEC-022). `gold_atendimentos_uc`, `gold_interrupcoes_uc` e `gold_medidor_uc` entram quando o contrato definir as colunas.
+- Nenhuma regra fixa o intervalo de competências: ele depende da carga, e o resultado vazio já é a resposta (§5.1, item 6). Toda SQL dos exemplos passa pelo validador num teste.
 - Gerador do `semantic/views.sql` (`CREATE OR REPLACE VIEW <schema>.sem_x AS SELECT ... FROM gold.gold_x`), versionado e conferido por teste, para o Dev aplicar (D7). Enquanto D1 não sair, as views ficam no schema `gold`, onde o `venergy_agent` já lê.
 - Teste de integração: cria as tabelas mínimas e as views no `venergy_test` e consulta pelo validador e pelo executor.
 
-**2. Contrato `AgentAnswer`.** `status`, `truncated`, `refused_reason`, `model`, `latency_ms` e as invariantes da §4. Combinar com o V1 antes do merge, porque o backend depende dele (D3).
+**2. Contrato `AgentAnswer`.** Feito: `status`, `truncated`, `refused_reason`, `model`, `latency_ms` e as invariantes da §4 (PRs #21 e #29, DEC-020 aceita pelo V1). O backend depende dele (D3).
 
 **6. Orquestração `ask()` + logs estruturados**, no mesmo PR: o fluxo da §5.1, `ErrorKind.REJECTED`, `Generation` no `SqlGenerator`, `answer_sample_rows` e o `bootstrap.py`. Inclui um teste rápido com o modelo real, fora do `pytest`, como o feito para o gerador.
+- Estado: PR #30, em revisão. Entregou o fluxo, a confiança, os logs por etapa, `Generation`, `ErrorKind.REJECTED` e `answer_sample_rows`, mais um ajuste no executor (colunas com o mesmo nome viram erro corrigível).
+- Desvio a decidir: o PR deixou o `bootstrap.py` para o item 8. Sem ele, o backend não tem como montar o agente e o D3 (`POST /ai/ask`) fica parado até a narração. A proposta é trazer o `bootstrap.py` para o item 6, com o texto determinístico, e o item 8 só trocar o redator.
 
 **7. Golden set + red team + runner** com as métricas de §9.3. Os itens do golden set e do red team podem ser escritos desde já, porque não dependem de código; o `reference_sql` precisa da amostra (D4).
+- Estado: golden set com 64 itens no PR #32 (rascunho, sem revisão humana), escrito sobre a camada do PR #20. Red team e runner ainda não começaram.
+- Antes do merge, alinhar com a camada v0.2:
+  - G026 (satisfação) e G027 (chamados) passam de `unknown` para `answered`, com `sem_kpis_mensais`;
+  - G040 continua `clarify`, mas a nota muda: os períodos da decomposição já estão definidos no contrato, só não estão na pergunta;
+  - G058 e G059: "comercial" é `classe_cadastro = 'Comercial'`, não `classe = 'B3'`, que junta comercial e poder público;
+  - G060 deixa de ser `unknown`: a decomposição está em `sem_receita_decomposicao`. Sem os períodos na pergunta, é `clarify`.
+- A revisão humana de cada item é do GenAI (Perylo), e a dos SQLs contra a amostra, dos Dados. O gabarito só se fixa com a Gold real.
 
 **8. `AnswerWriter` + verificação numérica.** Narrativa a partir das linhas, com o conteúdo do banco delimitado como dado (§5.2) e volta ao texto determinístico quando a verificação falha. A mesma verificação numérica serve ao item 9.
+- Estado: branch `feat/ai-agent-narracao`, sem PR, empilhada sobre o contrato anterior. Rebase na `main` depois do PR #30.
+- A decidir antes do PR: DEC-019 (proposta, na branch). A narrativa só vale se cada número existir nas linhas. Falta confirmar a leitura de números em pt-BR e en, porque `1.234` pode ser mil ou um vírgula dois. Sugestão: ler só pt-BR, como as respostas são escritas, e tratar o resto como número ausente.
 
 **9. `InsightWriter`.** Narra o JSON de métricas de uma tela (G2-04, tela de Receita; G2-05, "conta alta" na UC 360, Should) em 2 a 4 frases, sem conclusões causais que o JSON não sustenta (§9 do guia), e devolve `None` se algum número do texto não estiver no JSON. O cache por filtros e a montagem do JSON são do backend (D9).
+- Estado: branch `feat/ai-agent-insight`, sem PR, empilhada sobre a narração. Rebase depois do item 8.
 
 **Diferenciais, só depois dos obrigatórios:**
 - follow-up com memória (G1-10; o histórico fica fora do processo, §8 do guia);
