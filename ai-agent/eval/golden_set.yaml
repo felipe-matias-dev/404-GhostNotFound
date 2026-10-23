@@ -19,7 +19,7 @@
 # RESUMO_CONTEXTO.md §1.2, §1.3 e §1.7; case p. 5 e 6), planejamento §3, guia §10.1 e casos de
 # borda do domínio. A origem de cada item está no campo notes.
 
-versao: 0.1.0
+versao: 0.2.0
 status: rascunho
 
 itens:
@@ -261,20 +261,20 @@ itens:
 
   - id: G026
     question: "Qual foi a satisfação média dos clientes em março de 2025?"
-    category: sem_resposta
-    reference_sql: null
-    expected_status: unknown
+    category: simples
+    reference_sql: "SELECT satisfacao_media FROM sem_kpis_mensais WHERE competencia = '2025-03'"
+    expected_status: answered
     follow_up_of: null
-    notes: "satisfacao_media está a_confirmar no contrato e não entra nas views."
+    notes: "Camada v0.2: satisfacao_media é proposta no contrato v0.2 e está pronta em sem_kpis_mensais (nota de 1 a 5, só chamados com nota)."
     revisado_por: null
 
   - id: G027
     question: "Quantos chamados do call center foram abertos em março de 2025?"
-    category: sem_resposta
-    reference_sql: null
-    expected_status: unknown
+    category: simples
+    reference_sql: "SELECT n_chamados FROM sem_kpis_mensais WHERE competencia = '2025-03'"
+    expected_status: answered
     follow_up_of: null
-    notes: "Não há view de atendimento: gold_atendimentos_uc ainda não tem chave definida."
+    notes: "Camada v0.2: n_chamados está em sem_kpis_mensais, contado pela data de abertura. O detalhe por UC (gold_atendimentos_uc) continua fora."
     revisado_por: null
 
   - id: G028
@@ -393,7 +393,7 @@ itens:
     reference_sql: null
     expected_status: clarify
     follow_up_of: null
-    notes: "A definição de período base e atual está em aberto no contrato (open_questions). O agente não escolhe os períodos sozinho."
+    notes: "Os períodos da decomposição já estão definidos no contrato v0.2 (faixas AAAA-MM/AAAA-MM, qualquer par), mas a pergunta não diz quais. O agente não escolhe os períodos sozinho."
     revisado_por: null
 
   # --- case: perguntas do diagnóstico de receita (planejamento §3) ---
@@ -566,25 +566,25 @@ itens:
     reference_sql: null
     expected_status: clarify
     follow_up_of: null
-    notes: "Pergunta do Henrique (case p. 5; RESUMO §1.7). 'Comercial' é B3 (glossário). Os períodos não estão na pergunta: clarify. G059 é a versão com os períodos."
+    notes: "Pergunta do Henrique (case p. 5; RESUMO §1.7). 'Comercial' é classe_cadastro = 'Comercial' (glossário v0.2; o B3 junta comercial e poder público). Os períodos não estão na pergunta: clarify. G059 é a versão com os períodos."
     revisado_por: null
 
   - id: G059
     question: "Quanto a receita comercial de Jaboatão cresceu entre 2024 e 2025?"
     category: case
-    reference_sql: "SELECT round(100.0 * (a.total - b.total) / NULLIF(b.total, 0), 2) AS variacao_percentual FROM (SELECT sum(f.receita_faturada) AS total FROM sem_faturamento_mensal f JOIN sem_uc u ON u.cod_uc = f.cod_uc WHERE u.classe = 'B3' AND u.municipio ILIKE 'Jaboatão%' AND f.competencia LIKE '2025-%') a, (SELECT sum(f.receita_faturada) AS total FROM sem_faturamento_mensal f JOIN sem_uc u ON u.cod_uc = f.cod_uc WHERE u.classe = 'B3' AND u.municipio ILIKE 'Jaboatão%' AND f.competencia LIKE '2024-%') b"
+    reference_sql: "SELECT round(100.0 * (a.total - b.total) / NULLIF(b.total, 0), 2) AS variacao_percentual FROM (SELECT sum(f.receita_faturada) AS total FROM sem_faturamento_mensal f JOIN sem_uc u ON u.cod_uc = f.cod_uc WHERE u.classe_cadastro = 'Comercial' AND u.municipio ILIKE 'Jaboatão%' AND f.competencia LIKE '2025-%') a, (SELECT sum(f.receita_faturada) AS total FROM sem_faturamento_mensal f JOIN sem_uc u ON u.cod_uc = f.cod_uc WHERE u.classe_cadastro = 'Comercial' AND u.municipio ILIKE 'Jaboatão%' AND f.competencia LIKE '2024-%') b"
     expected_status: answered
     follow_up_of: null
-    notes: "Versão com períodos da pergunta do Henrique (case p. 5). Município e classe vêm da UC (sem_uc), não da fatura."
+    notes: "Versão com períodos da pergunta do Henrique (case p. 5). Município e classe do cadastro vêm da UC (sem_uc), não da fatura, como na tela de Receita (DEC-021). Comercial é classe_cadastro, não B3."
     revisado_por: null
 
   - id: G060
     question: "Por que a receita subiu só 8% se a tarifa subiu 10,5%?"
     category: case
     reference_sql: null
-    expected_status: unknown
+    expected_status: clarify
     follow_up_of: null
-    notes: "Pergunta do Henrique (case p. 5; RESUMO §1.2). A decomposição preço × volume × mix não está nas views: gold_receita_decomposicao tem periodo_base e periodo_atual a_confirmar. Não é ambiguidade: a informação não existe nas views."
+    notes: "Pergunta do Henrique (case p. 5; RESUMO §1.2). Camada v0.2: a decomposição está em sem_receita_decomposicao, mas a pergunta não diz os dois períodos. O agente pergunta quais, em vez de escolher."
     revisado_por: null
 
   - id: G061
@@ -621,4 +621,24 @@ itens:
     expected_status: unknown
     follow_up_of: null
     notes: "Pedido do Rafael (case p. 5; RESUMO §1.7). gold_fila_suspeitas fica fora do agente por padrão (decisão de produto, contrato v0.2). Não é tentativa de manipulação."
+    revisado_por: null
+
+  # --- camada v0.2: recortes e decomposição ---
+
+  - id: G065
+    question: "Qual foi o DEC de Olinda no primeiro trimestre de 2025?"
+    category: temporal
+    reference_sql: "SELECT sum(horas_interrompidas) / NULLIF(sum(n_uc) / 3.0, 0) AS dec FROM sem_kpis_segmento_mensal WHERE municipio = 'Olinda' AND competencia BETWEEN '2025-01' AND '2025-03'"
+    expected_status: answered
+    follow_up_of: null
+    notes: "DEC de um recorte num período: soma das horas ÷ média mensal de UCs nos 3 meses pedidos (regra da camada v0.2, contrato v0.2). Não é média dos DEC mensais."
+    revisado_por: null
+
+  - id: G066
+    question: "Quanto o efeito bandeira contribuiu para a variação da receita entre 2024-01/2024-12 e 2025-01/2025-12?"
+    category: case
+    reference_sql: "SELECT sum(efeito_bandeira) AS efeito_bandeira, sum(efeito_preco) AS efeito_preco, sum(receita_atual - receita_base) AS variacao FROM sem_receita_decomposicao WHERE periodo_base = '2024-01/2024-12' AND periodo_atual = '2025-01/2025-12'"
+    expected_status: answered
+    follow_up_of: null
+    notes: "Versão com períodos explícitos da pergunta do Henrique (G060). Os efeitos são lidos e somados, nunca recalculados. A receita da decomposição é de energia, sem tributos (DEC-023)."
     revisado_por: null

@@ -7,9 +7,12 @@ import yaml
 from venergy_agent.config import AGENT_ROOT
 from venergy_agent.infrastructure.postgres_executor import PostgresQueryExecutor
 from venergy_agent.infrastructure.sql_validator import SqlglotValidator
+from venergy_agent.infrastructure.views_sql import LAYER_PATH
 
 GOLDEN = AGENT_ROOT / "eval" / "golden_set.yaml"
-ALLOWED = frozenset({"sem_uc", "sem_faturamento_mensal", "sem_continuidade_alimentador_mensal"})
+ALLOWED = frozenset(
+    view["name"] for view in yaml.safe_load(LAYER_PATH.read_text(encoding="utf-8"))["views"]
+)
 
 
 def answered_items():
