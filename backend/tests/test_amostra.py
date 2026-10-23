@@ -7,7 +7,12 @@ from sqlalchemy.orm import Session
 
 from venergy_api.amostra import SAMPLE, SAMPLE_FILA, write_sample
 from venergy_api.carga import load_gold
-from venergy_api.models import FatoFaturamentoMensal, FilaSuspeita, KpisMensais
+from venergy_api.models import (
+    FatoFaturamentoMensal,
+    FilaSuspeita,
+    KpisMensais,
+    ReceitaDecomposicao,
+)
 
 
 def test_generated_sample_passes_the_gold_load(tmp_path: Path, engine: Engine) -> None:
@@ -54,6 +59,24 @@ def test_billing_follows_the_contract_checks(tmp_path: Path, engine: Engine) -> 
         "leitura_atual_troca_medidor",
         "consumo_absoluto",
     }
+
+
+def test_revenue_bridge_follows_the_contract_checks(tmp_path: Path, engine: Engine) -> None:
+    # As duas validações da decomposição no contrato, com as tolerâncias de arredondamento.
+    write_sample(tmp_path / "gold", force=False)
+    load_gold(tmp_path / "gold", engine)
+
+    with Session(engine) as session:
+        linhas = session.scalars(select(ReceitaDecomposicao)).all()
+
+    for linha in linhas:
+        preco = linha.efeito_tarifa + linha.efeito_bandeira
+        assert abs(linha.efeito_preco - preco) <= Decimal("0.01")
+        efeitos = linha.efeito_preco + linha.efeito_volume + linha.efeito_mix
+        assert abs(efeitos - (linha.receita_atual - linha.receita_base)) <= Decimal("0.02")
+    # A amostra separa as linhas com GD e tem acréscimo de bandeira para mostrar.
+    assert {linha.possui_gd for linha in linhas} == {True, False}
+    assert all(linha.efeito_bandeira > 0 for linha in linhas)
 
 
 def test_kpis_match_the_sum_of_the_billing_in_the_database(tmp_path: Path, engine: Engine) -> None:

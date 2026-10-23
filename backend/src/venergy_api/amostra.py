@@ -173,8 +173,10 @@ _TARIFA = {
 }
 _REAJUSTE = {2024: Decimal("1.00"), 2025: Decimal("1.08")}
 _VOLUME = {2024: Decimal("1.03"), 2025: Decimal("1.00")}
-# Bandeira de janeiro a dezembro: vermelha na seca, quando as térmicas entram.
-_BANDEIRAS = (
+# Bandeiras de 2025, de janeiro a dezembro: vermelha na seca, quando as térmicas entram.
+# 2024 fica todo em verde, como o período base do diagnóstico, para a decomposição ter
+# efeito bandeira.
+_BANDEIRAS_2025 = (
     "verde",
     "verde",
     "amarela",
@@ -188,8 +190,21 @@ _BANDEIRAS = (
     "verde",
     "verde",
 )
-# Formato do período ainda "a confirmar" no contrato.
+# Acréscimo por kWh em cada bandeira, na ordem de grandeza das bandeiras tarifárias.
+_ADICIONAL_BANDEIRA = {
+    "verde": Decimal("0"),
+    "amarela": Decimal("0.019"),
+    "vermelha_p1": Decimal("0.045"),
+    "vermelha_p2": Decimal("0.079"),
+}
+# Formato confirmado no contrato v0.2: AAAA-MM/AAAA-MM.
 _PERIODO = {2024: "2024-01/2024-12", 2025: "2025-01/2025-12"}
+
+
+def _bandeira(competencia: str) -> str:
+    if competencia < "2025-01":
+        return "verde"
+    return _BANDEIRAS_2025[int(competencia[5:]) - 1]
 
 
 # Tributos sobre a energia numa alíquota única inventada: na fatura real ela varia.
@@ -237,7 +252,10 @@ def _faturamento() -> tuple[FaturamentoMensalSchema, ...]:
             if uc.cod_uc == "0002" and mes == 1:
                 kwh = Decimal(0)
             kwh = kwh.quantize(_KWH)
-            energia = (kwh * _TARIFA[uc.classe] * _REAJUSTE[ano]).quantize(_CENTAVO)
+            tarifa = (
+                _TARIFA[uc.classe] * _REAJUSTE[ano] + _ADICIONAL_BANDEIRA[_bandeira(competencia)]
+            )
+            energia = (kwh * tarifa).quantize(_CENTAVO)
             tributos = (energia * _ALIQUOTA_TRIBUTOS).quantize(_CENTAVO)
             # A UC 0005 não pagou as três últimas faturas: arrecadado zero, e não vazio,
             # porque "não pagou" é um fato. As demais pagam no dia 8, antes do vencimento.
@@ -278,7 +296,7 @@ def _faturamento() -> tuple[FaturamentoMensalSchema, ...]:
                 receita_arrecadada=total if f["pagamento"] else Decimal("0.00"),
                 # Sem tributos, como o contrato redefiniu (DEC-023).
                 tarifa_media=float(f["energia"] / f["kwh"]) if f["kwh"] else None,
-                bandeira=_BANDEIRAS[int(f["competencia"][5:]) - 1],
+                bandeira=_bandeira(f["competencia"]),
                 data_vencimento=f["vencimento"],
                 data_pagamento=f["pagamento"],
                 status_pagamento=status,
@@ -359,21 +377,32 @@ def _kpis(
 def _decomposicao(
     faturamento: tuple[FaturamentoMensalSchema, ...],
 ) -> tuple[ReceitaDecomposicaoSchema, ...]:
-    # Totais de kWh e receita por segmento (município, bairro, classe) e ano.
-    segmento_da_uc = {uc.cod_uc: (uc.municipio, uc.bairro, uc.classe) for uc in SAMPLE_UCS}
-    totais: dict[tuple[tuple[str, str, str], int], list[Decimal]] = {}
+    # Totais de kWh, receita de energia e acréscimo de bandeira por segmento e ano. A base é a
+    # receita de energia, sem tributos (DEC-023).
+    segmento_da_uc = {
+        uc.cod_uc: (uc.municipio, uc.bairro, uc.classe, uc.possui_gd) for uc in SAMPLE_UCS
+    }
+    totais: dict[tuple[tuple[str, str, str, bool], int], list[Decimal]] = {}
     for linha in faturamento:
         chave = (segmento_da_uc[linha.cod_uc], int(linha.competencia[:4]))
-        kwh, receita = totais.get(chave, [Decimal(0), Decimal(0)])
-        totais[chave] = [kwh + linha.kwh_faturado, receita + linha.receita_faturada]
+        kwh, receita, bandeira = totais.get(chave, [Decimal(0), Decimal(0), Decimal(0)])
+        totais[chave] = [
+            kwh + linha.kwh_faturado,
+            receita + linha.receita_energia,
+            bandeira + linha.kwh_faturado * _ADICIONAL_BANDEIRA[linha.bandeira],
+        ]
 
     rows = []
-    for municipio, bairro, classe in sorted({segmento for segmento, _ in totais}):
-        kwh_base, receita_base = totais[((municipio, bairro, classe), 2024)]
-        kwh_atual, receita_atual = totais[((municipio, bairro, classe), 2025)]
+    for segmento in sorted({segmento for segmento, _ in totais}):
+        municipio, bairro, classe, possui_gd = segmento
+        kwh_base, receita_base, bandeira_base = totais[(segmento, 2024)]
+        kwh_atual, receita_atual, bandeira_atual = totais[(segmento, 2025)]
         tarifa_base, tarifa_atual = receita_base / kwh_base, receita_atual / kwh_atual
         efeito_preco = ((tarifa_atual - tarifa_base) * kwh_atual).quantize(_CENTAVO)
-        efeito_volume = ((kwh_atual - kwh_base) * tarifa_base).quantize(_CENTAVO)
+        # A parte do preço que veio da bandeira: o acréscimo médio por kWh mudou entre os
+        # períodos. O resto do efeito preço é o reajuste da tarifa base.
+        adicional_base, adicional_atual = bandeira_base / kwh_base, bandeira_atual / kwh_atual
+        efeito_bandeira = ((adicional_atual - adicional_base) * kwh_atual).quantize(_CENTAVO)
         rows.append(
             ReceitaDecomposicaoSchema(
                 periodo_base=_PERIODO[2024],
@@ -381,14 +410,17 @@ def _decomposicao(
                 municipio=municipio,
                 bairro=bairro,
                 classe=classe,
+                possui_gd=possui_gd,
                 receita_base=receita_base,
                 receita_atual=receita_atual,
                 efeito_preco=efeito_preco,
-                efeito_volume=efeito_volume,
-                # Num segmento só, preço e volume já explicam toda a variação: aqui o mix é
-                # o resíduo do arredondamento, e a conta fecha. A fórmula oficial, com o mix
-                # entre segmentos, é do Diagnóstico.
-                efeito_mix=receita_atual - receita_base - efeito_preco - efeito_volume,
+                efeito_tarifa=efeito_preco - efeito_bandeira,
+                efeito_bandeira=efeito_bandeira,
+                efeito_volume=((kwh_atual - kwh_base) * tarifa_base).quantize(_CENTAVO),
+                # Calculado, e não resíduo (contrato v0.2): num segmento de uma classe só, o
+                # peso entre classes não muda, então o mix é zero. Preço e volume fecham com a
+                # variação dentro da tolerância de arredondamento (R$ 0,02 por linha).
+                efeito_mix=Decimal("0.00"),
             )
         )
     return tuple(rows)

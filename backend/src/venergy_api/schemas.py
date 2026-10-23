@@ -84,10 +84,13 @@ class ReceitaDecomposicaoSchema(BaseModel):
     municipio: RequiredText
     bairro: RequiredText
     classe: Classe
+    possui_gd: bool
     receita_base: ExactNumber
     receita_atual: ExactNumber
     # Sem limite de sinal: queda de preço ou de volume é efeito negativo.
     efeito_preco: ExactNumber
+    efeito_tarifa: ExactNumber
+    efeito_bandeira: ExactNumber
     efeito_volume: ExactNumber
     efeito_mix: ExactNumber
 
@@ -199,6 +202,8 @@ class DecomposicaoLinhaSchema(BaseModel):
     receita_atual: ExactNumber
     variacao_receita: ExactNumber
     efeito_preco: ExactNumber
+    efeito_tarifa: ExactNumber
+    efeito_bandeira: ExactNumber
     efeito_volume: ExactNumber
     efeito_mix: ExactNumber
 

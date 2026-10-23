@@ -138,15 +138,19 @@ def get_decomposicao(
             receita_atual.label("receita_atual"),
             variacao.label("variacao_receita"),
             # Soma dos efeitos já calculados pela Gold, e não o PVM refeito no nível de cima:
-            # os efeitos se somam entre segmentos, e preço + volume + mix continua fechando
-            # com a variação. Recalcular seria uma fórmula própria do backend.
+            # os efeitos se somam entre segmentos, e preço + volume + mix fecha com a variação
+            # dentro da tolerância do contrato (R$ 0,02 por linha somada). Recalcular seria
+            # uma fórmula própria do backend.
             func.sum(decomposicao.efeito_preco).label("efeito_preco"),
+            func.sum(decomposicao.efeito_tarifa).label("efeito_tarifa"),
+            func.sum(decomposicao.efeito_bandeira).label("efeito_bandeira"),
             func.sum(decomposicao.efeito_volume).label("efeito_volume"),
             func.sum(decomposicao.efeito_mix).label("efeito_mix"),
         )
         .where(*filtros)
         # O par de períodos entra no agrupamento: se a Gold trouxer mais de um par, cada
-        # comparação sai separada, em vez de somar anos que não se comparam.
+        # comparação sai separada, em vez de somar anos que não se comparam. As linhas com e
+        # sem GD do mesmo segmento somam juntas.
         .group_by(decomposicao.periodo_base, decomposicao.periodo_atual, coluna)
         .order_by(decomposicao.periodo_base, decomposicao.periodo_atual, variacao, coluna)
     )

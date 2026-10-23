@@ -805,6 +805,14 @@
             "type": "number",
             "title": "Efeito Preco"
           },
+          "efeito_tarifa": {
+            "type": "number",
+            "title": "Efeito Tarifa"
+          },
+          "efeito_bandeira": {
+            "type": "number",
+            "title": "Efeito Bandeira"
+          },
           "efeito_volume": {
             "type": "number",
             "title": "Efeito Volume"
@@ -824,6 +832,8 @@
           "receita_atual",
           "variacao_receita",
           "efeito_preco",
+          "efeito_tarifa",
+          "efeito_bandeira",
           "efeito_volume",
           "efeito_mix"
         ],

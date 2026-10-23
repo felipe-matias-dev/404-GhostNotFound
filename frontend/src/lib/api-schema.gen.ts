@@ -207,6 +207,10 @@ export interface components {
             variacao_receita: number;
             /** Efeito Preco */
             efeito_preco: number;
+            /** Efeito Tarifa */
+            efeito_tarifa: number;
+            /** Efeito Bandeira */
+            efeito_bandeira: number;
             /** Efeito Volume */
             efeito_volume: number;
             /** Efeito Mix */

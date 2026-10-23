@@ -86,7 +86,7 @@ class FatoFaturamentoMensal(Base):
 
 
 class ReceitaDecomposicao(Base):
-    """Variação da receita entre dois períodos, por município, bairro e classe."""
+    """Variação da receita entre dois períodos, por município, bairro, classe e GD."""
 
     __tablename__ = "gold_receita_decomposicao"
     __table_args__ = {"schema": "gold"}
@@ -96,9 +96,15 @@ class ReceitaDecomposicao(Base):
     municipio: Mapped[str] = mapped_column(primary_key=True)
     bairro: Mapped[str] = mapped_column(primary_key=True)
     classe: Mapped[str] = mapped_column(primary_key=True)
+    # Na chave para isolar o efeito da geração própria: é o efeito volume das linhas com GD,
+    # sem coluna de efeito própria (DEC-023).
+    possui_gd: Mapped[bool] = mapped_column(primary_key=True)
     receita_base: Mapped[Decimal] = mapped_column(_MONEY)
     receita_atual: Mapped[Decimal] = mapped_column(_MONEY)
+    # efeito_preco = efeito_tarifa (reajuste) + efeito_bandeira (acréscimo da bandeira).
     efeito_preco: Mapped[Decimal] = mapped_column(_MONEY)
+    efeito_tarifa: Mapped[Decimal] = mapped_column(_MONEY)
+    efeito_bandeira: Mapped[Decimal] = mapped_column(_MONEY)
     efeito_volume: Mapped[Decimal] = mapped_column(_MONEY)
     efeito_mix: Mapped[Decimal] = mapped_column(_MONEY)
 
