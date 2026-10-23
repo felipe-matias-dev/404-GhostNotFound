@@ -670,11 +670,11 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Consequência:** `sem_faturamento_mensal` liga a `sem_uc` por `cod_uc`, e `sem_uc` liga a `sem_continuidade_alimentador_mensal` por `cod_alimentador`.
 - **Em aberto:** quando `gold_receita_decomposicao` entrar (contrato v0.2 liga por município, bairro e classe), revisar esta regra.
 
-## DEC-020 · Contrato `AgentAnswer` com status (proposta)
+## DEC-020 · Contrato `AgentAnswer` com status (aceita)
 
 - **Data:** 22/10/2026 · **Área:** GenAI e Backend (V1) · **Autor:** Lucas
-- **Status:** proposta, a confirmar com o V1. Não entra no `main` antes disso.
+- **Status:** aceita pelo V1 na revisão do PR #21 (respostas às cinco perguntas em aberto, abaixo). Entra no `main` com o PR #21.
 - **Decisão proposta:** o `AgentAnswer` ganha `status` (`answered`, `unknown`, `clarify`, `refused`, `failed`), `truncated`, `refused_reason`, `model` e `latency_ms`. Nenhum campo existente é removido. As invariantes por status estão na spec §4 e têm teste no código.
 - **Motivo:** o backend vai expor `POST /ai/ask` e `GET /ai/audit/{id}` (spec §10, D3). Sem `status`, o portal não distingue resposta, "não sei", pedido de esclarecimento e falha técnica, e a auditoria não guarda o modelo que respondeu nem a latência (G1-06). A spec (§4) manda combinar mudanças desse contrato com o V1 antes de implementar.
 - **Consequência:** a implementação fica em branch até o V1 aceitar. Depois do aceite, a spec §4 e o `answer.py` são a referência, e esta DEC passa para "aceita".
-- **Em aberto:** (1) nomes dos status, se o portal usa rótulos diferentes; (2) se o último SQL gerado vai na resposta de `failed`, para auditoria; (3) se `refused_reason` e `answer` podem repetir o mesmo texto nos casos sem resposta; (4) quem mede a latência total; (5) como o portal lida com campos novos ou removidos (versão da API).
+- **Respondido pelo V1 (PR #21):** (1) status em inglês, e o portal traduz; (2) sim, o último SQL vai em `failed`, para auditoria; (3) `refused_reason` e `answer` podem repetir o texto; (4) o agente mede a latência do `ask()` e o backend mede a requisição, e os dois vão para a auditoria; (5) campo novo é mudança menor da API; campo removido ou renomeado precisa ser combinado antes.
