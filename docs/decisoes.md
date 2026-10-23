@@ -661,20 +661,25 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Em aberto:** confirmar com a Visagio que resultados agregados do diagnóstico podem ser públicos
   (o case marca os materiais como confidenciais e pede um repositório público).
 
-## DEC-018 · Relações entre views só por chave (proposta)
+## DEC-018 · Relações entre views só por chave
 
-- **Data:** 22/10/2026 · **Área:** GenAI · **Autor:** Lucas
-- **Status:** proposta, a confirmar com o time.
-- **Decisão proposta:** a camada semântica monta relações entre views só pelas chaves estrangeiras do contrato e pelas chaves de entidade (`cod_uc` e `cod_alimentador`). `competencia`, `municipio` e `bairro` não viram relação.
+- **Data:** 22/10/2026 · **Área:** GenAI · **Autor:** Lucas · **Atualizada:** 23/10/2026, Luis Felipe
+- **Status:** aceita. O contrato v0.2.0 (PR #23) adotou a mesma regra em `relations`.
+- **Decisão:** a camada semântica monta relações entre views só pelas chaves estrangeiras do contrato e pelas chaves de entidade (`cod_uc` e `cod_alimentador`). `competencia`, `municipio` e `bairro` não viram relação.
 - **Motivo:** a spec (§5, item 5) manda montar relações a partir de `foreign_keys` e `shared_keys`. Juntar duas views só pelo período gera produto cartesiano, e o modelo tende a fazer essa junção quando a relação existe.
 - **Consequência:** `sem_faturamento_mensal` liga a `sem_uc` por `cod_uc`, e `sem_uc` liga a `sem_continuidade_alimentador_mensal` por `cod_alimentador`.
-- **Em aberto:** quando `gold_receita_decomposicao` entrar (contrato v0.2 liga por município, bairro e classe), revisar esta regra.
+- **Decomposição (23/10/2026):** `sem_receita_decomposicao` entra sem relação com outras views. A junção composta com `gold_dim_uc` (município, bairro, classe e GD) continua `a_confirmar` no contrato e repetiria cada efeito uma vez por UC do recorte. As perguntas de recorte se respondem filtrando a própria view.
 
-## DEC-020 · Contrato `AgentAnswer` com status (proposta)
+## DEC-020 · Contrato `AgentAnswer` com status
 
-- **Data:** 22/10/2026 · **Área:** GenAI e Backend (V1) · **Autor:** Lucas
-- **Status:** proposta, a confirmar com o V1. Não entra no `main` antes disso.
-- **Decisão proposta:** o `AgentAnswer` ganha `status` (`answered`, `unknown`, `clarify`, `refused`, `failed`), `truncated`, `refused_reason`, `model` e `latency_ms`. Nenhum campo existente é removido. As invariantes por status estão na spec §4 e têm teste no código.
+- **Data:** 22/10/2026 · **Área:** GenAI e Backend (V1) · **Autor:** Lucas · **Atualizada:** 23/10/2026, Luis Felipe
+- **Status:** aceita pelo V1 (Felipe) na revisão do PR #21, mesclado junto com o PR #20.
+- **Decisão:** o `AgentAnswer` ganha `status` (`answered`, `unknown`, `clarify`, `refused`, `failed`), `truncated`, `refused_reason`, `model` e `latency_ms`. Nenhum campo existente é removido. As invariantes por status estão na spec §4 e têm teste no código.
 - **Motivo:** o backend vai expor `POST /ai/ask` e `GET /ai/audit/{id}` (spec §10, D3). Sem `status`, o portal não distingue resposta, "não sei", pedido de esclarecimento e falha técnica, e a auditoria não guarda o modelo que respondeu nem a latência (G1-06). A spec (§4) manda combinar mudanças desse contrato com o V1 antes de implementar.
-- **Consequência:** a implementação fica em branch até o V1 aceitar. Depois do aceite, a spec §4 e o `answer.py` são a referência, e esta DEC passa para "aceita".
-- **Em aberto:** (1) nomes dos status, se o portal usa rótulos diferentes; (2) se o último SQL gerado vai na resposta de `failed`, para auditoria; (3) se `refused_reason` e `answer` podem repetir o mesmo texto nos casos sem resposta; (4) quem mede a latência total; (5) como o portal lida com campos novos ou removidos (versão da API).
+- **Consequência:** a spec §4 e o `answer.py` são a referência do contrato.
+- **Respostas do V1 às questões em aberto (PR #21):**
+  1. Os status ficam em inglês; o portal traduz, como já faz com `Confidence`.
+  2. O último SQL gerado vai na resposta de `failed`, para a auditoria. Em `refused` não chega a existir SQL.
+  3. `refused_reason` e `answer` podem repetir o mesmo texto fixo; o portal escolhe qual mostrar.
+  4. O agente mede o `ask()` em `latency_ms`; o backend mede a requisição separado, e os dois vão para a auditoria.
+  5. O backend tem um schema próprio para a resposta do `POST /ai/ask`. Campo novo é versão minor da API; campo removido ou renomeado é combinado antes.
