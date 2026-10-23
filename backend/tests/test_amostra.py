@@ -119,6 +119,13 @@ def test_queue_reasons_come_back_as_a_list_from_the_database(
     assert stored.motivos == SAMPLE_FILA[0].motivos
 
 
+def test_queue_positions_start_at_one_without_gaps() -> None:
+    # O score é a posição no ranking (1 = mais suspeita), e não uma nota.
+    positions = sorted(suspeita.score_suspeita for suspeita in SAMPLE_FILA)
+
+    assert positions == list(range(1, len(SAMPLE_FILA) + 1))
+
+
 def test_does_not_overwrite_existing_csv_without_force(tmp_path: Path) -> None:
     existing = tmp_path / "gold" / "gold_dim_uc.csv"
     existing.parent.mkdir()

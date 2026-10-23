@@ -147,7 +147,8 @@ class FilaSuspeita(Base):
     __table_args__ = {"schema": "gold"}
 
     cod_uc: Mapped[str] = mapped_column(primary_key=True)
-    score_suspeita: Mapped[float] = mapped_column(Double)
+    # Posição no ranking, e não nota: 1 = mais suspeita (decisão da daily de 21/10).
+    score_suspeita: Mapped[int]
     # Lista nativa do Postgres (text[]), e não uma tabela de motivos à parte: os motivos só
     # são lidos junto com a UC, e o agente consegue filtrar com ANY() no mesmo SELECT.
     motivos: Mapped[list[str]] = mapped_column(ARRAY(Text))

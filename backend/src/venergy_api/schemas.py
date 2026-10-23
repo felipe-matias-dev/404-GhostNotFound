@@ -224,7 +224,8 @@ class FilaSuspeitaSchema(BaseModel):
     """Uma UC suspeita de perda não técnica, com o porquê e o quanto vale inspecionar."""
 
     cod_uc: RequiredText
-    score_suspeita: float
+    # Posição no ranking: 1 = mais suspeita.
+    score_suspeita: Annotated[int, Field(ge=1)]
     # Motivos legíveis para o gerente de perdas decidir; no CSV, separados por ";".
     motivos: list[RequiredText]
     kwh_recuperavel_est: ExactNumber | None

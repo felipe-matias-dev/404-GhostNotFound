@@ -426,24 +426,24 @@ def _decomposicao(
     return tuple(rows)
 
 
-# Fila de suspeitas, da maior para a menor prioridade. A UC 0004 ainda não tem estimativa
+# Fila de suspeitas, pela posição no ranking (1 = mais suspeita). A UC 0004 ainda não tem estimativa
 # de energia recuperável: o gerente de perdas vê a suspeita mesmo sem o valor.
 SAMPLE_FILA = (
     FilaSuspeitaSchema(
         cod_uc="0005",
-        score_suspeita=0.91,
+        score_suspeita=1,
         motivos=["leituras estimadas em 3 dos últimos 6 meses", "medidor com mais de 15 anos"],
         kwh_recuperavel_est=Decimal("1850.000"),
     ),
     FilaSuspeitaSchema(
         cod_uc="0007",
-        score_suspeita=0.78,
+        score_suspeita=2,
         motivos=["inspeção anterior encontrou irregularidade"],
         kwh_recuperavel_est=Decimal("4200.000"),
     ),
     FilaSuspeitaSchema(
         cod_uc="0004",
-        score_suspeita=0.64,
+        score_suspeita=3,
         motivos=["leituras estimadas em 2 dos últimos 6 meses"],
         kwh_recuperavel_est=None,
     ),
