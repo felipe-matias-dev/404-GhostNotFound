@@ -4,6 +4,8 @@ Responde em português perguntas sobre consumo, faturamento, interrupções e at
 
 Fonte da verdade: [spec](docs/specs/2026-10-19-architecture-design.md). Em caso de conflito, a spec vence este arquivo. Boas práticas que a spec cita como "§x do guia": [guia](docs/contexto-agente-text-to-sql.md).
 
+Estado atual (o que existe, a cobertura da Gold e as lacunas): @docs/architecture.md
+
 ## Requisito central
 
 Se o agente não souber, diz que não sabe. Resposta inventada é falha crítica, pior do que nenhuma resposta. Toda regra abaixo serve a isso ou à segurança.
@@ -32,8 +34,8 @@ Se o agente não souber, diz que não sabe. Resposta inventada é falha crítica
 
 ## Para Dados
 
-- O agente lê a Gold pelas views `sem_*` da camada semântica, que é do GenAI. Quem escolhe tabelas e colunas é o arquivo `ai-agent/semantic/semantic_layer.yaml`, validado contra `contracts/gold_schema.yaml`; o campo `consumers` do contrato é informativo. Colunas `a_confirmar` ficam de fora.
-- A primeira versão usa `gold_dim_uc`, `gold_fato_faturamento_mensal` e `gold_continuidade_alimentador_mensal`; `gold_receita_decomposicao` entra quando `periodo_base` e `periodo_atual` forem confirmados (spec §10, D4, e §11, item 5).
+- O agente lê a Gold pelas views `sem_*` da camada semântica, que é do GenAI. Quem escolhe tabelas e colunas é o arquivo `ai-agent/semantic/semantic_layer.yaml`, validado contra `contracts/gold_schema.yaml`. Só entram tabelas com `agente` em `consumers` e colunas `confirmada` ou `proposta` sem `sensitive: true` (DEC-022). `gold_fila_suspeitas` fica fora.
+- A camada usa `gold_dim_uc`, `gold_fato_faturamento_mensal`, `gold_continuidade_alimentador_mensal`, `gold_kpis_mensais`, `gold_kpis_segmento_mensal` e `gold_receita_decomposicao`. Cobertura completa em `docs/architecture.md` §5.
 - Nenhum dado real da Gold vai para o prompt fixo: as linhas de exemplo são sintéticas, escritas pelo GenAI.
 - **Mudou uma tabela ou coluna da Gold? Avise o GenAI no mesmo PR.** A camada semântica e o gabarito do golden set dependem dos nomes, dos tipos e dos valores categóricos (ex.: classes `B1`, `B2`, `B3`, `A4`).
 - O dicionário de dados alimenta o prompt. Descrição, unidade (kWh, R$), formato (`YYYY-MM`) e grão de cada tabela fazem diferença direta na acurácia.
@@ -56,7 +58,7 @@ Se o agente não souber, diz que não sabe. Resposta inventada é falha crítica
 - **Estilo:** código, nomes e testes em inglês, sem comentários. Documentação em português.
 - **Testes:** TDD só para regras do projeto, sem testes de biblioteca, enum ou `Protocol`. A avaliação com modelo real (golden set, red team) fica fora do `pytest` padrão.
 - **Mudanças de prompt, modelo, few-shot, glossário ou camada semântica:** os prompts ficam versionados em `prompts/vN/`; mudança de prompt vai para uma versão nova, e a partir da primeira execução do golden set nenhuma dessas mudanças entra se ele regredir (spec §9.5, DEC-016).
-- **Branches e PRs:** uma branch e um plano (`docs/plans/`) por feature, na ordem de execução da spec §11 (5 → 2 → 6 → 7 → 8 → 9). Os obrigatórios do case vêm antes dos diferenciais.
+- **Branches e PRs:** uma branch e um plano (`docs/plans/`) por feature, na ordem de execução da spec §11 (hoje 6 → 7 → 8 → 9; os itens 1 a 5 estão feitos). Os obrigatórios do case vêm antes dos diferenciais.
 
 ## Comandos (dentro de `ai-agent/`)
 

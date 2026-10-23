@@ -9,6 +9,7 @@ SELECT
     municipio,
     bairro,
     classe,
+    classe_cadastro,
     cod_alimentador,
     possui_gd,
     consumo_medio_kwh_12m
@@ -37,3 +38,53 @@ SELECT
     n_interrupcoes,
     horas_interrompidas
 FROM gold.gold_continuidade_alimentador_mensal;
+
+CREATE OR REPLACE VIEW gold.sem_kpis_mensais AS
+SELECT
+    competencia,
+    kwh_faturado,
+    receita_faturada,
+    receita_energia,
+    dec,
+    fec,
+    n_chamados,
+    satisfacao_media
+FROM gold.gold_kpis_mensais;
+
+CREATE OR REPLACE VIEW gold.sem_kpis_segmento_mensal AS
+SELECT
+    competencia,
+    municipio,
+    bairro,
+    classe_cadastro,
+    classe,
+    possui_gd,
+    n_uc,
+    kwh_faturado,
+    receita_faturada,
+    receita_energia,
+    tributos,
+    receita_arrecadada,
+    horas_interrompidas,
+    n_interrupcoes,
+    n_chamados,
+    soma_notas,
+    n_notas
+FROM gold.gold_kpis_segmento_mensal;
+
+CREATE OR REPLACE VIEW gold.sem_receita_decomposicao AS
+SELECT
+    periodo_base,
+    periodo_atual,
+    municipio,
+    bairro,
+    classe,
+    possui_gd,
+    receita_base,
+    receita_atual,
+    efeito_preco,
+    efeito_tarifa,
+    efeito_bandeira,
+    efeito_volume,
+    efeito_mix
+FROM gold.gold_receita_decomposicao;
