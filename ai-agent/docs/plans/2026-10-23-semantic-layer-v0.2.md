@@ -6,6 +6,8 @@
 
 **Architecture:** No new module. `semantic_source.py` gains two checks. `semantic_layer.yaml` gains three views. `views.sql` is regenerated.
 
+> **Status (2026-10-23): executed on the branch.** The branch also merges PRs #29 and #31, so their conflicts in `decisoes.md`, the spec and `CLAUDE.md` are already resolved. Merge order: #29 → #31 → this branch → #30 → #32.
+
 **Spec:** `ai-agent/docs/specs/2026-10-19-architecture-design.md` (§5 item 5, §10 D7, §11). Requested in chat on 2026-10-23.
 
 ## Global Constraints

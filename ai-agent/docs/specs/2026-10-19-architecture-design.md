@@ -15,10 +15,19 @@ O agente transforma uma pergunta em português numa consulta SQL somente leitura
 - executor somente leitura no Postgres (PR #8);
 - gerador de SQL com PydanticAI (PRs #13 e #14);
 - job do agente no CI (PR #8);
-- camada semântica (PR #20, alinhada ao contrato v0.2.0 na branch `feat/ai-agent-camada-semantica-v0.2`);
-- contrato `AgentAnswer` com `status` (PR #21, DEC-020 aceita pelo V1).
+- camada semântica validada contra o contrato da Gold (PR #20, item 5);
+- contrato `AgentAnswer` com status e invariantes (PR #21, item 2).
 
-**Falta, na ordem da §11:** orquestração `ask()` (item 6), avaliação (item 7), redação da resposta (item 8) e insights (item 9).
+**Em revisão, na ordem de merge** (cada uma sobre a anterior):
+1. PR #29: invariantes do `AgentAnswer` pedidas na revisão do PR #21 (texto em branco, `row_count >= 0`, `truncated` exige linhas).
+2. PR #31: ordem da DEC-018 e da DEC-020 no `decisoes.md`.
+3. Branch `feat/ai-agent-camada-semantica-v0.2`: camada semântica alinhada ao contrato v0.2.0 (já integra os PRs #29 e #31).
+4. PR #30: orquestração `ask()` (item 6).
+5. PR #32 (rascunho): golden set (item 7). Antes do merge, os itens G026, G027, G040, G058, G059 e G060 precisam seguir a camada v0.2 (§11, item 7), e todo item precisa de revisão humana.
+
+**Branches prontas, sem PR:** `feat/ai-agent-narracao` (item 8) e `feat/ai-agent-insight` (item 9), empilhadas sobre o contrato anterior; fazem rebase na `main` depois do PR #30.
+
+**Falta, na ordem da §11:** red team e runner de métricas (item 7), e os PRs dos itens 8 e 9.
 
 **Critério de sucesso de cada feature:** `uv run pytest` e `uv run ruff check` passam em `ai-agent/` (inclusive no CI), os contratos desta spec batem com o código e os testes da §8 cobrem as regras novas.
 
@@ -319,12 +328,24 @@ Pedidos a abrir como issue para a área dona. O GenAI não altera esses arquivos
 **2. Contrato `AgentAnswer`.** Feito: `status`, `truncated`, `refused_reason`, `model`, `latency_ms` e as invariantes da §4 (PRs #21 e #29, DEC-020 aceita pelo V1). O backend depende dele (D3).
 
 **6. Orquestração `ask()` + logs estruturados**, no mesmo PR: o fluxo da §5.1, `ErrorKind.REJECTED`, `Generation` no `SqlGenerator`, `answer_sample_rows` e o `bootstrap.py`. Inclui um teste rápido com o modelo real, fora do `pytest`, como o feito para o gerador.
+- Estado: PR #30, em revisão. Entregou o fluxo, a confiança, os logs por etapa, `Generation`, `ErrorKind.REJECTED` e `answer_sample_rows`, mais um ajuste no executor (colunas com o mesmo nome viram erro corrigível).
+- Desvio a decidir: o PR deixou o `bootstrap.py` para o item 8. Sem ele, o backend não tem como montar o agente e o D3 (`POST /ai/ask`) fica parado até a narração. A proposta é trazer o `bootstrap.py` para o item 6, com o texto determinístico, e o item 8 só trocar o redator.
 
 **7. Golden set + red team + runner** com as métricas de §9.3. Os itens do golden set e do red team podem ser escritos desde já, porque não dependem de código; o `reference_sql` precisa da amostra (D4).
+- Estado: golden set com 64 itens no PR #32 (rascunho, sem revisão humana), escrito sobre a camada do PR #20. Red team e runner ainda não começaram.
+- Antes do merge, alinhar com a camada v0.2:
+  - G026 (satisfação) e G027 (chamados) passam de `unknown` para `answered`, com `sem_kpis_mensais`;
+  - G040 continua `clarify`, mas a nota muda: os períodos da decomposição já estão definidos no contrato, só não estão na pergunta;
+  - G058 e G059: "comercial" é `classe_cadastro = 'Comercial'`, não `classe = 'B3'`, que junta comercial e poder público;
+  - G060 deixa de ser `unknown`: a decomposição está em `sem_receita_decomposicao`. Sem os períodos na pergunta, é `clarify`.
+- A revisão humana de cada item é do GenAI (Perylo), e a dos SQLs contra a amostra, dos Dados. O gabarito só se fixa com a Gold real.
 
 **8. `AnswerWriter` + verificação numérica.** Narrativa a partir das linhas, com o conteúdo do banco delimitado como dado (§5.2) e volta ao texto determinístico quando a verificação falha. A mesma verificação numérica serve ao item 9.
+- Estado: branch `feat/ai-agent-narracao`, sem PR, empilhada sobre o contrato anterior. Rebase na `main` depois do PR #30.
+- A decidir antes do PR: DEC-019 (proposta, na branch). A narrativa só vale se cada número existir nas linhas. Falta confirmar a leitura de números em pt-BR e en, porque `1.234` pode ser mil ou um vírgula dois. Sugestão: ler só pt-BR, como as respostas são escritas, e tratar o resto como número ausente.
 
 **9. `InsightWriter`.** Narra o JSON de métricas de uma tela (G2-04, tela de Receita; G2-05, "conta alta" na UC 360, Should) em 2 a 4 frases, sem conclusões causais que o JSON não sustenta (§9 do guia), e devolve `None` se algum número do texto não estiver no JSON. O cache por filtros e a montagem do JSON são do backend (D9).
+- Estado: branch `feat/ai-agent-insight`, sem PR, empilhada sobre a narração. Rebase depois do item 8.
 
 **Diferenciais, só depois dos obrigatórios:**
 - follow-up com memória (G1-10; o histórico fica fora do processo, §8 do guia);

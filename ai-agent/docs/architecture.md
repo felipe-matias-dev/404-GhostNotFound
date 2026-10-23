@@ -2,7 +2,7 @@
 
 Resumo para orientar quem chega ao `ai-agent/` (pessoa ou sessão de IA). A fonte da verdade continua sendo a [spec](specs/2026-10-19-architecture-design.md); este arquivo só diz o que existe hoje, onde está e o que falta. Atualize-o no mesmo PR que mudar o estado.
 
-- **Atualizado em:** 23/10/2026, com a camada semântica v0.2 (branch `feat/ai-agent-camada-semantica-v0.2`) sobre o contrato da Gold v0.2.0.
+- **Atualizado em:** 23/10/2026, com a camada semântica v0.2 (branch `feat/ai-agent-camada-semantica-v0.2`, que já integra os PRs #29 e #31) sobre o contrato da Gold v0.2.0. O que está em revisão e a ordem de merge estão na spec §1.
 
 ## 1. O que o agente faz
 
@@ -18,15 +18,15 @@ Hexagonal: `domain` ← `application` ← `infrastructure`.
 | domain | `sql.py` | `SqlDraft` (`ok`, `unknown`, `clarify`, `refuse`), `AttemptFeedback`, `ValidatedQuery`, `QueryResult` | pronto |
 | domain | `errors.py` | `ErrorKind`, `SqlRejected`, `QueryExecutionError` | pronto; `ErrorKind.REJECTED` entra no item 6 |
 | domain | `semantic.py` | `SemanticLayer`, `ViewSpec`, `ColumnSpec`, `Relation`, glossário, regras, exemplos | pronto |
-| domain | `answer.py` | `AgentAnswer` com `status` e invariantes por status (DEC-020), `Insight` | pronto (PR #21) |
-| application | `ports.py` | `TextToSqlAgent`, `SemanticLayerSource`, `SqlGenerator`, `SqlValidator`, `QueryExecutor`, `AnswerWriter`, `InsightWriter` | `ask.py` (o caso de uso) ainda não existe |
+| domain | `answer.py` | `AgentAnswer` com `status` e invariantes por status (DEC-020), `Insight` | pronto (PR #21; texto em branco e `row_count >= 0` no PR #29) |
+| application | `ports.py` | `TextToSqlAgent`, `SemanticLayerSource`, `SqlGenerator`, `SqlValidator`, `QueryExecutor`, `AnswerWriter`, `InsightWriter` | `ask.py` (`AskUseCase`) em revisão no PR #30 |
 | infrastructure | `sql_validator.py` | `SqlglotValidator`: um `SELECT`, allowlist de views, funções conhecidas, `LIMIT` imposto | pronto |
 | infrastructure | `postgres_executor.py` | `PostgresQueryExecutor`: `BEGIN READ ONLY`, `statement_timeout`, SQLSTATE → `ErrorKind` | pronto |
 | infrastructure | `sql_generator.py`, `prompt_renderer.py`, `llm.py` | PydanticAI com `output_type=SqlDraft`; prompt em `prompts/v1/`; delimitadores com nonce; Gemini direto (padrão) ou OpenRouter | pronto |
 | infrastructure | `semantic_source.py`, `views_sql.py` | `YamlSemanticLayerSource` valida `semantic/semantic_layer.yaml` contra `contracts/gold_schema.yaml` (inclusive `consumers` e `sensitive`); `views_sql` gera `semantic/views.sql` | pronto |
 | raiz | `config.py` | `AgentSettings` (`VENERGY_AGENT_*`) | pronto |
 
-## 3. Fluxo do `ask()` (item 6, ainda não implementado)
+## 3. Fluxo do `ask()` (item 6, PR #30)
 
 ```
 pergunta → Question → SemanticLayer (carregada uma vez)
@@ -38,7 +38,9 @@ pergunta → Question → SemanticLayer (carregada uma vez)
         → texto determinístico (item 6) ou AnswerWriter (item 8) → AgentAnswer
 ```
 
-Detalhes, confiança e logs: spec §5.1.
+Detalhes, confiança e logs: spec §5.1. O `bootstrap.py`, que monta o agente a partir do `AgentSettings`, e o comando de terminal estão hoje na branch da narração (item 8); a spec §11 propõe trazê-los para o item 6.
+
+Em branches: `AnswerWriter` (`feat/ai-agent-narracao`, prompt em `prompts/answer/v1/`, verificação numérica da DEC-019) e `InsightWriter` (`feat/ai-agent-insight`, prompt em `prompts/insight/v1/`). O golden set está em `eval/golden_set.yaml` no PR #32 (rascunho).
 
 ## 4. Camada semântica hoje
 
@@ -80,6 +82,7 @@ O banco local só tem a amostra sintética do backend (`venergy_api.amostra`). A
 - O YAML não registra a versão do contrato (`conventions.agent.contract_version`).
 - D7 continua aberto: a carga apaga as tabelas da Gold sem `CASCADE` e falha se houver view `sem_*`. Procedimento manual no `README.md`.
 - D1 continua aberto: as views ficam no schema `gold`, onde o `venergy_agent` lê todas as tabelas.
+- O golden set do PR #32 foi escrito sobre a camada v0.1: seis itens precisam de ajuste (lista na spec §11, item 7).
 - Recortes de receita: a tela (`GET /receita/comparacao`, DEC-021) soma a fato com o cadastro atual da UC, e o agente soma `sem_kpis_segmento_mensal`. Os números só divergem se uma UC mudou de recorte; alinhar quando o backend migrar para a tabela de segmentos.
 
 ## 7. Onde está cada coisa
