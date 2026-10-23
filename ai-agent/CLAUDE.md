@@ -12,8 +12,8 @@ Se o agente não souber, diz que não sabe. Resposta inventada é falha crítica
 
 - **Contrato de entrada:** `TextToSqlAgent.ask(question: str, session_id: str) -> AgentAnswer` (`src/venergy_agent/application/ports.py`). O backend depende só dessa porta, nunca de classes internas.
 - **`AgentAnswer`** (`domain/answer.py`):
-  - campos atuais: `answer`, `sql`, `rows` (amostra), `row_count` (total real), `confidence`, `sources`, `assumptions`, `clarification`, `request_id`, `prompt_version`;
-  - campos planejados (item 2 da spec): `status` (`answered`, `unknown`, `clarify`, `refused`, `failed`), `truncated`, `refused_reason`, `model`, `latency_ms`;
+  - campos: `answer`, `status` (`answered`, `unknown`, `clarify`, `refused`, `failed`), `sql`, `rows` (amostra), `row_count` (total real), `truncated`, `confidence`, `sources`, `assumptions`, `clarification`, `refused_reason`, `request_id`, `model`, `prompt_version`, `latency_ms`;
+  - as invariantes por status estão na spec §4 e têm teste em `tests/unit/domain/test_answer.py`;
   - o `ask()` nunca levanta exceção: toda falha volta como `AgentAnswer` com `status`;
   - mudanças nesse contrato são combinadas com V1 antes de implementar (spec §4).
 - **Auditoria:** o agente é somente leitura e não grava nada. Cabe ao backend persistir cada `AgentAnswer` com timestamp e expor `POST /ai/ask` e `GET /ai/audit/{id}` (G1-06, G1-09).

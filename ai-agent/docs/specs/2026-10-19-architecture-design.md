@@ -89,33 +89,34 @@ ai-agent/
 ### `answer.py`
 - `Confidence`: `high`, `medium`, `low`, `unknown`. O mapeamento para os rótulos em português fica no portal.
 - `Insight(text, metrics_used)`.
-- `AgentAnswer` é o contrato com o backend (`docs/arquitetura.md`, G1-04). **Hoje** tem `answer`, `sql`, `rows`, `row_count`, `confidence`, `sources`, `assumptions`, `clarification`, `request_id` e `prompt_version`. **O item 2** acrescenta os campos marcados abaixo, combinado com o V1:
+- `AgentAnswer` é o contrato com o backend (`docs/arquitetura.md`, G1-04). Tem os campos da tabela abaixo. Os campos `status`, `truncated`, `refused_reason`, `model` e `latency_ms` foram acrescentados pelo item 2, combinados com o V1 (DEC-020):
 
 | Campo | Tipo | Observação |
 |---|---|---|
 | `answer` | `str` | Texto para o usuário |
-| `status` | `AnswerStatus` | **Item 2.** `answered`, `unknown` (a informação não existe nas views), `clarify` (precisa de esclarecimento), `refused` (pedido fora do escopo, de escrita ou de manipulação) ou `failed` (tentativas esgotadas ou erro técnico) |
+| `status` | `AnswerStatus` | `answered`, `unknown` (a informação não existe nas views), `clarify` (precisa de esclarecimento), `refused` (pedido fora do escopo, de escrita ou de manipulação) ou `failed` (tentativas esgotadas ou erro técnico) |
 | `sql` | `str \| None` | Último SQL gerado, mesmo se rejeitado ou com erro, para auditoria |
 | `rows` | `tuple[dict, ...]` | Amostra das linhas, até `answer_sample_rows` (§7) |
 | `row_count` | `int` | Total de linhas que a consulta devolveu |
-| `truncated` | `bool` | **Item 2.** O validador impôs o `LIMIT` e o resultado o atingiu; a resposta precisa avisar (§7.3 do guia) |
+| `truncated` | `bool` | O validador impôs o `LIMIT` e o resultado o atingiu; a resposta precisa avisar (§7.3 do guia) |
 | `confidence` | `Confidence` | Regra na §5.1 |
 | `sources` | `tuple[str, ...]` | Views consultadas |
 | `assumptions` | `tuple[str, ...]` | Suposições declaradas |
 | `clarification` | `str \| None` | Pergunta de esclarecimento |
-| `refused_reason` | `str \| None` | **Item 2.** Motivo, em português, de não ter respondido |
+| `refused_reason` | `str \| None` | Motivo, em português, de não ter respondido |
 | `request_id` | `str` | — |
-| `model` | `str` | **Item 2.** Modelo que respondeu de fato (G1-06) |
+| `model` | `str` | Modelo que respondeu de fato (G1-06) |
 | `prompt_version` | `str` | — |
-| `latency_ms` | `int` | **Item 2.** `≥ 0` (G1-06) |
+| `latency_ms` | `int` | `≥ 0` (G1-06) |
 
 Invariantes:
-- Hoje: `row_count >= len(rows)`, porque `rows` é uma amostra.
-- Item 2:
-  - `answered`: sem `refused_reason` e sem `clarification`.
+- Hoje: `row_count >= len(rows)`, porque `rows` é uma amostra; `row_count >= 0`.
+- Por status:
+  - `answered`: exige `sql` e `confidence` diferente de `unknown`; sem `refused_reason` e sem `clarification`.
   - `clarify`: exige `clarification`; `sql` nulo, `rows` vazio, `row_count == 0`, `confidence == unknown`.
   - `unknown`, `refused` e `failed`: exigem `refused_reason`; sem `clarification`; `rows` vazio, `row_count == 0`, `confidence == unknown`. Isso impede devolver resultado parcial como se fosse resposta (§6 do guia).
-  - `truncated` só é verdadeiro com `answered`.
+  - `truncated` só é verdadeiro com `answered`, e exige linhas (`row_count > 0`).
+  - `answer`, `sql`, `clarification`, `refused_reason`, `model`, `request_id` e `prompt_version` são texto não vazio (ou nulos, nos opcionais); texto em branco é recusado, não tratado como preenchido.
 
 O timestamp da auditoria é registrado pelo backend ao persistir; o agente não lê relógio no domínio.
 
@@ -232,7 +233,7 @@ Só regras do projeto; nada de testar enums, Protocols ou a própria biblioteca.
 
 **Com as próximas features:**
 - Item 5: o arquivo da camada semântica é validado contra o contrato (coluna inexistente, coluna `a_confirmar`, view sem chave primária confirmada → falha na carga); relações saem das `foreign_keys` e das `shared_keys`; `allowed_values` vem do `allowed`; o `views.sql` versionado é igual ao gerado; as views funcionam no `venergy_test` pelo validador e pelo executor.
-- Item 2: as invariantes de status do `AgentAnswer` (§4).
+- Invariantes de status do `AgentAnswer` (§4): um teste por violação.
 - Item 6: com fakes de todas as portas, cada linha da §5.1 (limite de tamanho, os três status sem SQL, correção depois de rejeição e de erro de execução, erro não classificado vira `failed` sem nova tentativa, tentativas esgotadas, erro do provedor, regra de confiança, resultado vazio); o `ask()` nunca levanta exceção; um log por etapa sem a amostra de linhas.
 - Item 8: verificação numérica (número inexistente nas linhas derruba a narrativa e volta ao texto determinístico).
 - Item 9: insight com número fora do JSON de métricas é descartado.
@@ -311,7 +312,7 @@ Pedidos a abrir como issue para a área dona. O GenAI não altera esses arquivos
 - Gerador do `semantic/views.sql` (`CREATE OR REPLACE VIEW <schema>.sem_x AS SELECT ... FROM gold.gold_x`), versionado e conferido por teste, para o Dev aplicar (D7). Enquanto D1 não sair, as views ficam no schema `gold`, onde o `venergy_agent` já lê.
 - Teste de integração: cria as tabelas mínimas e as views no `venergy_test` e consulta pelo validador e pelo executor.
 
-**2. Contrato `AgentAnswer`.** `status`, `truncated`, `refused_reason`, `model`, `latency_ms` e as invariantes da §4. Combinar com o V1 antes do merge, porque o backend depende dele (D3).
+**2. Contrato `AgentAnswer`.** Feito: `status`, `truncated`, `refused_reason`, `model`, `latency_ms` e as invariantes da §4 (PRs #21 e #29, DEC-020 aceita pelo V1). O backend depende dele (D3).
 
 **6. Orquestração `ask()` + logs estruturados**, no mesmo PR: o fluxo da §5.1, `ErrorKind.REJECTED`, `Generation` no `SqlGenerator`, `answer_sample_rows` e o `bootstrap.py`. Inclui um teste rápido com o modelo real, fora do `pytest`, como o feito para o gerador.
 
