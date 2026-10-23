@@ -1,4 +1,5 @@
 import type { RegionMapProps } from "#/components/ui/region-map";
+import { formatPct } from "#/lib/format";
 import type { DecomposicaoLinha, Recorte } from "./types";
 
 export type Nivel = DecomposicaoLinha["nivel"];
@@ -57,7 +58,6 @@ export function intensidadeVariacao(linha: DecomposicaoLinha): number {
 
 export const LEGENDA_VARIACAO: NonNullable<RegionMapProps["legend"]> = {
 	title: "Variação da receita",
-	ticks: ["−10%", "0", "+10%"],
-	description:
-		"vermelho para queda, verde para alta; a cor fica mais forte e brilha mais até 10% de variação sobre a receita base",
+	ticks: [formatPct(-SATURA), formatPct(0), formatPct(SATURA)],
+	description: `vermelho para queda, verde para alta; a cor fica mais forte e brilha mais até ${formatPct(SATURA)} de variação sobre a receita base`,
 };
