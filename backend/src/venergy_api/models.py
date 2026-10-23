@@ -39,16 +39,20 @@ class DimUc(Base):
     municipio: Mapped[str]
     bairro: Mapped[str]
     classe: Mapped[str]
+    # As 5 classes do cadastro, ao lado da classe de consumo: separa Comercial de Poder
+    # Público, que dividem o B3 (DEC-023).
+    classe_cadastro: Mapped[str]
     cod_alimentador: Mapped[str]
     possui_gd: Mapped[bool]
-    # O Postgres arredonda para as 3 casas do tipo de energia.
-    consumo_medio_kwh_12m: Mapped[Decimal] = mapped_column(_ENERGY)
-    # Opcionais e ainda "a confirmar" no contrato: o backend espelha o contrato inteiro, e
-    # o teste do contrato aponta o que mudar se o time de dados renomear alguma.
-    cod_cliente: Mapped[str | None]
-    subgrupo: Mapped[str | None]
-    # Double, o tipo "ratio" do contrato: potência é medida, não dinheiro nem energia somada.
-    potencia_kw: Mapped[float | None] = mapped_column(Double)
+    # O Postgres arredonda para as 3 casas do tipo de energia. Vazio, e não zero, para a UC
+    # sem nenhuma leitura: sem leitura não há média (DEC-023).
+    consumo_medio_kwh_12m: Mapped[Decimal | None] = mapped_column(_ENERGY)
+    # Só o mascarado chega à Gold, para o atendente confirmar a identidade na UC 360. São
+    # sensitive no contrato: ficam fora das views do agente (DEC-022).
+    titular_mascarado: Mapped[str | None]
+    documento_mascarado: Mapped[str | None]
+    # Double, o tipo "ratio" do contrato. Potência de pico em kWp, como vem da origem.
+    potencia_kwp: Mapped[float | None] = mapped_column(Double)
 
 
 class FatoFaturamentoMensal(Base):

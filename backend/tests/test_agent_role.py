@@ -36,6 +36,7 @@ def gold_with_one_uc(engine: Engine) -> None:
                 municipio="Recife",
                 bairro="Boa Viagem",
                 classe="B1",
+                classe_cadastro="Residencial",
                 cod_alimentador="AL-01",
                 possui_gd=False,
                 consumo_medio_kwh_12m=100.0,

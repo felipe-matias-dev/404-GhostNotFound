@@ -225,18 +225,23 @@ export interface components {
              * @enum {string}
              */
             classe: "B1" | "B2" | "B3" | "A4";
+            /**
+             * Classe Cadastro
+             * @enum {string}
+             */
+            classe_cadastro: "Residencial" | "Comercial" | "Industrial" | "Rural" | "Poder Público";
             /** Cod Alimentador */
             cod_alimentador: string;
             /** Possui Gd */
             possui_gd: boolean;
             /** Consumo Medio Kwh 12M */
-            consumo_medio_kwh_12m: number;
-            /** Cod Cliente */
-            cod_cliente: string | null;
-            /** Subgrupo */
-            subgrupo: string | null;
-            /** Potencia Kw */
-            potencia_kw: number | null;
+            consumo_medio_kwh_12m: number | null;
+            /** Titular Mascarado */
+            titular_mascarado: string | null;
+            /** Documento Mascarado */
+            documento_mascarado: string | null;
+            /** Potencia Kwp */
+            potencia_kwp: number | null;
         };
         /**
          * ErroSchema

@@ -26,6 +26,7 @@ ExactNumber = Annotated[Decimal, PlainSerializer(float, return_type=float, when_
 # Competência em texto AAAA-MM (DEC-011): não depende de como CSV, Delta e Postgres leem datas.
 Competencia = Annotated[str, StringConstraints(pattern=r"^\d{4}-(0[1-9]|1[0-2])$")]
 Classe = Literal["B1", "B2", "B3", "A4"]
+ClasseCadastro = Literal["Residencial", "Comercial", "Industrial", "Rural", "Poder Público"]
 Bandeira = Literal["verde", "amarela", "vermelha_p1", "vermelha_p2"]
 
 # Teto por pedido na ordem da capacidade mensal da equipe de campo (~200 inspeções):
@@ -41,13 +42,14 @@ class DimUcSchema(BaseModel):
     municipio: RequiredText
     bairro: RequiredText
     classe: Classe
+    classe_cadastro: ClasseCadastro
     cod_alimentador: RequiredText
     possui_gd: bool
-    consumo_medio_kwh_12m: ExactNumber = Field(ge=0)
     # Sem valor padrão de propósito: a coluna precisa existir no CSV, mesmo vazia.
-    cod_cliente: RequiredText | None
-    subgrupo: RequiredText | None
-    potencia_kw: float | None
+    consumo_medio_kwh_12m: Annotated[ExactNumber, Field(ge=0)] | None
+    titular_mascarado: RequiredText | None
+    documento_mascarado: RequiredText | None
+    potencia_kwp: float | None
 
 
 class FaturamentoMensalSchema(BaseModel):
