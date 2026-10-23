@@ -428,6 +428,63 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
     `VENERGY_AGENT_GOOGLE_API_KEY`, que vem de `GOOGLE_API_KEY` no `.env` da raiz. A chave é
     opcional até o `/ai` existir e nunca entra em camada da imagem.
 
+## DEC-021 · Recortes de receita somados no backend; DEC/FEC só no total
+
+- **Data:** 22/10/2026 · **Área:** Portal · **Autor:** Felipe
+- **Contexto:** o V1-05 pede KPIs e receita com filtros de período, município, bairro e
+  classe. A `gold_kpis_mensais` tem uma linha por competência, sem esses recortes, e a
+  `gold_receita_decomposicao` traz o PVM no menor recorte (município × bairro × classe).
+- **Decisão:**
+  - `GET /receita/mensal` devolve a `gold_kpis_mensais` como está, com recorte opcional de
+    `inicio` e `fim` (`AAAA-MM`, inclusivos).
+  - `GET /receita/comparacao`:
+    - recebe dois períodos e, opcionalmente, o segmento;
+    - soma em SQL o kWh e a receita da `gold_fato_faturamento_mensal`, com o município, o
+      bairro e a classe vindos da `gold_dim_uc`;
+    - a variação absoluta e a percentual são calculadas no backend. A percentual fica nula
+      quando a base é zero.
+  - `GET /receita/decomposicao`:
+    - soma os efeitos preço, volume e mix que a Gold já calculou, no nível abaixo do filtro:
+      município, depois bairro, depois classe;
+    - não refaz o PVM;
+    - separa cada par de períodos;
+    - ordena da maior queda para a maior alta.
+  - DEC, FEC, chamados e satisfação não têm recorte por segmento: continuam só no total da
+    empresa (`/receita/mensal`) e, por alimentador, na tela de continuidade.
+  - `bairro` sem `municipio` é recusado com 422, nas duas rotas que aceitam esse filtro.
+- **Motivo:**
+  - Receita e kWh são aditivos: o total de um bairro é a soma das faturas das UCs dele. Somar
+    não é fórmula de negócio, e é feito em `numeric`, então bate centavo por centavo com a
+    `gold_kpis_mensais`. Os testes conferem isso com a amostra carregada.
+  - Os efeitos do PVM também se somam entre segmentos, e a soma mantém o `check` do contrato
+    (preço + volume + mix = variação). O teste confere isso em todos os níveis.
+  - DEC e FEC são médias ponderadas pelas UCs atendidas, calculadas por alimentador, e um
+    alimentador atende vários bairros. Nenhuma soma ou média dos alimentadores dá o DEC de um
+    bairro. Mostrar um número errado é pior do que não mostrar.
+  - O mesmo nome de bairro pode existir em dois municípios, e somar os dois daria um recorte
+    que ninguém pediu.
+- **Alternativas descartadas:**
+  - Pedir ao time de Dados um grão novo na `gold_kpis_mensais`, com município, bairro e
+    classe: travaria o V1-05 à espera do contrato v0.2. Continua possível como evolução, se a
+    diretoria precisar de DEC/FEC por bairro calculado na Gold.
+  - Recalcular o PVM em cada nível do drill-down: seria uma segunda fórmula no backend, que
+    poderia divergir da Gold e do diagnóstico.
+  - Três rotas, uma por nível: o breadcrumb da tela só acrescenta filtros, e uma rota mantém
+    um schema só no client.
+- **Desempenho (aceite "< 1 s"):**
+  - Medido com dados sintéticos no volume da base real: 45.200 UCs × 24 meses, ou seja,
+    1.084.800 linhas na fato.
+  - O pior caso foi a comparação da empresa inteira, com mediana de 224 ms e máximo de
+    260 ms. Com filtro de bairro, 23 ms. A decomposição e a série mensal ficaram abaixo de
+    12 ms.
+  - Nenhum índice novo. A consulta com filtro usa a chave primária da fato
+    (`cod_uc, competencia`), e um índice na `gold_dim_uc` só deixaria a carga mais lenta.
+- **Consequências:**
+  - Se o `periodo_base` e o `periodo_atual` (ainda `a_confirmar` no contrato) mudarem de
+    representação, `/receita/decomposicao` muda no mesmo PR (DEC-014).
+  - O agente de IA, se responder sobre receita de um segmento, precisa somar a mesma fato com
+    a mesma dimensão para bater com a tela.
+
 ## DEC-022 · Regras do agente sobre a Gold e decisões da daily de 21/10
 
 - **Data:** 21/10/2026 · **Área:** Dados e IA · **Autor:** Alisson

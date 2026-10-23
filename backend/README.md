@@ -60,10 +60,17 @@ a UC `0003` em `GET /unidades-consumidoras/{cod_uc}`.
 |---|---|
 | `GET /health` | `200` se a API alcança o banco, `503` se não alcança |
 | `GET /unidades-consumidoras/{cod_uc}` | Resumo de uma unidade consumidora, ou `404` se ela não existir |
+| `GET /receita/mensal?inicio=&fim=` | KPIs de cada competência (`gold_kpis_mensais`), do mês mais antigo ao mais recente, com recorte opcional (`AAAA-MM`, inclusivo) |
+| `GET /receita/comparacao` | kWh e receita de dois períodos (`base_inicio`, `base_fim`, `atual_inicio`, `atual_fim`) e a variação, com filtros opcionais de `municipio`, `bairro` e `classe` |
+| `GET /receita/decomposicao` | Efeitos preço, volume e mix por município; com `municipio`, por bairro; com `bairro`, por classe. Da maior queda para a maior alta |
 | `POST /ordens-inspecao` | Gera uma ordem de inspeção por UC (`{"cod_ucs": [...]}`), tudo ou nada: `404` se uma UC não existir, `409` se já tiver ordem ativa |
 | `GET /ordens-inspecao?status=` | Lista as ordens, das mais recentes para as mais antigas, opcionalmente por status |
 | `GET /ordens-inspecao/{id}` | Uma ordem com o histórico de mudanças de status |
 | `PATCH /ordens-inspecao/{id}` | Muda o status (`EM_CAMPO`, `CONCLUIDA` com `resultado`, `CANCELADA`), com `observacao` opcional: `409` se a mudança não for permitida |
+
+Com filtro de segmento, a receita e o kWh são somados da fatura de cada UC. DEC e FEC só
+existem no total da empresa e por alimentador, porque não dá para somá-los por bairro
+([DEC-021](../docs/decisoes.md#dec-021--recortes-de-receita-somados-no-backend-decfec-só-no-total)).
 
 As regras das ordens (status, resultado, uma ordem ativa por UC) estão na
 [DEC-009](../docs/decisoes.md#dec-009--modelo-das-ordens-de-inspeção). As tabelas do schema
