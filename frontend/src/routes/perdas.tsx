@@ -1,4 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { PerdasPage } from "#/features/perdas";
+import { z } from "zod";
+import { PerdasPage, STATUS_ORDEM } from "#/features/perdas";
 
-export const Route = createFileRoute("/perdas")({ component: PerdasPage });
+const searchSchema = z.object({
+	status: z.enum(STATUS_ORDEM).optional().catch(undefined),
+});
+
+export const Route = createFileRoute("/perdas")({
+	validateSearch: searchSchema,
+	component: PerdasPage,
+});
