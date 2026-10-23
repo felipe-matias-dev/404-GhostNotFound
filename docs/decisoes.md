@@ -25,6 +25,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | 21/10/2026 | DEC-013: componentes base trazidos do shadcn/ui no estilo `base-nova` (Base UI) e do interior.dev para `frontend/src/components/ui/`, adaptados aos tokens; nenhuma biblioteca de componentes como dependência | O código fica no repositório e segue os tokens da marca; uma única base de primitivas (Base UI, sem Radix) | João Euclides |
 | 21/10/2026 | DEC-014: o backend espelha o contrato da Gold (6 de 9 tabelas), conferido por teste no CI; a carga recria as tabelas da Gold | Divergência entre contrato e backend aparece no CI, e não na carga da Gold real; coluna nova no contrato entra sem apagar tabela à mão | Felipe |
 | 22/10/2026 | DEC-017: backend e agente formam um workspace do uv, com um único `uv.lock` na raiz | Com o `/ai`, a API instala o agente; uma resolução só garante que o que é testado é o que roda | Luis Felipe |
+| 22/10/2026 | DEC-021: com filtro de município, bairro ou classe, a receita e o kWh são somados no backend a partir da fato e do cadastro; DEC e FEC ficam no total da empresa e por alimentador | Receita e kWh se somam; somar DEC de alimentadores por bairro daria um número errado | Felipe |
 | 21/10/2026 | DEC-022: o agente só lê colunas não sensíveis das tabelas liberadas no contrato, e "receita" sem qualificador é a receita faturada | Dado pessoal e texto livre ficam fora do agente; uma definição única de receita evita respostas divergentes | Alisson |
 | 22/10/2026 | DEC-023: receita da Gold em três medidas (total, energia e tributos), com a energia como base provisória do PVM; consumo médio nulo sem leitura; `potencia_kwp`; reconciliação do faturamento e da energia | Nenhum valor descartado sem explicação; os números da diretoria podem ser conciliados com os da Gold | Alisson |
 | 22/10/2026 | DEC-024: resultados agregados necessários para sustentar uma hipótese podem ir ao repositório; identificação de pessoas e de UCs e dado de LGPD ficam mascarados; linha a linha, amostras e outputs nunca sobem | O diagnóstico precisa mostrar a evidência, mas o dataset é confidencial e há dado pessoal | Alisson |
@@ -430,7 +431,8 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 
 ## DEC-021 · Recortes de receita somados no backend; DEC/FEC só no total
 
-- **Data:** 22/10/2026 · **Área:** Portal · **Autor:** Felipe
+- **Data:** 22/10/2026 · **Área:** Portal · **Autor:** Felipe · **Atualizada:** 22/10/2026,
+  com a revisão do João no PR #22 e o contrato v0.2 (PR #23)
 - **Contexto:** o V1-05 pede KPIs e receita com filtros de período, município, bairro e
   classe. A `gold_kpis_mensais` tem uma linha por competência, sem esses recortes, e a
   `gold_receita_decomposicao` traz o PVM no menor recorte (município × bairro × classe).
@@ -446,6 +448,8 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   - `GET /receita/decomposicao`:
     - soma os efeitos preço, volume e mix que a Gold já calculou, no nível abaixo do filtro:
       município, depois bairro, depois classe;
+    - desde o contrato v0.2, devolve também o efeito preço dividido em `efeito_tarifa` e
+      `efeito_bandeira`, e soma juntas as linhas com e sem GD do mesmo segmento;
     - não refaz o PVM;
     - separa cada par de períodos;
     - ordena da maior queda para a maior alta.
@@ -457,7 +461,8 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
     não é fórmula de negócio, e é feito em `numeric`, então bate centavo por centavo com a
     `gold_kpis_mensais`. Os testes conferem isso com a amostra carregada.
   - Os efeitos do PVM também se somam entre segmentos, e a soma mantém o `check` do contrato
-    (preço + volume + mix = variação). O teste confere isso em todos os níveis.
+    (preço + volume + mix = variação) dentro da tolerância de arredondamento. O teste confere
+    isso em todos os níveis.
   - DEC e FEC são médias ponderadas pelas UCs atendidas, calculadas por alimentador, e um
     alimentador atende vários bairros. Nenhuma soma ou média dos alimentadores dá o DEC de um
     bairro. Mostrar um número errado é pior do que não mostrar.
@@ -479,9 +484,18 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
     12 ms.
   - Nenhum índice novo. A consulta com filtro usa a chave primária da fato
     (`cod_uc, competencia`), e um índice na `gold_dim_uc` só deixaria a carga mais lenta.
+- **Limitações conhecidas** (apontadas pelo João na revisão do PR #22):
+  - A tolerância do contrato é de R$ 0,02 por linha em preço + volume + mix = variação, e ela
+    se acumula com o número de linhas somadas. Com a Gold real, a ponte de um município pode
+    não fechar no centavo; a diferença é arredondamento, e não erro.
+  - Os recortes da comparação usam o cadastro atual da UC: a `gold_dim_uc` tem uma linha por
+    UC. Os meses passados de uma UC que mudou de classe ou de bairro caem no recorte atual.
 - **Consequências:**
-  - Se o `periodo_base` e o `periodo_atual` (ainda `a_confirmar` no contrato) mudarem de
-    representação, `/receita/decomposicao` muda no mesmo PR (DEC-014).
+  - O contrato v0.2 confirmou o formato do período (`AAAA-MM/AAAA-MM`) e trouxe a
+    `gold_kpis_segmento_mensal` (DEC-023), com componentes somáveis por mês, município,
+    bairro, classe e GD. Ela resolve as duas limitações acima e permite DEC/FEC por recorte,
+    calculado sobre os componentes. Trocar o `/receita/comparacao` para essa tabela e liberar
+    DEC/FEC por recorte é uma tarefa própria, que revisa esta decisão.
   - O agente de IA, se responder sobre receita de um segmento, precisa somar a mesma fato com
     a mesma dimensão para bater com a tela.
 
