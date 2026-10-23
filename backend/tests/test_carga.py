@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from sqlalchemy import Engine, inspect, select, text
 from sqlalchemy.orm import Session
 
+from venergy_api import carga
 from venergy_api.amostra import write_sample
 from venergy_api.carga import AGENT_VIEWS_SQL, GoldLoadError, load_gold, read_rows
 from venergy_api.models import DimUc
@@ -110,6 +111,28 @@ def test_reload_drops_an_agent_view_that_left_the_views_file(
 
     load_gold(tmp_path / "gold", engine)
 
+    assert gold_views(engine) == AGENT_VIEWS
+
+
+def test_views_that_do_not_match_the_gold_cancel_the_load(
+    tmp_path: Path, engine: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    write_gold_dim_uc(tmp_path / "gold", [VALID_ROW])
+    load_gold(tmp_path / "gold", engine)
+    # O GenAI ainda não regerou o arquivo depois de uma mudança no contrato.
+    stale_views = tmp_path / "views.sql"
+    stale_views.write_text(
+        "CREATE OR REPLACE VIEW gold.sem_uc AS SELECT coluna_que_saiu FROM gold.gold_dim_uc;",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(carga, "AGENT_VIEWS_SQL", stale_views)
+    write_gold_dim_uc(tmp_path / "gold", [{**VALID_ROW, "cod_uc": "0002"}])
+
+    with pytest.raises(GoldLoadError, match="views do agente não batem com a Gold"):
+        load_gold(tmp_path / "gold", engine)
+
+    # Nada mudou: a Gold anterior e as views antigas continuam no banco.
+    assert [uc.cod_uc for uc in stored_ucs(engine)] == ["0001"]
     assert gold_views(engine) == AGENT_VIEWS
 
 

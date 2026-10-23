@@ -14,6 +14,7 @@ from typing import get_args, get_origin
 
 from pydantic import BaseModel, ValidationError
 from sqlalchemy import Connection, Engine, insert, text
+from sqlalchemy.exc import ProgrammingError
 
 from venergy_api.config import get_settings
 from venergy_api.database import Base, get_engine
@@ -167,7 +168,13 @@ def load_gold(gold_dir: Path, engine: Engine) -> dict[str, int]:
         for table, rows in validated.items():
             if rows:
                 connection.execute(insert(table.model), rows)
-        connection.exec_driver_sql(views_sql)
+        try:
+            connection.exec_driver_sql(views_sql)
+        except ProgrammingError as error:
+            # Coluna ou tabela que a Gold não tem mais: o GenAI ainda não regerou o views.sql.
+            # Falhar desfaz a transação inteira, e a Gold e as views anteriores continuam. Ignorar
+            # a view quebrada deixaria o agente sem consulta, e ninguém perceberia.
+            raise GoldLoadError(f"as views do agente não batem com a Gold: {error.orig}") from error
 
     return {table.model.__tablename__: len(rows) for table, rows in validated.items()}
 
