@@ -1,6 +1,9 @@
+import asyncio
+import contextlib
 import json
 import logging
 import time
+from collections.abc import AsyncIterator, Callable
 from uuid import uuid4
 
 from pydantic import ValidationError
@@ -13,6 +16,7 @@ from venergy_agent.application.ports import (
 )
 from venergy_agent.domain.answer import AgentAnswer, AnswerStatus, Confidence
 from venergy_agent.domain.errors import ErrorKind, QueryExecutionError, SqlRejected
+from venergy_agent.domain.events import AgentEvent, AnswerEvent, Stage, StageEvent
 from venergy_agent.domain.numbers import unsupported_numbers
 from venergy_agent.domain.question import Question
 from venergy_agent.domain.semantic import SemanticLayer
@@ -75,10 +79,39 @@ class AskUseCase:
         self._configured_model = configured_model
 
     async def ask(self, question: str, session_id: str) -> AgentAnswer:
+        async with contextlib.aclosing(self.stream(question, session_id)) as events:
+            async for event in events:
+                if isinstance(event, AnswerEvent):
+                    return event.answer
+        raise RuntimeError("stream ended without an answer")
+
+    async def stream(self, question: str, session_id: str) -> AsyncIterator[AgentEvent]:
+        queue: asyncio.Queue[AgentEvent] = asyncio.Queue()
+
+        async def produce() -> None:
+            answer = await self._run(question, session_id, queue.put_nowait)
+            queue.put_nowait(AnswerEvent(answer=answer))
+
+        task = asyncio.create_task(produce())
+        try:
+            while True:
+                event = await queue.get()
+                yield event
+                if isinstance(event, AnswerEvent):
+                    return
+        finally:
+            if not task.done():
+                task.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await task
+
+    async def _run(
+        self, question: str, session_id: str, emit: Callable[[StageEvent], None]
+    ) -> AgentAnswer:
         started = time.perf_counter()
         request_id = uuid4().hex
         try:
-            return await self._answer(question, session_id, request_id, started)
+            return await self._answer(question, session_id, request_id, started, emit)
         except Exception as error:
             self._log(
                 request_id, session_id, step="ask", status="internal_error", error=repr(error)
@@ -92,7 +125,12 @@ class AskUseCase:
             )
 
     async def _answer(
-        self, text: str, session_id: str, request_id: str, started: float
+        self,
+        text: str,
+        session_id: str,
+        request_id: str,
+        started: float,
+        emit: Callable[[StageEvent], None],
     ) -> AgentAnswer:
         if not text.strip():
             return self._unanswered(
@@ -118,6 +156,8 @@ class AskUseCase:
         last_sql: str | None = None
         last_model: str | None = None
         for attempt in range(1, self._max_attempts + 1):
+            stage = Stage.UNDERSTANDING if attempt == 1 else Stage.CORRECTING
+            emit(StageEvent(stage=stage, attempt=attempt))
             generation = await self._generate(question, feedback, attempt)
             if generation is None:
                 return self._unanswered(
@@ -157,6 +197,7 @@ class AskUseCase:
                     draft.clarification_question or "", request_id, started, model=generation.model
                 )
 
+            emit(StageEvent(stage=Stage.QUERYING, attempt=attempt))
             began = time.perf_counter()
             try:
                 validated = self._validator.validate(draft.sql, self._layer.allowed_views)
@@ -235,6 +276,7 @@ class AskUseCase:
                 truncated=result.truncated,
                 latency_ms=_elapsed_ms(began),
             )
+            emit(StageEvent(stage=Stage.WRITING, attempt=attempt))
             return await self._answered(
                 question, draft, validated, result, generation, attempt, started
             )
