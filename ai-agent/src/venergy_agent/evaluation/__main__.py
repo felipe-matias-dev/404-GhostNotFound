@@ -12,6 +12,7 @@ from pydantic import ValidationError
 
 from venergy_agent.bootstrap import build_agent
 from venergy_agent.config import AGENT_ROOT, AgentSettings
+from venergy_agent.evaluation.report import EvaluationReport
 from venergy_agent.evaluation.runner import EvaluationRunner
 from venergy_agent.infrastructure.postgres_executor import PostgresQueryExecutor
 from venergy_agent.infrastructure.semantic_source import (
@@ -40,6 +41,11 @@ def _format_value(value: float | int | None) -> str:
 
 def report_path(root: Path, started_at: datetime) -> Path:
     return root / f"{started_at.astimezone(UTC):%Y-%m-%dT%H%M%SZ}.json"
+
+
+def write_report(path: Path, report: EvaluationReport) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(report.model_dump_json(indent=2) + "\n", encoding="utf-8")
 
 
 def _parse_args(argv: list[str]) -> argparse.Namespace:
@@ -82,8 +88,7 @@ async def _evaluate(only: str | None, pause_seconds: float) -> tuple[Path, list[
         semantic_layer_version=layer.version,
     )
     path = report_path(RUNS_DIR, report.started_at)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(report.model_dump_json(indent=2), encoding="utf-8")
+    write_report(path, report)
     return path, format_metrics(report.metrics)
 
 
