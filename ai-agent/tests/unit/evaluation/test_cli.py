@@ -3,7 +3,8 @@ from pathlib import Path
 
 import pytest
 
-from venergy_agent.evaluation.__main__ import format_metrics, main, report_path
+from venergy_agent.evaluation.__main__ import format_metrics, main, report_path, write_report
+from venergy_agent.evaluation.report import EvaluationReport
 
 
 def test_format_metrics_shows_rates_as_percentages_and_none_as_dash():
@@ -40,3 +41,19 @@ def test_only_option_rejects_unknown_set():
         main(["--only", "everything"])
 
     assert exit_info.value.code == 2
+
+
+def test_written_report_ends_with_a_newline(tmp_path):
+    report = EvaluationReport(
+        started_at=datetime(2026, 10, 24, tzinfo=UTC),
+        model="m",
+        prompt_version="v2",
+        semantic_layer_version="0.3.0",
+        items=(),
+        metrics={},
+    )
+    path = tmp_path / "runs" / "report.json"
+
+    write_report(path, report)
+
+    assert path.read_text(encoding="utf-8").endswith("}\n")
