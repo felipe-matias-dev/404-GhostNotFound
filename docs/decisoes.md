@@ -320,6 +320,8 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   - Energia e dinheiro seguem a DEC-010: `numeric` no banco, com a escala do contrato.
   - Dados faz três cópias independentes da transformação Silver → Gold (Alisson, Arthur e
     Gabriel), todas contra o contrato, e as compara antes de definir a Gold exportada.
+    Não há ordem nem dono único: cada um faz a sua versão por conta própria, e o time compara os
+    pontos fortes e fracos de cada uma para montar uma versão final mais concisa.
 - **Motivo:** o formato texto não depende de interpretação de data entre CSV, Delta e
   PostgreSQL; comparar três cópias independentes expõe erro de tratamento que uma só
   não mostraria.
@@ -607,6 +609,10 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   - **Documento repetido (UC-12):** `flag_documento_repetido` existe só na Silver de
     `unidades_consumidoras`. A Gold não traz essa coluna (nem `gold_dim_uc`): a flag entra como
     filtro na construção da Gold, não como atributo. Confirmado por Arthur (Dados) em 23/10/2026.
+    As UCs com documento repetido contam no `n_uc` (estoque do cadastro, denominador do DEC/FEC):
+    continuam cadastradas e atendidas pelo alimentador, e o contrato define `n_uc` como UCs do
+    cadastro. Elas não têm medidor nem leitura, então ficam sem `consumo_medio_kwh_12m`; a existência
+    de faturas dessas UCs é conferida nos testes da Gold.
   - `consumo_medio_kwh_12m` passa a aceitar nulo: há UCs do cadastro sem nenhuma leitura, e sem
     leitura não há média. Zero seria inventar dado.
   - `potencia_kw` passa a ser `potencia_kwp`, em kWp: a origem só traz potência de pico, e kW
