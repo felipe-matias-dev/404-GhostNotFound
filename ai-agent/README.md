@@ -19,7 +19,8 @@ Os prompts ficam versionados em `prompts/vN/` (`system.md` e `correction.md`). A
 `semantic/semantic_layer.yaml` é do GenAI. Ele escolhe as views `sem_*`, as colunas, a descrição, o glossário, as regras e os exemplos. Cada view é validada contra [contracts/gold_schema.yaml](../contracts/gold_schema.yaml):
 
 - a tabela e a coluna existem no contrato;
-- coluna marcada `a_confirmar` não entra;
+- a tabela tem `agente` em `consumers` (DEC-022);
+- coluna marcada `a_confirmar` ou `sensitive: true` não entra;
 - a chave primária da tabela está confirmada ou proposta e aparece na view.
 
 As relações entre views saem das chaves estrangeiras e das chaves de entidade (`cod_uc`, `cod_alimentador`). Competência não vira relação, porque juntar só por período gera produto cartesiano (DEC-018).
@@ -43,6 +44,14 @@ cp .env.example .env   # preencha a sua chave do Gemini e a URL do banco
 uv run pytest          # os testes de integração precisam do banco: docker compose up -d --wait db (na raiz)
 uv run ruff check . && uv run ruff format --check .
 ```
+
+Para fazer uma pergunta pelo terminal, com a chave do modelo no `.env` e as views `sem_*` aplicadas no banco:
+
+```bash
+uv run python -m venergy_agent "Quantas UCs existem em cada classe de consumo?"
+```
+
+O backend monta o agente com `venergy_agent.bootstrap.build_agent(AgentSettings())`, uma vez por processo: erro na camada semântica, no contrato ou no prompt falha na subida.
 
 As configurações são lidas de variáveis com prefixo `VENERGY_AGENT_` (ou do `.env`), conforme `src/venergy_agent/config.py`. O `.env` não vai para o Git.
 

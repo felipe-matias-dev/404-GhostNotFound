@@ -3,6 +3,8 @@ from typing import Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from venergy_agent.domain.text import NonBlankText
+
 
 class AnswerStatus(StrEnum):
     ANSWERED = "answered"
@@ -22,20 +24,20 @@ class Confidence(StrEnum):
 class AgentAnswer(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    answer: str
+    answer: NonBlankText
     status: AnswerStatus
-    sql: str | None
+    sql: NonBlankText | None
     rows: tuple[dict[str, object], ...]
-    row_count: int
+    row_count: int = Field(ge=0)
     truncated: bool
     confidence: Confidence
     sources: tuple[str, ...]
     assumptions: tuple[str, ...]
-    clarification: str | None
-    refused_reason: str | None
-    request_id: str
-    model: str
-    prompt_version: str
+    clarification: NonBlankText | None
+    refused_reason: NonBlankText | None
+    request_id: NonBlankText
+    model: NonBlankText
+    prompt_version: NonBlankText
     latency_ms: int = Field(ge=0)
 
     @model_validator(mode="after")
@@ -44,6 +46,8 @@ class AgentAnswer(BaseModel):
             raise ValueError("row_count cannot be smaller than the rows sample")
         if self.truncated and self.status is not AnswerStatus.ANSWERED:
             raise ValueError("only an answered result can be truncated")
+        if self.truncated and self.row_count == 0:
+            raise ValueError("a truncated result must have rows")
 
         if self.status is AnswerStatus.ANSWERED:
             if self.sql is None:

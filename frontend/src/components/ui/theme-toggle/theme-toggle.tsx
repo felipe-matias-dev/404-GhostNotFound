@@ -1,6 +1,7 @@
-// Alternador de tema escuro/claro com o sol e a lua desenhados por pathLength. Botão
-// redondo (`outline` + `rounded-full`); o estado vem de useTema (atributo `data-tema` no
-// <html> + localStorage), então qualquer instância reflete a mesma escolha.
+// Alternador de tema escuro/claro com o sol e a lua desenhados por pathLength. Em repouso
+// é só o ícone; no hover vira um círculo preenchido (`ghost` + `rounded-full`, camadas
+// `hover`/`pressed`). O estado vem de useTema (atributo `data-tema` no <html> +
+// localStorage), então qualquer instância reflete a mesma escolha.
 import {
 	motion,
 	useMotionValue,
@@ -32,7 +33,7 @@ export function ThemeToggle({ className }: { className?: string }) {
 
 	return (
 		<Button
-			variant="outline"
+			variant="ghost"
 			size="icon"
 			aria-label={isDark ? "Ativar tema claro" : "Ativar tema escuro"}
 			onClick={() => definirTema(isDark ? "claro" : "escuro")}
@@ -70,7 +71,7 @@ function SolarSwitch({ isDark }: { isDark: boolean }) {
 				aria-hidden
 				viewBox="0 0 25 25"
 				fill="none"
-				className="size-5"
+				className="size-4"
 			>
 				<motion.path
 					d="M12.4058 17.7625C15.1672 17.7625 17.4058 15.5239 17.4058 12.7625C17.4058 10.0011 15.1672 7.76251 12.4058 7.76251C9.64434 7.76251 7.40576 10.0011 7.40576 12.7625C7.40576 15.5239 9.64434 17.7625 12.4058 17.7625Z"

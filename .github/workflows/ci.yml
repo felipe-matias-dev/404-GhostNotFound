@@ -97,6 +97,8 @@ jobs:
       - run: npm ci --no-audit --no-fund
       - name: Checagem de tipos
         run: npx tsc --noEmit
+      - name: Testes
+        run: npm test
       - name: Build
         run: npm run build
 

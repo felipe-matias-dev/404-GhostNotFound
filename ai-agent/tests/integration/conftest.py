@@ -44,9 +44,9 @@ def probe_view(owner: psycopg.Connection) -> Iterator[str]:
 GOLD_TABLES = (
     """CREATE TABLE gold.gold_dim_uc (
         cod_uc text PRIMARY KEY, municipio text NOT NULL, bairro text NOT NULL,
-        classe text NOT NULL, cod_alimentador text NOT NULL, possui_gd boolean NOT NULL,
-        consumo_medio_kwh_12m numeric(16,3) NOT NULL, cod_cliente text, subgrupo text,
-        potencia_kw double precision)""",
+        classe text NOT NULL, classe_cadastro text NOT NULL, cod_alimentador text NOT NULL,
+        possui_gd boolean NOT NULL, consumo_medio_kwh_12m numeric(16,3),
+        titular_mascarado text, documento_mascarado text, potencia_kwp double precision)""",
     """CREATE TABLE gold.gold_fato_faturamento_mensal (
         cod_uc text NOT NULL, competencia text NOT NULL, kwh_faturado numeric(16,3) NOT NULL,
         receita_faturada numeric(14,2) NOT NULL, receita_energia numeric(14,2) NOT NULL,
@@ -57,12 +57,34 @@ GOLD_TABLES = (
         fec double precision NOT NULL, n_uc integer NOT NULL, n_interrupcoes integer NOT NULL,
         horas_interrompidas double precision NOT NULL,
         PRIMARY KEY (cod_alimentador, competencia))""",
+    """CREATE TABLE gold.gold_kpis_mensais (
+        competencia text PRIMARY KEY, kwh_faturado numeric(16,3) NOT NULL,
+        receita_faturada numeric(14,2) NOT NULL, receita_energia numeric(14,2) NOT NULL,
+        dec double precision, fec double precision, n_chamados integer,
+        satisfacao_media double precision)""",
+    """CREATE TABLE gold.gold_kpis_segmento_mensal (
+        competencia text NOT NULL, municipio text NOT NULL, bairro text NOT NULL,
+        classe_cadastro text NOT NULL, classe text NOT NULL, possui_gd boolean NOT NULL,
+        n_uc integer NOT NULL, kwh_faturado numeric(16,3) NOT NULL,
+        receita_faturada numeric(14,2) NOT NULL, receita_energia numeric(14,2) NOT NULL,
+        tributos numeric(14,2) NOT NULL, receita_arrecadada numeric(14,2),
+        horas_interrompidas double precision NOT NULL, n_interrupcoes integer NOT NULL,
+        n_chamados integer NOT NULL, soma_notas double precision, n_notas integer NOT NULL,
+        PRIMARY KEY (competencia, municipio, bairro, classe_cadastro, possui_gd))""",
+    """CREATE TABLE gold.gold_receita_decomposicao (
+        periodo_base text NOT NULL, periodo_atual text NOT NULL, municipio text NOT NULL,
+        bairro text NOT NULL, classe text NOT NULL, possui_gd boolean NOT NULL,
+        receita_base numeric(14,2) NOT NULL, receita_atual numeric(14,2) NOT NULL,
+        efeito_preco numeric(14,2) NOT NULL, efeito_tarifa numeric(14,2) NOT NULL,
+        efeito_bandeira numeric(14,2) NOT NULL, efeito_volume numeric(14,2) NOT NULL,
+        efeito_mix numeric(14,2) NOT NULL,
+        PRIMARY KEY (periodo_base, periodo_atual, municipio, bairro, classe, possui_gd))""",
 )
 GOLD_ROWS = (
     "INSERT INTO gold.gold_dim_uc VALUES "
-    "('0001','Olinda','Bairro 1','B1','AL-07',false,250.5,'C-1',NULL,NULL),"
-    "('0002','Recife','Bairro 2','A4','AL-03',true,18000,'C-2',NULL,NULL),"
-    "('0003','Olinda','Bairro 1','B1','AL-07',false,300,'C-3',NULL,NULL)",
+    "('0001','Olinda','Bairro 1','B1','Residencial','AL-07',false,250.5,'A.S.','***-01',NULL),"
+    "('0002','Recife','Bairro 2','A4','Industrial','AL-03',true,18000,'B.T.','***-02',75.0),"
+    "('0003','Olinda','Bairro 1','B1','Residencial','AL-07',false,300,'C.R.','***-03',NULL)",
     "INSERT INTO gold.gold_fato_faturamento_mensal VALUES "
     "('0001','2024-01',230,180.40,160.00,20.40,180.40,0.70,'verde'),"
     "('0001','2025-03',240,190.10,170.00,20.10,190.10,0.71,'verde'),"
@@ -72,13 +94,36 @@ GOLD_ROWS = (
     "('AL-07','2024-03',1.2,0.4,1500,3,2.5),"
     "('AL-07','2025-03',0.8,0.3,1500,2,1.5),"
     "('AL-03','2025-01',0.0,0.0,800,0,0.0)",
+    "INSERT INTO gold.gold_kpis_mensais VALUES ('2025-03',9240,7290.10,6470.00,0.8,0.3,12,4.0)",
+    "INSERT INTO gold.gold_kpis_segmento_mensal VALUES "
+    "('2025-01','Olinda','Bairro 1','Residencial','B1',false,100,500,400.00,350.00,50.00,"
+    "400.00,30,10,4,15,4),"
+    "('2025-02','Olinda','Bairro 1','Residencial','B1',false,100,500,400.00,350.00,50.00,"
+    "400.00,10,5,2,8,2),"
+    "('2025-02','Olinda','Bairro 1','Residencial','B1',true,100,0,0.00,0.00,0.00,"
+    "NULL,20,5,0,NULL,0)",
+    "INSERT INTO gold.gold_receita_decomposicao VALUES "
+    "('2024-01/2024-12','2025-01/2025-12','Olinda','Bairro 1','B1',false,"
+    "1000.00,1100.00,80.00,60.00,20.00,30.00,-10.00),"
+    "('2024-01/2024-12','2025-01/2025-12','Olinda','Bairro 1','B1',true,"
+    "500.00,420.00,40.00,30.00,10.00,-115.00,-5.00)",
 )
 GOLD_TABLE_NAMES = (
     "gold_dim_uc",
     "gold_fato_faturamento_mensal",
     "gold_continuidade_alimentador_mensal",
+    "gold_kpis_mensais",
+    "gold_kpis_segmento_mensal",
+    "gold_receita_decomposicao",
 )
-VIEW_NAMES = ("sem_uc", "sem_faturamento_mensal", "sem_continuidade_alimentador_mensal")
+VIEW_NAMES = (
+    "sem_uc",
+    "sem_faturamento_mensal",
+    "sem_continuidade_alimentador_mensal",
+    "sem_kpis_mensais",
+    "sem_kpis_segmento_mensal",
+    "sem_receita_decomposicao",
+)
 
 
 @pytest.fixture

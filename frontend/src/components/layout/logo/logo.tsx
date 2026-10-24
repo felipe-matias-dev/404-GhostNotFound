@@ -1,12 +1,17 @@
 // Lockup do topo esquerdo: anel aberto com ponto + "VE-360" em Söhne Breit. As cores vêm
 // dos tokens do tema (styles.css), então a logo acompanha escuro/claro sozinha.
 // Tudo em `em`: o tamanho vem do `text-*` do className.
-export function Logo({ className = "" }: { className?: string }) {
+import { cn } from "#/lib/utils";
+
+export function Logo({ className }: { className?: string }) {
 	return (
 		<div
 			role="img"
 			aria-label="VE-360"
-			className={`inline-flex items-center gap-[0.5em] font-display text-title leading-none ${className}`}
+			className={cn(
+				"inline-flex items-center gap-[0.5em] font-display text-title leading-none",
+				className,
+			)}
 		>
 			<svg
 				aria-hidden="true"

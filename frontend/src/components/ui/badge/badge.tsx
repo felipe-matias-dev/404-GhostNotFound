@@ -1,9 +1,9 @@
-// Badge do shadcn/ui (`npx shadcn@latest add badge`, estilo base-nova sobre Base UI) com o
-// visual de label do Linear, nos tokens da marca VE-360:
+// Badge do shadcn/ui (`npx shadcn@latest add badge`, estilo base-nova sobre Base UI) com
+// visual de label, nos tokens da marca VE-360:
 // - pílula de 24px, texto `text-small`, ícone de 14px;
 // - a cor fica no ponto/ícone (`data-icon`), o texto continua neutro: o badge não
 //   compete com o accent nem vira "bloco colorido" na tabela;
-// - `outline` é o padrão (label do Linear); `secondary` é o preenchido (iniciativa).
+// - `outline` é o padrão (label); `secondary` é o preenchido (iniciativa).
 // Outro elemento (link): `render={<a href="…" />}`.
 import { mergeProps } from "@base-ui/react/merge-props";
 import { useRender } from "@base-ui/react/use-render";

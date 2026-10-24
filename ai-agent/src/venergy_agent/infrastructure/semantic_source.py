@@ -18,6 +18,7 @@ from venergy_agent.domain.sql import DraftStatus
 
 CONFIRMED_STATUSES = frozenset({"confirmada", "proposta"})
 ENTITY_KEYS = frozenset({"cod_uc", "cod_alimentador"})
+AGENT_CONSUMER = "agente"
 
 
 class SemanticLayerError(ValueError):
@@ -53,6 +54,10 @@ def view_definitions(layer: dict[str, Any], contract: dict[str, Any]) -> tuple[V
             continue
 
         table = tables[source]
+        if AGENT_CONSUMER not in table.get("consumers", ()):
+            problems.append(
+                f"view {name!r}: a tabela {source} não tem {AGENT_CONSUMER} em consumers"
+            )
         columns = {column["name"] for column in view.get("columns", [])}
         ordered = tuple(column["name"] for column in view.get("columns", []))
         primary_key = table["primary_key"]
@@ -70,8 +75,13 @@ def view_definitions(layer: dict[str, Any], contract: dict[str, Any]) -> tuple[V
             spec = table["columns"].get(column_name)
             if spec is None:
                 problems.append(f"view {name!r}: coluna {column_name!r} não existe em {source}")
-            elif spec["status"] == "a_confirmar":
-                problems.append(f"view {name!r}: coluna {column_name!r} ainda é a_confirmar")
+            elif spec["status"] not in CONFIRMED_STATUSES:
+                problems.append(
+                    f"view {name!r}: coluna {column_name!r} tem status {spec['status']!r}, "
+                    "e só confirmada ou proposta entra"
+                )
+            elif spec.get("sensitive", False):
+                problems.append(f"view {name!r}: coluna {column_name!r} é sensível")
         definitions.append(ViewDefinition(name=name, source_table=source, columns=ordered))
 
     if problems:
