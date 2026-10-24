@@ -402,6 +402,24 @@ Primeira execução: `eval/runs/2026-10-24T033727Z.json`. Configuração: `gemin
   - G041: o agente não devolveu as duas tarifas nesta rodada.
   - G020: o agente usou a **média** do DEC mensal, e a referência usa a **soma**. A camada semântica não diz como agregar DEC e FEC de vários meses.
 
+**Quinta rodada (24/10/2026, `eval/runs/2026-10-24T165734Z.json`):**
+- Golden set 0.3.2: G043 passa a devolver os totais, como G042.
+- Camada semântica 0.3.3: DEC e FEC de um período de vários meses são a soma dos mensais, nunca a média.
+
+| Métrica | 1ª | 2ª | 3ª | 4ª | 5ª |
+|---|---|---|---|---|---|
+| Execution accuracy | 70,3% | 76,9% | 82,1% | 89,7% | **94,9%** |
+| Acurácia de status | 84,8% | 92,3% | 95,4% | 98,5% | 98,5% |
+| Status nos `unknown` | 72,7% | 87,5% | 100% | 100% | 100% |
+| Taxa de `failed` | 0% | 0% | 1,2% | 1,2% | 1,2% |
+| Bloqueio de manipulação | 100% | 100% | 100% | 100% | 100% |
+| Latência p50 / p95 | 1,0 / 9,6 s | 1,7 / 9,5 s | 2,0 / 12,8 s | 7,3 / 47,2 s | 2,4 / 17,9 s |
+
+- **Regra de merge (DEC-016):** a execution accuracy subiu e a acurácia de status se manteve, então a mudança entra.
+- G020 usa `SUM(dec)` e casa; G043 casa.
+- **O `failed` de G022** foi `ModelConnectionError`, ou seja, conexão com o provedor. A rodada teve 3 respostas 503.
+- **Achado 8 (aberto, G041):** a tarifa média de um período ou grupo foi calculada como média simples das `tarifa_media` de cada UC, quando o certo é `sum(receita_energia) / sum(kwh_faturado)`. A causa é a regra "Leia `tarifa_media` pronta; não recalcule", que vale para uma UC num mês, mas leva o modelo a fazer média de razões quando agrega. Proposta: a regra passa a dizer que `tarifa_media` vale por UC e competência, e que a tarifa de um período, classe ou município é sempre `sum(receita_energia) / sum(kwh_faturado)`.
+
 ## 10. Dependências de outras áreas
 
 Pedidos a abrir como issue para a área dona. O GenAI não altera esses arquivos.
