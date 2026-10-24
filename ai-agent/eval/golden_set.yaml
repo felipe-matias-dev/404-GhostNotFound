@@ -19,7 +19,7 @@
 # RESUMO_CONTEXTO.md §1.2, §1.3 e §1.7; case p. 5 e 6), planejamento §3, guia §10.1 e casos de
 # borda do domínio. A origem de cada item está no campo notes.
 
-versao: 0.3.1
+versao: 0.3.2
 status: rascunho
 
 itens:
@@ -419,11 +419,11 @@ itens:
   - id: G043
     question: "A receita faturada subiu nos últimos 12 meses em relação ao primeiro ano da base?"
     category: case
-    reference_sql: "WITH meses AS (SELECT competencia, row_number() OVER (ORDER BY competencia) AS ordem_inicio, row_number() OVER (ORDER BY competencia DESC) AS ordem_fim FROM (SELECT DISTINCT competencia FROM sem_faturamento_mensal) c) SELECT round(100.0 * (sum(CASE WHEN m.ordem_fim <= 12 THEN f.receita_faturada END) - sum(CASE WHEN m.ordem_inicio <= 12 THEN f.receita_faturada END)) / NULLIF(sum(CASE WHEN m.ordem_inicio <= 12 THEN f.receita_faturada END), 0), 2) AS variacao_percentual FROM sem_faturamento_mensal f JOIN meses m ON m.competencia = f.competencia"
+    reference_sql: "WITH meses AS (SELECT competencia, row_number() OVER (ORDER BY competencia) AS ordem_inicio, row_number() OVER (ORDER BY competencia DESC) AS ordem_fim FROM (SELECT DISTINCT competencia FROM sem_faturamento_mensal) c) SELECT sum(CASE WHEN m.ordem_inicio <= 12 THEN f.receita_faturada END) AS receita_primeiro_ano, sum(CASE WHEN m.ordem_fim <= 12 THEN f.receita_faturada END) AS receita_ultimos_12_meses FROM sem_faturamento_mensal f JOIN meses m ON m.competencia = f.competencia"
     expected_status: answered
     follow_up_of: null
-    notes: "Pergunta do case: receita subiu ~8%. Usa a receita faturada, a suposição do glossário."
-    revisado_por: null
+    notes: "Pergunta do case: a receita subiu cerca de 8%. A referência devolve os dois totais, que respondem 'subiu?'; a variação é opcional. Usa a receita faturada, a suposição do glossário. Mesma janela de G041 e G042."
+    revisado_por: Perylo
 
   - id: G044
     question: "Qual bairro mais perdeu volume residencial no último ano?"
