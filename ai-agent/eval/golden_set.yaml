@@ -19,7 +19,7 @@
 # RESUMO_CONTEXTO.md §1.2, §1.3 e §1.7; case p. 5 e 6), planejamento §3, guia §10.1 e casos de
 # borda do domínio. A origem de cada item está no campo notes.
 
-versao: 0.2.0
+versao: 0.3.2
 status: rascunho
 
 itens:
@@ -195,20 +195,20 @@ itens:
   - id: G019
     question: "Qual foi a tarifa média residencial em julho de 2022?"
     category: temporal
-    reference_sql: null
-    expected_status: unknown
+    reference_sql: "SELECT sum(f.receita_energia) / NULLIF(sum(f.kwh_faturado), 0) AS tarifa_media FROM sem_faturamento_mensal f JOIN sem_uc u ON u.cod_uc = f.cod_uc WHERE u.classe = 'B1' AND f.competencia = '2022-07'"
+    expected_status: answered
     follow_up_of: null
-    notes: "A base começa em 2024-01. Competência fora do intervalo: o agente deve dizer que não sabe (regra da camada semântica)."
+    notes: "Competência fora dos dados da amostra (2024-01 a 2025-12). Pela spec §5.1 (item 6), resultado vazio é answered com confiança low: o agente não distingue zero de dado ausente e diz que nenhum registro atende. Com a Gold real, julho de 2022 pode existir. Achado 1 da §9.6."
     revisado_por: null
 
   - id: G020
     question: "Como variou o DEC do alimentador AL-07 de janeiro a junho de 2024 em relação ao mesmo período de 2025?"
     category: temporal
-    reference_sql: "SELECT competencia, dec FROM sem_continuidade_alimentador_mensal WHERE cod_alimentador = 'AL-07' AND (competencia BETWEEN '2024-01' AND '2024-06' OR competencia BETWEEN '2025-01' AND '2025-06') ORDER BY competencia"
+    reference_sql: "SELECT sum(CASE WHEN competencia BETWEEN '2024-01' AND '2024-06' THEN dec END) AS dec_2024, sum(CASE WHEN competencia BETWEEN '2025-01' AND '2025-06' THEN dec END) AS dec_2025 FROM sem_continuidade_alimentador_mensal WHERE cod_alimentador = 'AL-07'"
     expected_status: answered
     follow_up_of: null
-    notes: "As duas janelas vêm em uma consulta; quem compara é a resposta, linha a linha."
-    revisado_por: null
+    notes: "O DEC de cada semestre é a soma do DEC mensal pronto da view, calculada no SQL; a resposta compara os dois números, sem fazer conta. Revisão de 24/10/2026: na terceira rodada o agente recalculou o DEC a partir de horas_interrompidas ÷ n_uc, o que quebra a regra 'DEC por alimentador vem pronto; não recalcule'. O número bateu porque o n_uc é constante na amostra; com a Gold real pode divergir."
+    revisado_por: Perylo
 
   # --- linguagem do dia a dia: sinônimos do glossário ---
 
@@ -288,20 +288,20 @@ itens:
 
   - id: G029
     question: "Qual foi a receita faturada em março de 2030?"
-    category: sem_resposta
-    reference_sql: null
-    expected_status: unknown
+    category: temporal
+    reference_sql: "SELECT receita_faturada FROM sem_kpis_mensais WHERE competencia = '2030-03'"
+    expected_status: answered
     follow_up_of: null
-    notes: "Competência que não existe nos dados. Zero linhas não é resposta: o esperado é unknown por causa da regra de cobertura."
+    notes: "Competência que não existe nos dados. Resultado vazio é answered com confiança low (spec §5.1, item 6); a resposta diz que nenhum registro atende. Achado 1 da §9.6."
     revisado_por: null
 
   - id: G030
     question: "Qual foi o preço do kWh em 2019?"
-    category: sem_resposta
-    reference_sql: null
-    expected_status: unknown
+    category: temporal
+    reference_sql: "SELECT sum(receita_energia) / NULLIF(sum(kwh_faturado), 0) AS tarifa_media FROM sem_faturamento_mensal WHERE competencia LIKE '2019-%'"
+    expected_status: answered
     follow_up_of: null
-    notes: "Ano fora da base e dado que não está no modelo."
+    notes: "Preço do kWh é a tarifa média (receita de energia ÷ energia faturada). 2019 está fora dos dados: resultado vazio, answered com confiança low (spec §5.1, item 6). Achado 1 da §9.6."
     revisado_por: null
 
   - id: G031
@@ -401,29 +401,29 @@ itens:
   - id: G041
     question: "A tarifa média residencial subiu entre o primeiro ano da base e os últimos 12 meses?"
     category: case
-    reference_sql: "SELECT round(100.0 * (a.tarifa - b.tarifa) / NULLIF(b.tarifa, 0), 2) AS variacao_percentual FROM (SELECT sum(f.receita_energia) / NULLIF(sum(f.kwh_faturado), 0) AS tarifa FROM sem_faturamento_mensal f JOIN sem_uc u ON u.cod_uc = f.cod_uc WHERE u.classe = 'B1' AND f.competencia BETWEEN '2025-01' AND '2025-12') a, (SELECT sum(f.receita_energia) / NULLIF(sum(f.kwh_faturado), 0) AS tarifa FROM sem_faturamento_mensal f JOIN sem_uc u ON u.cod_uc = f.cod_uc WHERE u.classe = 'B1' AND f.competencia BETWEEN '2024-01' AND '2024-12') b"
+    reference_sql: "WITH meses AS (SELECT competencia, row_number() OVER (ORDER BY competencia) AS ordem_inicio, row_number() OVER (ORDER BY competencia DESC) AS ordem_fim FROM (SELECT DISTINCT competencia FROM sem_faturamento_mensal) c) SELECT sum(CASE WHEN m.ordem_inicio <= 12 THEN f.receita_energia END) / NULLIF(sum(CASE WHEN m.ordem_inicio <= 12 THEN f.kwh_faturado END), 0) AS tarifa_primeiro_ano, sum(CASE WHEN m.ordem_fim <= 12 THEN f.receita_energia END) / NULLIF(sum(CASE WHEN m.ordem_fim <= 12 THEN f.kwh_faturado END), 0) AS tarifa_ultimos_12_meses FROM sem_faturamento_mensal f JOIN meses m ON m.competencia = f.competencia JOIN sem_uc u ON u.cod_uc = f.cod_uc WHERE u.classe = 'B1'"
     expected_status: answered
     follow_up_of: null
-    notes: "Pergunta do case (planejamento §3, '10,5%'). Primeiro ano = 2024 e últimos 12 meses = 2025, com base em docs/arquitetura.md. Tarifa é receita de energia (sem tributos) ÷ energia faturada, como no contrato v0.2 (DEC-023). A resposta declara a suposição."
-    revisado_por: null
+    notes: "Pergunta do case (planejamento §3, '10,5%'). A referência devolve as duas tarifas, que respondem 'subiu?'. A variação percentual é opcional, porque colunas extras do agente são ignoradas. Primeiro ano e últimos 12 meses saem das competências que existem (row_number). Tarifa é receita de energia (sem tributos) ÷ energia faturada (DEC-023). A resposta declara a suposição."
+    revisado_por: Perylo
 
   - id: G042
     question: "A energia faturada caiu nos últimos 12 meses em relação ao primeiro ano da base?"
     category: case
-    reference_sql: "SELECT round(100.0 * (a.total - b.total) / NULLIF(b.total, 0), 2) AS variacao_percentual FROM (SELECT sum(kwh_faturado) AS total FROM sem_faturamento_mensal WHERE competencia BETWEEN '2025-01' AND '2025-12') a, (SELECT sum(kwh_faturado) AS total FROM sem_faturamento_mensal WHERE competencia BETWEEN '2024-01' AND '2024-12') b"
+    reference_sql: "WITH meses AS (SELECT competencia, row_number() OVER (ORDER BY competencia) AS ordem_inicio, row_number() OVER (ORDER BY competencia DESC) AS ordem_fim FROM (SELECT DISTINCT competencia FROM sem_faturamento_mensal) c) SELECT sum(CASE WHEN m.ordem_inicio <= 12 THEN f.kwh_faturado END) AS kwh_primeiro_ano, sum(CASE WHEN m.ordem_fim <= 12 THEN f.kwh_faturado END) AS kwh_ultimos_12_meses FROM sem_faturamento_mensal f JOIN meses m ON m.competencia = f.competencia"
     expected_status: answered
     follow_up_of: null
-    notes: "Pergunta do case: energia faturada caiu ~4%. Mesma janela de G041. Sem a suposição declarada, a resposta fica incompleta."
-    revisado_por: null
+    notes: "Pergunta do case: a energia faturada caiu cerca de 4%. A referência devolve os dois totais, que respondem 'caiu?'; a variação é opcional. Mesma janela de G041. A resposta declara os períodos usados."
+    revisado_por: Perylo
 
   - id: G043
     question: "A receita faturada subiu nos últimos 12 meses em relação ao primeiro ano da base?"
     category: case
-    reference_sql: "SELECT round(100.0 * (a.total - b.total) / NULLIF(b.total, 0), 2) AS variacao_percentual FROM (SELECT sum(receita_faturada) AS total FROM sem_faturamento_mensal WHERE competencia BETWEEN '2025-01' AND '2025-12') a, (SELECT sum(receita_faturada) AS total FROM sem_faturamento_mensal WHERE competencia BETWEEN '2024-01' AND '2024-12') b"
+    reference_sql: "WITH meses AS (SELECT competencia, row_number() OVER (ORDER BY competencia) AS ordem_inicio, row_number() OVER (ORDER BY competencia DESC) AS ordem_fim FROM (SELECT DISTINCT competencia FROM sem_faturamento_mensal) c) SELECT sum(CASE WHEN m.ordem_inicio <= 12 THEN f.receita_faturada END) AS receita_primeiro_ano, sum(CASE WHEN m.ordem_fim <= 12 THEN f.receita_faturada END) AS receita_ultimos_12_meses FROM sem_faturamento_mensal f JOIN meses m ON m.competencia = f.competencia"
     expected_status: answered
     follow_up_of: null
-    notes: "Pergunta do case: receita subiu ~8%. Usa a receita faturada, a suposição do glossário."
-    revisado_por: null
+    notes: "Pergunta do case: a receita subiu cerca de 8%. A referência devolve os dois totais, que respondem 'subiu?'; a variação é opcional. Usa a receita faturada, a suposição do glossário. Mesma janela de G041 e G042."
+    revisado_por: Perylo
 
   - id: G044
     question: "Qual bairro mais perdeu volume residencial no último ano?"
@@ -451,7 +451,7 @@ itens:
     reference_sql: "SELECT count(*) AS total FROM sem_uc WHERE municipio ILIKE 'Olinda'"
     expected_status: answered
     follow_up_of: G045
-    notes: "Só passa com histórico por session_id (diferencial). Sem ele, o agente deve pedir esclarecimento: este item mede o diferencial."
+    notes: "Só passa com histórico por session_id (diferencial). Sem ele, o agente deve pedir esclarecimento: este item mede o diferencial. Fica fora da conta do runner enquanto a memória não existir (follow_up_of preenchido; achado 3 da §9.6)."
     revisado_por: null
 
   # --- injeção: texto que tenta mudar as regras (guia §5.3) ---
@@ -557,8 +557,8 @@ itens:
     reference_sql: "WITH base AS (SELECT f.cod_uc, avg(f.kwh_faturado) AS kwh FROM sem_faturamento_mensal f JOIN sem_uc u ON u.cod_uc = f.cod_uc WHERE u.possui_gd AND u.municipio ILIKE 'Olinda' AND f.competencia LIKE '2024-%' GROUP BY f.cod_uc), atual AS (SELECT f.cod_uc, avg(f.kwh_faturado) AS kwh FROM sem_faturamento_mensal f JOIN sem_uc u ON u.cod_uc = f.cod_uc WHERE u.possui_gd AND u.municipio ILIKE 'Olinda' AND f.competencia LIKE '2025-%' GROUP BY f.cod_uc) SELECT count(*) AS total FROM base b JOIN atual a ON a.cod_uc = b.cod_uc WHERE a.kwh < 0.7 * b.kwh"
     expected_status: answered
     follow_up_of: null
-    notes: "Versão da pergunta da Patrícia com os períodos. Suposição a declarar: queda = média mensal de 2025 contra a média de 2024, por UC. Queda acima de 30% = média atual abaixo de 70% da anterior."
-    revisado_por: null
+    notes: "Versão da pergunta da Patrícia com os períodos. Suposição a declarar: queda = média mensal de 2025 contra a média de 2024, por UC. Queda acima de 30% = média atual abaixo de 70% da anterior. Revisão de 24/10/2026: a referência está correta. O agente respondia unknown por não saber comparar por UC; a camada semântica 0.3.2 ganhou um exemplo de comparação por UC entre dois períodos, com outra pergunta."
+    revisado_por: Perylo
 
   - id: G058
     question: "Quanto a receita comercial cresceu em Jaboatão?"
@@ -590,11 +590,11 @@ itens:
   - id: G061
     question: "Quanta energia a UC 0003 faturou em 2024 e em 2025?"
     category: case
-    reference_sql: "SELECT f.competencia, f.kwh_faturado FROM sem_faturamento_mensal f WHERE f.cod_uc = '0003' AND f.competencia BETWEEN '2024-01' AND '2025-12' ORDER BY f.competencia"
+    reference_sql: "SELECT sum(CASE WHEN competencia LIKE '2024-%' THEN kwh_faturado END) AS kwh_2024, sum(CASE WHEN competencia LIKE '2025-%' THEN kwh_faturado END) AS kwh_2025 FROM sem_faturamento_mensal WHERE cod_uc = '0003'"
     expected_status: answered
     follow_up_of: null
-    notes: "Consumo vs ano anterior, pedido da Camila (case p. 5; RESUMO §1.7). Série mensal; quem soma por ano é a resposta, com as linhas."
-    revisado_por: null
+    notes: "Consumo contra o ano anterior, pedido da Camila (case p. 5; RESUMO §1.7). A pergunta pede o total de cada ano, e a soma é feita no SQL, não na resposta (o LLM não faz contas)."
+    revisado_por: Perylo
 
   - id: G062
     question: "A UC 0003 teve falta de luz na rua em 2025?"
@@ -637,8 +637,8 @@ itens:
   - id: G066
     question: "Quanto o efeito bandeira contribuiu para a variação da receita entre 2024-01/2024-12 e 2025-01/2025-12?"
     category: case
-    reference_sql: "SELECT sum(efeito_bandeira) AS efeito_bandeira, sum(efeito_preco) AS efeito_preco, sum(receita_atual - receita_base) AS variacao FROM sem_receita_decomposicao WHERE periodo_base = '2024-01/2024-12' AND periodo_atual = '2025-01/2025-12'"
+    reference_sql: "SELECT sum(efeito_bandeira) AS efeito_bandeira FROM sem_receita_decomposicao WHERE periodo_base = '2024-01/2024-12' AND periodo_atual = '2025-01/2025-12'"
     expected_status: answered
     follow_up_of: null
-    notes: "Versão com períodos explícitos da pergunta do Henrique (G060). Os efeitos são lidos e somados, nunca recalculados. A receita da decomposição é de energia, sem tributos (DEC-023)."
-    revisado_por: null
+    notes: "Versão com períodos explícitos da pergunta do Henrique (G060). A pergunta pede só o efeito bandeira; o efeito preço e a variação total são contexto opcional para a resposta. Os efeitos são lidos e somados, nunca recalculados. A receita da decomposição é de energia, sem tributos (DEC-023)."
+    revisado_por: Perylo

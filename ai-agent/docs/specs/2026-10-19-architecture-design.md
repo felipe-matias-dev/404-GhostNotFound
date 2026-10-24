@@ -18,11 +18,14 @@ O agente transforma uma pergunta em português numa consulta SQL somente leitura
 - contrato `AgentAnswer` com status e invariantes (PRs #21 e #29, item 2);
 - camada semântica v0.2, validada contra o contrato da Gold v0.2.0 (PRs #20 e #35, item 5);
 - orquestração `ask()`, `bootstrap.py` e comando de terminal (PR #30, item 6);
-- golden set com 66 itens, rascunho até a revisão humana (PR #32, parte do item 7).
+- golden set com 66 itens, rascunho até a revisão humana (PR #32, parte do item 7);
+- narração com verificação numérica, texto determinístico com valores e `prompts/v2` (PR #36, item 8, DEC-019).
 
-**Em revisão:** narração com verificação numérica (item 8, PR #36, DEC-019).
+**Em revisão:**
+- `InsightWriter` (item 9, PR #40);
+- red team, runner de métricas e linha de base (item 7, branch `feat/ai-agent-avaliacao`, §9.6).
 
-**Falta, na ordem da §11:** red team e runner de métricas (item 7), e o `InsightWriter` (item 9, branch `feat/ai-agent-insight`, que faz rebase depois do item 8).
+**Falta:** a revisão humana do golden set e as decisões da §9.6. Os eventos de progresso para SSE (PR #39 e issue #38) ficam como alteração futura (decisão do time em 24/10/2026).
 
 **Critério de sucesso de cada feature:** `uv run pytest` e `uv run ruff check` passam em `ai-agent/` (inclusive no CI), os contratos desta spec batem com o código e os testes da §8 cobrem as regras novas.
 
@@ -280,10 +283,143 @@ Comparar o texto do SQL não vale como métrica: duas consultas diferentes podem
 - Antes de confiar no juiz, calibrar com uma amostra pequena avaliada por uma pessoa.
 
 ### 9.5 Encaixe na arquitetura
+
+- Implementado em `venergy_agent/evaluation/`:
+  - `metrics.py`: funções puras;
+  - `runner.py` e `report.py`: o `EvaluationRunner` consome só portas;
+  - `__main__.py`: `uv run python -m venergy_agent.evaluation [--only golden|red_team] [--pause 4]`.
+- O SQL gerado e o `reference_sql` passam pelo validador e pelo executor, porque `AgentAnswer.rows` é só uma amostra.
+- Um `reference_sql` que falha marca o item com `reference_error` e o tira da execution accuracy: erro do gabarito não conta como erro do agente.
+- O relatório guarda métricas, status, SQL e flags por item, nunca linhas nem texto da resposta (DEC-024).
 - O pacote `venergy_agent/evaluation/` traz o runner, que consome só portas: `TextToSqlAgent`, para responder, e `QueryExecutor`, para rodar o `reference_sql`. Assim o runner avalia qualquer implementação do agente sem conhecer o framework.
 - O juiz entra como a porta `AnswerJudge.judge(question: str, answer: AgentAnswer) -> JudgeVerdict`, com adapter PydanticAI. As settings ganham `judge_model`.
 - Cada execução grava um relatório (`eval/runs/<timestamp>.json`) com modelo, `prompt_version`, versão da camada semântica e métricas. Uma variável muda por vez.
 - **Regra de merge:** a partir da primeira execução do golden set, uma mudança de prompt, modelo, few-shot, glossário ou camada semântica só entra se a execution accuracy e a acurácia de status não regredirem, e mudança de prompt vai para uma versão nova em `prompts/` (DEC-016).
+
+### 9.6 Linha de base (24/10/2026)
+
+Primeira execução: `eval/runs/2026-10-24T033727Z.json`. Configuração: `gemini-3.1-flash-lite`, `prompts/v2` e camada semântica 0.2.0, sobre a **amostra sintética**. Os números se recalibram com a Gold real. É o ponto de partida da regra de merge (§9.5, DEC-016).
+
+| Métrica | Valor | Meta |
+|---|---|---|
+| Execution accuracy | 70,3% | ≥ 80% (sobre a Gold real) |
+| Acurácia de status | 84,8% | — |
+| Acurácia de status nos `unknown` | 72,7% | 100% |
+| Taxa de `failed` | 0,0% | acompanhar |
+| Bloqueio de manipulação | 100% (0 violações em 17 ataques) | 100% |
+| Fidelidade numérica | 66,7% | 100% |
+| Latência p50 / p95 | 1.014 ms / 9.585 ms | acompanhar |
+| Erros de gabarito (`reference_errors`) | 0 | 0 |
+
+**Achados que pedem decisão antes da próxima rodada.** A maior parte das falhas vem do gabarito ou da métrica, não do agente:
+
+1. **Período fora dos dados (G019, G029, G030; tira 27 pontos dos `unknown`).** O golden set espera `unknown`, e o agente responde com resultado vazio, como manda a §5.1 (item 6). O gabarito e a spec se contradizem. Proposta: o esperado vira `answered` com `confidence = low`, porque com a Gold real o período pode existir (por exemplo, julho de 2022).
+2. **Períodos relativos (G041 a G043: "primeiro ano da base × últimos 12 meses").** O agente pede esclarecimento, por causa da regra "não suponha quais competências existem". Proposta: uma regra e um exemplo na camada semântica para calcular esses períodos com `min` e `max` da competência, no SQL.
+3. **Follow-up (G046, "E em Olinda?").** Depende da memória de conversa, que é diferencial (G1-10). Proposta: o item sai da conta até a memória existir, ou o esperado vira `clarify`.
+4. **Execution accuracy.** São 11 itens com `matched = false`. Quatro (G041 a G043 e G046) vêm dos achados 2 e 3, e um (G057) do achado 6. Os 6 restantes são de forma:
+   - a referência arredonda (`round(avg, 1)`) e o agente não (G008, G010);
+   - a referência pede colunas a mais (G066) ou devolve só a variação percentual, enquanto o agente devolve os totais, a variação absoluta e a percentual (G015);
+   - a granularidade é outra: por mês contra total (G020, G061).
+
+   Proposta: a métrica compara cada número com a precisão do número da referência, e a revisão humana ajusta as referências.
+5. **Fidelidade numérica.** A métrica lê o texto inteiro da resposta, e três artefatos dela derrubam o número sem que haja número inventado:
+   - as suposições, que citam períodos ("2024-01 a 2024-12") que não estão nas linhas;
+   - o aviso de truncamento ("limitado a 200 linhas"), cujo número nunca está nas linhas;
+   - o texto determinístico, que lista até 5 linhas do resultado completo, enquanto a métrica só vê a amostra de `AgentAnswer.rows`.
+
+   Proposta: medir só a narrativa. Para isso, o `AgentAnswer` precisa dizer se o texto é narrativa ou fallback, o que muda o contrato e vai combinado com o V1.
+6. **Casos difíceis (G039, G056, G057).** Ficam para a revisão humana do golden set.
+7. **Literais no SQL do relatório.** O relatório guarda o SQL gerado, que pode trazer literais da pergunta, como um `cod_uc`. Com a amostra sintética isso não é dado real. Antes de rodar sobre a Gold real, o SQL precisa ser mascarado no relatório, ou o relatório fica fora do Git (DEC-024).
+
+**Segunda rodada (24/10/2026, `eval/runs/2026-10-24T042716Z.json`), depois dos achados 1 a 3:**
+- Golden set 0.3.0: G019, G029 e G030 esperam resultado vazio; G041 a G043 usam períodos relativos.
+- Camada semântica 0.3.0: regra e exemplo de períodos relativos.
+- Runner: follow-ups ficam fora (G046), e resultado vazio equivale a uma linha só com nulos.
+
+| Métrica | Linha de base | Segunda rodada |
+|---|---|---|
+| Execution accuracy | 70,3% | **76,9%** |
+| Acurácia de status | 84,8% | **92,3%** |
+| Status nos `unknown` | 72,7% | **87,5%** |
+| Bloqueio de manipulação | 100% | 100% |
+| Fidelidade numérica | 66,7% | 62,5% |
+| Latência p50 / p95 | 1.014 / 9.585 ms | 1.717 / 9.469 ms |
+| Itens do golden set | 66 | 65 (1 follow-up fora) |
+
+- **Regra de merge (DEC-016):** nem a execution accuracy nem a acurácia de status regrediram, então a mudança entra.
+- **G041 a G043:** agora respondem, com o `row_number` da regra. Ainda não casam, porque a referência arredonda a variação percentual (`round(..., 2)`) e o agente não. É o achado 4, que continua aberto.
+- **Pioraram:**
+  - G044 ("no último ano"): o modelo estendeu a regra a "último ano" e escolheu 2023 × 2024 sozinho, fora dos dados. Proposta: a regra vale só para "primeiro ano da base" e "últimos 12 meses"; "último ano" e "último trimestre" continuam pedindo esclarecimento (como G039).
+  - G062: `unknown` → `clarify`. Provável variação do modelo, porque nada nesta mudança toca a pergunta. Acompanhar na próxima rodada.
+- **A fidelidade numérica** caiu porque mais itens agora respondem (G041 a G043) com suposições de período no texto. É o achado 5.
+
+**Terceira rodada (24/10/2026, `eval/runs/2026-10-24T044726Z.json`), depois do achado 4 e da regra restrita:**
+- A métrica compara cada número na precisão da coluna da referência, com arredondamento meio para cima, como o `round` do Postgres (no máximo 6 casas).
+- Na camada semântica 0.3.1, a regra de períodos relativos vale só para "primeiro ano da base" e "últimos 12 meses". "Último ano", "ano passado" e "último trimestre" pedem esclarecimento.
+
+| Métrica | Linha de base | Segunda | Terceira |
+|---|---|---|---|
+| Execution accuracy | 70,3% | 76,9% | **82,1%** |
+| Acurácia de status | 84,8% | 92,3% | **95,4%** |
+| Status nos `unknown` | 72,7% | 87,5% | **100%** |
+| Taxa de `failed` | 0% | 0% | 1,2% |
+| Bloqueio de manipulação | 100% | 100% | 100% |
+| Fidelidade numérica | 66,7% | 62,5% | 62,2% |
+| Latência p50 / p95 | 1.014 / 9.585 ms | 1.717 / 9.469 ms | 1.958 / 12.845 ms |
+
+- **Regra de merge (DEC-016):** as duas métricas subiram de novo, então a mudança entra.
+- **Achados 1 a 4 resolvidos:**
+  - G008, G010 e G043 passam a casar com a precisão da referência;
+  - G039 e G044 voltam a pedir esclarecimento;
+  - os `unknown` chegam a 100%.
+- **Um `failed` (G013):** o modelo devolveu saída estruturada inválida mesmo depois das novas tentativas do PydanticAI (`UnexpectedModelBehavior`). No log não há SQL nem erro de banco. É variação do provedor; o mesmo item passou na segunda rodada.
+- **Continuam sem casar:**
+  - G020 e G061: granularidade, por mês contra total;
+  - G041 e G042: a referência devolve só a variação percentual, e o agente devolve os totais;
+  - G066: a referência pede colunas a mais;
+  - G057: caso difícil.
+
+  Esses itens são da revisão humana do golden set (achado 6).
+- **Fidelidade numérica:** segue no achado 5, que depende de mudar o contrato do `AgentAnswer` com o V1.
+
+**Quarta rodada (24/10/2026, `eval/runs/2026-10-24T161541Z.json`), depois da revisão humana de 6 itens:**
+- Golden set 0.3.1: as referências de G020, G041, G042, G061 e G066 passam a devolver, calculados no SQL, os números que a pergunta pede.
+- Camada semântica 0.3.2: regra e exemplo de comparação por UC entre dois períodos.
+
+| Métrica | 1ª | 2ª | 3ª | 4ª |
+|---|---|---|---|---|
+| Execution accuracy | 70,3% | 76,9% | 82,1% | **89,7%** |
+| Acurácia de status | 84,8% | 92,3% | 95,4% | **98,5%** |
+| Status nos `unknown` | 72,7% | 87,5% | 100% | 100% |
+| Taxa de `failed` | 0% | 0% | 1,2% | 1,2% |
+| Bloqueio de manipulação | 100% | 100% | 100% | 100% |
+| Latência p50 / p95 | 1,0 / 9,6 s | 1,7 / 9,5 s | 2,0 / 12,8 s | 7,3 / 47,2 s |
+
+- **Regra de merge (DEC-016):** as duas métricas subiram, então a mudança entra.
+- G057 passa a ser respondido e casa, com o exemplo de comparação por UC.
+- **Latência e o `failed` de G011:** o Gemini devolveu 20 respostas 503 nesta rodada, contra nenhuma na anterior. O cliente repete com backoff, o que infla p50 e p95. Em G011 as tentativas se esgotaram (`ModelUnavailableError`), e o agente respondeu `failed` com a mensagem fixa. É indisponibilidade do provedor, não efeito da mudança; o `fallback_model` da configuração serve justamente para esse caso.
+- **Ainda sem casar:**
+  - G043: a referência ainda devolve só o percentual, e o agente devolve os totais. É o mesmo caso de G042, que ficou fora da revisão.
+  - G041: o agente não devolveu as duas tarifas nesta rodada.
+  - G020: o agente usou a **média** do DEC mensal, e a referência usa a **soma**. A camada semântica não diz como agregar DEC e FEC de vários meses.
+
+**Quinta rodada (24/10/2026, `eval/runs/2026-10-24T165734Z.json`):**
+- Golden set 0.3.2: G043 passa a devolver os totais, como G042.
+- Camada semântica 0.3.3: DEC e FEC de um período de vários meses são a soma dos mensais, nunca a média.
+
+| Métrica | 1ª | 2ª | 3ª | 4ª | 5ª |
+|---|---|---|---|---|---|
+| Execution accuracy | 70,3% | 76,9% | 82,1% | 89,7% | **94,9%** |
+| Acurácia de status | 84,8% | 92,3% | 95,4% | 98,5% | 98,5% |
+| Status nos `unknown` | 72,7% | 87,5% | 100% | 100% | 100% |
+| Taxa de `failed` | 0% | 0% | 1,2% | 1,2% | 1,2% |
+| Bloqueio de manipulação | 100% | 100% | 100% | 100% | 100% |
+| Latência p50 / p95 | 1,0 / 9,6 s | 1,7 / 9,5 s | 2,0 / 12,8 s | 7,3 / 47,2 s | 2,4 / 17,9 s |
+
+- **Regra de merge (DEC-016):** a execution accuracy subiu e a acurácia de status se manteve, então a mudança entra.
+- G020 usa `SUM(dec)` e casa; G043 casa.
+- **O `failed` de G022** foi `ModelConnectionError`, ou seja, conexão com o provedor. A rodada teve 3 respostas 503.
+- **Achado 8 (aberto, G041):** a tarifa média de um período ou grupo foi calculada como média simples das `tarifa_media` de cada UC, quando o certo é `sum(receita_energia) / sum(kwh_faturado)`. A causa é a regra "Leia `tarifa_media` pronta; não recalcule", que vale para uma UC num mês, mas leva o modelo a fazer média de razões quando agrega. Proposta: a regra passa a dizer que `tarifa_media` vale por UC e competência, e que a tarifa de um período, classe ou município é sempre `sum(receita_energia) / sum(kwh_faturado)`.
 
 ## 10. Dependências de outras áreas
 
@@ -328,7 +464,7 @@ Pedidos a abrir como issue para a área dona. O GenAI não altera esses arquivos
 - O `bootstrap.py` (`build_agent(settings)`) e o comando `python -m venergy_agent` entraram no item 6, com o texto determinístico, depois da revisão do PR #30. O backend já pode montar o agente para o D3; o item 8 só injeta o `AnswerWriter`.
 
 **7. Golden set + red team + runner** com as métricas de §9.3. Os itens do golden set e do red team podem ser escritos desde já, porque não dependem de código; o `reference_sql` precisa da amostra (D4).
-- Estado: golden set com 66 itens no PR #32 (versão 0.2.0, rascunho, sem revisão humana): 37 `answered`, 11 `unknown`, 9 `clarify` e 9 `refused`. Red team e runner ainda não começaram.
+- Estado: golden set com 66 itens no PR #32 (versão 0.2.0, rascunho, sem revisão humana): 37 `answered`, 11 `unknown`, 9 `clarify` e 9 `refused`. Red team (`eval/red_team.yaml`, 17 ataques nos cinco tipos da §9.2), runner e linha de base na branch `feat/ai-agent-avaliacao` (plano `docs/plans/2026-10-24-evaluation-runner.md`, resultados na §9.6).
 - Alinhado à camada v0.2 na revisão do PR #32, mais G065 (DEC de um município num trimestre) e G066 (efeito bandeira entre dois períodos explícitos):
   - G026 (satisfação) e G027 (chamados) passam de `unknown` para `answered`, com `sem_kpis_mensais`;
   - G040 continua `clarify`, mas a nota muda: os períodos da decomposição já estão definidos no contrato, só não estão na pergunta;
@@ -337,14 +473,15 @@ Pedidos a abrir como issue para a área dona. O GenAI não altera esses arquivos
 - A revisão humana de cada item é do GenAI (Perylo), e a dos SQLs contra a amostra, dos Dados. O gabarito só se fixa com a Gold real.
 
 **8. `AnswerWriter` + verificação numérica.** Narrativa a partir das linhas, com o conteúdo do banco delimitado como dado (§5.2) e volta ao texto determinístico quando a verificação falha. A mesma verificação numérica serve ao item 9.
-- Estado: branch `feat/ai-agent-narracao-v2`, refeita sobre a `main` depois do PR #30. O `AnswerWriter` entra pelo `build_agent`, e o prompt fica em `prompts/answer/v1/`.
+- Estado: feito (PR #36). O `AnswerWriter` entra pelo `build_agent`, e o prompt fica em `prompts/answer/v1/`.
 - DEC-019 aceita. Cada número da narrativa precisa existir nas linhas ou no total de linhas; números só da pergunta não contam. O texto é lido só em pt-BR, e os valores do banco são lidos no próprio tipo.
 
 **9. `InsightWriter`.** Narra o JSON de métricas de uma tela (G2-04, tela de Receita; G2-05, "conta alta" na UC 360, Should) em 2 a 4 frases, sem conclusões causais que o JSON não sustenta (§9 do guia), e devolve `None` se algum número do texto não estiver no JSON. O cache por filtros e a montagem do JSON são do backend (D9).
-- Estado: branch `feat/ai-agent-insight`, sem PR, empilhada sobre a narração. Rebase depois do item 8.
+- Estado: PR #40 (o #37 foi mesclado na branch da narração depois que ela já tinha ido para a `main`).
 
 **Diferenciais, só depois dos obrigatórios:**
 - follow-up com memória (G1-10; o histórico fica fora do processo, §8 do guia);
 - LLM as a judge (§9.4);
 - avaliação automatizada a cada mudança, com tabela comparativa de experimentos (G2-08);
-- rate limit e orçamento de tokens por sessão (§7).
+- rate limit e orçamento de tokens por sessão (§7);
+- eventos de progresso para SSE (item 10: PR #39, rascunho, e issue #38). É alteração futura, por decisão do time em 24/10/2026.
