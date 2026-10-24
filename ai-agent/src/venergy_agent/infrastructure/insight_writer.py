@@ -1,6 +1,5 @@
-import json
 import secrets
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
 from pathlib import Path
 
 from pydantic_ai import Agent
@@ -36,7 +35,17 @@ class PydanticAiInsightWriter:
         except Exception:
             return None
         text = run.output.strip()
-        source = json.dumps(metrics, ensure_ascii=False, default=str, sort_keys=True)
-        if not text or unsupported_numbers(text, [source]):
+        if not text or unsupported_numbers(text, list(_metric_values(metrics))):
             return None
         return Insight(text=text, metrics_used=tuple(metrics.keys()))
+
+
+def _metric_values(value: object) -> Iterator[object]:
+    if isinstance(value, Mapping):
+        for item in value.values():
+            yield from _metric_values(item)
+    elif isinstance(value, list | tuple):
+        for item in value:
+            yield from _metric_values(item)
+    else:
+        yield value

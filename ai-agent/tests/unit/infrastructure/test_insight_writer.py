@@ -58,7 +58,7 @@ async def test_number_written_in_english_format_drops_the_insight():
     assert await writer(model).narrate("Receita", METRICS) is None
 
 
-async def test_numbers_inside_nested_metrics_and_their_keys_are_supported():
+async def test_numbers_inside_nested_metrics_are_supported():
     metrics = {"dec_por_municipio": {"Olinda": 0.6}, "competencias": ["2025-01", "2025-03"]}
     model, _ = narrating_model("Entre 2025-01 e 2025-03, Olinda teve DEC de 0,6 hora.")
 
@@ -85,3 +85,10 @@ async def test_unreadable_number_drops_the_insight_instead_of_raising():
     model, _ = narrating_model("As classes 1,2,3 tiveram queda de 4,0%.")
 
     assert await writer(model).narrate("Receita", METRICS) is None
+
+
+async def test_a_number_that_only_appears_in_a_metric_key_drops_the_insight():
+    metrics = {"receita_2024": 1.0}
+    model, _ = narrating_model("Em 2024 a receita ficou em 1,0.")
+
+    assert await writer(model).narrate("Receita", metrics) is None
