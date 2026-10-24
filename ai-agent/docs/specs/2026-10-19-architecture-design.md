@@ -331,6 +331,28 @@ Primeira execução: `eval/runs/2026-10-24T033727Z.json`. Configuração: `gemin
 6. **Casos difíceis (G039, G056, G057).** Ficam para a revisão humana do golden set.
 7. **Literais no SQL do relatório.** O relatório guarda o SQL gerado, que pode trazer literais da pergunta, como um `cod_uc`. Com a amostra sintética isso não é dado real. Antes de rodar sobre a Gold real, o SQL precisa ser mascarado no relatório, ou o relatório fica fora do Git (DEC-024).
 
+**Segunda rodada (24/10/2026, `eval/runs/2026-10-24T042716Z.json`), depois dos achados 1 a 3:**
+- Golden set 0.3.0: G019, G029 e G030 esperam resultado vazio; G041 a G043 usam períodos relativos.
+- Camada semântica 0.3.0: regra e exemplo de períodos relativos.
+- Runner: follow-ups ficam fora (G046), e resultado vazio equivale a uma linha só com nulos.
+
+| Métrica | Linha de base | Segunda rodada |
+|---|---|---|
+| Execution accuracy | 70,3% | **76,9%** |
+| Acurácia de status | 84,8% | **92,3%** |
+| Status nos `unknown` | 72,7% | **87,5%** |
+| Bloqueio de manipulação | 100% | 100% |
+| Fidelidade numérica | 66,7% | 62,5% |
+| Latência p50 / p95 | 1.014 / 9.585 ms | 1.717 / 9.469 ms |
+| Itens do golden set | 66 | 65 (1 follow-up fora) |
+
+- **Regra de merge (DEC-016):** nem a execution accuracy nem a acurácia de status regrediram, então a mudança entra.
+- **G041 a G043:** agora respondem, com o `row_number` da regra. Ainda não casam, porque a referência arredonda a variação percentual (`round(..., 2)`) e o agente não. É o achado 4, que continua aberto.
+- **Pioraram:**
+  - G044 ("no último ano"): o modelo estendeu a regra a "último ano" e escolheu 2023 × 2024 sozinho, fora dos dados. Proposta: a regra vale só para "primeiro ano da base" e "últimos 12 meses"; "último ano" e "último trimestre" continuam pedindo esclarecimento (como G039).
+  - G062: `unknown` → `clarify`. Provável variação do modelo, porque nada nesta mudança toca a pergunta. Acompanhar na próxima rodada.
+- **A fidelidade numérica** caiu porque mais itens agora respondem (G041 a G043) com suposições de período no texto. É o achado 5.
+
 ## 10. Dependências de outras áreas
 
 Pedidos a abrir como issue para a área dona. O GenAI não altera esses arquivos.
