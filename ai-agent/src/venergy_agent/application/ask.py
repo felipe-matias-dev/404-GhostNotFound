@@ -1,17 +1,20 @@
 import json
 import logging
 import time
+from decimal import Decimal
 from uuid import uuid4
 
 from pydantic import ValidationError
 
 from venergy_agent.application.ports import (
+    AnswerWriter,
     QueryExecutor,
     SqlGenerator,
     SqlValidator,
 )
 from venergy_agent.domain.answer import AgentAnswer, AnswerStatus, Confidence
 from venergy_agent.domain.errors import ErrorKind, QueryExecutionError, SqlRejected
+from venergy_agent.domain.numbers import unsupported_numbers
 from venergy_agent.domain.question import Question
 from venergy_agent.domain.semantic import SemanticLayer
 from venergy_agent.domain.sql import (
@@ -40,6 +43,10 @@ INTERNAL_FAILED = "Algo deu errado do nosso lado. Tente de novo em instantes."
 ATTEMPTS_FAILED = "Não consegui montar uma consulta válida depois de {attempts} tentativas."
 DATABASE_FAILED = "Não consegui consultar o banco agora. Tente de novo em instantes."
 CLARIFY_PREFIX = "Preciso de um esclarecimento antes de consultar: "
+FALLBACK_MAX_ROWS = 5
+FALLBACK_MAX_COLUMNS = 4
+MISSING_VALUE = "sem valor"
+TEXT_VALUE_MAX_CHARS = 120
 EMPTY_RESULT = (
     "Nenhum registro atende à consulta. O agente não distingue zero de dado ausente, "
     "então confira os filtros."
@@ -54,6 +61,7 @@ class AskUseCase:
         generator: SqlGenerator,
         validator: SqlValidator,
         executor: QueryExecutor,
+        answer_writer: AnswerWriter,
         max_question_chars: int,
         max_correction_attempts: int,
         answer_sample_rows: int,
@@ -64,6 +72,7 @@ class AskUseCase:
         self._generator = generator
         self._validator = validator
         self._executor = executor
+        self._answer_writer = answer_writer
         self._max_question_chars = max_question_chars
         self._max_attempts = max_correction_attempts
         self._sample_rows = answer_sample_rows
@@ -287,14 +296,9 @@ class AskUseCase:
         started: float,
     ) -> AgentAnswer:
         sample = result.rows[: self._sample_rows]
+        visible = result.model_copy(update={"rows": sample})
         text = self._deterministic_text(result, draft, validated)
-        self._log(
-            question.request_id,
-            question.session_id,
-            step="resposta",
-            status="determinista",
-            row_count=result.row_count,
-        )
+        text = await self._narrate(question, draft, visible, text)
 
         return AgentAnswer(
             answer=text,
@@ -314,6 +318,39 @@ class AskUseCase:
             latency_ms=_elapsed_ms(started),
         )
 
+    async def _narrate(
+        self,
+        question: Question,
+        draft: SqlDraft,
+        visible: QueryResult,
+        fallback: str,
+    ) -> str:
+        try:
+            narrative = await self._answer_writer.write(question, draft, visible)
+        except Exception as error:
+            self._log(
+                question.request_id,
+                question.session_id,
+                step="resposta",
+                status="narrativa_falhou",
+                error=type(error).__name__,
+            )
+            return fallback
+
+        values = [visible.row_count, *(value for row in visible.rows for value in row.values())]
+        unsupported = unsupported_numbers(narrative, values)
+        if unsupported:
+            self._log(
+                question.request_id,
+                question.session_id,
+                step="resposta",
+                status="verificacao_numerica_falhou",
+                unsupported=list(unsupported),
+            )
+            return fallback
+        self._log(question.request_id, question.session_id, step="resposta", status="narrativa_ok")
+        return narrative
+
     def _deterministic_text(
         self, result: QueryResult, draft: SqlDraft, validated: ValidatedQuery
     ) -> str:
@@ -321,6 +358,15 @@ class AskUseCase:
             text = EMPTY_RESULT
         else:
             text = f"A consulta devolveu {result.row_count} linha(s)."
+            if (
+                len(result.rows) <= FALLBACK_MAX_ROWS
+                and len(result.columns) <= FALLBACK_MAX_COLUMNS
+            ):
+                text += (
+                    " Resultado: "
+                    + "; ".join(_row_text(result.columns, row) for row in result.rows)
+                    + "."
+                )
         if result.truncated:
             text += (
                 f" O resultado foi limitado a {validated.applied_limit} linhas, "
@@ -401,6 +447,27 @@ class AskUseCase:
         line = {"request_id": request_id, "session_id": session_id, "step": step, "status": status}
         line.update(fields)
         logger.info(json.dumps(line, ensure_ascii=False, default=str))
+
+
+def _row_text(columns: tuple[str, ...], row: dict[str, object]) -> str:
+    return ", ".join(f"{column} = {_pt_br(row.get(column))}" for column in columns)
+
+
+def _pt_br(value: object) -> str:
+    if value is None:
+        return MISSING_VALUE
+    if isinstance(value, bool):
+        return "sim" if value else "não"
+    if isinstance(value, int | float | Decimal):
+        grouped = format(Decimal(str(value)), ",f")
+        return grouped.replace(",", "_").replace(".", ",").replace("_", ".")
+    return _shorten(str(value))
+
+
+def _shorten(text: str) -> str:
+    if len(text) <= TEXT_VALUE_MAX_CHARS:
+        return text
+    return text[: TEXT_VALUE_MAX_CHARS - 3] + "..."
 
 
 def _elapsed_ms(since: float) -> int:

@@ -15,19 +15,14 @@ O agente transforma uma pergunta em português numa consulta SQL somente leitura
 - executor somente leitura no Postgres (PR #8);
 - gerador de SQL com PydanticAI (PRs #13 e #14);
 - job do agente no CI (PR #8);
-- camada semântica validada contra o contrato da Gold (PR #20, item 5);
-- contrato `AgentAnswer` com status e invariantes (PR #21, item 2).
+- contrato `AgentAnswer` com status e invariantes (PRs #21 e #29, item 2);
+- camada semântica v0.2, validada contra o contrato da Gold v0.2.0 (PRs #20 e #35, item 5);
+- orquestração `ask()`, `bootstrap.py` e comando de terminal (PR #30, item 6);
+- golden set com 66 itens, rascunho até a revisão humana (PR #32, parte do item 7).
 
-**Em revisão, na ordem de merge** (cada uma sobre a anterior):
-1. PR #29: invariantes do `AgentAnswer` pedidas na revisão do PR #21 (texto em branco, `row_count >= 0`, `truncated` exige linhas).
-2. PR #31: ordem da DEC-018 e da DEC-020 no `decisoes.md`.
-3. Branch `feat/ai-agent-camada-semantica-v0.2`: camada semântica alinhada ao contrato v0.2.0 (já integra os PRs #29 e #31).
-4. PR #30: orquestração `ask()` (item 6), com o `bootstrap.py` e o comando de terminal.
-5. PR #32: golden set (item 7), já alinhado à camada v0.2. Continua rascunho até a revisão humana de cada item.
+**Em revisão:** narração com verificação numérica (item 8, PR #36, DEC-019).
 
-**Branches prontas, sem PR:** `feat/ai-agent-narracao` (item 8) e `feat/ai-agent-insight` (item 9), empilhadas sobre o contrato anterior; fazem rebase na `main` depois do PR #30.
-
-**Falta, na ordem da §11:** red team e runner de métricas (item 7), e os PRs dos itens 8 e 9.
+**Falta, na ordem da §11:** red team e runner de métricas (item 7), e o `InsightWriter` (item 9, branch `feat/ai-agent-insight`, que faz rebase depois do item 8).
 
 **Critério de sucesso de cada feature:** `uv run pytest` e `uv run ruff check` passam em `ai-agent/` (inclusive no CI), os contratos desta spec batem com o código e os testes da §8 cobrem as regras novas.
 
@@ -57,7 +52,7 @@ O agente transforma uma pergunta em português numa consulta SQL somente leitura
 ai-agent/
 ├── pyproject.toml
 ├── .env.example
-├── prompts/v1/                  # system.md e correction.md; versão em AgentSettings.prompt_version
+├── prompts/v1/, prompts/v2/     # system.md e correction.md; versão em AgentSettings.prompt_version (padrão v2)
 ├── semantic/                    # item 5: semantic_layer.yaml (do GenAI) e views.sql (gerado)
 ├── eval/                        # item 7: golden_set.yaml, red_team.yaml, runs/
 ├── src/venergy_agent/
@@ -168,6 +163,7 @@ O caso de uso `application/ask.py` implementa `TextToSqlAgent` encadeando as por
 6. **Resultado vazio** é `answered` com `confidence = low`. A resposta diz que nenhum registro atende aos filtros e repete as suposições, porque o agente não distingue "zero" de "dado ausente" (§6 do guia).
 7. **Texto da resposta.**
    - Item 6: texto determinístico, montado sem LLM (quantas linhas, as suposições e o aviso de truncamento), mais a amostra em `rows`.
+   - Quando o resultado é pequeno (até 5 linhas e 4 colunas), o texto determinístico traz os valores em pt-BR (`Resultado: total = 3.`; nulo vira "sem valor"). Assim a resposta tem o número mesmo quando a narrativa cai na verificação (DEC-019). Resultado maior fica só em `rows`.
    - Item 8: o `AnswerWriter` substitui esse texto por uma narrativa. Se a verificação numérica falhar (§7.3 do guia), volta para o texto determinístico.
 8. **Mensagens de `unknown`, `refused` e `failed`:** textos fixos em português, sem LLM, em `refused_reason` e em `answer`. O modelo não escreve o motivo de não ter respondido.
 9. **Logs estruturados:** uma linha JSON por etapa (stdlib `logging`), com `request_id`, `session_id`, número da tentativa, etapa, status, SQL, motivo ou tipo de erro, número de linhas, latência da etapa, modelo, tokens e `prompt_version` (§12 do guia). Sem a amostra de linhas, para não levar dado pessoal aos logs.
@@ -218,7 +214,7 @@ O validador é a primeira trava. A segunda é o banco: role somente leitura, com
 | `max_rows` | `200` | `> 0`; teto do `LIMIT` |
 | `query_timeout_seconds` | `10` | `> 0` |
 | `max_correction_attempts` | `3` | `1 ≤ n ≤ 3` |
-| `prompt_version` | `v1` | Pasta em `prompts/` |
+| `prompt_version` | `v2` | Pasta em `prompts/`. A v2 (23/10/2026) pede só as suposições que mudam o número da resposta; a v1 fica como registro |
 | `answer_sample_rows` | `20` | **Item 6.** `> 0`; linhas em `AgentAnswer.rows` e no `AnswerWriter` |
 | `semantic_layer_path` | `ai-agent/semantic/semantic_layer.yaml` | **Item 5.** Resolvido pelo caminho do pacote, como o `.env` |
 | `gold_contract_path` | `contracts/gold_schema.yaml` da raiz | **Item 5.** Idem. A imagem da API já copia `contracts/` (DEC-017) |
@@ -341,8 +337,8 @@ Pedidos a abrir como issue para a área dona. O GenAI não altera esses arquivos
 - A revisão humana de cada item é do GenAI (Perylo), e a dos SQLs contra a amostra, dos Dados. O gabarito só se fixa com a Gold real.
 
 **8. `AnswerWriter` + verificação numérica.** Narrativa a partir das linhas, com o conteúdo do banco delimitado como dado (§5.2) e volta ao texto determinístico quando a verificação falha. A mesma verificação numérica serve ao item 9.
-- Estado: branch `feat/ai-agent-narracao`, sem PR, empilhada sobre o contrato anterior. Rebase na `main` depois do PR #30.
-- A decidir antes do PR: DEC-019 (proposta, na branch). A narrativa só vale se cada número existir nas linhas. Falta confirmar a leitura de números em pt-BR e en, porque `1.234` pode ser mil ou um vírgula dois. Sugestão: ler só pt-BR, como as respostas são escritas, e tratar o resto como número ausente.
+- Estado: branch `feat/ai-agent-narracao-v2`, refeita sobre a `main` depois do PR #30. O `AnswerWriter` entra pelo `build_agent`, e o prompt fica em `prompts/answer/v1/`.
+- DEC-019 aceita. Cada número da narrativa precisa existir nas linhas ou no total de linhas; números só da pergunta não contam. O texto é lido só em pt-BR, e os valores do banco são lidos no próprio tipo.
 
 **9. `InsightWriter`.** Narra o JSON de métricas de uma tela (G2-04, tela de Receita; G2-05, "conta alta" na UC 360, Should) em 2 a 4 frases, sem conclusões causais que o JSON não sustenta (§9 do guia), e devolve `None` se algum número do texto não estiver no JSON. O cache por filtros e a montagem do JSON são do backend (D9).
 - Estado: branch `feat/ai-agent-insight`, sem PR, empilhada sobre a narração. Rebase depois do item 8.

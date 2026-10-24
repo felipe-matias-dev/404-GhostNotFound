@@ -1,5 +1,6 @@
 import json
 import logging
+from decimal import Decimal
 
 import pytest
 
@@ -71,6 +72,19 @@ class ScriptedExecutor:
         return outcome
 
 
+class FixedWriter:
+    def __init__(self, text=None, error=None):
+        self._text = text
+        self._error = error
+        self.calls = 0
+
+    async def write(self, question, draft, result):
+        self.calls += 1
+        if self._error:
+            raise self._error
+        return self._text
+
+
 class BrokenValidator:
     def validate(self, sql, allowed_views):
         raise ValueError("bug no validador")
@@ -85,7 +99,7 @@ def result(rows=({"total": 3},), row_count=None, truncated=False):
     )
 
 
-def use_case(layer, generator, executor=None, **settings):
+def use_case(layer, generator, executor=None, writer=None, **settings):
     values = {
         "max_question_chars": 500,
         "max_correction_attempts": 3,
@@ -97,6 +111,7 @@ def use_case(layer, generator, executor=None, **settings):
         generator=generator,
         validator=SqlglotValidator(dialect="postgres", max_rows=200, allowed_schema="gold"),
         executor=executor or ScriptedExecutor(result()),
+        answer_writer=writer or FixedWriter(error=RuntimeError("sem redator")),
         prompt_version="v1",
         configured_model=CONFIGURED,
         **values,
@@ -297,6 +312,7 @@ async def test_ask_never_raises_even_when_a_port_breaks(layer):
         generator=ScriptedGenerator(generation()),
         validator=BrokenValidator(),
         executor=ScriptedExecutor(result()),
+        answer_writer=FixedWriter(),
         max_question_chars=500,
         max_correction_attempts=3,
         answer_sample_rows=20,
@@ -308,6 +324,98 @@ async def test_ask_never_raises_even_when_a_port_breaks(layer):
 
     assert answer.status is AnswerStatus.FAILED
     assert answer.refused_reason == INTERNAL_FAILED
+
+
+# --- narrativa e verificação numérica -----------------------------------------------------
+
+
+async def test_narrative_with_supported_numbers_replaces_the_deterministic_text(layer):
+    writer = FixedWriter(text="Há 3 UCs cadastradas.")
+
+    answer = await use_case(layer, ScriptedGenerator(generation()), writer=writer).ask(
+        "quantas?", "s1"
+    )
+
+    assert answer.answer == "Há 3 UCs cadastradas."
+    assert writer.calls == 1
+
+
+async def test_narrative_with_an_invented_number_falls_back_to_the_deterministic_text(layer):
+    writer = FixedWriter(text="Há 999 UCs cadastradas.")
+
+    answer = await use_case(layer, ScriptedGenerator(generation()), writer=writer).ask(
+        "quantas?", "s1"
+    )
+
+    assert "999" not in answer.answer
+    assert answer.answer.startswith("A consulta devolveu 1 linha(s).")
+
+
+async def test_narrative_with_an_unreadable_number_falls_back_instead_of_failing(layer):
+    writer = FixedWriter(text="Classes 1,2,3 com 3 UCs.")
+
+    answer = await use_case(layer, ScriptedGenerator(generation()), writer=writer).ask(
+        "quantas?", "s1"
+    )
+
+    assert answer.status is AnswerStatus.ANSWERED
+    assert answer.answer.startswith("A consulta devolveu 1 linha(s).")
+
+
+def table(columns, *rows):
+    return QueryResult(
+        columns=columns,
+        rows=tuple(dict(zip(columns, row, strict=True)) for row in rows),
+        row_count=len(rows),
+        truncated=False,
+    )
+
+
+async def fallback_text(layer, query_result):
+    answer = await use_case(
+        layer, ScriptedGenerator(generation()), ScriptedExecutor(query_result)
+    ).ask("quantas?", "s1")
+    return answer.answer
+
+
+async def test_fallback_text_shows_the_values_of_a_small_result(layer):
+    text = await fallback_text(layer, table(("total",), (3,)))
+
+    assert text == "A consulta devolveu 1 linha(s). Resultado: total = 3."
+
+
+async def test_fallback_text_writes_numbers_in_pt_br_and_null_as_missing(layer):
+    query_result = table(
+        ("municipio", "receita", "dec"),
+        ("Olinda", Decimal("11079.18"), None),
+        ("Recife", Decimal("1234567.5"), 0.6),
+    )
+
+    text = await fallback_text(layer, query_result)
+
+    assert text.endswith(
+        "Resultado: municipio = Olinda, receita = 11.079,18, dec = sem valor; "
+        "municipio = Recife, receita = 1.234.567,5, dec = 0,6."
+    )
+
+
+async def test_fallback_text_omits_the_values_of_a_large_result(layer):
+    query_result = table(("total",), *[(n,) for n in range(6)])
+
+    text = await fallback_text(layer, query_result)
+
+    assert text == "A consulta devolveu 6 linha(s)."
+
+
+async def test_writer_error_falls_back_to_the_deterministic_text(layer):
+    writer = FixedWriter(error=RuntimeError("provedor caiu"))
+
+    answer = await use_case(layer, ScriptedGenerator(generation()), writer=writer).ask(
+        "quantas?", "s1"
+    )
+
+    assert answer.status is AnswerStatus.ANSWERED
+    assert answer.answer.startswith("A consulta devolveu")
 
 
 # --- logs ------------------------------------------------------------------------------
@@ -349,3 +457,27 @@ async def test_validation_and_execution_steps_log_their_own_latency(layer, caplo
     for step in ("validacao", "execucao"):
         (line,) = [entry for entry in lines if entry["step"] == step and "latency_ms" in entry]
         assert isinstance(line["latency_ms"], int) and line["latency_ms"] >= 0
+
+
+async def test_number_from_the_question_does_not_make_a_narrative_faithful(layer):
+    writer = FixedWriter(text="Há 3 UCs acima de 300 kWh.")
+
+    answer = await use_case(layer, ScriptedGenerator(generation()), writer=writer).ask(
+        "Quantas UCs estão acima de 300 kWh?", "s1"
+    )
+
+    assert "300" not in answer.answer
+    assert answer.answer.startswith("A consulta devolveu 1 linha(s).")
+
+
+async def test_long_text_values_are_shortened_in_the_fallback_answer(layer):
+    long_text = "x" * 300
+
+    answer = await use_case(
+        layer,
+        ScriptedGenerator(generation()),
+        ScriptedExecutor(result(rows=({"total": long_text},))),
+    ).ask("quantas?", "s1")
+
+    assert "x" * 300 not in answer.answer
+    assert "x" * 117 + "..." in answer.answer

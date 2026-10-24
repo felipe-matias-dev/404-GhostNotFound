@@ -9,7 +9,7 @@ from venergy_agent.domain.semantic import (
     SemanticLayer,
     ViewSpec,
 )
-from venergy_agent.domain.sql import AttemptFeedback
+from venergy_agent.domain.sql import AttemptFeedback, QueryResult, SqlDraft
 
 PLACEHOLDER = re.compile(r"\{\{(\w+)\}\}")
 REDACTED = "[redigido]"
@@ -45,7 +45,7 @@ def render_user_prompt(
     nonce: str,
 ) -> str:
     _require(nonce)
-    asked = _delimited("pergunta", question.text, nonce)
+    asked = delimited("pergunta", question.text, nonce)
     if feedback is None:
         return asked
     involved = [
@@ -53,9 +53,9 @@ def render_user_prompt(
     ] or list(layer.views)
     correction = _fill(
         correction_template,
-        sql_anterior=_delimited("dados", feedback.previous_sql, nonce),
+        sql_anterior=delimited("dados", feedback.previous_sql, nonce),
         tipo_erro=feedback.error_kind.value,
-        mensagem=_delimited("dados", feedback.message, nonce),
+        mensagem=delimited("dados", feedback.message, nonce),
         colunas="\n".join(_columns_line(view) for view in involved),
     )
     return f"{correction}\n\n{asked}"
@@ -77,7 +77,7 @@ def _view_block(view: ViewSpec, nonce: str) -> str:
         rows = "\n".join(
             json.dumps(row, ensure_ascii=False, default=str) for row in view.sample_rows
         )
-        lines += ["Linhas de exemplo:", _delimited("dados", rows, nonce)]
+        lines += ["Linhas de exemplo:", delimited("dados", rows, nonce)]
     return "\n".join(lines)
 
 
@@ -85,7 +85,7 @@ def _column_line(column: ColumnSpec, nonce: str) -> str:
     unit = f", {column.unit}" if column.unit else ""
     line = f"- {column.name} ({column.type}{unit}): {column.description}"
     if column.allowed_values:
-        values = _delimited("dados", ", ".join(column.allowed_values), nonce)
+        values = delimited("dados", ", ".join(column.allowed_values), nonce)
         line += f". Valores possíveis: {values}"
     return line
 
@@ -99,7 +99,7 @@ def _example_block(example: FewShotExample) -> str:
     return f"Pergunta: {example.question}\nStatus esperado: {example.expected_status.value}\n{sql}"
 
 
-def _delimited(tag: str, text: str, nonce: str) -> str:
+def delimited(tag: str, text: str, nonce: str) -> str:
     return f"<{tag}-{nonce}>\n{_redact(text, nonce)}\n</{tag}-{nonce}>"
 
 
@@ -118,3 +118,27 @@ def _mentions(sql: str, name: str) -> bool:
 
 def _fill(template: str, **values: str) -> str:
     return PLACEHOLDER.sub(lambda match: values.get(match.group(1), match.group(0)), template)
+
+
+def render_answer_system(template: str, nonce: str) -> str:
+    _require(nonce)
+    return _fill(template, nonce=nonce)
+
+
+def render_answer_user(question: Question, draft: SqlDraft, result: QueryResult, nonce: str) -> str:
+    _require(nonce)
+    rows = "\n".join(json.dumps(row, ensure_ascii=False, default=str) for row in result.rows)
+    assumptions = "\n".join(f"- {item}" for item in draft.assumptions) or "(nenhuma)"
+    data = "\n".join(
+        [
+            f"colunas: {', '.join(result.columns)}",
+            f"total de linhas: {result.row_count}",
+            "suposições declaradas:",
+            assumptions,
+            "linhas:",
+            rows,
+        ]
+    )
+    return "\n\n".join(
+        [delimited("pergunta", question.text, nonce), delimited("dados", data, nonce)]
+    )
