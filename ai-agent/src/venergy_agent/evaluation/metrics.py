@@ -1,7 +1,7 @@
 import math
 from collections import Counter
-from collections.abc import Mapping, Sequence
-from decimal import Decimal
+from collections.abc import Iterator, Mapping, Sequence
+from decimal import Decimal, InvalidOperation
 
 from venergy_agent.application.ports import SqlValidator
 from venergy_agent.domain.answer import AgentAnswer
@@ -24,19 +24,37 @@ def _normalize(value: object) -> object:
     if isinstance(value, bool):
         return str(value)
     if isinstance(value, int | float | Decimal):
-        return Decimal(str(value)).quantize(_PLACES)
+        number = Decimal(str(value))
+        if not number.is_finite():
+            return str(number)
+        try:
+            return number.quantize(_PLACES)
+        except InvalidOperation:
+            return str(number)
     return str(value)
 
 
-def _columns(rows: Sequence[Mapping[str, object]]) -> list[list[object]]:
+def _columns(rows: Sequence[Mapping[str, object]]) -> list[tuple[object, ...]]:
     names = list(rows[0].keys())
-    return [[_normalize(row[name]) for row in rows] for name in names]
+    return [tuple(_normalize(row[name]) for row in rows) for name in names]
 
 
-def _same(left: list[object], right: list[object], ordered: bool) -> bool:
+def _same(left: Sequence[object], right: Sequence[object], ordered: bool) -> bool:
     if ordered:
-        return left == right
-    return Counter(map(repr, left)) == Counter(map(repr, right))
+        return list(left) == list(right)
+    return Counter(left) == Counter(right)
+
+
+def _mappings(
+    options: list[list[int]], used: frozenset[int] = frozenset()
+) -> Iterator[tuple[int, ...]]:
+    if not options:
+        yield ()
+        return
+    for index in options[0]:
+        if index not in used:
+            for rest in _mappings(options[1:], used | {index}):
+                yield (index, *rest)
 
 
 def results_match(
@@ -49,20 +67,17 @@ def results_match(
     if not reference:
         return True
     candidates = _columns(generated)
-    used: set[int] = set()
-    for expected in _columns(reference):
-        match = next(
-            (
-                index
-                for index, column in enumerate(candidates)
-                if index not in used and _same(column, expected, ordered)
-            ),
-            None,
-        )
-        if match is None:
-            return False
-        used.add(match)
-    return True
+    expected = _columns(reference)
+    options = [
+        [index for index, column in enumerate(candidates) if _same(column, wanted, ordered)]
+        for wanted in expected
+    ]
+    reference_rows = list(zip(*expected, strict=True))
+    for mapping in _mappings(options):
+        generated_rows = list(zip(*(candidates[index] for index in mapping), strict=True))
+        if _same(generated_rows, reference_rows, ordered):
+            return True
+    return False
 
 
 def is_violation(sql: str | None, allowed_views: frozenset[str], validator: SqlValidator) -> bool:
