@@ -20,9 +20,9 @@ O agente transforma uma pergunta em português numa consulta SQL somente leitura
 - orquestração `ask()`, `bootstrap.py` e comando de terminal (PR #30, item 6);
 - golden set com 66 itens, rascunho até a revisão humana (PR #32, parte do item 7).
 
-**Em revisão:** narração com verificação numérica (item 8, PR #36, DEC-019).
+**Em revisão:** narração com verificação numérica (item 8, PR #36, DEC-019) e, sobre ela, o `InsightWriter` (item 9, branch `feat/ai-agent-insight-v2`).
 
-**Falta, na ordem da §11:** red team e runner de métricas (item 7), e o `InsightWriter` (item 9, branch `feat/ai-agent-insight`, que faz rebase depois do item 8).
+**Falta, na ordem da §11:** red team e runner de métricas (item 7). Depois, os diferenciais.
 
 **Critério de sucesso de cada feature:** `uv run pytest` e `uv run ruff check` passam em `ai-agent/` (inclusive no CI), os contratos desta spec batem com o código e os testes da §8 cobrem as regras novas.
 
@@ -140,7 +140,7 @@ São `typing.Protocol` assíncronos, exceto `SqlValidator`, que é síncrono por
 | `SqlValidator` | `validate(sql: str, allowed_views: frozenset[str]) -> ValidatedQuery` | Levanta `SqlRejected`; adapter `SqlglotValidator` (§6) |
 | `QueryExecutor` | `execute(query: ValidatedQuery) -> QueryResult` | Levanta `QueryExecutionError` para erros que o modelo pode corrigir; os demais erros do banco (permissão, somente leitura, conexão) propagam sem classificação |
 | `AnswerWriter` | `write(question: Question, draft: SqlDraft, result: QueryResult) -> str` | Item 8. Resposta só a partir das linhas |
-| `InsightWriter` | `narrate(screen: str, metrics: Mapping[str, object]) -> Insight` | Item 9. O LLM só narra números prontos. O item 9 muda o retorno para `Insight \| None`: `None` quando a verificação numérica falha |
+| `InsightWriter` | `narrate(screen: str, metrics: Mapping[str, object]) -> Insight \| None` | Item 9. O LLM só narra números prontos. `None` quando a verificação numérica falha ou o provedor dá erro, e a tela aparece sem insight |
 
 ### 5.1 Fluxo do `ask()` (item 6)
 
@@ -341,7 +341,7 @@ Pedidos a abrir como issue para a área dona. O GenAI não altera esses arquivos
 - DEC-019 aceita. Cada número da narrativa precisa existir nas linhas ou no total de linhas; números só da pergunta não contam. O texto é lido só em pt-BR, e os valores do banco são lidos no próprio tipo.
 
 **9. `InsightWriter`.** Narra o JSON de métricas de uma tela (G2-04, tela de Receita; G2-05, "conta alta" na UC 360, Should) em 2 a 4 frases, sem conclusões causais que o JSON não sustenta (§9 do guia), e devolve `None` se algum número do texto não estiver no JSON. O cache por filtros e a montagem do JSON são do backend (D9).
-- Estado: branch `feat/ai-agent-insight`, sem PR, empilhada sobre a narração. Rebase depois do item 8.
+- Estado: branch `feat/ai-agent-insight-v2`, refeita sobre o PR #36. Usa a mesma verificação da DEC-019: o texto é lido em pt-BR, e o JSON de métricas é a fonte dos números, inclusive os aninhados. A porta devolve `Insight | None`. A montagem do JSON, o cache e a ligação no composition root são do backend (D9).
 
 **Diferenciais, só depois dos obrigatórios:**
 - follow-up com memória (G1-10; o histórico fica fora do processo, §8 do guia);
