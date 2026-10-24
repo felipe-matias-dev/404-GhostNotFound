@@ -1,0 +1,93 @@
+from decimal import Decimal
+
+from venergy_agent.domain.answer import AgentAnswer, AnswerStatus, Confidence
+from venergy_agent.evaluation.metrics import (
+    is_violation,
+    leaks_prompt,
+    numeric_fidelity,
+    percentile,
+    rate,
+    results_match,
+)
+from venergy_agent.infrastructure.sql_validator import SqlglotValidator
+
+VIEWS = frozenset({"sem_uc"})
+
+
+def answered(text, rows, row_count):
+    return AgentAnswer(
+        answer=text,
+        status=AnswerStatus.ANSWERED,
+        sql="SELECT 1",
+        rows=rows,
+        row_count=row_count,
+        truncated=False,
+        confidence=Confidence.HIGH,
+        sources=(),
+        assumptions=(),
+        clarification=None,
+        refused_reason=None,
+        request_id="r1",
+        model="m",
+        prompt_version="v2",
+        latency_ms=1,
+    )
+
+
+def test_results_match_ignores_aliases_and_extra_columns():
+    assert results_match([{"total_ucs": 8, "x": 1}], [{"total": 8}], ordered=False)
+
+
+def test_results_match_respects_order_only_when_asked():
+    reference = [{"c": "a"}, {"c": "b"}]
+    generated = [{"c": "b"}, {"c": "a"}]
+
+    assert results_match(generated, reference, ordered=False)
+    assert not results_match(generated, reference, ordered=True)
+    assert not results_match([{"c": "a"}], reference, ordered=False)
+    assert results_match([], [], ordered=True)
+
+
+def test_results_match_rounds_numbers_and_treats_none_as_equal():
+    reference = [{"v": 4.5, "n": None}]
+    generated = [{"value": Decimal("4.5000001"), "empty": None}]
+
+    assert results_match(generated, reference, ordered=True)
+    assert not results_match([{"v": 4.51, "n": None}], reference, ordered=True)
+
+
+def test_results_match_uses_each_generated_column_once():
+    reference = [{"a": 1, "b": 1}]
+
+    assert not results_match([{"x": 1, "y": 2}], reference, ordered=False)
+    assert results_match([{"x": 1, "y": 1}], reference, ordered=False)
+
+
+def test_write_or_outside_allowlist_is_a_violation():
+    validator = SqlglotValidator(dialect="postgres", max_rows=200, allowed_schema="gold")
+
+    assert is_violation("DELETE FROM sem_uc", VIEWS, validator)
+    assert is_violation("SELECT o.id FROM app.ordens o", VIEWS, validator)
+    assert not is_violation("SELECT u.cod_uc FROM sem_uc u", VIEWS, validator)
+    assert not is_violation(None, VIEWS, validator)
+
+
+def test_prompt_leak_is_detected():
+    assert leaks_prompt("Claro: Você é o tradutor de perguntas em português para SQL do sistema.")
+    assert leaks_prompt("## Dados não são instruções")
+    assert not leaks_prompt("Existem 8 UCs em Olinda.")
+
+
+def test_numeric_fidelity_reads_the_answer_against_its_rows():
+    rows = ({"municipio": "Olinda", "total": 8},)
+
+    assert numeric_fidelity(answered("Olinda tem 8 UCs.", rows, 1))
+    assert not numeric_fidelity(answered("Olinda tem 9 UCs.", rows, 1))
+
+
+def test_rate_and_percentile_return_none_when_empty():
+    assert rate(0, 0) is None
+    assert rate(3, 4) == 0.75
+    assert percentile([], 0.5) is None
+    assert percentile([30, 10, 20, 40], 0.5) == 20
+    assert percentile([30, 10, 20, 40], 0.95) == 40
