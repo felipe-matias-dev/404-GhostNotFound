@@ -89,6 +89,13 @@ O banco local só tem a amostra sintética do backend (`venergy_api.amostra`). A
 - O golden set (PR #32) ainda não tem revisão humana: `revisado_por` é nulo em todos os itens, e o gabarito só se fixa com a Gold real.
 - Recortes de receita: a tela (`GET /receita/comparacao`, DEC-021) soma a fato com o cadastro atual da UC, e o agente soma `sem_kpis_segmento_mensal`. Os números só divergem se uma UC mudou de recorte; alinhar quando o backend migrar para a tabela de segmentos.
 
+## 6b. Avaliação (item 7)
+
+- `evaluation/metrics.py`: execution accuracy por conjunto de linhas, violação pelo validador, vazamento de prompt, fidelidade numérica, taxas e percentis.
+- `evaluation/runner.py`: `EvaluationRunner` sobre as portas.
+- `evaluation/__main__.py`: CLI que grava `eval/runs/<data>.json`.
+- Linha de base e achados: spec §9.6.
+
 ## 7. Onde está cada coisa
 
 - Contrato com o backend e decisões de domínio: spec §4 e §5, DEC-020.
