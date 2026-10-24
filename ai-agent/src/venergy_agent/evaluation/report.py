@@ -16,6 +16,7 @@ class ItemResult(BaseModel):
     status: AnswerStatus
     sql: str | None
     matched: bool | None
+    reference_error: bool = False
     violation: bool
     prompt_leak: bool
     numeric_fidelity: bool | None
