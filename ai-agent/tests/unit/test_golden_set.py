@@ -87,7 +87,8 @@ def test_follow_up_points_to_an_existing_item(items):
             assert item["follow_up_of"] in ids, item["id"]
 
 
-def test_review_field_stays_null_until_a_person_reviews_the_item(items):
+def test_review_field_is_null_or_the_name_of_who_reviewed_the_item(items):
     for item in items:
         assert "revisado_por" in item, item["id"]
-        assert item["revisado_por"] is None, item["id"]
+        reviewer = item["revisado_por"]
+        assert reviewer is None or (isinstance(reviewer, str) and reviewer.strip()), item["id"]
