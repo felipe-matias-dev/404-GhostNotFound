@@ -1,5 +1,6 @@
 import json
 import logging
+from decimal import Decimal
 
 from ask_fakes import (
     CONFIGURED,
@@ -28,6 +29,7 @@ from venergy_agent.application.ask import (
 )
 from venergy_agent.domain.answer import AnswerStatus, Confidence
 from venergy_agent.domain.errors import ErrorKind, QueryExecutionError
+from venergy_agent.domain.sql import QueryResult
 
 # --- entrada -----------------------------------------------------------------------------
 
@@ -271,6 +273,51 @@ async def test_narrative_with_an_unreadable_number_falls_back_instead_of_failing
 
     assert answer.status is AnswerStatus.ANSWERED
     assert answer.answer.startswith("A consulta devolveu 1 linha(s).")
+
+
+def table(columns, *rows):
+    return QueryResult(
+        columns=columns,
+        rows=tuple(dict(zip(columns, row, strict=True)) for row in rows),
+        row_count=len(rows),
+        truncated=False,
+    )
+
+
+async def fallback_text(layer, query_result):
+    answer = await use_case(
+        layer, ScriptedGenerator(generation()), ScriptedExecutor(query_result)
+    ).ask("quantas?", "s1")
+    return answer.answer
+
+
+async def test_fallback_text_shows_the_values_of_a_small_result(layer):
+    text = await fallback_text(layer, table(("total",), (3,)))
+
+    assert text == "A consulta devolveu 1 linha(s). Resultado: total = 3."
+
+
+async def test_fallback_text_writes_numbers_in_pt_br_and_null_as_missing(layer):
+    query_result = table(
+        ("municipio", "receita", "dec"),
+        ("Olinda", Decimal("11079.18"), None),
+        ("Recife", Decimal("1234567.5"), 0.6),
+    )
+
+    text = await fallback_text(layer, query_result)
+
+    assert text.endswith(
+        "Resultado: municipio = Olinda, receita = 11.079,18, dec = sem valor; "
+        "municipio = Recife, receita = 1.234.567,5, dec = 0,6."
+    )
+
+
+async def test_fallback_text_omits_the_values_of_a_large_result(layer):
+    query_result = table(("total",), *[(n,) for n in range(6)])
+
+    text = await fallback_text(layer, query_result)
+
+    assert text == "A consulta devolveu 6 linha(s)."
 
 
 async def test_writer_error_falls_back_to_the_deterministic_text(layer):
