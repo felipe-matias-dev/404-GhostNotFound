@@ -46,6 +46,7 @@ CLARIFY_PREFIX = "Preciso de um esclarecimento antes de consultar: "
 FALLBACK_MAX_ROWS = 5
 FALLBACK_MAX_COLUMNS = 4
 MISSING_VALUE = "sem valor"
+TEXT_VALUE_MAX_CHARS = 120
 EMPTY_RESULT = (
     "Nenhum registro atende à consulta. O agente não distingue zero de dado ausente, "
     "então confira os filtros."
@@ -460,7 +461,13 @@ def _pt_br(value: object) -> str:
     if isinstance(value, int | float | Decimal):
         grouped = format(Decimal(str(value)), ",f")
         return grouped.replace(",", "_").replace(".", ",").replace("_", ".")
-    return str(value)
+    return _shorten(str(value))
+
+
+def _shorten(text: str) -> str:
+    if len(text) <= TEXT_VALUE_MAX_CHARS:
+        return text
+    return text[: TEXT_VALUE_MAX_CHARS - 3] + "..."
 
 
 def _elapsed_ms(since: float) -> int:
