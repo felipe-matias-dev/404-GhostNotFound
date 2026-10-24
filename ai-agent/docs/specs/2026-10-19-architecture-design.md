@@ -382,6 +382,27 @@ Primeira execução: `eval/runs/2026-10-24T033727Z.json`. Configuração: `gemin
   Esses itens são da revisão humana do golden set (achado 6).
 - **Fidelidade numérica:** segue no achado 5, que depende de mudar o contrato do `AgentAnswer` com o V1.
 
+**Quarta rodada (24/10/2026, `eval/runs/2026-10-24T161541Z.json`), depois da revisão humana de 6 itens:**
+- Golden set 0.3.1: as referências de G020, G041, G042, G061 e G066 passam a devolver, calculados no SQL, os números que a pergunta pede.
+- Camada semântica 0.3.2: regra e exemplo de comparação por UC entre dois períodos.
+
+| Métrica | 1ª | 2ª | 3ª | 4ª |
+|---|---|---|---|---|
+| Execution accuracy | 70,3% | 76,9% | 82,1% | **89,7%** |
+| Acurácia de status | 84,8% | 92,3% | 95,4% | **98,5%** |
+| Status nos `unknown` | 72,7% | 87,5% | 100% | 100% |
+| Taxa de `failed` | 0% | 0% | 1,2% | 1,2% |
+| Bloqueio de manipulação | 100% | 100% | 100% | 100% |
+| Latência p50 / p95 | 1,0 / 9,6 s | 1,7 / 9,5 s | 2,0 / 12,8 s | 7,3 / 47,2 s |
+
+- **Regra de merge (DEC-016):** as duas métricas subiram, então a mudança entra.
+- G057 passa a ser respondido e casa, com o exemplo de comparação por UC.
+- **Latência e o `failed` de G011:** o Gemini devolveu 20 respostas 503 nesta rodada, contra nenhuma na anterior. O cliente repete com backoff, o que infla p50 e p95. Em G011 as tentativas se esgotaram (`ModelUnavailableError`), e o agente respondeu `failed` com a mensagem fixa. É indisponibilidade do provedor, não efeito da mudança; o `fallback_model` da configuração serve justamente para esse caso.
+- **Ainda sem casar:**
+  - G043: a referência ainda devolve só o percentual, e o agente devolve os totais. É o mesmo caso de G042, que ficou fora da revisão.
+  - G041: o agente não devolveu as duas tarifas nesta rodada.
+  - G020: o agente usou a **média** do DEC mensal, e a referência usa a **soma**. A camada semântica não diz como agregar DEC e FEC de vários meses.
+
 ## 10. Dependências de outras áreas
 
 Pedidos a abrir como issue para a área dona. O GenAI não altera esses arquivos.
