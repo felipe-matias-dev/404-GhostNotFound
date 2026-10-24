@@ -1,0 +1,1 @@
+export { Pagina } from "./pagina";

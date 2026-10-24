@@ -8,7 +8,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | 19/10/2026 | Frontend com TanStack Start em modo SPA (React + TypeScript + Vite) | O gerador já integra Router, Query, Form, Table, devtools e React Compiler; SSR desligado porque o FastAPI é o único backend | João Euclides |
 | 19/10/2026 | Autenticação e perfis ficam no FastAPI; better-auth removido do frontend | Pensei em usar BetterAuth, porém, permissão precisa ser checada onde estão os dados, melhor evitar um segundo backend em Node com sessões que o FastAPI não valida | João Euclides |
 | 19/10/2026 | Em dev, o Vite encaminha `/api/*` para o FastAPI removendo o prefixo; base da API configurável por `VITE_API_URL` | Evita CORS no desenvolvimento e não exige prefixo `/api` nas rotas do backend; endereço do backend ainda não definido | João Euclides |
-| 19/10/2026 | Frontend em camadas por feature (`features/<feature>` com `api.ts`, `hooks`, `pages`; `routes/` só define rotas) | Times e agentes seguem a mesma organização; regras em `frontend/README.md` e `frontend/AGENTS.md` | João Euclides |
+| 19/10/2026 | Frontend em camadas por feature (`features/<feature>` com `api.ts`, `hooks`, `pages`; `routes/` só define rotas) | Times e agentes seguem a mesma organização; regras em `frontend/README.md` e `frontend/CLAUDE.md` | João Euclides |
 | 19/10/2026 | Cálculos de negócio (DEC/FEC, efeito-preço × efeito-volume) ficam na camada Gold/backend; o frontend só exibe | Uma única fonte dos números para portal e agente de IA | João Euclides |
 | 19/10/2026 | Valores exibidos (R$, kWh, %, competência, datas) formatados só por `frontend/src/lib/format.ts` | Mesmo número com o mesmo formato em todas as telas | João Euclides |
 | 19/10/2026 | DEC-002: banco local PostgreSQL em Docker, com schemas `gold` e `app` | Usuário somente leitura nativo para o agente; recarga da Gold não apaga as ordens de inspeção | Time |
@@ -24,11 +24,18 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | 21/10/2026 | DEC-012: tokens do frontend vêm do design system da marca VE-360 (paleta OKLCH a partir de #f2c94c, neutros `graphite`, Inter Tight + Söhne Breit + JetBrains Mono); escalas padrão do Tailwind removidas | Uma única fonte de cor, tipo, raio e sombra; utilitário fora do sistema não gera CSS | João Euclides |
 | 21/10/2026 | DEC-013: componentes base trazidos do shadcn/ui no estilo `base-nova` (Base UI) e do interior.dev para `frontend/src/components/ui/`, adaptados aos tokens; nenhuma biblioteca de componentes como dependência | O código fica no repositório e segue os tokens da marca; uma única base de primitivas (Base UI, sem Radix) | João Euclides |
 | 21/10/2026 | DEC-014: o backend espelha o contrato da Gold (6 de 9 tabelas), conferido por teste no CI; a carga recria as tabelas da Gold | Divergência entre contrato e backend aparece no CI, e não na carga da Gold real; coluna nova no contrato entra sem apagar tabela à mão | Felipe |
+| 21/10/2026 | DEC-015 (proposta): o plano gratuito do Gemini recebe só a amostra sintética; a Gold real só vai com chave paga ou fornecida pela organização | No Free Tier o Google pode usar o conteúdo enviado, e o dataset é confidencial | GenAI |
+| 21/10/2026 | DEC-016 (proposta): a `prompts/v1/` recebe a delimitação do SQL anterior e das linhas de exemplo sem virar `prompts/v2/`, só nesta mudança, antes de a v1 chegar à `main` | O golden set ainda não rodou com dados; criar a v2 mudaria o `prompt_version` da auditoria sem ganho real | GenAI |
 | 22/10/2026 | DEC-017: backend e agente formam um workspace do uv, com um único `uv.lock` na raiz | Com o `/ai`, a API instala o agente; uma resolução só garante que o que é testado é o que roda | Luis Felipe |
+| 22/10/2026 | DEC-018: a camada semântica monta relações entre views só pelas chaves estrangeiras do contrato e pelas chaves de entidade (`cod_uc`, `cod_alimentador`) | Juntar views só pelo período gera produto cartesiano | Lucas |
+| 22/10/2026 | DEC-019 (reservada): verificação numérica da narrativa do agente, registrada no PR #36 | Número já citado na spec e em `ai-agent/docs/architecture.md`; a seção entra com o PR | Lucas |
+| 22/10/2026 | DEC-020: o `AgentAnswer` ganha `status` (`answered`, `unknown`, `clarify`, `refused`, `failed`), `truncated`, `refused_reason`, `model` e `latency_ms`, com invariantes por status | O portal distingue resposta, "não sei", esclarecimento e falha; a auditoria guarda modelo e latência | Lucas |
 | 22/10/2026 | DEC-021: com filtro de município, bairro ou classe, a receita e o kWh são somados no backend a partir da fato e do cadastro; DEC e FEC ficam no total da empresa e por alimentador | Receita e kWh se somam; somar DEC de alimentadores por bairro daria um número errado | Felipe |
 | 21/10/2026 | DEC-022: o agente só lê colunas não sensíveis das tabelas liberadas no contrato, e "receita" sem qualificador é a receita faturada | Dado pessoal e texto livre ficam fora do agente; uma definição única de receita evita respostas divergentes | Alisson |
 | 22/10/2026 | DEC-023: receita da Gold em três medidas (total, energia e tributos), com a energia como base provisória do PVM; consumo médio nulo sem leitura; `potencia_kwp`; reconciliação do faturamento e da energia | Nenhum valor descartado sem explicação; os números da diretoria podem ser conciliados com os da Gold | Alisson |
 | 22/10/2026 | DEC-024: resultados agregados necessários para sustentar uma hipótese podem ir ao repositório; identificação de pessoas e de UCs e dado de LGPD ficam mascarados; linha a linha, amostras e outputs nunca sobem | O diagnóstico precisa mostrar a evidência, mas o dataset é confidencial e há dado pessoal | Alisson |
+| 23/10/2026 | DEC-025 (proposta): mapa da RMR com a malha municipal 2025 e a malha de bairros do Censo 2022 do IBGE, os 15 municípios da LC estadual 382/2018, e município e bairro da Gold casados com os do mapa pelo nome normalizado | O mapa vira o seletor principal de município e bairro sem mudar o contrato da Gold; o que está na Gold é clicável, o resto aparece apagado | João Euclides |
+| 23/10/2026 | DEC-026: ações das OIs na tela de perdas (enviar a campo, concluir, cancelar, histórico, gerar) com Kanban das ativas e troca Kanban ⇄ tabela lembrada no navegador | O gerente acompanha e move as OIs sem sair da tela; o backend continua sendo o dono da máquina de estados | João Euclides |
 
 ## DEC-001 · Localização dos arquivos de origem (landing)
 
@@ -337,9 +344,9 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
     (dependem da Silver); o mesmo teste falha quando o contrato definir a chave de uma delas.
   - A carga recria as tabelas da Gold (`DROP` e `CREATE`) na mesma transação em que grava
     os dados, em vez de só apagar as linhas. O schema `app` não é tocado. O `DROP` é sem
-    `CASCADE`, de propósito: quando existirem as views `sem_*` do agente, a carga passa a
-    recriá-las depois do `CREATE`, na mesma transação. Até lá, um objeto que dependa de uma
-    tabela da Gold faz a carga falhar sem alterar nada, em vez de sumir em silêncio.
+    `CASCADE`, de propósito: um objeto que dependa de uma tabela da Gold e que ninguém
+    previu faz a carga falhar sem alterar nada, em vez de sumir em silêncio. As views
+    `sem_*` do agente são tratadas à parte (atualização de 23/10/2026, abaixo).
   - Colunas `text[]` do contrato viram `ARRAY(Text)` no banco; no CSV, os itens vão numa
     célula só, separados por `;`, e a carga recusa item vazio.
   - Mudança no contrato e no backend entram no mesmo PR: quem muda o YAML recebe, no próprio
@@ -351,6 +358,22 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   nova entrar na próxima carga. A permissão de leitura do agente vem do `ALTER DEFAULT
   PRIVILEGES` do schema `gold` e vale para a tabela recriada (testado em
   `backend/tests/test_agent_role.py`).
+- **Atualização (23/10/2026, D7 da spec do agente):** a carga passou a recriar as views
+  `sem_*`, na mesma transação, com o usuário dono:
+  - antes do `drop_all`, apaga toda view `sem_*` do schema `gold` **lendo o catálogo do
+    banco** (`pg_views`), e não a lista de nomes do `ai-agent/semantic/views.sql`: uma view
+    que o GenAI renomeou ou tirou do arquivo continuaria presa à tabela e quebraria a carga;
+  - depois do `create_all` e dos `INSERT`, executa o `views.sql` inteiro;
+  - se o arquivo citar coluna ou tabela que a Gold não tem mais, a carga é cancelada com
+    "as views do agente não batem com a Gold" e nada muda (Gold e views anteriores
+    ficam). Ignorar a view quebrada deixaria o agente sem consulta, sem aviso;
+  - arquivo ausente cancela a carga antes de tocar no banco;
+  - o `views.sql` é lido por caminho fixo a partir da raiz do repositório, sem variável
+    de ambiente, e o backend não importa nada de `venergy_agent`.
+  - Alternativa descartada: `DROP ... CASCADE`, que apagaria as views em silêncio.
+  - Testes: `test_carga.py` (views criadas, recarga com views no lugar, view antiga
+    removida, views incompatíveis) e `test_agent_role.py` (o agente lê e não escreve
+    pelas views depois da recarga).
 - **Alternativas descartadas:** gerar os modelos a partir do YAML, difícil de revisar e de
   explicar; Alembic para a Gold, que seria migração para um dado descartável; modelar as 3
   tabelas pendentes com colunas inventadas; implementar só as colunas `confirmada` e
@@ -693,3 +716,34 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   necessário à hipótese pode subir; os CSVs da Gold continuam fora do Git.
 - **Em aberto:** confirmar com a Visagio que resultados agregados do diagnóstico podem ser públicos
   (o case marca os materiais como confidenciais e pede um repositório público).
+
+## DEC-025 · Mapa da RMR como seletor de município e bairro (proposta)
+
+- **Data:** 23/10/2026 · **Área:** Portal · **Autor:** João Euclides
+- **Status:** proposta, a confirmar com Dados (lista de municípios da Gold).
+- **Contexto:** o log de qualidade registra "14 municípios da RMR" em `unidades_consumidoras`, sem listar quais. A RMR oficial tem 15 desde a LC estadual 382/2018, que incluiu Goiana. As regiões geográficas do IBGE não coincidem com a RMR: a Imediata de Recife inclui Paudalho e Fernando de Noronha e deixa Goiana de fora.
+- **Decisão:**
+  - geometria da Malha Municipal 2025 do IBGE (`PE_Municipios_2025`), filtrada pelos 15 códigos IBGE da RMR, projetada em UTM 25S e simplificada; os municípios vizinhos entram só como contorno de contexto;
+  - bairros da malha de bairros do Censo 2022 (`PE_bairros_CD2022`), na mesma projeção: 315 bairros em 12 municípios. Goiana, Ilha de Itamaracá e Moreno não têm bairros na malha do IBGE e ficam só com a tabela e o menu;
+  - os arquivos gerados (`frontend/src/components/ui/region-map/rmr.gen.ts`, ~20 KB, e `rmr-bairros.gen.ts`, ~140 KB, ~47 KB com gzip, baixado só quando um município é escolhido) são versionados; os shapefiles não. Regerar: `npm run gen:mapa -- <pasta do PE_Municipios_AAAA> <pasta do PE_bairros_CD2022>`;
+  - a Gold não tem código IBGE: município e bairro da Gold casam com os do mapa pelo nome sem acento, caixa e espaço extra. O que não casa aparece apagado e sem link no mapa, mas continua na tabela e no menu do topo.
+  - cor do mapa pela variação da receita sobre a receita base do próprio segmento, em escala contínua: abaixo de 0,5% é neutro, e a cor (vermelho para queda, verde para alta, misturados à superfície) e o brilho do contorno crescem até saturar em 10%. A fração é calculada no frontend só para a cor; nenhum número novo é exibido (o hover mostra a variação em R$ da API).
+- **Motivo:** o mapa funciona com 14 ou 15 municípios sem mudar o contrato; as malhas são públicas e não são dado do case.
+- **Em aberto:** (1) Dados confirmar os 14 nomes de município da Gold e conferir os bairros contra a malha do IBGE (bairro vem do cadastro, em texto livre); (2) avaliar `cod_municipio_ibge` e `cod_bairro_ibge` (`CD_BAIRRO`) na `gold_dim_uc` para casar por código; (3) o bairro do IBGE é agregado de setores censitários e pode não coincidir com o limite oficial da prefeitura; (4) se a variação percentual for exibida, ela passa a vir da API (`variacao_receita_pct` em `/receita/decomposicao`), como já vem em `/receita/comparacao`.
+
+## DEC-026 · Ações das OIs, Kanban e troca de visão na tela de perdas
+
+- **Data:** 23/10/2026 · **Área:** Portal · **Autor:** João Euclides
+- **Contexto:** o backend já expõe `PATCH`, `GET /{id}` (histórico) e `POST` das ordens de inspeção (DEC-009), mas a tela de perdas só listava as OIs.
+- **Decisão:**
+  - a tela mostra só os botões das transições permitidas, a partir de uma cópia das `TRANSICOES` do backend (`ACOES_POR_STATUS` em `features/perdas/conversions.ts`). A cópia serve só para exibir: quem decide é o backend, que responde 409 a uma transição inválida, e a tela mostra a mensagem dele;
+  - enviar a campo é sem formulário (a observação é opcional e a OI ainda pode ser cancelada), mas o PATCH só sai depois de 6 s: um aviso embaixo da tela oferece "Desfazer" e "Enviar agora", e o tempo para enquanto o ponteiro ou o foco estão no aviso. É o único desfazer: o backend continua sem a volta Em campo → Gerada (DEC-009), e Concluída e Cancelada continuam finais. Sair da tela envia na hora o que estava agendado; fechar a aba pede confirmação do navegador;
+  - concluir e cancelar abrem um modal (Modal do interior.dev): concluir pede o resultado, cancelar pede segurar o botão (HoldToConfirm), porque não tem volta. O histórico, que é consulta, abre no painel lateral (Sheet);
+  - Kanban e tabela ocupam a largura toda da tela, sem a descrição da tela no topo (o layout da tela de perdas será ajustado quando a fila de suspeitas entrar); o Kanban também estica até o fim da altura. Cada ação tem a cor do status a que leva (enviar = info, concluir = success, cancelar = danger);
+  - Kanban com as ativas (Gerada, Em campo) completas e as finalizadas (Concluída, Cancelada) limitadas às últimas N por `atualizada_em`, com N pela altura da viewport: 3 abaixo de 900 px (notebook), 5 até 1299 px (PC 1080p), 8 a partir de 1300 px (desktop grande). "Ver todas" leva à tabela filtrada pelo status;
+  - cada cartão tem botões de ação; arrastar entre colunas (HTML5 Drag and Drop, sem biblioteca) é só atalho para a mesma ação;
+  - a visão (Kanban ou tabela) é preferência do usuário, não filtro: fica no `localStorage` (`perdas:visao-ordens`, padrão Kanban), não na URL. Abaixo de 48rem a tela mostra sempre a tabela em cards, sem mexer na preferência salva;
+  - gerar OIs por códigos de UC digitados (repetidos ignorados, até 200 por pedido), enquanto não existe endpoint da fila de suspeitas;
+  - Vitest no frontend só para funções puras (`src/**/__tests__/*.test.ts`, sem DOM).
+- **Motivo:** cobre o ciclo de vida da OI sem regra de negócio nova no frontend; o Kanban dá a visão do trabalho em andamento sem a lista de finalizadas crescer sem limite.
+- **Em aberto:** (1) gerar a partir da fila de suspeitas quando houver `GET` da `gold_fila_suspeitas`; (2) autoria das mudanças no histórico quando houver autenticação.

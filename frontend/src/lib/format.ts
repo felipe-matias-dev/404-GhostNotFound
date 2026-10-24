@@ -12,6 +12,11 @@ const percentual = new Intl.NumberFormat("pt-BR", {
 const decimal1 = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1 });
 // Datas sem hora ("2025-03-10") são interpretadas em UTC; formatar em UTC evita mostrar o dia anterior.
 const data = new Intl.DateTimeFormat("pt-BR", { timeZone: "UTC" });
+// Instantes com fuso ("2026-10-23T13:30:26Z") ficam no fuso de quem vê a tela.
+const dataHora = new Intl.DateTimeFormat("pt-BR", {
+	dateStyle: "short",
+	timeStyle: "short",
+});
 
 const MESES = [
 	"jan",
@@ -55,11 +60,26 @@ export function formatCompetencia(
 	return match && mes ? `${mes}/${match[1]}` : competencia;
 }
 
+/** Período "2024-01/2024-12" → "jan/2024 a dez/2024" */
+export function formatPeriodo(periodo: string | null | undefined): string {
+	if (!periodo) return VAZIO;
+	const [inicio, fim] = periodo.split("/");
+	if (!inicio || !fim) return formatCompetencia(periodo);
+	return `${formatCompetencia(inicio)} a ${formatCompetencia(fim)}`;
+}
+
 /** Data ISO "2025-03-10" → "10/03/2025" */
 export function formatData(iso: string | null | undefined): string {
 	if (!iso) return VAZIO;
 	const date = new Date(iso);
 	return Number.isNaN(date.getTime()) ? iso : data.format(date);
+}
+
+/** Instante ISO "2026-10-23T13:30:26Z" → "23/10/2026, 10:30" (fuso local) */
+export function formatDataHora(iso: string | null | undefined): string {
+	if (!iso) return VAZIO;
+	const date = new Date(iso);
+	return Number.isNaN(date.getTime()) ? iso : dataHora.format(date);
 }
 
 /** Milissegundos → segundos por extenso: 1800 → "1,8 segundos", 1000 → "1 segundo" */
