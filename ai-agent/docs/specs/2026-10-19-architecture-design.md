@@ -316,7 +316,7 @@ Primeira execução: `eval/runs/2026-10-24T033727Z.json`. Configuração: `gemin
 1. **Período fora dos dados (G019, G029, G030; tira 27 pontos dos `unknown`).** O golden set espera `unknown`, e o agente responde com resultado vazio, como manda a §5.1 (item 6). O gabarito e a spec se contradizem. Proposta: o esperado vira `answered` com `confidence = low`, porque com a Gold real o período pode existir (por exemplo, julho de 2022).
 2. **Períodos relativos (G041 a G043: "primeiro ano da base × últimos 12 meses").** O agente pede esclarecimento, por causa da regra "não suponha quais competências existem". Proposta: uma regra e um exemplo na camada semântica para calcular esses períodos com `min` e `max` da competência, no SQL.
 3. **Follow-up (G046, "E em Olinda?").** Depende da memória de conversa, que é diferencial (G1-10). Proposta: o item sai da conta até a memória existir, ou o esperado vira `clarify`.
-4. **Execution accuracy.** São 11 itens com `matched = false`. Quatro (G041 a G043 e G046) vêm dos achados 2 e 3, e um (G057) do achado 6. Dos 7 restantes, a maioria é de forma:
+4. **Execution accuracy.** São 11 itens com `matched = false`. Quatro (G041 a G043 e G046) vêm dos achados 2 e 3, e um (G057) do achado 6. Os 6 restantes são de forma:
    - a referência arredonda (`round(avg, 1)`) e o agente não (G008, G010);
    - a referência pede colunas a mais (G066) ou devolve só a variação percentual, enquanto o agente devolve os totais, a variação absoluta e a percentual (G015);
    - a granularidade é outra: por mês contra total (G020, G061).
