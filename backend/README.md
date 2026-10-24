@@ -121,8 +121,10 @@ contrato definir as colunas e a chave delas
 A carga valida cada linha contra o contrato (`src/venergy_api/schemas.py`). Se um
 arquivo estiver fora do formato, ela é cancelada, informa a linha e a coluna com
 problema e mantém os dados anteriores. A cada execução, ela recria as tabelas da Gold:
-coluna nova no contrato entra sem apagar nada à mão. O gerador da amostra nunca
-sobrescreve um CSV existente sem `--force`.
+coluna nova no contrato entra sem apagar nada à mão. Na mesma transação, ela também
+recria as views `sem_*` do agente de IA a partir de `ai-agent/semantic/views.sql`; se esse
+arquivo não bater com a Gold, a carga é cancelada e o banco fica como estava. O gerador da
+amostra nunca sobrescreve um CSV existente sem `--force`.
 
 O teste `tests/test_contrato_gold.py` compara o contrato com os modelos e os schemas do
 backend. Mudou o YAML? Ele aponta o que o backend precisa acompanhar.
@@ -135,7 +137,7 @@ O `docker compose` cria, na primeira subida (`infra/postgres/init/01-init.sh`):
 
 | O quê | Para quê |
 |---|---|
-| Schema `gold` | Tabelas da Gold, recriadas a cada carga a partir dos CSVs |
+| Schema `gold` | Tabelas da Gold e views `sem_*` do agente, recriadas a cada carga |
 | Schema `app` | Dados criados no portal (ordens de inspeção). A carga nunca toca nele |
 | Usuário `venergy` | Usado pela API: lê e escreve |
 | Usuário `venergy_agent` | Usado pelo agente de IA: só `SELECT` no schema `gold`, sem acesso a `app` |
@@ -197,6 +199,7 @@ tests/            # pytest
 | `/health` responde `503` | O banco está parado (`docker compose ps`) ou a URL no `.env` de `backend/` está errada |
 | A busca de UC responde `500` | A carga ainda não rodou (passos 5 e 6) |
 | A carga é cancelada com "arquivo não encontrado" ou "colunas faltando" | A amostra em `data/gold/` é de uma versão anterior do contrato: `uv run python -m venergy_api.amostra --force` |
+| A carga é cancelada com "as views do agente não batem com a Gold" | O `ai-agent/semantic/views.sql` cita coluna que o contrato não tem mais: avise o time de GenAI para regerar o arquivo |
 | Testes param com "Banco de testes indisponível" | O banco não está no ar: `docker compose up -d --wait db` |
 | A API não sobe: porta 8000 em uso | A API do `docker compose` está no ar: `docker compose stop api web` |
 | Testes param com "Usuário do agente não conecta" | O banco foi criado antes do script de inicialização atual: `docker compose down -v` |
