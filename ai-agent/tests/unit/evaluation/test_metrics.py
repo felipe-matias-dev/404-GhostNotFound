@@ -63,6 +63,28 @@ def test_results_match_uses_each_generated_column_once():
     assert results_match([{"x": 1, "y": 1}], reference, ordered=False)
 
 
+def test_results_match_keeps_row_pairs_together_when_unordered():
+    reference = [{"c": "a", "v": 1}, {"c": "b", "v": 2}]
+
+    assert not results_match([{"c": "a", "v": 2}, {"c": "b", "v": 1}], reference, ordered=False)
+    assert results_match([{"v": 2, "c": "b"}, {"v": 1, "c": "a"}], reference, ordered=False)
+
+
+def test_results_match_tries_another_mapping_when_columns_look_alike():
+    reference = [{"c": "a", "v": 1}, {"c": "b", "v": 2}]
+    generated = [{"x": 2, "c": "a", "y": 1}, {"x": 1, "c": "b", "y": 2}]
+
+    assert results_match(generated, reference, ordered=False)
+    assert results_match(generated, reference, ordered=True)
+
+
+def test_results_match_handles_non_finite_and_huge_numbers():
+    reference = [{"v": float("inf"), "w": Decimal("1e40")}]
+
+    assert results_match([{"a": float("inf"), "b": Decimal("1e40")}], reference, ordered=True)
+    assert not results_match([{"a": float("-inf"), "b": Decimal("1e40")}], reference, ordered=True)
+
+
 def test_write_or_outside_allowlist_is_a_violation():
     validator = SqlglotValidator(dialect="postgres", max_rows=200, allowed_schema="gold")
 
