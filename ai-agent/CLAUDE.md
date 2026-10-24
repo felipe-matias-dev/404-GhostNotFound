@@ -13,6 +13,7 @@ Se o agente não souber, diz que não sabe. Resposta inventada é falha crítica
 ## Para Dev (backend e infra)
 
 - **Contrato de entrada:** `TextToSqlAgent.ask(question: str, session_id: str) -> AgentAnswer` (`src/venergy_agent/application/ports.py`). O backend depende só dessa porta, nunca de classes internas.
+- **Stream (item 10, SSE):** `TextToSqlAgent.stream(question, session_id)` devolve `StageEvent` (código da etapa e rótulo em português) e, por último, um `AnswerEvent` com o mesmo `AgentAnswer` do `ask()`. A rota SSE e a tela são do Dev (spec §10, D10). Fechar o iterador cancela o agente.
 - **`AgentAnswer`** (`domain/answer.py`):
   - campos: `answer`, `status` (`answered`, `unknown`, `clarify`, `refused`, `failed`), `sql`, `rows` (amostra), `row_count` (total real), `truncated`, `confidence`, `sources`, `assumptions`, `clarification`, `refused_reason`, `request_id`, `model`, `prompt_version`, `latency_ms`;
   - as invariantes por status estão na spec §4 e têm teste em `tests/unit/domain/test_answer.py`;
