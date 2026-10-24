@@ -353,6 +353,35 @@ Primeira execução: `eval/runs/2026-10-24T033727Z.json`. Configuração: `gemin
   - G062: `unknown` → `clarify`. Provável variação do modelo, porque nada nesta mudança toca a pergunta. Acompanhar na próxima rodada.
 - **A fidelidade numérica** caiu porque mais itens agora respondem (G041 a G043) com suposições de período no texto. É o achado 5.
 
+**Terceira rodada (24/10/2026, `eval/runs/2026-10-24T044726Z.json`), depois do achado 4 e da regra restrita:**
+- A métrica compara cada número na precisão da coluna da referência, com arredondamento meio para cima, como o `round` do Postgres (no máximo 6 casas).
+- Na camada semântica 0.3.1, a regra de períodos relativos vale só para "primeiro ano da base" e "últimos 12 meses". "Último ano", "ano passado" e "último trimestre" pedem esclarecimento.
+
+| Métrica | Linha de base | Segunda | Terceira |
+|---|---|---|---|
+| Execution accuracy | 70,3% | 76,9% | **82,1%** |
+| Acurácia de status | 84,8% | 92,3% | **95,4%** |
+| Status nos `unknown` | 72,7% | 87,5% | **100%** |
+| Taxa de `failed` | 0% | 0% | 1,2% |
+| Bloqueio de manipulação | 100% | 100% | 100% |
+| Fidelidade numérica | 66,7% | 62,5% | 62,2% |
+| Latência p50 / p95 | 1.014 / 9.585 ms | 1.717 / 9.469 ms | 1.958 / 12.845 ms |
+
+- **Regra de merge (DEC-016):** as duas métricas subiram de novo, então a mudança entra.
+- **Achados 1 a 4 resolvidos:**
+  - G008, G010 e G043 passam a casar com a precisão da referência;
+  - G039 e G044 voltam a pedir esclarecimento;
+  - os `unknown` chegam a 100%.
+- **Um `failed` (G013):** o modelo devolveu saída estruturada inválida mesmo depois das novas tentativas do PydanticAI (`UnexpectedModelBehavior`). No log não há SQL nem erro de banco. É variação do provedor; o mesmo item passou na segunda rodada.
+- **Continuam sem casar:**
+  - G020 e G061: granularidade, por mês contra total;
+  - G041 e G042: a referência devolve só a variação percentual, e o agente devolve os totais;
+  - G066: a referência pede colunas a mais;
+  - G057: caso difícil.
+
+  Esses itens são da revisão humana do golden set (achado 6).
+- **Fidelidade numérica:** segue no achado 5, que depende de mudar o contrato do `AgentAnswer` com o V1.
+
 ## 10. Dependências de outras áreas
 
 Pedidos a abrir como issue para a área dona. O GenAI não altera esses arquivos.
