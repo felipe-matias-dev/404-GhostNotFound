@@ -18,7 +18,10 @@ def _numbers_in_value(value: object) -> set[Decimal]:
         return set()
     if isinstance(value, int | float | Decimal):
         return {abs(Decimal(str(value)))}
-    return {Decimal(token) for token in MACHINE_NUMBER.findall(str(value))}
+    text = str(value)
+    if any(char.isalpha() for char in text):
+        return set()
+    return {Decimal(token) for token in MACHINE_NUMBER.findall(text)}
 
 
 def unsupported_numbers(text: str, values: Iterable[object]) -> tuple[str, ...]:

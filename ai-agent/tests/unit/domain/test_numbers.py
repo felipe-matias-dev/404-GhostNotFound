@@ -56,3 +56,7 @@ def test_negative_value_is_supported_when_the_text_cites_its_magnitude():
 @pytest.mark.parametrize("text", ["As classes 1,2,3", "Meses 01,02,03"])
 def test_token_that_is_not_a_pt_br_number_is_reported_instead_of_raising(text):
     assert unsupported_numbers(text, [1, 2, 3]) == (text.split()[-1],)
+
+
+def test_numbers_inside_a_code_are_not_a_source():
+    assert unsupported_numbers("Há 7 alimentadores", ["AL-07"]) == ("7",)
