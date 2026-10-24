@@ -38,7 +38,7 @@ pergunta → Question → SemanticLayer (carregada uma vez)
                  erro corrigível → AttemptFeedback → nova tentativa (até 3)
                  erro do banco não classificado → failed
         → AnswerWriter (narrativa) → números conferidos com as linhas (DEC-019)
-            falhou → texto determinístico
+            falhou → texto determinístico (com os valores, se o resultado for pequeno)
         → AgentAnswer
 ```
 
