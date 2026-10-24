@@ -53,7 +53,7 @@ def test_results_match_rounds_numbers_and_treats_none_as_equal():
     generated = [{"value": Decimal("4.5000001"), "empty": None}]
 
     assert results_match(generated, reference, ordered=True)
-    assert not results_match([{"v": 4.51, "n": None}], reference, ordered=True)
+    assert not results_match([{"v": 4.56, "n": None}], reference, ordered=True)
 
 
 def test_results_match_uses_each_generated_column_once():
@@ -127,3 +127,18 @@ def test_empty_result_and_single_all_null_row_both_mean_no_data():
     assert results_match([], [{"total": None}], ordered=False)
     assert results_match([{"tarifa": None, "x": None}], [], ordered=False)
     assert not results_match([], [{"total": 0}], ordered=False)
+
+
+def test_generated_number_is_compared_at_the_reference_precision():
+    reference = [{"variacao_percentual": Decimal("10.05")}]
+
+    assert results_match([{"pct": 10.0517}], reference, ordered=False)
+    assert results_match([{"pct": Decimal("10.045")}], reference, ordered=False)
+    assert not results_match([{"pct": 10.06}], reference, ordered=False)
+
+
+def test_reference_precision_is_taken_per_column():
+    reference = [{"media": Decimal("4.5"), "total": 8}, {"media": Decimal("3.2"), "total": 5}]
+    generated = [{"total": 8, "media": 4.4999}, {"total": 5, "media": 3.2001}]
+
+    assert results_match(generated, reference, ordered=False)
