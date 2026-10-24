@@ -289,3 +289,15 @@ async def test_broken_reference_sql_is_flagged_and_left_out_of_execution_accurac
     assert missing.reference_error is True
     assert report.metrics["execution_accuracy"] == 1.0
     assert report.metrics["reference_errors"] == 2
+
+
+async def test_follow_up_items_are_skipped_until_the_agent_has_memory():
+    agent, evaluation = runner({"Quantas UCs?": make_answer()})
+    follow_up = {**golden("G002", "E em Olinda?", OLINDA_SQL), "follow_up_of": "G001"}
+
+    report = await run(evaluation, [golden("G001", "Quantas UCs?", COUNT_SQL), follow_up])
+
+    assert [question for question, _ in agent.calls] == ["Quantas UCs?"]
+    assert [item.id for item in report.items] == ["G001"]
+    assert report.metrics["golden_items"] == 1
+    assert report.metrics["follow_up_skipped"] == 1

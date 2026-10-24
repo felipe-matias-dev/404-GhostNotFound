@@ -121,3 +121,9 @@ def test_rate_and_percentile_return_none_when_empty():
     assert percentile([], 0.5) is None
     assert percentile([30, 10, 20, 40], 0.5) == 20
     assert percentile([30, 10, 20, 40], 0.95) == 40
+
+
+def test_empty_result_and_single_all_null_row_both_mean_no_data():
+    assert results_match([], [{"total": None}], ordered=False)
+    assert results_match([{"tarifa": None, "x": None}], [], ordered=False)
+    assert not results_match([], [{"total": 0}], ordered=False)

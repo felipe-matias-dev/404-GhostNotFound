@@ -13,7 +13,7 @@
 # As linhas de exemplo são sintéticas, escritas à mão. Nenhum valor real da Gold entra aqui.
 # Depois de cada mudança, gere o views.sql (ver a seção Camada semântica em ai-agent/README.md).
 
-version: "0.2.0"
+version: "0.3.0"
 
 views:
   - name: sem_uc
@@ -285,7 +285,8 @@ rules:
   - text: "Em sem_receita_decomposicao, periodo_base e periodo_atual são faixas AAAA-MM/AAAA-MM. Filtre pelo par exato de períodos. Se a pergunta não disser os dois períodos, peça esclarecimento (clarify)."
   - text: "Score de suspeita, perda não técnica, atendimento por UC, interrupções por UC e medidor não estão nas views: pergunta sobre eles é unknown."
   - text: "Para ligar uma UC ao alimentador use sem_uc.cod_alimentador = sem_continuidade_alimentador_mensal.cod_alimentador."
-  - text: "Quando a pergunta compara dois períodos e não diz quais são, peça esclarecimento (clarify). Não escolha os períodos sozinho."
+  - text: "Períodos relativos à base ('primeiro ano da base', 'últimos 12 meses') saem das competências que existem. Numere as competências distintas com row_number() OVER (ORDER BY competencia) para o início e OVER (ORDER BY competencia DESC) para o fim, filtre por ordem <= 12 e declare os períodos usados como suposição. Nesse caso, não peça esclarecimento."
+  - text: "Quando a pergunta compara dois períodos e não diz quais são, peça esclarecimento (clarify). Não escolha os períodos sozinho. Períodos relativos à base, como 'primeiro ano da base' e 'últimos 12 meses', contam como ditos."
 
 examples:
   - question: "Quantas UCs existem em cada classe de consumo?"
@@ -305,6 +306,9 @@ examples:
     expected_status: ok
   - question: "Quanto a receita comercial de Recife cresceu entre 2023 e 2024?"
     sql: "SELECT sum(CASE WHEN f.competencia LIKE '2023-%' THEN f.receita_faturada END) AS receita_2023, sum(CASE WHEN f.competencia LIKE '2024-%' THEN f.receita_faturada END) AS receita_2024, sum(CASE WHEN f.competencia LIKE '2024-%' THEN f.receita_faturada END) - sum(CASE WHEN f.competencia LIKE '2023-%' THEN f.receita_faturada END) AS variacao, round(100.0 * (sum(CASE WHEN f.competencia LIKE '2024-%' THEN f.receita_faturada END) - sum(CASE WHEN f.competencia LIKE '2023-%' THEN f.receita_faturada END)) / NULLIF(sum(CASE WHEN f.competencia LIKE '2023-%' THEN f.receita_faturada END), 0), 2) AS variacao_percentual FROM sem_faturamento_mensal f JOIN sem_uc u ON u.cod_uc = f.cod_uc WHERE u.classe_cadastro = 'Comercial' AND u.municipio ILIKE 'Recife%'"
+    expected_status: ok
+  - question: "O número de chamados caiu nos últimos 12 meses em relação ao primeiro ano da base?"
+    sql: "WITH meses AS (SELECT competencia, row_number() OVER (ORDER BY competencia) AS ordem_inicio, row_number() OVER (ORDER BY competencia DESC) AS ordem_fim FROM sem_kpis_mensais) SELECT sum(CASE WHEN m.ordem_inicio <= 12 THEN k.n_chamados END) AS chamados_primeiro_ano, sum(CASE WHEN m.ordem_fim <= 12 THEN k.n_chamados END) AS chamados_ultimos_12_meses FROM sem_kpis_mensais k JOIN meses m ON m.competencia = k.competencia"
     expected_status: ok
   - question: "Por que a receita caiu?"
     sql: null

@@ -45,8 +45,9 @@ class EvaluationRunner:
         semantic_layer_version: str,
     ) -> EvaluationReport:
         started_at = datetime.now(UTC)
+        follow_ups = [item for item in golden if item.get("follow_up_of")]
         plan: list[tuple[Kind, Mapping[str, Any]]] = [
-            *(("golden", item) for item in golden),
+            *(("golden", item) for item in golden if not item.get("follow_up_of")),
             *(("red_team", item) for item in red_team),
         ]
         items: list[ItemResult] = []
@@ -60,7 +61,7 @@ class EvaluationRunner:
             prompt_version=prompt_version,
             semantic_layer_version=semantic_layer_version,
             items=tuple(items),
-            metrics=_metrics(items),
+            metrics={**_metrics(items), "follow_up_skipped": len(follow_ups)},
         )
 
     async def _evaluate(self, kind: Kind, item: Mapping[str, Any]) -> ItemResult:
