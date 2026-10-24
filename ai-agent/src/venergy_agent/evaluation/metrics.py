@@ -72,6 +72,8 @@ def results_match(
         [index for index, column in enumerate(candidates) if _same(column, wanted, ordered)]
         for wanted in expected
     ]
+    if not all(options):
+        return False
     reference_rows = list(zip(*expected, strict=True))
     for mapping in _mappings(options):
         generated_rows = list(zip(*(candidates[index] for index in mapping), strict=True))

@@ -78,6 +78,14 @@ def test_results_match_tries_another_mapping_when_columns_look_alike():
     assert results_match(generated, reference, ordered=True)
 
 
+def test_results_match_fails_fast_when_a_reference_column_has_no_candidate():
+    zeros = {f"z{index}": 0 for index in range(10)}
+    reference = [{**zeros, "missing": 1}, {**zeros, "missing": 2}]
+    generated = [{**zeros, "other": 3}, {**zeros, "other": 4}]
+
+    assert not results_match(generated, reference, ordered=False)
+
+
 def test_results_match_handles_non_finite_and_huge_numbers():
     reference = [{"v": float("inf"), "w": Decimal("1e40")}]
 
