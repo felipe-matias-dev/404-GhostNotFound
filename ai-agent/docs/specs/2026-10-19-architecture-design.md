@@ -52,7 +52,7 @@ O agente transforma uma pergunta em português numa consulta SQL somente leitura
 ai-agent/
 ├── pyproject.toml
 ├── .env.example
-├── prompts/v1/                  # system.md e correction.md; versão em AgentSettings.prompt_version
+├── prompts/v1/, prompts/v2/     # system.md e correction.md; versão em AgentSettings.prompt_version (padrão v2)
 ├── semantic/                    # item 5: semantic_layer.yaml (do GenAI) e views.sql (gerado)
 ├── eval/                        # item 7: golden_set.yaml, red_team.yaml, runs/
 ├── src/venergy_agent/
@@ -163,6 +163,7 @@ O caso de uso `application/ask.py` implementa `TextToSqlAgent` encadeando as por
 6. **Resultado vazio** é `answered` com `confidence = low`. A resposta diz que nenhum registro atende aos filtros e repete as suposições, porque o agente não distingue "zero" de "dado ausente" (§6 do guia).
 7. **Texto da resposta.**
    - Item 6: texto determinístico, montado sem LLM (quantas linhas, as suposições e o aviso de truncamento), mais a amostra em `rows`.
+   - Quando o resultado é pequeno (até 5 linhas e 4 colunas), o texto determinístico traz os valores em pt-BR (`Resultado: total = 3.`; nulo vira "sem valor"). Assim a resposta tem o número mesmo quando a narrativa cai na verificação (DEC-019). Resultado maior fica só em `rows`.
    - Item 8: o `AnswerWriter` substitui esse texto por uma narrativa. Se a verificação numérica falhar (§7.3 do guia), volta para o texto determinístico.
 8. **Mensagens de `unknown`, `refused` e `failed`:** textos fixos em português, sem LLM, em `refused_reason` e em `answer`. O modelo não escreve o motivo de não ter respondido.
 9. **Logs estruturados:** uma linha JSON por etapa (stdlib `logging`), com `request_id`, `session_id`, número da tentativa, etapa, status, SQL, motivo ou tipo de erro, número de linhas, latência da etapa, modelo, tokens e `prompt_version` (§12 do guia). Sem a amostra de linhas, para não levar dado pessoal aos logs.
@@ -213,7 +214,7 @@ O validador é a primeira trava. A segunda é o banco: role somente leitura, com
 | `max_rows` | `200` | `> 0`; teto do `LIMIT` |
 | `query_timeout_seconds` | `10` | `> 0` |
 | `max_correction_attempts` | `3` | `1 ≤ n ≤ 3` |
-| `prompt_version` | `v1` | Pasta em `prompts/` |
+| `prompt_version` | `v2` | Pasta em `prompts/`. A v2 (23/10/2026) pede só as suposições que mudam o número da resposta; a v1 fica como registro |
 | `answer_sample_rows` | `20` | **Item 6.** `> 0`; linhas em `AgentAnswer.rows` e no `AnswerWriter` |
 | `semantic_layer_path` | `ai-agent/semantic/semantic_layer.yaml` | **Item 5.** Resolvido pelo caminho do pacote, como o `.env` |
 | `gold_contract_path` | `contracts/gold_schema.yaml` da raiz | **Item 5.** Idem. A imagem da API já copia `contracts/` (DEC-017) |

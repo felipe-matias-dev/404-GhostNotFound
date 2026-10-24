@@ -27,7 +27,7 @@ class AgentSettings(BaseSettings):
     max_rows: int = Field(200, gt=0)
     query_timeout_seconds: float = Field(10.0, gt=0)
     max_correction_attempts: int = Field(3, ge=1, le=3)
-    prompt_version: str = "v1"
+    prompt_version: str = "v2"
     prompts_dir: Path = AGENT_ROOT / "prompts"
     answer_prompt_version: str = "v1"
     answer_sample_rows: int = Field(20, gt=0)

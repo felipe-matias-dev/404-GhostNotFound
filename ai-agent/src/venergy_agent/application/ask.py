@@ -1,6 +1,7 @@
 import json
 import logging
 import time
+from decimal import Decimal
 from uuid import uuid4
 
 from pydantic import ValidationError
@@ -42,6 +43,9 @@ INTERNAL_FAILED = "Algo deu errado do nosso lado. Tente de novo em instantes."
 ATTEMPTS_FAILED = "Não consegui montar uma consulta válida depois de {attempts} tentativas."
 DATABASE_FAILED = "Não consegui consultar o banco agora. Tente de novo em instantes."
 CLARIFY_PREFIX = "Preciso de um esclarecimento antes de consultar: "
+FALLBACK_MAX_ROWS = 5
+FALLBACK_MAX_COLUMNS = 4
+MISSING_VALUE = "sem valor"
 EMPTY_RESULT = (
     "Nenhum registro atende à consulta. O agente não distingue zero de dado ausente, "
     "então confira os filtros."
@@ -353,6 +357,15 @@ class AskUseCase:
             text = EMPTY_RESULT
         else:
             text = f"A consulta devolveu {result.row_count} linha(s)."
+            if (
+                len(result.rows) <= FALLBACK_MAX_ROWS
+                and len(result.columns) <= FALLBACK_MAX_COLUMNS
+            ):
+                text += (
+                    " Resultado: "
+                    + "; ".join(_row_text(result.columns, row) for row in result.rows)
+                    + "."
+                )
         if result.truncated:
             text += (
                 f" O resultado foi limitado a {validated.applied_limit} linhas, "
@@ -433,6 +446,21 @@ class AskUseCase:
         line = {"request_id": request_id, "session_id": session_id, "step": step, "status": status}
         line.update(fields)
         logger.info(json.dumps(line, ensure_ascii=False, default=str))
+
+
+def _row_text(columns: tuple[str, ...], row: dict[str, object]) -> str:
+    return ", ".join(f"{column} = {_pt_br(row.get(column))}" for column in columns)
+
+
+def _pt_br(value: object) -> str:
+    if value is None:
+        return MISSING_VALUE
+    if isinstance(value, bool):
+        return "sim" if value else "não"
+    if isinstance(value, int | float | Decimal):
+        grouped = format(Decimal(str(value)), ",f")
+        return grouped.replace(",", "_").replace(".", ",").replace("_", ".")
+    return str(value)
 
 
 def _elapsed_ms(since: float) -> int:

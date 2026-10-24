@@ -269,7 +269,9 @@ glossary:
     maps_to: "classe = 'A4'"
 
 rules:
-  - text: "Receita, sem qualificador, é receita_faturada (energia e tributos). A resposta declara essa suposição."
+  - text: "Quando a pergunta fala de receita sem dizer qual, use receita_faturada (energia e tributos) e declare essa suposição. Em pergunta que não envolve receita, não declare suposição sobre receita."
+  - text: "Receita por classe do cadastro (comercial, poder público, residencial, rural, industrial) sai de sem_faturamento_mensal ligada a sem_uc por cod_uc, filtrando sem_uc.classe_cadastro. sem_receita_decomposicao não tem classe_cadastro: não a use para separar comercial de poder público, e não troque classe_cadastro por classe."
+  - text: "Crescimento ou variação de receita entre dois períodos: devolva o total de cada período, a variação absoluta e a percentual, todas calculadas no SQL, com NULLIF no divisor."
   - text: "Tarifa média é receita_energia ÷ kwh_faturado, sem tributos. Leia tarifa_media pronta; não recalcule."
   - text: "Energia faturada é kwh_faturado, já líquida de geração distribuída."
   - text: "Competência é texto no formato AAAA-MM. Filtre por igualdade (competencia = '2025-03') ou por intervalo de texto (competencia BETWEEN '2025-01' AND '2025-03')."
@@ -300,6 +302,9 @@ examples:
     expected_status: ok
   - question: "Quanto da variação da receita entre 2024-01/2024-12 e 2025-01/2025-12 veio do efeito preço?"
     sql: "SELECT sum(efeito_preco) AS efeito_preco, sum(receita_atual - receita_base) AS variacao FROM sem_receita_decomposicao WHERE periodo_base = '2024-01/2024-12' AND periodo_atual = '2025-01/2025-12'"
+    expected_status: ok
+  - question: "Quanto a receita comercial de Recife cresceu entre 2023 e 2024?"
+    sql: "SELECT sum(CASE WHEN f.competencia LIKE '2023-%' THEN f.receita_faturada END) AS receita_2023, sum(CASE WHEN f.competencia LIKE '2024-%' THEN f.receita_faturada END) AS receita_2024, sum(CASE WHEN f.competencia LIKE '2024-%' THEN f.receita_faturada END) - sum(CASE WHEN f.competencia LIKE '2023-%' THEN f.receita_faturada END) AS variacao, round(100.0 * (sum(CASE WHEN f.competencia LIKE '2024-%' THEN f.receita_faturada END) - sum(CASE WHEN f.competencia LIKE '2023-%' THEN f.receita_faturada END)) / NULLIF(sum(CASE WHEN f.competencia LIKE '2023-%' THEN f.receita_faturada END), 0), 2) AS variacao_percentual FROM sem_faturamento_mensal f JOIN sem_uc u ON u.cod_uc = f.cod_uc WHERE u.classe_cadastro = 'Comercial' AND u.municipio ILIKE 'Recife%'"
     expected_status: ok
   - question: "Por que a receita caiu?"
     sql: null
