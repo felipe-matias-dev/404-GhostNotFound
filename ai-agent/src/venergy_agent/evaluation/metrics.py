@@ -62,10 +62,10 @@ def results_match(
     reference: Sequence[Mapping[str, object]],
     ordered: bool,
 ) -> bool:
+    if _no_data(generated) and _no_data(reference):
+        return True
     if len(generated) != len(reference):
         return False
-    if not reference:
-        return True
     candidates = _columns(generated)
     expected = _columns(reference)
     options = [
@@ -80,6 +80,10 @@ def results_match(
         if _same(generated_rows, reference_rows, ordered):
             return True
     return False
+
+
+def _no_data(rows: Sequence[Mapping[str, object]]) -> bool:
+    return not rows or (len(rows) == 1 and all(value is None for value in rows[0].values()))
 
 
 def is_violation(sql: str | None, allowed_views: frozenset[str], validator: SqlValidator) -> bool:
