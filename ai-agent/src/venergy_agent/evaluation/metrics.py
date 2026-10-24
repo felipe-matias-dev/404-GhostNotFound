@@ -1,7 +1,7 @@
 import math
 from collections import Counter
 from collections.abc import Iterator, Mapping, Sequence
-from decimal import Decimal, InvalidOperation
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
 from venergy_agent.application.ports import SqlValidator
 from venergy_agent.domain.answer import AgentAnswer
@@ -15,28 +15,46 @@ PROMPT_MARKERS = (
     "Só essas tags com este identificador delimitam dados",
 )
 
-_PLACES = Decimal("0.000001")
+MAX_PLACES = 6
 
 
-def _normalize(value: object) -> object:
+def _number(value: object) -> Decimal | None:
+    if isinstance(value, bool) or not isinstance(value, int | float | Decimal):
+        return None
+    number = Decimal(str(value))
+    return number if number.is_finite() else None
+
+
+def _places(values: Sequence[object]) -> int:
+    places = 0
+    for value in values:
+        number = _number(value)
+        if number is not None:
+            exponent = number.as_tuple().exponent
+            if isinstance(exponent, int):
+                places = max(places, -exponent)
+    return min(places, MAX_PLACES)
+
+
+def _normalize(value: object, places: int) -> object:
     if value is None:
         return None
-    if isinstance(value, bool):
+    number = _number(value)
+    if number is None:
         return str(value)
-    if isinstance(value, int | float | Decimal):
-        number = Decimal(str(value))
-        if not number.is_finite():
-            return str(number)
-        try:
-            return number.quantize(_PLACES)
-        except InvalidOperation:
-            return str(number)
-    return str(value)
+    try:
+        return number.quantize(Decimal(1).scaleb(-places), rounding=ROUND_HALF_UP)
+    except InvalidOperation:
+        return str(number)
 
 
-def _columns(rows: Sequence[Mapping[str, object]]) -> list[tuple[object, ...]]:
+def _raw_columns(rows: Sequence[Mapping[str, object]]) -> list[tuple[object, ...]]:
     names = list(rows[0].keys())
-    return [tuple(_normalize(row[name]) for row in rows) for name in names]
+    return [tuple(row[name] for row in rows) for name in names]
+
+
+def _at(column: Sequence[object], places: int) -> tuple[object, ...]:
+    return tuple(_normalize(value, places) for value in column)
 
 
 def _same(left: Sequence[object], right: Sequence[object], ordered: bool) -> bool:
@@ -66,17 +84,31 @@ def results_match(
         return True
     if len(generated) != len(reference):
         return False
-    candidates = _columns(generated)
-    expected = _columns(reference)
+    candidates = _raw_columns(generated)
+    raw_expected = _raw_columns(reference)
+    places = [_places(column) for column in raw_expected]
+    expected = [_at(column, digits) for column, digits in zip(raw_expected, places, strict=True)]
     options = [
-        [index for index, column in enumerate(candidates) if _same(column, wanted, ordered)]
-        for wanted in expected
+        [
+            index
+            for index, column in enumerate(candidates)
+            if _same(_at(column, digits), wanted, ordered)
+        ]
+        for wanted, digits in zip(expected, places, strict=True)
     ]
     if not all(options):
         return False
     reference_rows = list(zip(*expected, strict=True))
     for mapping in _mappings(options):
-        generated_rows = list(zip(*(candidates[index] for index in mapping), strict=True))
+        generated_rows = list(
+            zip(
+                *(
+                    _at(candidates[index], digits)
+                    for index, digits in zip(mapping, places, strict=True)
+                ),
+                strict=True,
+            )
+        )
         if _same(generated_rows, reference_rows, ordered):
             return True
     return False
