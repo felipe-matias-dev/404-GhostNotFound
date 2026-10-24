@@ -613,6 +613,12 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
     continuam cadastradas e atendidas pelo alimentador, e o contrato define `n_uc` como UCs do
     cadastro. Elas não têm medidor nem leitura, então ficam sem `consumo_medio_kwh_12m`; a existência
     de faturas dessas UCs é conferida nos testes da Gold.
+  - **`possui_gd` na decomposição:** é o estado no último mês do período atual e vale para a UC nos
+    dois períodos. A UC que conectou a GD entre eles fica no grupo com GD de ambos os lados, porque o
+    PVM compara linhas de mesma chave e o efeito GD precisa ser a queda de volume das mesmas UCs. É o
+    mesmo grupo do diagnóstico (as UCs da tabela de GD, todas conectadas depois do início de P1), então
+    os números do diagnóstico não mudam. Em `gold_kpis_segmento_mensal` continua por competência, a
+    partir do mês da conexão; por isso as duas tabelas podem diferir no período base.
   - `consumo_medio_kwh_12m` passa a aceitar nulo: há UCs do cadastro sem nenhuma leitura, e sem
     leitura não há média. Zero seria inventar dado.
   - `potencia_kw` passa a ser `potencia_kwp`, em kWp: a origem só traz potência de pico, e kW
