@@ -45,6 +45,9 @@ services:
     volumes:
       - ./backend/src:/app/backend/src
       - ./ai-agent/src:/app/ai-agent/src
+      # Camada semântica do agente (semantic_layer.yaml e views.sql): a carga aplica o views.sql
+      # e o agente lê o YAML. Montada para valer a versão do repositório, não a do último build.
+      - ./ai-agent/semantic:/app/ai-agent/semantic
       # CSVs da Gold (data/gold/), lidos pela carga e escritos pelo gerador da amostra.
       - ./data:/data
     depends_on:
