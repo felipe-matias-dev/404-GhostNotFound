@@ -13,7 +13,7 @@
 # As linhas de exemplo são sintéticas, escritas à mão. Nenhum valor real da Gold entra aqui.
 # Depois de cada mudança, gere o views.sql (ver a seção Camada semântica em ai-agent/README.md).
 
-version: "0.3.1"
+version: "0.3.2"
 
 views:
   - name: sem_uc
@@ -271,6 +271,7 @@ glossary:
 rules:
   - text: "Quando a pergunta fala de receita sem dizer qual, use receita_faturada (energia e tributos) e declare essa suposição. Em pergunta que não envolve receita, não declare suposição sobre receita."
   - text: "Receita por classe do cadastro (comercial, poder público, residencial, rural, industrial) sai de sem_faturamento_mensal ligada a sem_uc por cod_uc, filtrando sem_uc.classe_cadastro. sem_receita_decomposicao não tem classe_cadastro: não a use para separar comercial de poder público, e não troque classe_cadastro por classe."
+  - text: "Variação por UC entre dois períodos (quantas UCs subiram ou caíram mais de X%): calcule a média mensal de cada UC em cada período, numa CTE por período, junte por cod_uc e conte as UCs que passam do limite. Declare como suposição que a comparação usa a média mensal."
   - text: "Crescimento ou variação de receita entre dois períodos: devolva o total de cada período, a variação absoluta e a percentual, todas calculadas no SQL, com NULLIF no divisor."
   - text: "Tarifa média é receita_energia ÷ kwh_faturado, sem tributos. Leia tarifa_media pronta; não recalcule."
   - text: "Energia faturada é kwh_faturado, já líquida de geração distribuída."
@@ -309,6 +310,9 @@ examples:
     expected_status: ok
   - question: "O número de chamados caiu nos últimos 12 meses em relação ao primeiro ano da base?"
     sql: "WITH meses AS (SELECT competencia, row_number() OVER (ORDER BY competencia) AS ordem_inicio, row_number() OVER (ORDER BY competencia DESC) AS ordem_fim FROM sem_kpis_mensais) SELECT sum(CASE WHEN m.ordem_inicio <= 12 THEN k.n_chamados END) AS chamados_primeiro_ano, sum(CASE WHEN m.ordem_fim <= 12 THEN k.n_chamados END) AS chamados_ultimos_12_meses FROM sem_kpis_mensais k JOIN meses m ON m.competencia = k.competencia"
+    expected_status: ok
+  - question: "Entre 2023 e 2024, quantas UCs residenciais de Recife aumentaram o consumo em mais de 20%?"
+    sql: "WITH base AS (SELECT f.cod_uc, avg(f.kwh_faturado) AS kwh FROM sem_faturamento_mensal f JOIN sem_uc u ON u.cod_uc = f.cod_uc WHERE u.classe_cadastro = 'Residencial' AND u.municipio ILIKE 'Recife%' AND f.competencia LIKE '2023-%' GROUP BY f.cod_uc), atual AS (SELECT f.cod_uc, avg(f.kwh_faturado) AS kwh FROM sem_faturamento_mensal f JOIN sem_uc u ON u.cod_uc = f.cod_uc WHERE u.classe_cadastro = 'Residencial' AND u.municipio ILIKE 'Recife%' AND f.competencia LIKE '2024-%' GROUP BY f.cod_uc) SELECT count(*) AS total FROM base b JOIN atual a ON a.cod_uc = b.cod_uc WHERE a.kwh > 1.2 * b.kwh"
     expected_status: ok
   - question: "Por que a receita caiu?"
     sql: null
