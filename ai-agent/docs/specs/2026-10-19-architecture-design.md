@@ -316,9 +316,20 @@ Primeira execução: `eval/runs/2026-10-24T033727Z.json`. Configuração: `gemin
 1. **Período fora dos dados (G019, G029, G030; tira 27 pontos dos `unknown`).** O golden set espera `unknown`, e o agente responde com resultado vazio, como manda a §5.1 (item 6). O gabarito e a spec se contradizem. Proposta: o esperado vira `answered` com `confidence = low`, porque com a Gold real o período pode existir (por exemplo, julho de 2022).
 2. **Períodos relativos (G041 a G043: "primeiro ano da base × últimos 12 meses").** O agente pede esclarecimento, por causa da regra "não suponha quais competências existem". Proposta: uma regra e um exemplo na camada semântica para calcular esses períodos com `min` e `max` da competência, no SQL.
 3. **Follow-up (G046, "E em Olinda?").** Depende da memória de conversa, que é diferencial (G1-10). Proposta: o item sai da conta até a memória existir, ou o esperado vira `clarify`.
-4. **Execution accuracy.** Das 6 falhas, a maioria é de forma: a referência arredonda (`round(avg, 1)`) e o agente não (G008, G010); a referência pede colunas a mais (G066); ou a granularidade é outra (G020 e G061: por mês contra total). Proposta: a métrica compara cada número com a precisão do número da referência, e a revisão humana ajusta as referências.
-5. **Fidelidade numérica.** A métrica lê o texto inteiro, inclusive o texto determinístico e as suposições, que citam períodos ("2024-01 a 2024-12") que não estão nas linhas. Proposta: medir só a narrativa. Para isso, o `AgentAnswer` precisa dizer se o texto é narrativa ou fallback, o que muda o contrato e vai combinado com o V1.
+4. **Execution accuracy.** São 11 itens com `matched = false`. Quatro (G041 a G043 e G046) vêm dos achados 2 e 3, e um (G057) do achado 6. Dos 7 restantes, a maioria é de forma:
+   - a referência arredonda (`round(avg, 1)`) e o agente não (G008, G010);
+   - a referência pede colunas a mais (G066) ou devolve só a variação percentual, enquanto o agente devolve os totais, a variação absoluta e a percentual (G015);
+   - a granularidade é outra: por mês contra total (G020, G061).
+
+   Proposta: a métrica compara cada número com a precisão do número da referência, e a revisão humana ajusta as referências.
+5. **Fidelidade numérica.** A métrica lê o texto inteiro da resposta, e três artefatos dela derrubam o número sem que haja número inventado:
+   - as suposições, que citam períodos ("2024-01 a 2024-12") que não estão nas linhas;
+   - o aviso de truncamento ("limitado a 200 linhas"), cujo número nunca está nas linhas;
+   - o texto determinístico, que lista até 5 linhas do resultado completo, enquanto a métrica só vê a amostra de `AgentAnswer.rows`.
+
+   Proposta: medir só a narrativa. Para isso, o `AgentAnswer` precisa dizer se o texto é narrativa ou fallback, o que muda o contrato e vai combinado com o V1.
 6. **Casos difíceis (G039, G056, G057).** Ficam para a revisão humana do golden set.
+7. **Literais no SQL do relatório.** O relatório guarda o SQL gerado, que pode trazer literais da pergunta, como um `cod_uc`. Com a amostra sintética isso não é dado real. Antes de rodar sobre a Gold real, o SQL precisa ser mascarado no relatório, ou o relatório fica fora do Git (DEC-024).
 
 ## 10. Dependências de outras áreas
 
