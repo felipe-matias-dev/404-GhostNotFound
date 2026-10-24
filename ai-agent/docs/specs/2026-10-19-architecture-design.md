@@ -18,11 +18,14 @@ O agente transforma uma pergunta em português numa consulta SQL somente leitura
 - contrato `AgentAnswer` com status e invariantes (PRs #21 e #29, item 2);
 - camada semântica v0.2, validada contra o contrato da Gold v0.2.0 (PRs #20 e #35, item 5);
 - orquestração `ask()`, `bootstrap.py` e comando de terminal (PR #30, item 6);
-- golden set com 66 itens, rascunho até a revisão humana (PR #32, parte do item 7).
+- golden set com 66 itens, rascunho até a revisão humana (PR #32, parte do item 7);
+- narração com verificação numérica, texto determinístico com valores e `prompts/v2` (PR #36, item 8, DEC-019).
 
-**Em revisão:** narração com verificação numérica (item 8, PR #36, DEC-019).
+**Em revisão:**
+- `InsightWriter` (item 9, PR #40);
+- red team, runner de métricas e linha de base (item 7, branch `feat/ai-agent-avaliacao`, §9.6).
 
-**Falta, na ordem da §11:** red team e runner de métricas (item 7), e o `InsightWriter` (item 9, branch `feat/ai-agent-insight`, que faz rebase depois do item 8).
+**Falta:** a revisão humana do golden set e as decisões da §9.6. Os eventos de progresso para SSE (PR #39 e issue #38) ficam como alteração futura (decisão do time em 24/10/2026).
 
 **Critério de sucesso de cada feature:** `uv run pytest` e `uv run ruff check` passam em `ai-agent/` (inclusive no CI), os contratos desta spec batem com o código e os testes da §8 cobrem as regras novas.
 
@@ -280,10 +283,42 @@ Comparar o texto do SQL não vale como métrica: duas consultas diferentes podem
 - Antes de confiar no juiz, calibrar com uma amostra pequena avaliada por uma pessoa.
 
 ### 9.5 Encaixe na arquitetura
+
+- Implementado em `venergy_agent/evaluation/`:
+  - `metrics.py`: funções puras;
+  - `runner.py` e `report.py`: o `EvaluationRunner` consome só portas;
+  - `__main__.py`: `uv run python -m venergy_agent.evaluation [--only golden|red_team] [--pause 4]`.
+- O SQL gerado e o `reference_sql` passam pelo validador e pelo executor, porque `AgentAnswer.rows` é só uma amostra.
+- Um `reference_sql` que falha marca o item com `reference_error` e o tira da execution accuracy: erro do gabarito não conta como erro do agente.
+- O relatório guarda métricas, status, SQL e flags por item, nunca linhas nem texto da resposta (DEC-024).
 - O pacote `venergy_agent/evaluation/` traz o runner, que consome só portas: `TextToSqlAgent`, para responder, e `QueryExecutor`, para rodar o `reference_sql`. Assim o runner avalia qualquer implementação do agente sem conhecer o framework.
 - O juiz entra como a porta `AnswerJudge.judge(question: str, answer: AgentAnswer) -> JudgeVerdict`, com adapter PydanticAI. As settings ganham `judge_model`.
 - Cada execução grava um relatório (`eval/runs/<timestamp>.json`) com modelo, `prompt_version`, versão da camada semântica e métricas. Uma variável muda por vez.
 - **Regra de merge:** a partir da primeira execução do golden set, uma mudança de prompt, modelo, few-shot, glossário ou camada semântica só entra se a execution accuracy e a acurácia de status não regredirem, e mudança de prompt vai para uma versão nova em `prompts/` (DEC-016).
+
+### 9.6 Linha de base (24/10/2026)
+
+Primeira execução: `eval/runs/2026-10-24T033727Z.json`. Configuração: `gemini-3.1-flash-lite`, `prompts/v2` e camada semântica 0.2.0, sobre a **amostra sintética**. Os números se recalibram com a Gold real. É o ponto de partida da regra de merge (§9.5, DEC-016).
+
+| Métrica | Valor | Meta |
+|---|---|---|
+| Execution accuracy | 70,3% | ≥ 80% (sobre a Gold real) |
+| Acurácia de status | 84,8% | — |
+| Acurácia de status nos `unknown` | 72,7% | 100% |
+| Taxa de `failed` | 0,0% | acompanhar |
+| Bloqueio de manipulação | 100% (0 violações em 17 ataques) | 100% |
+| Fidelidade numérica | 66,7% | 100% |
+| Latência p50 / p95 | 1.014 ms / 9.585 ms | acompanhar |
+| Erros de gabarito (`reference_errors`) | 0 | 0 |
+
+**Achados que pedem decisão antes da próxima rodada.** A maior parte das falhas vem do gabarito ou da métrica, não do agente:
+
+1. **Período fora dos dados (G019, G029, G030; tira 27 pontos dos `unknown`).** O golden set espera `unknown`, e o agente responde com resultado vazio, como manda a §5.1 (item 6). O gabarito e a spec se contradizem. Proposta: o esperado vira `answered` com `confidence = low`, porque com a Gold real o período pode existir (por exemplo, julho de 2022).
+2. **Períodos relativos (G041 a G043: "primeiro ano da base × últimos 12 meses").** O agente pede esclarecimento, por causa da regra "não suponha quais competências existem". Proposta: uma regra e um exemplo na camada semântica para calcular esses períodos com `min` e `max` da competência, no SQL.
+3. **Follow-up (G046, "E em Olinda?").** Depende da memória de conversa, que é diferencial (G1-10). Proposta: o item sai da conta até a memória existir, ou o esperado vira `clarify`.
+4. **Execution accuracy.** Das 6 falhas, a maioria é de forma: a referência arredonda (`round(avg, 1)`) e o agente não (G008, G010); a referência pede colunas a mais (G066); ou a granularidade é outra (G020 e G061: por mês contra total). Proposta: a métrica compara cada número com a precisão do número da referência, e a revisão humana ajusta as referências.
+5. **Fidelidade numérica.** A métrica lê o texto inteiro, inclusive o texto determinístico e as suposições, que citam períodos ("2024-01 a 2024-12") que não estão nas linhas. Proposta: medir só a narrativa. Para isso, o `AgentAnswer` precisa dizer se o texto é narrativa ou fallback, o que muda o contrato e vai combinado com o V1.
+6. **Casos difíceis (G039, G056, G057).** Ficam para a revisão humana do golden set.
 
 ## 10. Dependências de outras áreas
 
@@ -328,7 +363,7 @@ Pedidos a abrir como issue para a área dona. O GenAI não altera esses arquivos
 - O `bootstrap.py` (`build_agent(settings)`) e o comando `python -m venergy_agent` entraram no item 6, com o texto determinístico, depois da revisão do PR #30. O backend já pode montar o agente para o D3; o item 8 só injeta o `AnswerWriter`.
 
 **7. Golden set + red team + runner** com as métricas de §9.3. Os itens do golden set e do red team podem ser escritos desde já, porque não dependem de código; o `reference_sql` precisa da amostra (D4).
-- Estado: golden set com 66 itens no PR #32 (versão 0.2.0, rascunho, sem revisão humana): 37 `answered`, 11 `unknown`, 9 `clarify` e 9 `refused`. Red team e runner ainda não começaram.
+- Estado: golden set com 66 itens no PR #32 (versão 0.2.0, rascunho, sem revisão humana): 37 `answered`, 11 `unknown`, 9 `clarify` e 9 `refused`. Red team (`eval/red_team.yaml`, 17 ataques nos cinco tipos da §9.2), runner e linha de base na branch `feat/ai-agent-avaliacao` (plano `docs/plans/2026-10-24-evaluation-runner.md`, resultados na §9.6).
 - Alinhado à camada v0.2 na revisão do PR #32, mais G065 (DEC de um município num trimestre) e G066 (efeito bandeira entre dois períodos explícitos):
   - G026 (satisfação) e G027 (chamados) passam de `unknown` para `answered`, com `sem_kpis_mensais`;
   - G040 continua `clarify`, mas a nota muda: os períodos da decomposição já estão definidos no contrato, só não estão na pergunta;
@@ -337,14 +372,15 @@ Pedidos a abrir como issue para a área dona. O GenAI não altera esses arquivos
 - A revisão humana de cada item é do GenAI (Perylo), e a dos SQLs contra a amostra, dos Dados. O gabarito só se fixa com a Gold real.
 
 **8. `AnswerWriter` + verificação numérica.** Narrativa a partir das linhas, com o conteúdo do banco delimitado como dado (§5.2) e volta ao texto determinístico quando a verificação falha. A mesma verificação numérica serve ao item 9.
-- Estado: branch `feat/ai-agent-narracao-v2`, refeita sobre a `main` depois do PR #30. O `AnswerWriter` entra pelo `build_agent`, e o prompt fica em `prompts/answer/v1/`.
+- Estado: feito (PR #36). O `AnswerWriter` entra pelo `build_agent`, e o prompt fica em `prompts/answer/v1/`.
 - DEC-019 aceita. Cada número da narrativa precisa existir nas linhas ou no total de linhas; números só da pergunta não contam. O texto é lido só em pt-BR, e os valores do banco são lidos no próprio tipo.
 
 **9. `InsightWriter`.** Narra o JSON de métricas de uma tela (G2-04, tela de Receita; G2-05, "conta alta" na UC 360, Should) em 2 a 4 frases, sem conclusões causais que o JSON não sustenta (§9 do guia), e devolve `None` se algum número do texto não estiver no JSON. O cache por filtros e a montagem do JSON são do backend (D9).
-- Estado: branch `feat/ai-agent-insight`, sem PR, empilhada sobre a narração. Rebase depois do item 8.
+- Estado: PR #40 (o #37 foi mesclado na branch da narração depois que ela já tinha ido para a `main`).
 
 **Diferenciais, só depois dos obrigatórios:**
 - follow-up com memória (G1-10; o histórico fica fora do processo, §8 do guia);
 - LLM as a judge (§9.4);
 - avaliação automatizada a cada mudança, com tabela comparativa de experimentos (G2-08);
-- rate limit e orçamento de tokens por sessão (§7).
+- rate limit e orçamento de tokens por sessão (§7);
+- eventos de progresso para SSE (item 10: PR #39, rascunho, e issue #38). É alteração futura, por decisão do time em 24/10/2026.
