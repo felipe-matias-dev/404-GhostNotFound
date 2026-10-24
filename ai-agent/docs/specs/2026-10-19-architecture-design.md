@@ -18,11 +18,12 @@ O agente transforma uma pergunta em português numa consulta SQL somente leitura
 - contrato `AgentAnswer` com status e invariantes (PRs #21 e #29, item 2);
 - camada semântica v0.2, validada contra o contrato da Gold v0.2.0 (PRs #20 e #35, item 5);
 - orquestração `ask()`, `bootstrap.py` e comando de terminal (PR #30, item 6);
-- golden set com 66 itens, rascunho até a revisão humana (PR #32, parte do item 7).
+- golden set com 66 itens, rascunho até a revisão humana (PR #32, parte do item 7);
+- narração com verificação numérica, texto determinístico com valores e `prompts/v2` (PR #36, item 8, DEC-019).
 
-**Em revisão:** narração com verificação numérica (item 8, PR #36, DEC-019).
+**Em revisão:** `InsightWriter` (item 9). O PR #37 foi mesclado na branch da narração depois que o #36 já tinha ido para a `main`, e chega à `main` por um PR próprio da branch `feat/ai-agent-narracao-v2`. Também em revisão: eventos de progresso para SSE (item 10, PR #39, rascunho).
 
-**Falta, na ordem da §11:** red team e runner de métricas (item 7), e o `InsightWriter` (item 9, branch `feat/ai-agent-insight`, que faz rebase depois do item 8).
+**Falta, na ordem da §11:** red team e runner de métricas (item 7). Depois, os diferenciais.
 
 **Critério de sucesso de cada feature:** `uv run pytest` e `uv run ruff check` passam em `ai-agent/` (inclusive no CI), os contratos desta spec batem com o código e os testes da §8 cobrem as regras novas.
 
@@ -140,7 +141,7 @@ São `typing.Protocol` assíncronos, exceto `SqlValidator`, que é síncrono por
 | `SqlValidator` | `validate(sql: str, allowed_views: frozenset[str]) -> ValidatedQuery` | Levanta `SqlRejected`; adapter `SqlglotValidator` (§6) |
 | `QueryExecutor` | `execute(query: ValidatedQuery) -> QueryResult` | Levanta `QueryExecutionError` para erros que o modelo pode corrigir; os demais erros do banco (permissão, somente leitura, conexão) propagam sem classificação |
 | `AnswerWriter` | `write(question: Question, draft: SqlDraft, result: QueryResult) -> str` | Item 8. Resposta só a partir das linhas |
-| `InsightWriter` | `narrate(screen: str, metrics: Mapping[str, object]) -> Insight` | Item 9. O LLM só narra números prontos. O item 9 muda o retorno para `Insight \| None`: `None` quando a verificação numérica falha |
+| `InsightWriter` | `narrate(screen: str, metrics: Mapping[str, object]) -> Insight \| None` | Item 9. O LLM só narra números prontos. `None` quando a verificação numérica falha ou o provedor dá erro, e a tela aparece sem insight |
 
 ### 5.1 Fluxo do `ask()` (item 6)
 
@@ -299,7 +300,7 @@ Pedidos a abrir como issue para a área dona. O GenAI não altera esses arquivos
 | D6 | Dev (`infra/postgres/init/01-init.sh`) | Versionar o script com bit de execução (`git update-index --chmod=+x`) | No Docker Desktop do macOS, a primeira subida do banco falha com `bad interpreter: Permission denied` | Aberto |
 | D7 | Dev (loader `venergy_api.carga`) | Na mesma transação da carga: apagar as views `sem_*` antes do `drop_all` e rodar o `ai-agent/semantic/views.sql` (gerado pelo item 5) com o usuário dono depois do `create_all` | O usuário do agente é somente leitura. Desde a DEC-014 a carga recria as tabelas da Gold (`drop_all` sem `CASCADE`), e o `DROP TABLE` falha enquanto houver view dependente; sem esse passo, a primeira carga depois do item 5 quebra | Feito (PR da branch `feat/carga-views-agente`): a carga apaga as `sem_*` pelo catálogo e aplica o `views.sql`; se o arquivo não bater com a Gold, a carga é cancelada (DEC-014) |
 | D8 | Dev (`backend/`, `docker-compose.yml`, CI) | Instalar o agente na API: workspace do uv com um único `uv.lock` na raiz, build da API com contexto na raiz e as variáveis `VENERGY_AGENT_*` no serviço `api` | O backend precisa importar o agente para o `/ai` (G1-09) | **Feito** (DEC-017, issue #18). A imagem já leva `ai-agent/` (com `prompts/` e, no item 5, `semantic/`) e `contracts/` |
-| D9 | Dev (G2-04, G2-05) | Montar o JSON de métricas de cada tela, chamar o `InsightWriter` e guardar o insight em cache por combinação de filtros; quando o agente devolver `None`, mostrar a tela sem o insight | O LLM só narra números prontos (ADR-04); o agente não guarda estado no processo (§14 do guia) | Aberto; depende do item 9 |
+| D9 | Dev (G2-04, G2-05) | Montar o JSON de métricas de cada tela, chamar o `InsightWriter` e guardar o insight em cache por combinação de filtros; quando o agente devolver `None`, mostrar a tela sem o insight. O JSON traz como valor o período da tela (por exemplo `"periodo": "2025-01/2025-03"`), porque só os valores do JSON validam os números do texto (DEC-019) | O LLM só narra números prontos (ADR-04); o agente não guarda estado no processo (§14 do guia) | Aberto; depende do item 9 |
 
 ## 11. Próximas features (cada uma em sua branch, com plano próprio)
 
@@ -337,11 +338,11 @@ Pedidos a abrir como issue para a área dona. O GenAI não altera esses arquivos
 - A revisão humana de cada item é do GenAI (Perylo), e a dos SQLs contra a amostra, dos Dados. O gabarito só se fixa com a Gold real.
 
 **8. `AnswerWriter` + verificação numérica.** Narrativa a partir das linhas, com o conteúdo do banco delimitado como dado (§5.2) e volta ao texto determinístico quando a verificação falha. A mesma verificação numérica serve ao item 9.
-- Estado: branch `feat/ai-agent-narracao-v2`, refeita sobre a `main` depois do PR #30. O `AnswerWriter` entra pelo `build_agent`, e o prompt fica em `prompts/answer/v1/`.
+- Estado: feito (PR #36). Refeito sobre a `main` depois do PR #30. O `AnswerWriter` entra pelo `build_agent`, e o prompt fica em `prompts/answer/v1/`.
 - DEC-019 aceita. Cada número da narrativa precisa existir nas linhas ou no total de linhas; números só da pergunta não contam. O texto é lido só em pt-BR, e os valores do banco são lidos no próprio tipo.
 
 **9. `InsightWriter`.** Narra o JSON de métricas de uma tela (G2-04, tela de Receita; G2-05, "conta alta" na UC 360, Should) em 2 a 4 frases, sem conclusões causais que o JSON não sustenta (§9 do guia), e devolve `None` se algum número do texto não estiver no JSON. O cache por filtros e a montagem do JSON são do backend (D9).
-- Estado: branch `feat/ai-agent-insight`, sem PR, empilhada sobre a narração. Rebase depois do item 8.
+- Estado: branch `feat/ai-agent-insight-v2`, refeita sobre o PR #36. Usa a mesma verificação da DEC-019: o texto é lido em pt-BR, e os valores do JSON de métricas são a fonte dos números, inclusive os aninhados, mas não as chaves. A porta devolve `Insight | None`. A montagem do JSON, o cache e a ligação no composition root são do backend (D9).
 
 **Diferenciais, só depois dos obrigatórios:**
 - follow-up com memória (G1-10; o histórico fica fora do processo, §8 do guia);
