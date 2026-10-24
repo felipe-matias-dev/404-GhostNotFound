@@ -68,11 +68,16 @@ class EvaluationRunner:
         question = item["question"] if golden else item["attack"]
         expected = AnswerStatus(item["expected_status"])
         scored = golden and expected is AnswerStatus.ANSWERED
+        reference_sql = item.get("reference_sql") if scored else None
+        reference = await self._reference(reference_sql) if scored else None
+        judged = reference is not None
+        reference_error = scored and not judged
         common = {
             "id": item["id"],
             "kind": kind,
             "category": item["category"] if golden else item["kind"],
             "expected_status": expected,
+            "reference_error": reference_error,
         }
         try:
             answer = await self._agent.ask(question, session_id=SESSION_ID)
@@ -81,30 +86,45 @@ class EvaluationRunner:
                 **common,
                 status=AnswerStatus.FAILED,
                 sql=None,
-                matched=False if scored else None,
+                matched=False if judged else None,
                 violation=False,
                 prompt_leak=False,
                 numeric_fidelity=None,
                 latency_ms=None,
             )
         answered = answer.status is AnswerStatus.ANSWERED
+        matched = None
+        if reference is not None and reference_sql is not None:
+            matched = await self._matched(answer, reference, reference_sql)
         return ItemResult(
             **common,
             status=answer.status,
             sql=answer.sql,
-            matched=await self._matched(answer, item["reference_sql"]) if scored else None,
+            matched=matched,
             violation=is_violation(answer.sql, self._allowed_views, self._validator),
             prompt_leak=leaks_prompt(answer.answer),
             numeric_fidelity=numeric_fidelity(answer) if answered else None,
             latency_ms=answer.latency_ms,
         )
 
-    async def _matched(self, answer: AgentAnswer, reference_sql: str) -> bool:
+    async def _reference(self, sql: str | None) -> tuple[dict[str, object], ...] | None:
+        if not sql:
+            return None
+        try:
+            return await self._rows(sql)
+        except Exception:
+            return None
+
+    async def _matched(
+        self,
+        answer: AgentAnswer,
+        reference: Sequence[Mapping[str, object]],
+        reference_sql: str,
+    ) -> bool:
         if answer.status is not AnswerStatus.ANSWERED or answer.sql is None:
             return False
         try:
             generated = await self._rows(answer.sql)
-            reference = await self._rows(reference_sql)
         except Exception:
             return False
         return results_match(generated, reference, ordered="ORDER BY" in reference_sql.upper())
@@ -117,7 +137,11 @@ class EvaluationRunner:
 def _metrics(items: Sequence[ItemResult]) -> dict[str, float | int | None]:
     golden = [item for item in items if item.kind == "golden"]
     red_team = [item for item in items if item.kind == "red_team"]
-    scored = [item for item in golden if item.expected_status is AnswerStatus.ANSWERED]
+    scored = [
+        item
+        for item in golden
+        if item.expected_status is AnswerStatus.ANSWERED and not item.reference_error
+    ]
     unknown = [item for item in golden if item.expected_status is AnswerStatus.UNKNOWN]
     manipulation = red_team + [
         item for item in golden if item.expected_status is AnswerStatus.REFUSED
@@ -136,6 +160,7 @@ def _metrics(items: Sequence[ItemResult]) -> dict[str, float | int | None]:
         "numeric_fidelity": rate(sum(fidelity), len(fidelity)),
         "latency_p50_ms": percentile(latencies, 0.5),
         "latency_p95_ms": percentile(latencies, 0.95),
+        "reference_errors": sum(item.reference_error for item in items),
         "golden_items": len(golden),
         "red_team_items": len(red_team),
     }

@@ -260,3 +260,32 @@ async def test_report_never_contains_rows_or_answer_text():
     assert report.prompt_version == "v2"
     assert report.semantic_layer_version == "0.3.0"
     assert report.started_at.tzinfo is not None
+
+
+async def test_broken_reference_sql_is_flagged_and_left_out_of_execution_accuracy():
+    _, evaluation = runner(
+        {
+            "Quantas UCs?": make_answer(),
+            "Quantas em Olinda?": make_answer(sql=OLINDA_SQL, text="Existem 3 UCs."),
+            "Quantas em Recife?": make_answer(sql=WRONG_SQL, text="Existem 5 UCs."),
+        }
+    )
+
+    report = await run(
+        evaluation,
+        [
+            golden("G001", "Quantas UCs?", COUNT_SQL),
+            golden("G002", "Quantas em Olinda?", "SELECT missing FROM sem_uc"),
+            golden("G003", "Quantas em Recife?", None),
+        ],
+    )
+
+    first, broken, missing = report.items
+    assert first.matched is True
+    assert first.reference_error is False
+    assert broken.matched is None
+    assert broken.reference_error is True
+    assert missing.matched is None
+    assert missing.reference_error is True
+    assert report.metrics["execution_accuracy"] == 1.0
+    assert report.metrics["reference_errors"] == 2
