@@ -1,6 +1,6 @@
 # InsightWriter Implementation Plan
 
-> **Status (2026-10-23): rebuilt as branch `feat/ai-agent-insight-v2`, on top of PR #36 (item 8).** It uses the DEC-019 verification from #36: the text is read in pt-BR only, and the metrics JSON is the value source (nested values and keys included). The prompt now asks for the Brazilian number format. The composition-root wiring is not included: the backend (D9) decides how and when screens request insights.
+> **Status (2026-10-23): rebuilt as branch `feat/ai-agent-insight-v2`, on top of PR #36 (item 8).** It uses the DEC-019 verification from #36: the text is read in pt-BR only, and the values of the metrics JSON are the number source (nested values included, keys excluded: a number that only appears in a key such as `receita_2024` does not validate the text, per Lucas in commit 4f88343). Merged into `main` through the narration branch, because PR #37 was merged into its base after PR #36 had already gone to `main`. The prompt now asks for the Brazilian number format. The composition-root wiring is not included: the backend (D9) decides how and when screens request insights.
 
 **Goal:** narrate the metrics of a screen in two to four sentences, and return `None` whenever the text contains a number that is not in the metrics JSON (spec §11, item 9; ADR-04).
 

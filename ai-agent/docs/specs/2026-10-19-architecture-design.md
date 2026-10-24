@@ -18,9 +18,10 @@ O agente transforma uma pergunta em português numa consulta SQL somente leitura
 - contrato `AgentAnswer` com status e invariantes (PRs #21 e #29, item 2);
 - camada semântica v0.2, validada contra o contrato da Gold v0.2.0 (PRs #20 e #35, item 5);
 - orquestração `ask()`, `bootstrap.py` e comando de terminal (PR #30, item 6);
-- golden set com 66 itens, rascunho até a revisão humana (PR #32, parte do item 7).
+- golden set com 66 itens, rascunho até a revisão humana (PR #32, parte do item 7);
+- narração com verificação numérica, texto determinístico com valores e `prompts/v2` (PR #36, item 8, DEC-019).
 
-**Em revisão:** narração com verificação numérica (item 8, PR #36, DEC-019) e, sobre ela, o `InsightWriter` (item 9, branch `feat/ai-agent-insight-v2`).
+**Em revisão:** `InsightWriter` (item 9). O PR #37 foi mesclado na branch da narração depois que o #36 já tinha ido para a `main`, e chega à `main` por um PR próprio da branch `feat/ai-agent-narracao-v2`. Também em revisão: eventos de progresso para SSE (item 10, PR #39, rascunho).
 
 **Falta, na ordem da §11:** red team e runner de métricas (item 7). Depois, os diferenciais.
 
@@ -337,11 +338,11 @@ Pedidos a abrir como issue para a área dona. O GenAI não altera esses arquivos
 - A revisão humana de cada item é do GenAI (Perylo), e a dos SQLs contra a amostra, dos Dados. O gabarito só se fixa com a Gold real.
 
 **8. `AnswerWriter` + verificação numérica.** Narrativa a partir das linhas, com o conteúdo do banco delimitado como dado (§5.2) e volta ao texto determinístico quando a verificação falha. A mesma verificação numérica serve ao item 9.
-- Estado: branch `feat/ai-agent-narracao-v2`, refeita sobre a `main` depois do PR #30. O `AnswerWriter` entra pelo `build_agent`, e o prompt fica em `prompts/answer/v1/`.
+- Estado: feito (PR #36). Refeito sobre a `main` depois do PR #30. O `AnswerWriter` entra pelo `build_agent`, e o prompt fica em `prompts/answer/v1/`.
 - DEC-019 aceita. Cada número da narrativa precisa existir nas linhas ou no total de linhas; números só da pergunta não contam. O texto é lido só em pt-BR, e os valores do banco são lidos no próprio tipo.
 
 **9. `InsightWriter`.** Narra o JSON de métricas de uma tela (G2-04, tela de Receita; G2-05, "conta alta" na UC 360, Should) em 2 a 4 frases, sem conclusões causais que o JSON não sustenta (§9 do guia), e devolve `None` se algum número do texto não estiver no JSON. O cache por filtros e a montagem do JSON são do backend (D9).
-- Estado: branch `feat/ai-agent-insight-v2`, refeita sobre o PR #36. Usa a mesma verificação da DEC-019: o texto é lido em pt-BR, e o JSON de métricas é a fonte dos números, inclusive os aninhados. A porta devolve `Insight | None`. A montagem do JSON, o cache e a ligação no composition root são do backend (D9).
+- Estado: branch `feat/ai-agent-insight-v2`, refeita sobre o PR #36. Usa a mesma verificação da DEC-019: o texto é lido em pt-BR, e os valores do JSON de métricas são a fonte dos números, inclusive os aninhados, mas não as chaves. A porta devolve `Insight | None`. A montagem do JSON, o cache e a ligação no composition root são do backend (D9).
 
 **Diferenciais, só depois dos obrigatórios:**
 - follow-up com memória (G1-10; o histórico fica fora do processo, §8 do guia);

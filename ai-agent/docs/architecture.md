@@ -2,7 +2,7 @@
 
 Resumo para orientar quem chega ao `ai-agent/` (pessoa ou sessão de IA). A fonte da verdade continua sendo a [spec](specs/2026-10-19-architecture-design.md); este arquivo só diz o que existe hoje, onde está e o que falta. Atualize-o no mesmo PR que mudar o estado.
 
-- **Atualizado em:** 23/10/2026, com a narração (item 8) sobre a `main` depois dos PRs #29, #30, #31, #32 e #35. O que está em revisão está na spec §1.
+- **Atualizado em:** 24/10/2026: narração (item 8, PR #36) na `main`; o `InsightWriter` (item 9) chega por um PR da branch `feat/ai-agent-narracao-v2`. O que está em revisão está na spec §1.
 
 ## 1. O que o agente faz
 
