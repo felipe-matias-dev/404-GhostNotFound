@@ -381,3 +381,16 @@ async def test_number_from_the_question_does_not_make_a_narrative_faithful(layer
 
     assert "300" not in answer.answer
     assert answer.answer.startswith("A consulta devolveu 1 linha(s).")
+
+
+async def test_long_text_values_are_shortened_in_the_fallback_answer(layer):
+    long_text = "x" * 300
+
+    answer = await use_case(
+        layer,
+        ScriptedGenerator(generation()),
+        ScriptedExecutor(result(rows=({"total": long_text},))),
+    ).ask("quantas?", "s1")
+
+    assert "x" * 300 not in answer.answer
+    assert "x" * 117 + "..." in answer.answer

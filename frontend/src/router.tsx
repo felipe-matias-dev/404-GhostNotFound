@@ -10,6 +10,8 @@ export function getRouter() {
 		routeTree,
 		context,
 		scrollRestoration: true,
+		// O painel de conteúdo rola sozinho (AppShell): volta ao topo a cada tela nova.
+		scrollToTopSelectors: ["#conteudo"],
 		defaultPreload: "intent",
 		defaultPreloadStaleTime: 0,
 	});

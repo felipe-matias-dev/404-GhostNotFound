@@ -10,33 +10,73 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as PerdasRouteImport } from './routes/perdas'
+import { Route as ReceitaRouteImport } from './routes/receita'
+import { Route as RedeRouteImport } from './routes/rede'
+import { Route as UcRouteImport } from './routes/uc'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PerdasRoute = PerdasRouteImport.update({
+  id: '/perdas',
+  path: '/perdas',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReceitaRoute = ReceitaRouteImport.update({
+  id: '/receita',
+  path: '/receita',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RedeRoute = RedeRouteImport.update({
+  id: '/rede',
+  path: '/rede',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const UcRoute = UcRouteImport.update({
+  id: '/uc',
+  path: '/uc',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/perdas': typeof PerdasRoute
+  '/receita': typeof ReceitaRoute
+  '/rede': typeof RedeRoute
+  '/uc': typeof UcRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/perdas': typeof PerdasRoute
+  '/receita': typeof ReceitaRoute
+  '/rede': typeof RedeRoute
+  '/uc': typeof UcRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/perdas': typeof PerdasRoute
+  '/receita': typeof ReceitaRoute
+  '/rede': typeof RedeRoute
+  '/uc': typeof UcRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths: '/' | '/perdas' | '/receita' | '/rede' | '/uc'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to: '/' | '/perdas' | '/receita' | '/rede' | '/uc'
+  id: '__root__' | '/' | '/perdas' | '/receita' | '/rede' | '/uc'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  PerdasRoute: typeof PerdasRoute
+  ReceitaRoute: typeof ReceitaRoute
+  RedeRoute: typeof RedeRoute
+  UcRoute: typeof UcRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +88,43 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/perdas': {
+      id: '/perdas'
+      path: '/perdas'
+      fullPath: '/perdas'
+      preLoaderRoute: typeof PerdasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/receita': {
+      id: '/receita'
+      path: '/receita'
+      fullPath: '/receita'
+      preLoaderRoute: typeof ReceitaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/rede': {
+      id: '/rede'
+      path: '/rede'
+      fullPath: '/rede'
+      preLoaderRoute: typeof RedeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/uc': {
+      id: '/uc'
+      path: '/uc'
+      fullPath: '/uc'
+      preLoaderRoute: typeof UcRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  PerdasRoute: PerdasRoute,
+  ReceitaRoute: ReceitaRoute,
+  RedeRoute: RedeRoute,
+  UcRoute: UcRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

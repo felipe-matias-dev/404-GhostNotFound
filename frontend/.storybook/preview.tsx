@@ -1,7 +1,27 @@
 import type { Preview } from "@storybook/react-vite";
-import { useEffect } from "storybook/preview-api";
+import {
+	createMemoryHistory,
+	createRootRoute,
+	createRoute,
+	createRouter,
+	RouterContextProvider,
+} from "@tanstack/react-router";
+import { useEffect, useMemo } from "storybook/preview-api";
 import { themes } from "storybook/theming";
 import "../src/styles.css";
+
+// Componentes com Link (sidebar, app-shell) precisam de um router. A story declara a rota
+// atual em `parameters.rota`; o splat aceita qualquer caminho sem cair no "não encontrado".
+// O router nasce uma vez por rota e a story fica fora dele, então trocar o tema ou um control
+// não reinicia a navegação nem o estado da story.
+function criarRouter(rota: string) {
+	const raiz = createRootRoute();
+	const qualquer = createRoute({ getParentRoute: () => raiz, path: "$" });
+	return createRouter({
+		routeTree: raiz.addChildren([qualquer]),
+		history: createMemoryHistory({ initialEntries: [rota] }),
+	});
+}
 
 const preview: Preview = {
 	parameters: {
@@ -35,6 +55,19 @@ const preview: Preview = {
 	},
 	initialGlobals: { tema: "escuro" },
 	decorators: [
+		(Story, { parameters }) => {
+			const rota = parameters.rota as string | undefined;
+			const router = useMemo(
+				() => (rota ? criarRouter(rota) : undefined),
+				[rota],
+			);
+			if (!router) return <Story />;
+			return (
+				<RouterContextProvider router={router}>
+					<Story />
+				</RouterContextProvider>
+			);
+		},
 		(Story, { globals, viewMode }) => {
 			const claro = globals.tema === "claro";
 
