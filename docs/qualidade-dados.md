@@ -90,6 +90,7 @@ Problemas encontrados no profiling dos arquivos da landing e a decisão de trata
 | OCO-01 | `causa` | Ausência escrita de várias formas (vazio, `-`, `N/A`, `NULL`) | Tratar: converter para nulo. Flag `flag_causa_ausente` |
 | OCO-02 | `duracao_min` | Sufixo `" min"` junto ao valor (ex.: `"23 min"`) | Tratar: remover o sufixo e converter para `decimal` |
 | OCO-03 | `data_abertura`, `data_encerramento` | Registradas com data e hora | Tratar: converter para `timestamp` |
+| OCO-04 | `data_abertura` × `data_ligacao` | Ocorrências registradas antes do mês de ligação da UC (achado da Gold, em UCs ligadas durante o período) | Na Gold, ficam fora do DEC/FEC e da UC 360: a UC ainda não existia. A Silver mantém a linha; a Gold confere que Gold + excluídas = Silver ([DEC-030](decisoes.md)) |
 
 **Validações no notebook:** `id_ocorrencia` único (deduplicação depois de limpar espaços), encerramento depois da abertura, `duracao_min` igual à diferença entre encerramento e abertura, nenhuma ocorrência de UC fora do cadastro. `tipo` tem 5 categorias (`FALTA DE ENERGIA`, `DANO EM EQUIPAMENTO`, `OSCILACAO`, `SOBRECARGA`, `FIO PARTIDO`).
 
