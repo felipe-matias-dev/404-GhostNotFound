@@ -32,19 +32,24 @@ Unidades usadas: `R$` (reais); `R$/kWh` (reais por quilowatt-hora); `kWh` (quilo
 | DEC | Duração equivalente de interrupção por UC: `horas_interrompidas ÷ n_uc`, em horas. Em um período, divide-se pela média mensal de `n_uc`. | `horas_interrompidas` é em UC·h (soma das durações das ocorrências das UCs do alimentador no mês). Ocorrência que vira o mês entra no mês da abertura. Os valores são simplificados pelo case: servem para comparar alimentadores e períodos, não para comparar com os limites regulatórios. Limpeza: OCO-01 a OCO-03. |
 | FEC | Frequência equivalente de interrupção por UC: `n_interrupcoes ÷ n_uc`. Em um período, divide-se pela média mensal de `n_uc`. | No case, cada ocorrência corresponde a uma UC interrompida. |
 | Satisfação média | `soma_notas ÷ n_notas` sobre o recorte escolhido. | Guarda-se a soma e a contagem, e não a média, para agregar corretamente. Limpeza: ATD-01. |
-| Efeito preço | Parte da variação da receita explicada pelo preço: `efeito_tarifa + efeito_bandeira`. | `efeito_tarifa` é o reajuste da tarifa base; `efeito_bandeira` é o acréscimo da bandeira (meses com bandeira amarela ou vermelha). Método do efeito bandeira a validar. |
+| Efeito preço | Parte da variação da receita explicada pelo preço: `efeito_tarifa + efeito_bandeira`. | `efeito_tarifa` é o reajuste da tarifa base; `efeito_bandeira` é o acréscimo da bandeira (meses com bandeira amarela ou vermelha). No dado, a bandeira é um acréscimo fixo por kWh, igual em todas as classes: a receita sem bandeira é `receita_energia − receita_bandeira` ([DEC-029](decisoes.md)). |
 | Efeito volume | Parte da variação explicada pela mudança de energia faturada. | As linhas com `possui_gd = true` isolam o efeito da geração própria. |
 | Efeito mix | Parte da variação explicada pela mudança de peso entre classes. | Calculado, não resíduo. |
 | Checagem do PVM | `abs(efeito_preco + efeito_volume + efeito_mix − (receita_atual − receita_base)) ≤ R$ 0,02` por linha (só o arredondamento dos três efeitos). | É regra de qualidade de dados, não da carga ([DEC-014](decisoes.md)). |
-| Score de suspeita | Posição da UC na fila de suspeitas: 1 = mais suspeita. | Posição no ranking, e não uma nota. Abordagem híbrida: regras explicáveis e modelo simples treinado nas inspeções. |
+| Score de suspeita | Posição da UC na fila de suspeitas: 1 = mais suspeita. Entram UCs sem GD, ainda não inspecionadas, com queda de 15% ou mais no consumo médio das 12 últimas competências contra as 12 anteriores; a ordem vem de pontos (queda forte, medidor eletromecânico, leituras estimadas) e depois do kWh a recuperar. | Posição no ranking, e não uma nota. Regras explicáveis, calibradas e medidas nas inspeções de campo (precisão e cobertura saem a cada carga) ([DEC-030](decisoes.md)). |
 | `possui_gd` | A UC tem geração própria conectada. Em `gold_kpis_segmento_mensal`, vale por competência (a partir do mês da conexão); em `gold_receita_decomposicao`, é o estado no último mês do período atual. | A UC que conectou entre os períodos fica no grupo com GD dos dois lados da decomposição (DEC-023). |
 | Potência | Potência de pico instalada, em kWp. | A origem só traz potência de pico. Registros com potência muito acima do normal (GD-02) seguem a decisão da Gold. |
 | Situação da fatura (`status_pagamento`) | Calculada na Gold contra a **data de corte** (a maior data presente nas faturas): `paga` (paga até o vencimento), `paga_com_atraso`, `em_aberto` (não paga e ainda no prazo) e `em_atraso` (não paga e vencida). `dias_em_atraso` = dias entre o vencimento e o pagamento (ou a data de corte). | Uma UC tem uma única fatura por competência, então a situação vive no fato. A Silver só distingue paga, paga com atraso e em aberto. No dataset do case todas as faturas não pagas estão em atraso, porque o corte é posterior a todos os vencimentos. Limpeza: FAT-04. |
+| Inadimplência | `valor_nao_pago ÷ receita_faturada` no recorte e período escolhidos. | A situação da fatura é medida na data de corte: numa competência antiga, conta as faturas daquele mês que continuam sem pagamento hoje. Limpeza: FAT-04. |
+| Atraso médio | `soma_dias_em_atraso ÷ faturas com atraso` (pagas com atraso + não pagas e vencidas). | Mesma data de corte. |
+| Leituras estimadas | `n_leituras_estimadas ÷ n_leituras`. | Sinal de erro de leitura (H5). |
+| Idade do medidor | Anos entre a instalação do medidor vigente e o fim da última competência dos dados (`gold_medidor_uc`). | A data da última manutenção não existe na origem (MED-06): "medidor sem manutenção" não é respondível. |
+| Pares de períodos da decomposição | A Gold grava todos os pares de **mesmos meses em anos diferentes** (qualquer mês de início, 1 a 12 meses, qualquer par de anos com dado). | Totais e comparações de qualquer período saem da soma dos meses em `gold_kpis_segmento_mensal`. A decomposição de trechos diferentes (ex.: jan–abr × mar–jun) não é gravada, porque todas as combinações passariam de 1 bilhão de linhas; se o portal precisar, o backend calcula na hora com a mesma fórmula ([DEC-028](decisoes.md)). |
 | Reconciliação | Ponte do número bruto até o usado nos indicadores, por competência. Receita: total de todas as faturas = cadastro + UCs fora do cadastro; cadastro = energia + tributos. Energia: consumo apurado nas leituras + correção das trocas de medidor + correção do sinal invertido = energia faturada. | Tabela `gold_reconciliacao_faturamento`. As faturas de UCs fora do cadastro (FAT-05) ficam fora do fato por UC, mas nunca são descartadas: aparecem ali. Responde qual receita é considerada, quanto vem de faturas sem cadastro e de onde vem a diferença entre a receita da diretoria e a nossa. |
 
 ### KPIs por recorte: como agregar
 
-`gold_kpis_segmento_mensal` guarda **componentes somáveis**, nunca índices prontos. Para qualquer filtro (município, bairro, classe, GD e período), soma-se cada componente nas linhas escolhidas e calcula-se o índice no fim. Receitas, kWh, horas, interrupções e notas são fluxos e somam entre meses; `n_uc` é um estoque e só soma dentro do mesmo mês, então para vários meses usa-se a média mensal. A soma por competência bate com `gold_kpis_mensais` (total da empresa) e com `gold_continuidade_alimentador_mensal`.
+`gold_kpis_segmento_mensal` guarda **componentes somáveis**, nunca índices prontos. Para qualquer filtro (município, bairro, classe, GD, alimentador, tipo de medidor e período), soma-se cada componente nas linhas escolhidas e calcula-se o índice no fim. Receitas, kWh, horas, interrupções e notas são fluxos e somam entre meses; `n_uc` é um estoque e só soma dentro do mesmo mês, então para vários meses usa-se a média mensal. A soma por competência bate com `gold_kpis_mensais` (total da empresa) e com `gold_continuidade_alimentador_mensal`.
 
 ## 3. Tabelas
 
@@ -55,7 +60,7 @@ Dimensão de unidades consumidoras.
 - **Grão:** 1 linha por UC
 - **Chave:** `cod_uc`
 - **Consumidores:** UC 360, agente, filtros
-- **Decisões de limpeza que afetam esta tabela:** UC-01 a UC-12 (cadastro; a flag `flag_documento_repetido` da UC-12 fica só na Silver, DEC-023), MED-01 a MED-06 (medidores), GD-01 e GD-02 (potência)
+- **Decisões de limpeza que afetam esta tabela:** UC-01 a UC-12 (cadastro; a flag `flag_documento_repetido` da UC-12 fica só na Silver, DEC-023), MED-01 a MED-06 (medidores), GD-01 e GD-02 (potência e conexão)
 
 | Coluna | Tipo | Nulo | Unidade | Status | Definição |
 |---|---|---|---|---|---|
@@ -70,6 +75,10 @@ Dimensão de unidades consumidoras.
 | `titular_mascarado` | text | sim |  | proposta | Iniciais do titular da UC, para o atendente confirmar a identidade na UC 360. **Sensível: fora do agente.** O nome completo não chega à Gold; fora do agente (DEC-023). |
 | `documento_mascarado` | text | sim |  | proposta | Documento do titular com só os 3 últimos dígitos, para o atendente confirmar a identidade. **Sensível: fora do agente.** O documento completo não chega à Gold; fora do agente (DEC-023). |
 | `potencia_kwp` | double precision | sim | kWp | proposta | Potência de pico instalada da geração própria; só para UCs com GD. Era potencia_kw: a origem só traz potência de pico (kWp), e kW seria outra grandeza (DEC-023); o tratamento dos registros com potência anômala da Silver é decidido na Gold. |
+| `data_ligacao` | date | não |  | proposta | Data em que a UC foi ligada (cliente desde). A UC conta no n_uc a partir do mês da ligação (DEC-030). |
+| `data_conexao_gd` | date | sim |  | proposta | Data em que a geração própria foi conectada; vazia sem GD. Permite comparar o consumo da UC antes e depois da conexão (H1, UC 360). |
+| `modalidade_gd` | text (geracao_propria_uc, autoconsumo_remoto, geracao_compartilhada) | sim |  | proposta | Modalidade da geração própria; vazia sem GD. |
+| `energia_injetada_kwh_mes` | numeric(16,3) | sim | kWh/mês | proposta | Energia média injetada na rede por mês pela geração própria; vazia sem GD. |
 
 ### `gold_fato_faturamento_mensal`
 
@@ -79,7 +88,7 @@ Faturamento por UC e competência.
 - **Chave:** `cod_uc`, `competencia`
 - **Consumidores:** KPIs, tela Receita, UC 360, agente
 - **Chave estrangeira (lógica):** cod_uc → gold_dim_uc.cod_uc
-- **Decisões de limpeza que afetam esta tabela:** FAT-01 a FAT-05 (faturas), LEI-01 a LEI-07 (leituras e consumo)
+- **Decisões de limpeza que afetam esta tabela:** FAT-01 a FAT-05 (faturas), LEI-01 a LEI-07 (leituras e consumo), MED-03 (tipo do medidor)
 
 | Coluna | Tipo | Nulo | Unidade | Status | Definição |
 |---|---|---|---|---|---|
@@ -92,15 +101,20 @@ Faturamento por UC e competência.
 | `receita_energia` | numeric(14,2) | não | R$ | proposta | Valor da energia na fatura, sem tributos. Base provisória da receita comercial no PVM até a reconciliação (DEC-023). |
 | `tributos` | numeric(14,2) | não | R$ | proposta | Tributos cobrados na fatura. |
 | `receita_arrecadada` | numeric(14,2) | sim | R$ | proposta | Valor efetivamente pago. |
-| `tarifa_media` | double precision | sim | R$/kWh | proposta | Receita de energia dividida pela energia faturada (sem tributos). Receita_energia ÷ kwh_faturado, provisório até a reconciliação (DEC-023); NULL quando kwh_faturado = 0 (ex.: GD que compensa todo o consumo). |
+| `tarifa_media` | double precision | sim | R$/kWh | proposta | Receita de energia dividida pela energia faturada (sem tributos). receita_energia ÷ kwh_faturado, provisório até a reconciliação (DEC-023); NULL quando kwh_faturado = 0 (ex.: GD que compensa todo o consumo). |
 | `bandeira` | text (verde, amarela, vermelha_p1, vermelha_p2) | sim |  | proposta | Bandeira tarifária da competência (acréscimo mensal). A Silver usa Verde, Amarela, Vermelha P1 e Vermelha P2; a Gold converte para este formato. |
 | `data_vencimento` | date | não |  | proposta | Data de vencimento da fatura. |
 | `data_pagamento` | date | sim |  | proposta | Data em que a fatura foi paga; vazia quando não foi paga. A Silver converte o ano 9999 (código de não pago) em nulo (FAT-04). |
 | `status_pagamento` | text (paga, paga_com_atraso, em_aberto, em_atraso) | não |  | proposta | Situação da fatura na data de corte: paga (até o vencimento), paga com atraso, em aberto (não paga e ainda no prazo) ou em atraso (não paga e vencida). Regra em conventions.invoice_status; a Silver só distingue paga, paga com atraso e em aberto. |
 | `dias_em_atraso` | integer | sim | dias | proposta | Dias de atraso: da data de pagamento depois do vencimento (paga com atraso) ou da data de corte depois do vencimento (em atraso); vazio nos demais casos. Dá ao portal a gravidade do atraso sem precisar conhecer a data de corte. |
+| `receita_bandeira` | numeric(14,2) | não | R$ | proposta | Parte da receita de energia que é acréscimo da bandeira tarifária do mês (zero na bandeira verde). kwh_faturado × acréscimo da bandeira por kWh (DEC-029); receita_energia - receita_bandeira é a receita pela tarifa base. |
+| `tipo_leitura` | text (real, estimada) | não |  | proposta | Se a leitura do mês foi feita no medidor (real) ou estimada. |
+| `tipo_medidor` | text (eletromecanico, eletronico, smart) | não |  | proposta | Tipo do medidor que fez a leitura do mês. |
+| `dias_faturados` | integer | sim | dias | proposta | Dias entre a leitura do mês e a do mês anterior; vazio na primeira leitura da UC. Explica parte da variação da conta (insight conta alta, G2-05). |
 
 **Validações:**
 - receita_faturada = receita_energia + tributos (por linha, diferença máxima de R$ 0,01)
+- 0 <= receita_bandeira <= receita_energia; receita_bandeira = 0 quando a bandeira é verde
 - data_pagamento vazia se e somente se status_pagamento é em_aberto ou em_atraso; dias_em_atraso vazio quando a fatura foi paga até o vencimento ou está em aberto
 
 ### `gold_receita_decomposicao`
@@ -110,6 +124,7 @@ Decomposição da variação de receita entre dois períodos (PVM com efeito mix
 - **Grão:** par de períodos × município × bairro × classe × possui_gd
 - **Chave:** `periodo_base`, `periodo_atual`, `municipio`, `bairro`, `classe`, `possui_gd`
 - **Consumidores:** tela Receita, insight, diagnóstico, agente
+- **Pares de períodos:** Todos os pares de 'mesmos meses em anos diferentes' com dado nos dois lados: para cada mês de início, cada duração de 1 a 12 meses e cada par de anos (ex.: 2024-01/2024-04 x 2025-01/2025-04; 2022-07/2023-06 x 2025-07/2026-06). Outros pares (trechos diferentes, ex.: jan-abr x mar-jun) não são gravados: todas as combinações passariam de 1 bilhão de linhas. Se o portal precisar deles, o backend calcula na hora com a mesma fórmula, a partir de gold_fato_faturamento_mensal e receita_bandeira (DEC-028).
 - **Decisões de limpeza que afetam esta tabela:** FAT-03 e FAT-05, LEI-03 a LEI-07, GD-01
 
 | Coluna | Tipo | Nulo | Unidade | Status | Definição |
@@ -124,7 +139,7 @@ Decomposição da variação de receita entre dois períodos (PVM com efeito mix
 | `receita_atual` | numeric(14,2) | não | R$ | proposta | Receita de energia (sem tributos) no período atual. Base provisória: receita_energia, até a reconciliação (DEC-023). |
 | `efeito_preco` | numeric(14,2) | não | R$ | proposta | Parte da variação de receita explicada pela mudança de preço: efeito_tarifa + efeito_bandeira. |
 | `efeito_tarifa` | numeric(14,2) | não | R$ | proposta | Parte do efeito preço explicada pelo reajuste da tarifa base, sem a bandeira. |
-| `efeito_bandeira` | numeric(14,2) | não | R$ | proposta | Parte do efeito preço explicada pelo acréscimo da bandeira tarifária (meses com bandeira amarela ou vermelha). |
+| `efeito_bandeira` | numeric(14,2) | não | R$ | proposta | Parte do efeito preço explicada pelo acréscimo da bandeira tarifária (meses com bandeira amarela ou vermelha). Método na DEC-029: a bandeira é um acréscimo fixo por kWh; efeito_tarifa usa a receita sem o acréscimo. |
 | `efeito_volume` | numeric(14,2) | não | R$ | proposta | Parte da variação de receita explicada pela mudança de energia faturada. |
 | `efeito_mix` | numeric(14,2) | não | R$ | proposta | Parte da variação de receita explicada pela mudança de peso entre classes. |
 
@@ -159,10 +174,10 @@ Indicadores executivos por competência: total da empresa, igual à soma de gold
 
 KPIs por recorte (município, bairro, classe e geração própria) e competência, guardados como componentes somáveis. Qualquer período é a soma das competências escolhidas. O portal e o agente somam os componentes do filtro e calculam os índices no final.
 
-- **Grão:** competência × município × bairro × classe_cadastro × possui_gd
-- **Chave:** `competencia`, `municipio`, `bairro`, `classe_cadastro`, `possui_gd`
+- **Grão:** competência × município × bairro × classe_cadastro × possui_gd × alimentador × tipo de medidor
+- **Chave:** `competencia`, `municipio`, `bairro`, `classe_cadastro`, `possui_gd`, `cod_alimentador`, `tipo_medidor`
 - **Consumidores:** dashboard executivo, filtros da diretoria, agente
-- **Decisões de limpeza que afetam esta tabela:** FAT-03, FAT-05, LEI-03 a LEI-07, OCO-01 a OCO-03, ATD-01 a ATD-03
+- **Decisões de limpeza que afetam esta tabela:** FAT-03 a FAT-05, LEI-02 a LEI-07, MED-03 a MED-05 (medidor vigente), OCO-01 a OCO-04, ATD-01 a ATD-03
 
 | Coluna | Tipo | Nulo | Unidade | Status | Definição |
 |---|---|---|---|---|---|
@@ -172,6 +187,8 @@ KPIs por recorte (município, bairro, classe e geração própria) e competênci
 | `classe_cadastro` | text (Residencial, Comercial, Industrial, Rural, Poder Público) | não |  | proposta | Classe da UC no cadastro comercial. |
 | `classe` | text (B1, B2, B3, A4) | não |  | proposta | Classe de consumo (B1, B2, B3, A4); determinada pela classe do cadastro. |
 | `possui_gd` | boolean | não |  | proposta | A UC já tinha geração própria conectada na competência (data de conexão até o mês). Por competência, e não o estado atual: antes da conexão a UC conta como sem GD, o que permite comparar antes e depois. |
+| `cod_alimentador` | text | não |  | proposta | Alimentador que atende as UCs do recorte (do cadastro da UC). Cada bairro é atendido por 1 ou 2 alimentadores; permite cruzar continuidade com bairro, classe e GD (DEC-027). |
+| `tipo_medidor` | text (eletromecanico, eletronico, smart, sem_medidor) | não |  | proposta | Tipo do medidor vigente na UC na competência; sem_medidor quando a UC não tem medidor instalado no mês. Vigente pela data de instalação e de retirada: muda quando o medidor é trocado (DEC-027). |
 | `n_uc` | integer | não | contagem | proposta | UCs do cadastro no recorte, na competência. É um estoque: some só dentro do mesmo mês. Para um período de vários meses, o DEC e o FEC usam a média mensal (soma de n_uc ÷ número de meses). |
 | `kwh_faturado` | numeric(16,3) | não | kWh | proposta | Energia faturada no recorte. |
 | `receita_faturada` | numeric(14,2) | não | R$ | proposta | Receita faturada no recorte (energia + tributos). |
@@ -183,10 +200,18 @@ KPIs por recorte (município, bairro, classe e geração própria) e competênci
 | `n_chamados` | integer | não | contagem | proposta | Chamados de atendimento das UCs do recorte, abertos no mês (pela data de abertura). |
 | `soma_notas` | double precision | sim | nota | proposta | Soma das notas de satisfação (de 1 a 5) dos chamados avaliados. Guardar soma e contagem, e não a média, para agregar corretamente entre recortes. |
 | `n_notas` | integer | não | contagem | proposta | Chamados com nota de satisfação. Satisfação média = soma de soma_notas ÷ soma de n_notas (ATD-01: chamado sem nota fica fora). |
+| `receita_bandeira` | numeric(14,2) | não | R$ | proposta | Parte da receita de energia do recorte que é acréscimo de bandeira. receita_energia - receita_bandeira = receita pela tarifa base (DEC-029). |
+| `n_faturas` | integer | não | contagem | proposta | Faturas emitidas para as UCs do recorte na competência. |
+| `n_faturas_nao_pagas` | integer | não | contagem | proposta | Faturas da competência ainda não pagas na data de corte (em aberto ou em atraso). Situação medida na data de corte, e não no mês da fatura: numa competência antiga, conta as faturas daquele mês que continuam sem pagamento hoje (DEC-027). |
+| `valor_nao_pago` | numeric(14,2) | não | R$ | proposta | Valor das faturas da competência ainda não pagas na data de corte. Inadimplência do recorte = valor_nao_pago ÷ receita_faturada; mesma semântica da data de corte. |
+| `n_faturas_pagas_com_atraso` | integer | não | contagem | proposta | Faturas da competência pagas depois do vencimento. |
+| `soma_dias_em_atraso` | integer | não | dias | proposta | Soma dos dias de atraso das faturas com atraso (pagas com atraso ou em atraso). Atraso médio = soma_dias_em_atraso ÷ (n_faturas_pagas_com_atraso + faturas em atraso). |
+| `n_leituras` | integer | não | contagem | proposta | Leituras das UCs do recorte na competência. |
+| `n_leituras_estimadas` | integer | não | contagem | proposta | Leituras estimadas (não feitas no medidor) das UCs do recorte na competência. Parte de leituras estimadas = n_leituras_estimadas ÷ n_leituras (H5). |
 
 **Validações:**
 - soma por competência de kwh_faturado, receita_faturada e receita_energia = gold_kpis_mensais
-- soma por competência de horas_interrompidas e de n_interrupcoes = gold_continuidade_alimentador_mensal (todas as UCs)
+- soma por competência e alimentador de n_uc, horas_interrompidas e n_interrupcoes = gold_continuidade_alimentador_mensal
 - receita_faturada = receita_energia + tributos por linha (diferença máxima de R$ 0,01)
 - índices (DEC, FEC, satisfação) não são guardados: só componentes somáveis, para qualquer filtro dar o mesmo resultado que a empresa inteira
 
@@ -197,65 +222,112 @@ DEC e FEC por alimentador e competência.
 - **Grão:** alimentador × competência
 - **Chave:** `cod_alimentador`, `competencia`
 - **Consumidores:** tela DEC/FEC, agente
-- **Decisões de limpeza que afetam esta tabela:** OCO-01 a OCO-03 (ocorrências)
+- **Decisões de limpeza que afetam esta tabela:** OCO-01 a OCO-04 (ocorrências; a OCO-04 tira as registradas antes da ligação da UC)
 
 | Coluna | Tipo | Nulo | Unidade | Status | Definição |
 |---|---|---|---|---|---|
 | `cod_alimentador` | text | não |  | proposta | Alimentador (circuito de média tensão). |
 | `competencia` | text | não |  | proposta | Mês de referência. |
-| `dec` | double precision | não | h | proposta | Duração equivalente de interrupção por UC no alimentador. Horas_interrompidas ÷ n_uc (DEC-014). |
-| `fec` | double precision | não | interrupções | proposta | Frequência equivalente de interrupção por UC no alimentador. N_interrupcoes ÷ n_uc (DEC-014). |
+| `dec` | double precision | não | h | proposta | Duração equivalente de interrupção por UC no alimentador. horas_interrompidas ÷ n_uc (DEC-014). |
+| `fec` | double precision | não | interrupções | proposta | Frequência equivalente de interrupção por UC no alimentador. n_interrupcoes ÷ n_uc (DEC-014). |
 | `n_uc` | integer | não | contagem | proposta | UCs atendidas pelo alimentador (cadastro), e não só as afetadas. |
 | `n_interrupcoes` | integer | não | contagem | proposta | Número de ocorrências das UCs do alimentador no mês. No case, cada ocorrência corresponde a uma UC interrompida; ocorrência que vira o mês entra no mês da abertura (DEC-014). |
 | `horas_interrompidas` | double precision | não | UC·h | proposta | Soma das durações das ocorrências das UCs do alimentador no mês. Consumidor × hora; ocorrência que vira o mês entra no mês da abertura (DEC-014). |
 
 ### `gold_interrupcoes_uc`
 
-Interrupções que afetaram cada UC.
+Interrupções que afetaram cada UC (UC 360).
 
 - **Grão:** UC × ocorrência
-- **Chave:** a definir
+- **Chave:** `cod_ocorrencia`
 - **Consumidores:** UC 360, agente
 - **Chave estrangeira (lógica):** cod_uc → gold_dim_uc.cod_uc
-- **Decisões de limpeza que afetam esta tabela:** OCO-01 a OCO-03
+- **Decisões de limpeza que afetam esta tabela:** OCO-01 a OCO-04
 
 | Coluna | Tipo | Nulo | Unidade | Status | Definição |
 |---|---|---|---|---|---|
-| `cod_uc` | text | não |  | proposta | Código da unidade consumidora. |
+| `cod_ocorrencia` | text | não |  | proposta | Código da ocorrência de rede. |
+| `cod_uc` | text | não |  | proposta | Código da unidade consumidora interrompida. |
+| `cod_alimentador` | text | não |  | proposta | Alimentador da UC (do cadastro). |
+| `competencia` | text | não |  | proposta | Mês da abertura da ocorrência. Ocorrência que vira o mês entra no mês da abertura (DEC-014). |
+| `data_abertura` | timestamp | não |  | proposta | Início da interrupção. |
+| `data_encerramento` | timestamp | não |  | proposta | Fim da interrupção. |
+| `duracao_horas` | double precision | não | h | proposta | Duração da interrupção em horas. |
+| `tipo` | text | não |  | proposta | Tipo da ocorrência (ex.: FALTA DE ENERGIA, OSCILACAO). |
+| `causa` | text | sim |  | proposta | Causa registrada (ex.: CLIMATICA, VEGETACAO); vazia quando não foi registrada (OCO-01). |
 
-> As demais colunas e a chave desta tabela serão definidas depois que a Gold estiver pronta (decisão da daily de 21/10).
+**Validações:**
+- soma por competência e alimentador de duracao_horas e contagem = gold_continuidade_alimentador_mensal
+- nenhuma ocorrência antes do mês de ligação da UC (DEC-030)
 
 ### `gold_atendimentos_uc`
 
-Chamados de atendimento por UC.
+Chamados de atendimento por UC (UC 360).
 
 - **Grão:** UC × chamado
-- **Chave:** a definir
+- **Chave:** `protocolo`
 - **Consumidores:** UC 360, agente
 - **Chave estrangeira (lógica):** cod_uc → gold_dim_uc.cod_uc
 - **Decisões de limpeza que afetam esta tabela:** ATD-01 a ATD-03
 
 | Coluna | Tipo | Nulo | Unidade | Status | Definição |
 |---|---|---|---|---|---|
+| `protocolo` | text | não |  | proposta | Protocolo do chamado. |
 | `cod_uc` | text | não |  | proposta | Código da unidade consumidora. |
+| `competencia` | text | não |  | proposta | Mês de abertura do chamado. |
+| `data_abertura` | timestamp | não |  | proposta | Abertura do chamado. |
+| `data_fechamento` | timestamp | não |  | proposta | Fechamento do chamado. |
+| `canal` | text | não |  | proposta | Canal de entrada (ex.: TELEFONE, APP, WHATSAPP). |
+| `assunto` | text | não |  | proposta | Assunto do chamado (ex.: FALTA DE ENERGIA, FATURA). |
+| `subassunto` | text | sim |  | proposta | Detalhe do assunto. |
+| `nota_satisfacao` | double precision | sim | nota | proposta | Nota de satisfação de 1 a 5; vazia quando o cliente não avaliou (ATD-01). |
 
-> As demais colunas e a chave desta tabela serão definidas depois que a Gold estiver pronta (decisão da daily de 21/10).
+> O histórico de interações do chamado (texto livre) fica fora da Gold: é dado sensível e não é usado pelo portal nem pelo agente.
 
 ### `gold_medidor_uc`
 
-Medidor vigente de cada UC.
+Medidor vigente de cada UC e o histórico de trocas (UC 360).
 
-- **Grão:** UC × medidor vigente
-- **Chave:** a definir
+- **Grão:** 1 linha por UC com medidor
+- **Chave:** `cod_uc`
 - **Consumidores:** UC 360, score de suspeita, agente
 - **Chave estrangeira (lógica):** cod_uc → gold_dim_uc.cod_uc
-- **Decisões de limpeza que afetam esta tabela:** MED-01 a MED-06
+- **Decisões de limpeza que afetam esta tabela:** MED-01 a MED-06 (MED-06: sem data de manutenção na origem)
 
 | Coluna | Tipo | Nulo | Unidade | Status | Definição |
 |---|---|---|---|---|---|
 | `cod_uc` | text | não |  | proposta | Código da unidade consumidora. |
+| `cod_medidor` | text | não |  | proposta | Código do medidor vigente. |
+| `tipo_medidor` | text (eletromecanico, eletronico, smart) | não |  | proposta | Tipo do medidor vigente. |
+| `modelo` | text | sim |  | proposta | Modelo do medidor vigente. |
+| `data_instalacao` | date | não |  | proposta | Instalação do medidor vigente. |
+| `idade_anos` | double precision | não | anos | proposta | Idade do medidor vigente no fim da última competência dos dados. |
+| `n_trocas` | integer | não | contagem | proposta | Medidores já retirados da UC. |
+| `data_ultima_troca` | date | sim |  | proposta | Retirada do medidor anterior; vazia se nunca houve troca. |
 
-> As demais colunas e a chave desta tabela serão definidas depois que a Gold estiver pronta (decisão da daily de 21/10).
+> UCs sem medidor (UC-12) não têm linha. A data da última manutenção não existe na origem (MED-06), então 'medidor sem manutenção' não é respondível.
+
+### `gold_inspecoes_uc`
+
+Inspeções de campo por UC: histórico na UC 360, taxa de irregularidade por recorte (H2) e régua da fila de suspeitas.
+
+- **Grão:** UC × inspeção
+- **Chave:** `cod_inspecao`
+- **Consumidores:** UC 360, tela Perdas, diagnóstico
+- **Chave estrangeira (lógica):** cod_uc → gold_dim_uc.cod_uc
+- **Decisões de limpeza que afetam esta tabela:** INSP-01 a INSP-07
+
+| Coluna | Tipo | Nulo | Unidade | Status | Definição |
+|---|---|---|---|---|---|
+| `cod_inspecao` | text | não |  | proposta | Código da inspeção. |
+| `cod_uc` | text | não |  | proposta | Código da unidade consumidora inspecionada. |
+| `data_inspecao` | date | não |  | proposta | Data da inspeção (vale a data, não a aba de origem: INSP-05). |
+| `competencia` | text | não |  | proposta | Mês da inspeção. |
+| `resultado` | text (irregularidade_confirmada, sem_irregularidade) | não |  | proposta | Resultado da inspeção. |
+| `tipo_irregularidade` | text | sim |  | proposta | Tipo da irregularidade (ex.: DESVIO DIRETO, BY-PASS); vazio sem irregularidade. |
+| `kwh_recuperado` | numeric(16,3) | não | kWh | proposta | Energia recuperada com a regularização; zero sem irregularidade. |
+
+> O nome do inspetor fica fora da Gold (dado pessoal sem uso no portal).
 
 ### `gold_reconciliacao_faturamento`
 
@@ -307,7 +379,7 @@ UCs suspeitas de perda não técnica, ordenadas por prioridade.
 
 - Dados (Alisson, Arthur e Gabriel) faz três cópias independentes da transformação Silver -> Gold, todas contra este contrato; as três são comparadas entre si antes de definir a Gold que será exportada.
 - Período base: decidido manter qualquer par de períodos em gold_receita_decomposicao. Falta alinhar docs/arquitetura.md e docs/planejamento.md, que ainda falam em primeiros e últimos 12 meses e em votação.
-- Chave e colunas de gold_interrupcoes_uc, gold_atendimentos_uc e gold_medidor_uc dependem da Silver.
+- Tabelas da UC 360 (DECIDIDO, DEC-027): gold_interrupcoes_uc, gold_atendimentos_uc e gold_medidor_uc com colunas e chave, e gold_inspecoes_uc nova.
 - Precisão numérica (energy_kwh, money) e normalização de município/bairro dependem da Silver.
 - Titular na UC 360 (DECIDIDO, DEC-023): a Gold traz só titular_mascarado (iniciais) e documento_mascarado (3 últimos dígitos), ambos sensitive. Não há cod_cliente: a origem não tem código de cliente e, no dataset, cada titular tem uma UC só, exceto um documento de preenchimento repetido em um grupo de UCs cadastradas sem nenhum medidor (verificado: o grupo é exatamente o das UCs sem medidor, e o documento não é nulo).
 - DEC-004: a Gold agregada não vai ao repositório público (a confirmar com a organização).
@@ -315,7 +387,9 @@ UCs suspeitas de perda não técnica, ordenadas por prioridade.
 - receita (A CONFIRMAR APÓS A RECONCILIAÇÃO): receita_energia é a base provisória do PVM e da tarifa_media (DEC-023). Teste declarado: medir qual definição (com ou sem tributos) reproduz a variação citada pela diretoria e registrar o resultado como hipótese testada, sem ajustar números. Confirmar com o diagnóstico do PR #19 qual coluna foi usada para reproduzir a variação.
 - kwh_faturado x consumo_kwh (VALIDADO, DEC-023): a fatura não tem kWh, e a energia faturada vem do consumo_kwh das leituras. O case diz que a energia da GD é abatida do consumo faturado. Teste: para as UCs com GD, a queda do consumo médio depois da conexão (até 12 meses de cada lado, mínimo 6) dividida pela energia injetada média mensal fica em torno de 1 (mediana próxima de 1, todas dentro de 0,7 a 1,3), então o consumo da leitura já é líquido de GD e não precisa de correção.
 - Regra de kwh_faturado (VALIDADA contra a fatura, DEC-023): troca de medidor -> leitura_atual; consumo negativo sem troca (sinal invertido) -> valor absoluto; demais -> consumo_kwh. Teste: o kWh implícito da fatura (valor_energia ÷ tarifa mediana do subgrupo na competência, calculada só com leituras limpas) reproduz kwh_faturado dentro de 2% em todos os grupos sinalizados. Os dois grupos de leitura negativa são exclusivos e completos: todas as leituras sinalizadas pelo notebook de Silver são negativas, e cada uma cai em exatamente uma regra.
-- Efeito bandeira e efeito GD (DECIDIDO, DEC-023): efeito_preco passa a ser efeito_tarifa + efeito_bandeira, e possui_gd entra no grão de gold_receita_decomposicao, de modo que o efeito GD é o efeito volume das linhas com possui_gd = true. Falta definir o método do cálculo (bandeira: receita com a bandeira do mês menos receita com a tarifa base, mantendo o consumo) e validar que as parcelas fecham com a variação total.
+- Efeito bandeira e efeito GD (DECIDIDO, DEC-023): efeito_preco passa a ser efeito_tarifa + efeito_bandeira, e possui_gd entra no grão de gold_receita_decomposicao, de modo que o efeito GD é o efeito volume das linhas com possui_gd = true. Método (DECIDIDO, DEC-029): no dado, a bandeira é um acréscimo fixo por kWh, igual em todas as classes; efeito_tarifa usa a receita sem o acréscimo, e efeito_bandeira a variação do acréscimo. As parcelas fecham com a variação total por construção (conferido por trava).
 - KPIs por recorte (DECIDIDO, DEC-023): gold_kpis_segmento_mensal guarda componentes somáveis por mês, município, bairro, classe e geração própria (possui_gd), para o filtro da diretoria, do portal e do agente; qualquer período é a soma das competências escolhidas. gold_kpis_mensais continua como total da empresa, e as duas são conferidas entre si. Os componentes de atendimento (n_chamados, soma_notas, n_notas) saem da Silver de atendimentos, que já existe, e contam o chamado pelo mês de abertura.
 - possui_gd por competência (DECIDIDO, DEC-023): em gold_kpis_segmento_mensal, a UC conta como com GD a partir do mês da conexão. Em gold_receita_decomposicao, possui_gd é o estado no último mês do período atual e vale para a UC nos dois períodos, base e atual: a UC que conectou a GD entre eles fica no grupo com GD dos dois lados, para o PVM comparar as mesmas UCs e o efeito GD ser a queda de volume delas. Por isso a soma de possui_gd = true no período base da decomposição pode diferir da tabela mensal.
-- Faturas de UCs fora do cadastro (flag_uc_orfa): ficam fora do fato por UC (não há UC para ligar), mas não são descartadas: entram em gold_reconciliacao_faturamento, que também traz a ponte da energia (DEC-023).
+- Faturas de UCs fora do cadastro (flag_uc_orfa): ficam fora do fato por UC (não há UC para ligar), mas não são descartadas: entram em gold_reconciliacao_faturamento, que também traz a ponte da energia (DEC-023). Limite: sem cadastro, não dá para cruzá-las com município, bairro ou classe.
+- Pares da decomposição (DECIDIDO, DEC-028): a Gold grava todos os pares de mesmos meses em anos diferentes; pares de trechos diferentes ficam para o backend calcular na hora, se o portal precisar (gravar todos passaria de 1 bilhão de linhas).
+- Ocorrências registradas antes da ligação da UC (DECIDIDO, DEC-030): ficam fora da Gold (OCO-04).
