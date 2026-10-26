@@ -509,6 +509,74 @@
         }
       }
     },
+    "/continuidade/alimentadores/ranking": {
+      "get": {
+        "tags": [
+          "continuidade"
+        ],
+        "summary": "Get Ranking Alimentadores",
+        "description": "Os piores alimentadores do período, pelo DEC ou pelo FEC.",
+        "operationId": "get_ranking_alimentadores_continuidade_alimentadores_ranking_get",
+        "parameters": [
+          {
+            "name": "inicio",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+              "title": "Inicio"
+            }
+          },
+          {
+            "name": "fim",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+              "title": "Fim"
+            }
+          },
+          {
+            "name": "criterio",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "dec",
+                "fec"
+              ],
+              "type": "string",
+              "default": "dec",
+              "title": "Criterio"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RankingContinuidadeSchema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/ordens-inspecao": {
       "post": {
         "tags": [
@@ -1430,6 +1498,109 @@
         ],
         "title": "ParPeriodosSchema",
         "description": "Um par de períodos que a Gold gravou na decomposição (DEC-028)."
+      },
+      "RankingAlimentadorSchema": {
+        "properties": {
+          "dec": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dec"
+          },
+          "fec": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fec"
+          },
+          "horas_interrompidas": {
+            "type": "number",
+            "title": "Horas Interrompidas"
+          },
+          "n_interrupcoes": {
+            "type": "integer",
+            "title": "N Interrupcoes"
+          },
+          "n_uc_medio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "N Uc Medio"
+          },
+          "cod_alimentador": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Cod Alimentador"
+          }
+        },
+        "type": "object",
+        "required": [
+          "dec",
+          "fec",
+          "horas_interrompidas",
+          "n_interrupcoes",
+          "n_uc_medio",
+          "cod_alimentador"
+        ],
+        "title": "RankingAlimentadorSchema"
+      },
+      "RankingContinuidadeSchema": {
+        "properties": {
+          "inicio": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+            "title": "Inicio"
+          },
+          "fim": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+            "title": "Fim"
+          },
+          "criterio": {
+            "type": "string",
+            "enum": [
+              "dec",
+              "fec"
+            ],
+            "title": "Criterio"
+          },
+          "n_meses": {
+            "type": "integer",
+            "title": "N Meses"
+          },
+          "alimentadores": {
+            "items": {
+              "$ref": "#/components/schemas/RankingAlimentadorSchema"
+            },
+            "type": "array",
+            "title": "Alimentadores"
+          }
+        },
+        "type": "object",
+        "required": [
+          "inicio",
+          "fim",
+          "criterio",
+          "n_meses",
+          "alimentadores"
+        ],
+        "title": "RankingContinuidadeSchema",
+        "description": "Os alimentadores do pior para o melhor, e quantos meses entraram na média."
       },
       "ResultadoOrdem": {
         "type": "string",

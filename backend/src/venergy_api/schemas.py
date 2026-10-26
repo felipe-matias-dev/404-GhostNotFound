@@ -355,6 +355,46 @@ class ContinuidadeSerieFiltroSchema(PeriodoSchema):
     cod_alimentador: list[RequiredText] = Field(default_factory=list)
 
 
+class IndicesContinuidadeSchema(BaseModel):
+    """DEC e FEC de um período, calculados sobre os componentes somados."""
+
+    # Nulos quando não há UC atendida no período: sem divisor, não existe índice.
+    dec: float | None
+    fec: float | None
+    horas_interrompidas: float
+    n_interrupcoes: int
+    # Média mensal das UCs atendidas, o divisor do DEC e do FEC de um período.
+    n_uc_medio: float | None
+
+
+class RankingFiltroSchema(BaseModel):
+    """Período do ranking, obrigatório: a média mensal só existe sobre um período."""
+
+    inicio: Competencia
+    fim: Competencia
+    criterio: Literal["dec", "fec"] = "dec"
+
+    @model_validator(mode="after")
+    def inicio_ate_o_fim(self) -> "RankingFiltroSchema":
+        _inicio_ate_o_fim(self.inicio, self.fim)
+        return self
+
+
+class RankingAlimentadorSchema(IndicesContinuidadeSchema):
+    cod_alimentador: RequiredText
+
+
+class RankingContinuidadeSchema(BaseModel):
+    """Os alimentadores do pior para o melhor, e quantos meses entraram na média."""
+
+    inicio: Competencia
+    fim: Competencia
+    criterio: Literal["dec", "fec"]
+    # Meses com dado dentro do período: o divisor da média mensal de UCs. Zero, sem dados.
+    n_meses: int
+    alimentadores: list[RankingAlimentadorSchema]
+
+
 class FilaSuspeitaSchema(BaseModel):
     """Uma UC suspeita de perda não técnica, com o porquê e o quanto vale inspecionar."""
 

@@ -140,6 +140,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/continuidade/alimentadores/ranking": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Ranking Alimentadores
+         * @description Os piores alimentadores do período, pelo DEC ou pelo FEC.
+         */
+        get: operations["get_ranking_alimentadores_continuidade_alimentadores_ranking_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/ordens-inspecao": {
         parameters: {
             query?: never;
@@ -422,6 +442,40 @@ export interface components {
             /** Periodo Atual */
             periodo_atual: string;
         };
+        /** RankingAlimentadorSchema */
+        RankingAlimentadorSchema: {
+            /** Dec */
+            dec: number | null;
+            /** Fec */
+            fec: number | null;
+            /** Horas Interrompidas */
+            horas_interrompidas: number;
+            /** N Interrupcoes */
+            n_interrupcoes: number;
+            /** N Uc Medio */
+            n_uc_medio: number | null;
+            /** Cod Alimentador */
+            cod_alimentador: string;
+        };
+        /**
+         * RankingContinuidadeSchema
+         * @description Os alimentadores do pior para o melhor, e quantos meses entraram na média.
+         */
+        RankingContinuidadeSchema: {
+            /** Inicio */
+            inicio: string;
+            /** Fim */
+            fim: string;
+            /**
+             * Criterio
+             * @enum {string}
+             */
+            criterio: "dec" | "fec";
+            /** N Meses */
+            n_meses: number;
+            /** Alimentadores */
+            alimentadores: components["schemas"]["RankingAlimentadorSchema"][];
+        };
         /**
          * ResultadoOrdem
          * @enum {string}
@@ -674,6 +728,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ContinuidadeAlimentadorMensalSchema"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_ranking_alimentadores_continuidade_alimentadores_ranking_get: {
+        parameters: {
+            query: {
+                inicio: string;
+                fim: string;
+                criterio?: "dec" | "fec";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RankingContinuidadeSchema"];
                 };
             };
             /** @description Validation Error */
