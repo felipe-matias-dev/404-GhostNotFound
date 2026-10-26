@@ -1,6 +1,6 @@
 import type { RegionMapProps } from "#/components/ui/region-map";
 import { formatPct } from "#/lib/format";
-import type { DecomposicaoLinha, Recorte } from "./types";
+import type { DecomposicaoLinha, ParPeriodos, Recorte } from "./types";
 
 export type Nivel = DecomposicaoLinha["nivel"];
 
@@ -24,6 +24,26 @@ export function filtroAoAbrir(
 	if (linha.nivel === "bairro")
 		return { municipio: filtro.municipio, bairro: linha.segmento };
 	return null;
+}
+
+const meses = (periodo: string) => {
+	const [inicio, fim] = periodo.split("/");
+	const [ai, mi] = inicio.split("-").map(Number);
+	const [af, mf] = fim.split("-").map(Number);
+	return (af - ai) * 12 + (mf - mi) + 1;
+};
+
+/**
+ * Par que a tela abre sem escolha na URL: a janela de 12 meses com o período atual mais
+ * recente. A lista vem ordenada como texto, e o último item pode ser um par de 1 mês.
+ */
+export function parPadrao(pares: ParPeriodos[]) {
+	const anuais = pares.filter((p) => meses(p.periodo_atual) === 12);
+	return (anuais.length ? anuais : pares).reduce<ParPeriodos | undefined>(
+		(melhor, p) =>
+			!melhor || p.periodo_atual > melhor.periodo_atual ? p : melhor,
+		undefined,
+	);
 }
 
 /**
