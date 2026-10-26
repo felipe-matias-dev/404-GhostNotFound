@@ -30,6 +30,8 @@ ClasseCadastro = Literal["Residencial", "Comercial", "Industrial", "Rural", "Pod
 Bandeira = Literal["verde", "amarela", "vermelha_p1", "vermelha_p2"]
 OrigemKwh = Literal["leitura", "leitura_atual_troca_medidor", "consumo_absoluto"]
 StatusPagamento = Literal["paga", "paga_com_atraso", "em_aberto", "em_atraso"]
+TipoLeitura = Literal["real", "estimada"]
+TipoMedidor = Literal["eletromecanico", "eletronico", "smart"]
 ModalidadeGd = Literal["geracao_propria_uc", "autoconsumo_remoto", "geracao_compartilhada"]
 
 # Teto por pedido na ordem da capacidade mensal da equipe de campo (~200 inspeções):
@@ -79,6 +81,10 @@ class FaturamentoMensalSchema(BaseModel):
     data_pagamento: date | None
     status_pagamento: StatusPagamento
     dias_em_atraso: int | None
+    receita_bandeira: Annotated[ExactNumber, Field(ge=0)]
+    tipo_leitura: TipoLeitura
+    tipo_medidor: TipoMedidor
+    dias_faturados: Annotated[int, Field(ge=1)] | None
 
 
 class ReceitaDecomposicaoSchema(BaseModel):

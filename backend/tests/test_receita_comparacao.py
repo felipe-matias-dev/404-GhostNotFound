@@ -66,6 +66,9 @@ def store_billing(engine: Engine) -> None:
                 tributos=Decimal("0.00"),
                 data_vencimento=date(2026, 1, 10),
                 status_pagamento="paga",
+                receita_bandeira=Decimal("0.00"),
+                tipo_leitura="real",
+                tipo_medidor="eletronico",
             )
             for cod_uc, competencia, kwh, receita in BILLING
         )

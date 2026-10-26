@@ -7,6 +7,7 @@ Uso: uv run python -m venergy_api.amostra [--force]
 """
 
 import argparse
+import calendar
 import csv
 from datetime import date
 from decimal import Decimal
@@ -252,6 +253,25 @@ _ALIQUOTA_TRIBUTOS = Decimal("0.25")
 _TROCA_MEDIDOR = ("0003", "2025-03")
 _SINAL_INVERTIDO = ("0006", "2024-08")
 _PAGOU_COM_ATRASO = ("0001", "2025-03")
+# Leituras estimadas (o leiturista não chegou ao medidor), nos últimos seis meses das UCs da
+# fila de suspeitas: 3 de 6 na UC 0005 e 2 de 6 na UC 0004.
+_LEITURAS_ESTIMADAS = {
+    "0005": ("2025-08", "2025-10", "2025-12"),
+    "0004": ("2025-09", "2025-11"),
+}
+# Tipo do medidor de cada UC. A UC 0003 troca o eletromecânico por um eletrônico no mês da
+# troca de medidor (a mesma em que a leitura vem negativa).
+_MEDIDOR = {
+    "0001": "eletronico",
+    "0002": "smart",
+    "0003": "eletronico",
+    "0004": "eletronico",
+    "0005": "eletromecanico",
+    "0006": "eletronico",
+    "0007": "smart",
+    "0008": "smart",
+}
+_MEDIDOR_ANTES_DA_TROCA = "eletromecanico"
 
 
 def _mes_seguinte(competencia: str, dia: int) -> date:
@@ -268,6 +288,21 @@ def _leitura(cod_uc: str, competencia: str, kwh_faturado: Decimal) -> tuple[Deci
     if (cod_uc, competencia) == _SINAL_INVERTIDO:
         return -kwh_faturado, "consumo_absoluto"
     return kwh_faturado, "leitura"
+
+
+def tipo_medidor_da_leitura(cod_uc: str, competencia: str) -> str:
+    """Tipo do medidor que fez a leitura do mês."""
+    if cod_uc == _TROCA_MEDIDOR[0] and competencia < _TROCA_MEDIDOR[1]:
+        return _MEDIDOR_ANTES_DA_TROCA
+    return _MEDIDOR[cod_uc]
+
+
+def _dias_faturados(competencia: str) -> int | None:
+    # A leitura é feita no mesmo dia de todo mês, então os dias entre duas leituras são os do
+    # mês. A primeira leitura da UC não tem anterior.
+    if competencia == COMPETENCIAS[0]:
+        return None
+    return calendar.monthrange(int(competencia[:4]), int(competencia[5:]))[1]
 
 
 def _situacao(vencimento: date, pagamento: date | None, corte: date) -> tuple[str, int | None]:
@@ -310,6 +345,9 @@ def _faturamento() -> tuple[FaturamentoMensalSchema, ...]:
                     "emissao": _mes_seguinte(competencia, 1),
                     "vencimento": _mes_seguinte(competencia, 10),
                     "pagamento": None if nao_pagou else _mes_seguinte(competencia, dia_pagamento),
+                    "bandeira": (kwh * _ADICIONAL_BANDEIRA[_bandeira(competencia)]).quantize(
+                        _CENTAVO
+                    ),
                 }
             )
 
@@ -340,6 +378,14 @@ def _faturamento() -> tuple[FaturamentoMensalSchema, ...]:
                 data_pagamento=f["pagamento"],
                 status_pagamento=status,
                 dias_em_atraso=dias_em_atraso,
+                receita_bandeira=f["bandeira"],
+                tipo_leitura=(
+                    "estimada"
+                    if f["competencia"] in _LEITURAS_ESTIMADAS.get(f["uc"].cod_uc, ())
+                    else "real"
+                ),
+                tipo_medidor=tipo_medidor_da_leitura(f["uc"].cod_uc, f["competencia"]),
+                dias_faturados=_dias_faturados(f["competencia"]),
             )
         )
     return tuple(rows)

@@ -44,6 +44,9 @@ def test_billing_follows_the_contract_checks(tmp_path: Path, engine: Engine) -> 
         assert (fatura.data_pagamento is None) == nao_paga
         sem_atraso = fatura.status_pagamento in ("paga", "em_aberto")
         assert (fatura.dias_em_atraso is None) == sem_atraso
+        assert 0 <= fatura.receita_bandeira <= fatura.receita_energia
+        if fatura.bandeira == "verde":
+            assert fatura.receita_bandeira == 0
         if fatura.origem_kwh == "leitura":
             assert fatura.kwh_faturado == fatura.kwh_leitura
         else:
@@ -62,6 +65,10 @@ def test_billing_follows_the_contract_checks(tmp_path: Path, engine: Engine) -> 
         "leitura_atual_troca_medidor",
         "consumo_absoluto",
     }
+    assert {f.tipo_leitura for f in faturas} == {"real", "estimada"}
+    assert {f.tipo_medidor for f in faturas} == {"eletromecanico", "eletronico", "smart"}
+    # Só a primeira leitura de cada UC fica sem dias faturados.
+    assert sum(f.dias_faturados is None for f in faturas) == len({f.cod_uc for f in faturas})
 
 
 def test_revenue_bridge_follows_the_contract_checks(tmp_path: Path, engine: Engine) -> None:

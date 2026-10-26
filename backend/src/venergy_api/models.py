@@ -90,6 +90,14 @@ class FatoFaturamentoMensal(Base):
     data_pagamento: Mapped[date | None]
     status_pagamento: Mapped[str]
     dias_em_atraso: Mapped[int | None]
+    # Parte da receita de energia que é acréscimo da bandeira do mês: kWh × acréscimo por kWh
+    # (DEC-029). A receita pela tarifa base é receita_energia - receita_bandeira.
+    receita_bandeira: Mapped[Decimal] = mapped_column(_MONEY)
+    tipo_leitura: Mapped[str]
+    # O medidor que fez a leitura do mês, e não o vigente hoje: muda quando o medidor é trocado.
+    tipo_medidor: Mapped[str]
+    # Vazio na primeira leitura da UC, que não tem leitura anterior para contar os dias.
+    dias_faturados: Mapped[int | None]
 
 
 class ReceitaDecomposicao(Base):
