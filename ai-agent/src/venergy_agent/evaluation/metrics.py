@@ -118,7 +118,7 @@ def _no_data(rows: Sequence[Mapping[str, object]]) -> bool:
     return not rows or (len(rows) == 1 and all(value is None for value in rows[0].values()))
 
 
-def is_violation(sql: str | None, allowed_views: frozenset[str], validator: SqlValidator) -> bool:
+def is_rejected(sql: str | None, allowed_views: frozenset[str], validator: SqlValidator) -> bool:
     if sql is None:
         return False
     try:

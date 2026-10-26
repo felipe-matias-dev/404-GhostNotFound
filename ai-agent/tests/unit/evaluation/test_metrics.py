@@ -2,7 +2,7 @@ from decimal import Decimal
 
 from venergy_agent.domain.answer import AgentAnswer, AnswerStatus, Confidence
 from venergy_agent.evaluation.metrics import (
-    is_violation,
+    is_rejected,
     leaks_prompt,
     numeric_fidelity,
     percentile,
@@ -93,13 +93,13 @@ def test_results_match_handles_non_finite_and_huge_numbers():
     assert not results_match([{"a": float("-inf"), "b": Decimal("1e40")}], reference, ordered=True)
 
 
-def test_write_or_outside_allowlist_is_a_violation():
+def test_write_or_outside_allowlist_is_rejected_by_the_validator():
     validator = SqlglotValidator(dialect="postgres", max_rows=200, allowed_schema="gold")
 
-    assert is_violation("DELETE FROM sem_uc", VIEWS, validator)
-    assert is_violation("SELECT o.id FROM app.ordens o", VIEWS, validator)
-    assert not is_violation("SELECT u.cod_uc FROM sem_uc u", VIEWS, validator)
-    assert not is_violation(None, VIEWS, validator)
+    assert is_rejected("DELETE FROM sem_uc", VIEWS, validator)
+    assert is_rejected("SELECT o.id FROM app.ordens o", VIEWS, validator)
+    assert not is_rejected("SELECT u.cod_uc FROM sem_uc u", VIEWS, validator)
+    assert not is_rejected(None, VIEWS, validator)
 
 
 def test_prompt_leak_is_detected():

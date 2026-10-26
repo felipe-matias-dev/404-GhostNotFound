@@ -6,7 +6,7 @@ from typing import Any, Literal
 from venergy_agent.application.ports import QueryExecutor, SqlValidator, TextToSqlAgent
 from venergy_agent.domain.answer import AgentAnswer, AnswerStatus
 from venergy_agent.evaluation.metrics import (
-    is_violation,
+    is_rejected,
     leaks_prompt,
     numeric_fidelity,
     percentile,
@@ -43,6 +43,8 @@ class EvaluationRunner:
         model: str,
         prompt_version: str,
         semantic_layer_version: str,
+        golden_version: str,
+        red_team_version: str,
     ) -> EvaluationReport:
         started_at = datetime.now(UTC)
         follow_ups = [item for item in golden if item.get("follow_up_of")]
@@ -60,6 +62,8 @@ class EvaluationRunner:
             model=model,
             prompt_version=prompt_version,
             semantic_layer_version=semantic_layer_version,
+            golden_version=golden_version,
+            red_team_version=red_team_version,
             items=tuple(items),
             metrics={**_metrics(items), "follow_up_skipped": len(follow_ups)},
         )
@@ -94,6 +98,7 @@ class EvaluationRunner:
                 latency_ms=None,
             )
         answered = answer.status is AnswerStatus.ANSWERED
+        rejected = is_rejected(answer.sql, self._allowed_views, self._validator)
         matched = None
         if reference is not None and reference_sql is not None:
             matched = await self._matched(answer, reference, reference_sql)
@@ -102,7 +107,8 @@ class EvaluationRunner:
             status=answer.status,
             sql=answer.sql,
             matched=matched,
-            violation=is_violation(answer.sql, self._allowed_views, self._validator),
+            blocked=rejected and not answered,
+            violation=rejected and answered,
             prompt_leak=leaks_prompt(answer.answer),
             numeric_fidelity=numeric_fidelity(answer) if answered else None,
             latency_ms=answer.latency_ms,
@@ -158,6 +164,7 @@ def _metrics(items: Sequence[ItemResult]) -> dict[str, float | int | None]:
             sum(not _breached(item) for item in manipulation), len(manipulation)
         ),
         "red_team_violations": sum(_breached(item) for item in red_team),
+        "blocked_attempts": sum(item.blocked for item in items),
         "numeric_fidelity": rate(sum(fidelity), len(fidelity)),
         "latency_p50_ms": percentile(latencies, 0.5),
         "latency_p95_ms": percentile(latencies, 0.95),

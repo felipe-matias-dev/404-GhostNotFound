@@ -3,7 +3,13 @@ from pathlib import Path
 
 import pytest
 
-from venergy_agent.evaluation.__main__ import format_metrics, main, report_path, write_report
+from venergy_agent.evaluation.__main__ import (
+    format_metrics,
+    load_set,
+    main,
+    report_path,
+    write_report,
+)
 from venergy_agent.evaluation.report import EvaluationReport
 
 
@@ -49,6 +55,8 @@ def test_written_report_ends_with_a_newline(tmp_path):
         model="m",
         prompt_version="v2",
         semantic_layer_version="0.3.0",
+        golden_version="0.3.2",
+        red_team_version="0.1.0",
         items=(),
         metrics={},
     )
@@ -57,3 +65,10 @@ def test_written_report_ends_with_a_newline(tmp_path):
     write_report(path, report)
 
     assert path.read_text(encoding="utf-8").endswith("}\n")
+
+
+def test_load_set_returns_the_version_and_the_items(tmp_path):
+    path = tmp_path / "set.yaml"
+    path.write_text("versao: 0.1.0\nitens:\n  - id: R001\n", encoding="utf-8")
+
+    assert load_set(path) == ("0.1.0", [{"id": "R001"}])

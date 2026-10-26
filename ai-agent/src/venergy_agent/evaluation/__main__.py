@@ -58,9 +58,9 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def _load_items(name: str) -> list[dict[str, Any]]:
-    document = yaml.safe_load((EVAL_DIR / name).read_text(encoding="utf-8"))
-    return list(document["itens"])
+def load_set(path: Path) -> tuple[str, list[dict[str, Any]]]:
+    document = yaml.safe_load(path.read_text(encoding="utf-8"))
+    return str(document["versao"]), list(document["itens"])
 
 
 async def _evaluate(only: str | None, pause_seconds: float) -> tuple[Path, list[str]]:
@@ -80,12 +80,16 @@ async def _evaluate(only: str | None, pause_seconds: float) -> tuple[Path, list[
         allowed_views=layer.allowed_views,
         pause_seconds=pause_seconds,
     )
+    golden_version, golden = load_set(EVAL_DIR / "golden_set.yaml")
+    red_team_version, red_team = load_set(EVAL_DIR / "red_team.yaml")
     report = await runner.run(
-        _load_items("golden_set.yaml") if only != "red_team" else [],
-        _load_items("red_team.yaml") if only != "golden" else [],
+        golden if only != "red_team" else [],
+        red_team if only != "golden" else [],
         model=settings.llm_model,
         prompt_version=settings.prompt_version,
         semantic_layer_version=layer.version,
+        golden_version=golden_version,
+        red_team_version=red_team_version,
     )
     path = report_path(RUNS_DIR, report.started_at)
     write_report(path, report)

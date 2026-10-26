@@ -13,7 +13,7 @@
 # As linhas de exemplo são sintéticas, escritas à mão. Nenhum valor real da Gold entra aqui.
 # Depois de cada mudança, gere o views.sql (ver a seção Camada semântica em ai-agent/README.md).
 
-version: "0.3.3"
+version: "0.3.4"
 
 views:
   - name: sem_uc
@@ -201,7 +201,7 @@ views:
       - name: classe
         description: "classe de consumo: B1, B2, B3 ou A4"
       - name: possui_gd
-        description: "verdadeiro quando as UCs do recorte tinham geração própria no último mês do período atual; o efeito GD é o efeito_volume dessas linhas"
+        description: "verdadeiro quando as UCs do recorte tinham geração própria no último mês do período atual; o grupo vale para a UC nos dois períodos, então quem conectou a GD entre eles fica no grupo com GD dos dois lados (PR #42); o efeito GD é o efeito_volume dessas linhas"
       - name: receita_base
         unit: "R$"
         description: "receita de energia, sem tributos, no período base"
@@ -281,7 +281,7 @@ rules:
   - text: "Bairro só identifica um lugar junto com o município: filtre e agrupe sempre por municipio e bairro."
   - text: "Totais da empresa por mês (energia, receita, DEC, FEC, chamados e satisfação) vêm prontos de sem_kpis_mensais."
   - text: "DEC e FEC por alimentador vêm prontos de sem_continuidade_alimentador_mensal; da empresa, de sem_kpis_mensais. Leia; não recalcule."
-  - text: "DEC e FEC de um período de vários meses (semestre, ano) são a soma dos valores mensais prontos, porque são indicadores acumulados: sum(dec) e sum(fec) sobre as competências do período. Nunca use a média (avg) dos meses. Por recorte de sem_kpis_segmento_mensal, use a fórmula dos componentes da regra de recortes."
+  - text: "DEC e FEC de um período de vários meses (semestre, ano) são a soma dos valores mensais prontos, porque são indicadores acumulados: sum(dec) e sum(fec) sobre as competências do período. Nunca use a média (avg) dos meses (DEC-032, proposta). Por recorte de sem_kpis_segmento_mensal, use a fórmula dos componentes da regra de recortes."
   - text: "Por município, bairro, classe ou GD, use sem_kpis_segmento_mensal e some os componentes antes de dividir; nunca faça média de índices. Num mês: DEC = sum(horas_interrompidas) / sum(n_uc) e FEC = sum(n_interrupcoes) / sum(n_uc). Num período de vários meses, divida pela média mensal de UCs: sum(n_uc) dividido pelo número de meses do período pedido (3 num trimestre), e não pelos meses que aparecem no resultado. Satisfação = sum(soma_notas) / sum(n_notas), com NULLIF no divisor."
   - text: "Efeitos de preço, tarifa, bandeira, volume e mix são lidos de sem_receita_decomposicao e somados sobre o recorte; não recalcule. receita_base e receita_atual são receita de energia, sem tributos."
   - text: "Em sem_receita_decomposicao, periodo_base e periodo_atual são faixas AAAA-MM/AAAA-MM. Filtre pelo par exato de períodos. Se a pergunta não disser os dois períodos, peça esclarecimento (clarify)."
