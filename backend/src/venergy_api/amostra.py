@@ -245,8 +245,6 @@ _ADICIONAL_BANDEIRA = {
     "vermelha_p1": Decimal("0.045"),
     "vermelha_p2": Decimal("0.079"),
 }
-# Formato confirmado no contrato v0.2: AAAA-MM/AAAA-MM.
-_PERIODO = {2024: "2024-01/2024-12", 2025: "2025-01/2025-12"}
 
 
 def _bandeira(competencia: str) -> str:
@@ -707,55 +705,75 @@ def _reconciliacao(
     return tuple(rows)
 
 
+def _janelas() -> list[tuple[int, int]]:
+    """Todo trecho do ano, do mês de início ao mês final: 78 trechos."""
+    return [(inicio, fim) for inicio in range(1, 13) for fim in range(inicio, 13)]
+
+
 def _decomposicao(
     faturamento: tuple[FaturamentoMensalSchema, ...],
 ) -> tuple[ReceitaDecomposicaoSchema, ...]:
-    # Totais de kWh, receita de energia e acréscimo de bandeira por segmento e ano. A base é a
-    # receita de energia, sem tributos (DEC-023).
+    # Totais de kWh, receita de energia e acréscimo de bandeira por segmento e competência. A base
+    # é a receita de energia, sem tributos (DEC-023).
     segmento_da_uc = {
         uc.cod_uc: (uc.municipio, uc.bairro, uc.classe, uc.possui_gd) for uc in SAMPLE_UCS
     }
-    totais: dict[tuple[tuple[str, str, str, bool], int], list[Decimal]] = {}
+    totais: dict[tuple[tuple[str, str, str, bool], str], list[Decimal]] = {}
     for linha in faturamento:
-        chave = (segmento_da_uc[linha.cod_uc], int(linha.competencia[:4]))
+        chave = (segmento_da_uc[linha.cod_uc], linha.competencia)
         kwh, receita, bandeira = totais.get(chave, [Decimal(0), Decimal(0), Decimal(0)])
         totais[chave] = [
             kwh + linha.kwh_faturado,
             receita + linha.receita_energia,
-            bandeira + linha.kwh_faturado * _ADICIONAL_BANDEIRA[linha.bandeira],
+            bandeira + linha.receita_bandeira,
         ]
 
+    def soma(
+        segmento: tuple[str, str, str, bool], ano: int, inicio: int, fim: int
+    ) -> list[Decimal]:
+        meses = [totais[(segmento, f"{ano}-{mes:02d}")] for mes in range(inicio, fim + 1)]
+        return [sum((mes[i] for mes in meses), Decimal(0)) for i in range(3)]
+
+    # Todos os pares de mesmos meses em anos diferentes (DEC-028), aqui entre 2024 e 2025. Cada
+    # par tem o formato do contrato, AAAA-MM/AAAA-MM.
     rows = []
-    for segmento in sorted({segmento for segmento, _ in totais}):
-        municipio, bairro, classe, possui_gd = segmento
-        kwh_base, receita_base, bandeira_base = totais[(segmento, 2024)]
-        kwh_atual, receita_atual, bandeira_atual = totais[(segmento, 2025)]
-        tarifa_base, tarifa_atual = receita_base / kwh_base, receita_atual / kwh_atual
-        efeito_preco = ((tarifa_atual - tarifa_base) * kwh_atual).quantize(_CENTAVO)
-        # A parte do preço que veio da bandeira: o acréscimo médio por kWh mudou entre os
-        # períodos. O resto do efeito preço é o reajuste da tarifa base.
-        adicional_base, adicional_atual = bandeira_base / kwh_base, bandeira_atual / kwh_atual
-        efeito_bandeira = ((adicional_atual - adicional_base) * kwh_atual).quantize(_CENTAVO)
-        rows.append(
-            ReceitaDecomposicaoSchema(
-                periodo_base=_PERIODO[2024],
-                periodo_atual=_PERIODO[2025],
-                municipio=municipio,
-                bairro=bairro,
-                classe=classe,
-                possui_gd=possui_gd,
-                receita_base=receita_base,
-                receita_atual=receita_atual,
-                efeito_preco=efeito_preco,
-                efeito_tarifa=efeito_preco - efeito_bandeira,
-                efeito_bandeira=efeito_bandeira,
-                efeito_volume=((kwh_atual - kwh_base) * tarifa_base).quantize(_CENTAVO),
-                # Calculado, e não resíduo (contrato v0.2): num segmento de uma classe só, o
-                # peso entre classes não muda, então o mix é zero. Preço e volume fecham com a
-                # variação dentro da tolerância de arredondamento (R$ 0,02 por linha).
-                efeito_mix=Decimal("0.00"),
+    for inicio, fim in _janelas():
+        periodo_base = f"2024-{inicio:02d}/2024-{fim:02d}"
+        periodo_atual = f"2025-{inicio:02d}/2025-{fim:02d}"
+        for segmento in sorted({segmento for segmento, _ in totais}):
+            municipio, bairro, classe, possui_gd = segmento
+            kwh_base, receita_base, bandeira_base = soma(segmento, 2024, inicio, fim)
+            kwh_atual, receita_atual, bandeira_atual = soma(segmento, 2025, inicio, fim)
+            if not kwh_base or not kwh_atual:
+                # Sem energia faturada num dos lados não há tarifa média para decompor: o par
+                # não existe para este segmento (a UC 0002 compensa todo o consumo de janeiro).
+                continue
+            tarifa_base, tarifa_atual = receita_base / kwh_base, receita_atual / kwh_atual
+            efeito_preco = ((tarifa_atual - tarifa_base) * kwh_atual).quantize(_CENTAVO)
+            # A parte do preço que veio da bandeira, pela DEC-029: o acréscimo médio por kWh
+            # mudou entre os períodos. O resto do efeito preço é o reajuste da tarifa base.
+            adicional_base, adicional_atual = bandeira_base / kwh_base, bandeira_atual / kwh_atual
+            efeito_bandeira = ((adicional_atual - adicional_base) * kwh_atual).quantize(_CENTAVO)
+            rows.append(
+                ReceitaDecomposicaoSchema(
+                    periodo_base=periodo_base,
+                    periodo_atual=periodo_atual,
+                    municipio=municipio,
+                    bairro=bairro,
+                    classe=classe,
+                    possui_gd=possui_gd,
+                    receita_base=receita_base,
+                    receita_atual=receita_atual,
+                    efeito_preco=efeito_preco,
+                    efeito_tarifa=efeito_preco - efeito_bandeira,
+                    efeito_bandeira=efeito_bandeira,
+                    efeito_volume=((kwh_atual - kwh_base) * tarifa_base).quantize(_CENTAVO),
+                    # Calculado, e não resíduo (contrato v0.2): num segmento de uma classe só,
+                    # o peso entre classes não muda, então o mix é zero. Preço e volume fecham
+                    # com a variação dentro da tolerância de arredondamento (R$ 0,02 por linha).
+                    efeito_mix=Decimal("0.00"),
+                )
             )
-        )
     return tuple(rows)
 
 

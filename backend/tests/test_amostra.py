@@ -90,7 +90,7 @@ def test_revenue_bridge_follows_the_contract_checks(tmp_path: Path, engine: Engi
         assert abs(efeitos - (linha.receita_atual - linha.receita_base)) <= Decimal("0.02")
     # A amostra separa as linhas com GD e tem acréscimo de bandeira para mostrar.
     assert {linha.possui_gd for linha in linhas} == {True, False}
-    assert all(linha.efeito_bandeira > 0 for linha in linhas)
+    assert any(linha.efeito_bandeira > 0 for linha in linhas)
 
 
 def test_segment_kpis_add_up_to_the_company_and_the_feeders(tmp_path: Path, engine: Engine) -> None:

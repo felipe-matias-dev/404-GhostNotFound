@@ -36,6 +36,12 @@ TipoMedidorRecorte = Literal["eletromecanico", "eletronico", "smart", "sem_medid
 ResultadoInspecao = Literal["irregularidade_confirmada", "sem_irregularidade"]
 ModalidadeGd = Literal["geracao_propria_uc", "autoconsumo_remoto", "geracao_compartilhada"]
 
+# Um período da decomposição, no formato do contrato: AAAA-MM/AAAA-MM, da primeira à última
+# competência.
+PeriodoDecomposicao = Annotated[
+    str, StringConstraints(pattern=r"^\d{4}-(0[1-9]|1[0-2])/\d{4}-(0[1-9]|1[0-2])$")
+]
+
 # Teto por pedido na ordem da capacidade mensal da equipe de campo (~200 inspeções):
 # acima disso é engano de seleção, e o limite evita um pedido gigante travar o banco.
 MAX_ORDENS_POR_PEDIDO = 200
@@ -188,11 +194,20 @@ class ComparacaoReceitaSchema(BaseModel):
     variacao_receita_pct: float | None
 
 
+class ParPeriodosSchema(BaseModel):
+    """Um par de períodos que a Gold gravou na decomposição (DEC-028)."""
+
+    periodo_base: PeriodoDecomposicao
+    periodo_atual: PeriodoDecomposicao
+
+
 class DecomposicaoFiltroSchema(BaseModel):
     """Onde está o Henrique no drill-down: o nível da resposta é o próximo abaixo do filtro."""
 
-    periodo_base: RequiredText | None = None
-    periodo_atual: RequiredText | None = None
+    # Obrigatório: a Gold guarda centenas de pares, e a ponte de um par só faz sentido sozinha.
+    # Os pares válidos vêm de /receita/decomposicao/periodos.
+    periodo_base: PeriodoDecomposicao
+    periodo_atual: PeriodoDecomposicao
     municipio: RequiredText | None = None
     bairro: RequiredText | None = None
     classe: Classe | None = None

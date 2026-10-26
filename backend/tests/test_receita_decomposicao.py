@@ -134,14 +134,71 @@ def test_lines_with_and_without_solar_add_up_in_the_same_segment(
 
 
 @pytest.mark.usefixtures("bridge")
-def test_keeps_each_pair_of_periods_apart(client: TestClient) -> None:
-    response = client.get("/receita/decomposicao", params={"municipio": "Olinda"})
+def test_returns_only_the_requested_pair_of_periods(client: TestClient) -> None:
+    rows = decompose(client, municipio="Olinda")
+    assert [(row["periodo_base"], row["variacao_receita"]) for row in rows] == [(CURRENT[0], -20.0)]
 
-    rows = response.json()
-    assert [(row["periodo_base"], row["variacao_receita"]) for row in rows] == [
-        (PREVIOUS[0], 10.0),
-        (CURRENT[0], -20.0),
+    response = client.get(
+        "/receita/decomposicao",
+        params={"periodo_base": PREVIOUS[0], "periodo_atual": PREVIOUS[1], "municipio": "Olinda"},
+    )
+    assert [(row["periodo_base"], row["variacao_receita"]) for row in response.json()] == [
+        (PREVIOUS[0], 10.0)
     ]
+
+
+@pytest.mark.usefixtures("bridge")
+@pytest.mark.parametrize(
+    "params",
+    [
+        {},
+        {"periodo_base": CURRENT[0]},
+        {"periodo_atual": CURRENT[1]},
+        {"periodo_base": "2024", "periodo_atual": "2025"},
+        {"periodo_base": "2024-13/2024-12", "periodo_atual": CURRENT[1]},
+    ],
+)
+def test_rejects_a_missing_or_malformed_pair_of_periods(
+    client: TestClient, params: dict[str, str]
+) -> None:
+    # A Gold guarda centenas de pares: sem os dois, a resposta somaria períodos que não se comparam.
+    response = client.get("/receita/decomposicao", params=params)
+
+    assert response.status_code == 422
+
+
+@pytest.mark.usefixtures("bridge")
+def test_lists_the_stored_pairs_in_order(client: TestClient) -> None:
+    response = client.get("/receita/decomposicao/periodos")
+
+    assert response.status_code == 200
+    assert response.json() == [
+        {"periodo_base": PREVIOUS[0], "periodo_atual": PREVIOUS[1]},
+        {"periodo_base": CURRENT[0], "periodo_atual": CURRENT[1]},
+    ]
+
+
+def test_lists_no_pairs_before_the_gold_is_loaded(engine: Engine, client: TestClient) -> None:
+    Base.metadata.create_all(engine)
+
+    assert client.get("/receita/decomposicao/periodos").json() == []
+
+
+def test_every_pair_in_the_sample_has_the_same_months_in_two_years(
+    tmp_path: Path, engine: Engine, client: TestClient
+) -> None:
+    # DEC-028: só pares de mesmos meses em anos diferentes. O seletor da tela oferece estes.
+    write_sample(tmp_path / "gold", force=False)
+    load_gold(tmp_path / "gold", engine)
+
+    pares = client.get("/receita/decomposicao/periodos").json()
+
+    assert len(pares) == 78
+    for par in pares:
+        base, atual = par["periodo_base"], par["periodo_atual"]
+        assert (base[:4], atual[:4]) == ("2024", "2025")
+        assert (base[5:7], base[13:15]) == (atual[5:7], atual[13:15])
+    assert {"periodo_base": CURRENT[0], "periodo_atual": CURRENT[1]} in pares
 
 
 def test_effects_add_up_to_the_revenue_change_at_every_level(
@@ -152,11 +209,15 @@ def test_effects_add_up_to_the_revenue_change_at_every_level(
     # tarifa + bandeira, R$ 0,02 em preço + volume + mix = variação), vezes as linhas somadas.
     write_sample(tmp_path / "gold", force=False)
     load_gold(tmp_path / "gold", engine)
-    lines = len(SAMPLE_DECOMPOSICAO)
+    year = ("2024-01/2024-12", "2025-01/2025-12")
+    lines = sum(1 for linha in SAMPLE_DECOMPOSICAO if linha.periodo_base == year[0])
+    params = {"periodo_base": year[0], "periodo_atual": year[1]}
 
-    rows = client.get("/receita/decomposicao").json()
+    rows = client.get("/receita/decomposicao", params=params).json()
     for municipio in {row["segmento"] for row in rows}:
-        rows += client.get("/receita/decomposicao", params={"municipio": municipio}).json()
+        rows += client.get(
+            "/receita/decomposicao", params={**params, "municipio": municipio}
+        ).json()
 
     assert rows
     for row in rows:
@@ -170,7 +231,8 @@ def test_effects_add_up_to_the_revenue_change_at_every_level(
 
 
 def test_rejects_a_neighborhood_without_its_city(engine: Engine, client: TestClient) -> None:
-    response = client.get("/receita/decomposicao", params={"bairro": "Carmo"})
+    params = {"periodo_base": CURRENT[0], "periodo_atual": CURRENT[1], "bairro": "Carmo"}
+    response = client.get("/receita/decomposicao", params=params)
 
     assert response.status_code == 422
     assert "Informe o município junto com o bairro" in response.text
