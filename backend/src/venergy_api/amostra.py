@@ -27,6 +27,7 @@ from venergy_api.models import (
     InterrupcaoUc,
     KpisMensais,
     KpisSegmentoMensal,
+    MedidorUc,
     ReceitaDecomposicao,
     ReconciliacaoFaturamento,
 )
@@ -39,6 +40,7 @@ from venergy_api.schemas import (
     InterrupcaoUcSchema,
     KpisMensaisSchema,
     KpisSegmentoMensalSchema,
+    MedidorUcSchema,
     ReceitaDecomposicaoSchema,
     ReconciliacaoFaturamentoSchema,
 )
@@ -456,6 +458,41 @@ def _interrupcoes_uc() -> tuple[InterrupcaoUcSchema, ...]:
     return tuple(rows)
 
 
+# Instalação do medidor vigente de cada UC. A UC 0003 tem o medidor da troca de 2025-03, a UC
+# 0005 tem o mais antigo (mais de 15 anos, um dos motivos da fila) e a UC 0004 não traz o modelo.
+_INSTALACAO_MEDIDOR = {
+    "0001": date(2018, 6, 12),
+    "0002": date(2021, 9, 3),
+    "0003": date(2025, 3, 5),
+    "0004": date(2016, 2, 20),
+    "0005": date(2009, 8, 14),
+    "0006": date(2019, 11, 25),
+    "0007": date(2022, 5, 17),
+    "0008": date(2023, 1, 9),
+}
+_FIM_DOS_DADOS = date(2025, 12, 31)
+
+
+def _medidores() -> tuple[MedidorUcSchema, ...]:
+    rows = []
+    for uc in SAMPLE_UCS:
+        trocas = 1 if uc.cod_uc == _TROCA_MEDIDOR[0] else 0
+        instalacao = _INSTALACAO_MEDIDOR[uc.cod_uc]
+        rows.append(
+            MedidorUcSchema(
+                cod_uc=uc.cod_uc,
+                cod_medidor=f"MD-{uc.cod_uc}-{trocas + 1:02d}",
+                tipo_medidor=_MEDIDOR[uc.cod_uc],
+                modelo=None if uc.cod_uc == "0004" else f"MOD-{_MEDIDOR[uc.cod_uc].upper()}",
+                data_instalacao=instalacao,
+                idade_anos=(_FIM_DOS_DADOS - instalacao).days / 365.25,
+                n_trocas=trocas,
+                data_ultima_troca=instalacao if trocas else None,
+            )
+        )
+    return tuple(rows)
+
+
 def _chamados(uc: DimUcSchema, competencia: str) -> tuple[int, int | None]:
     """Chamados abertos pela UC no mês e a nota do atendimento, de 1 a 5."""
     mes, numero = int(competencia[5:]), int(uc.cod_uc)
@@ -750,6 +787,7 @@ SAMPLE_KPIS_SEGMENTO = _kpis_segmento(SAMPLE_FATURAMENTO)
 SAMPLE_RECONCILIACAO = _reconciliacao(SAMPLE_FATURAMENTO)
 SAMPLE_INTERRUPCOES = _interrupcoes_uc()
 SAMPLE_ATENDIMENTOS = _atendimentos_uc()
+SAMPLE_MEDIDORES = _medidores()
 SAMPLE_DECOMPOSICAO = _decomposicao(SAMPLE_FATURAMENTO)
 
 # Linhas por tabela da Gold. A carga exige um CSV para cada tabela de GOLD_TABLES, e o
@@ -765,6 +803,7 @@ SAMPLE: dict[type[Base], tuple[BaseModel, ...]] = {
     FilaSuspeita: SAMPLE_FILA,
     InterrupcaoUc: SAMPLE_INTERRUPCOES,
     AtendimentoUc: SAMPLE_ATENDIMENTOS,
+    MedidorUc: SAMPLE_MEDIDORES,
 }
 
 

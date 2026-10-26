@@ -308,6 +308,19 @@ class AtendimentoUcSchema(BaseModel):
     nota_satisfacao: Annotated[float, Field(ge=1, le=5)] | None
 
 
+class MedidorUcSchema(BaseModel):
+    """O medidor vigente de uma UC e quantas vezes ele já foi trocado."""
+
+    cod_uc: RequiredText
+    cod_medidor: RequiredText
+    tipo_medidor: TipoMedidor
+    modelo: RequiredText | None
+    data_instalacao: date
+    idade_anos: Annotated[float, Field(ge=0)]
+    n_trocas: Annotated[int, Field(ge=0)]
+    data_ultima_troca: date | None
+
+
 class FilaSuspeitaSchema(BaseModel):
     """Uma UC suspeita de perda não técnica, com o porquê e o quanto vale inspecionar."""
 

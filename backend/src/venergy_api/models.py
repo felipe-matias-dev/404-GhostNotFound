@@ -261,6 +261,25 @@ class AtendimentoUc(Base):
     nota_satisfacao: Mapped[float | None] = mapped_column(Double)
 
 
+class MedidorUc(Base):
+    """Medidor vigente de cada UC, com a idade e o histórico de trocas: a UC 360 e a fila."""
+
+    __tablename__ = "gold_medidor_uc"
+    __table_args__ = {"schema": "gold"}
+
+    # Uma linha por UC com medidor: a UC sem medidor (UC-12) não tem linha aqui.
+    cod_uc: Mapped[str] = mapped_column(primary_key=True)
+    cod_medidor: Mapped[str]
+    tipo_medidor: Mapped[str]
+    modelo: Mapped[str | None]
+    data_instalacao: Mapped[date]
+    # Em anos com fração, no fim da última competência dos dados, e não na data de hoje.
+    idade_anos: Mapped[float] = mapped_column(Double)
+    n_trocas: Mapped[int]
+    # Vazia se nunca houve troca.
+    data_ultima_troca: Mapped[date | None]
+
+
 class FilaSuspeita(Base):
     """UCs suspeitas de perda não técnica: de onde o gerente de perdas gera as OIs."""
 

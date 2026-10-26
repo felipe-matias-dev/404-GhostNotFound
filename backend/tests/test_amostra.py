@@ -5,7 +5,7 @@ import pytest
 from sqlalchemy import Engine, func, select
 from sqlalchemy.orm import Session
 
-from venergy_api.amostra import SAMPLE, SAMPLE_FILA, write_sample
+from venergy_api.amostra import COMPETENCIAS, SAMPLE, SAMPLE_FILA, write_sample
 from venergy_api.carga import load_gold
 from venergy_api.models import (
     AtendimentoUc,
@@ -15,6 +15,7 @@ from venergy_api.models import (
     InterrupcaoUc,
     KpisMensais,
     KpisSegmentoMensal,
+    MedidorUc,
     ReceitaDecomposicao,
     ReconciliacaoFaturamento,
 )
@@ -370,3 +371,37 @@ def test_calls_add_up_to_the_segment_components(tmp_path: Path, engine: Engine) 
     # Mês sem chamado fica de fora da tabela por chamado; no recorte, tem zero.
     for competencia, (quantidade, soma_notas, notas) in recortes.items():
         assert chamados.get(competencia, (0, None, 0)) == (quantidade, soma_notas, notas)
+
+
+def test_current_meter_matches_the_last_reading_and_the_replacement(
+    tmp_path: Path, engine: Engine
+) -> None:
+    # O medidor vigente é o da última leitura, e a troca de medidor do fato aparece como troca
+    # no medidor da UC (UC 360 e fila de suspeitas).
+    write_sample(tmp_path / "gold", force=False)
+    load_gold(tmp_path / "gold", engine)
+    ultima = COMPETENCIAS[-1]
+
+    with Session(engine) as session:
+        medidores = session.scalars(select(MedidorUc)).all()
+        da_ultima_leitura = {
+            cod_uc: tipo_medidor
+            for cod_uc, tipo_medidor in session.execute(
+                select(FatoFaturamentoMensal.cod_uc, FatoFaturamentoMensal.tipo_medidor).where(
+                    FatoFaturamentoMensal.competencia == ultima
+                )
+            )
+        }
+        trocas = set(
+            session.scalars(
+                select(FatoFaturamentoMensal.cod_uc).where(
+                    FatoFaturamentoMensal.origem_kwh == "leitura_atual_troca_medidor"
+                )
+            )
+        )
+
+    assert {m.cod_uc: m.tipo_medidor for m in medidores} == da_ultima_leitura
+    assert {m.cod_uc for m in medidores if m.n_trocas} == trocas
+    for medidor in medidores:
+        assert (medidor.data_ultima_troca is None) == (medidor.n_trocas == 0)
+        assert medidor.idade_anos > 0

@@ -27,6 +27,7 @@ from venergy_api.models import (
     InterrupcaoUc,
     KpisMensais,
     KpisSegmentoMensal,
+    MedidorUc,
     ReceitaDecomposicao,
     ReconciliacaoFaturamento,
 )
@@ -39,6 +40,7 @@ from venergy_api.schemas import (
     InterrupcaoUcSchema,
     KpisMensaisSchema,
     KpisSegmentoMensalSchema,
+    MedidorUcSchema,
     ReceitaDecomposicaoSchema,
     ReconciliacaoFaturamentoSchema,
 )
@@ -78,6 +80,7 @@ GOLD_TABLES = (
     GoldTable(model=FilaSuspeita, schema=FilaSuspeitaSchema),
     GoldTable(model=InterrupcaoUc, schema=InterrupcaoUcSchema),
     GoldTable(model=AtendimentoUc, schema=AtendimentoUcSchema),
+    GoldTable(model=MedidorUc, schema=MedidorUcSchema),
 )
 
 
