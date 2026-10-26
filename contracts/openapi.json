@@ -932,6 +932,50 @@
               }
             ],
             "title": "Potencia Kwp"
+          },
+          "data_ligacao": {
+            "type": "string",
+            "format": "date",
+            "title": "Data Ligacao"
+          },
+          "data_conexao_gd": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data Conexao Gd"
+          },
+          "modalidade_gd": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "geracao_propria_uc",
+                  "autoconsumo_remoto",
+                  "geracao_compartilhada"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modalidade Gd"
+          },
+          "energia_injetada_kwh_mes": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Energia Injetada Kwh Mes"
           }
         },
         "type": "object",
@@ -946,7 +990,11 @@
           "consumo_medio_kwh_12m",
           "titular_mascarado",
           "documento_mascarado",
-          "potencia_kwp"
+          "potencia_kwp",
+          "data_ligacao",
+          "data_conexao_gd",
+          "modalidade_gd",
+          "energia_injetada_kwh_mes"
         ],
         "title": "DimUcSchema"
       },

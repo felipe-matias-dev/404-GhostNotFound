@@ -30,6 +30,7 @@ ClasseCadastro = Literal["Residencial", "Comercial", "Industrial", "Rural", "Pod
 Bandeira = Literal["verde", "amarela", "vermelha_p1", "vermelha_p2"]
 OrigemKwh = Literal["leitura", "leitura_atual_troca_medidor", "consumo_absoluto"]
 StatusPagamento = Literal["paga", "paga_com_atraso", "em_aberto", "em_atraso"]
+ModalidadeGd = Literal["geracao_propria_uc", "autoconsumo_remoto", "geracao_compartilhada"]
 
 # Teto por pedido na ordem da capacidade mensal da equipe de campo (~200 inspeções):
 # acima disso é engano de seleção, e o limite evita um pedido gigante travar o banco.
@@ -52,6 +53,10 @@ class DimUcSchema(BaseModel):
     titular_mascarado: RequiredText | None
     documento_mascarado: RequiredText | None
     potencia_kwp: float | None
+    data_ligacao: date
+    data_conexao_gd: date | None
+    modalidade_gd: ModalidadeGd | None
+    energia_injetada_kwh_mes: Annotated[ExactNumber, Field(ge=0)] | None
 
 
 class FaturamentoMensalSchema(BaseModel):

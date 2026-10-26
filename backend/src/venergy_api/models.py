@@ -53,6 +53,13 @@ class DimUc(Base):
     documento_mascarado: Mapped[str | None]
     # Double, o tipo "ratio" do contrato. Potência de pico em kWp, como vem da origem.
     potencia_kwp: Mapped[float | None] = mapped_column(Double)
+    # Cliente desde: a UC conta no n_uc a partir do mês da ligação (DEC-030).
+    data_ligacao: Mapped[date]
+    # Os três de baixo só existem para UCs com GD. A data permite comparar o consumo antes e
+    # depois da conexão (H1, UC 360).
+    data_conexao_gd: Mapped[date | None]
+    modalidade_gd: Mapped[str | None]
+    energia_injetada_kwh_mes: Mapped[Decimal | None] = mapped_column(_ENERGY)
 
 
 class FatoFaturamentoMensal(Base):

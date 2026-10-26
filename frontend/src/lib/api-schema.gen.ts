@@ -246,6 +246,17 @@ export interface components {
             documento_mascarado: string | null;
             /** Potencia Kwp */
             potencia_kwp: number | null;
+            /**
+             * Data Ligacao
+             * Format: date
+             */
+            data_ligacao: string;
+            /** Data Conexao Gd */
+            data_conexao_gd: string | null;
+            /** Modalidade Gd */
+            modalidade_gd: ("geracao_propria_uc" | "autoconsumo_remoto" | "geracao_compartilhada") | null;
+            /** Energia Injetada Kwh Mes */
+            energia_injetada_kwh_mes: number | null;
         };
         /**
          * ErroSchema

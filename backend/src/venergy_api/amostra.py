@@ -43,14 +43,17 @@ FIELDS = list(DimUcSchema.model_fields)
 # Cobre as 4 classes de consumo e as 5 do cadastro (o B3 aparece como Poder Público e como
 # Comercial), UCs com e sem painel solar e municípios citados pelas lideranças. Os códigos
 # são fixos para que o time possa citá-los ("busque a UC 0003"). Titular e documento são
-# inventados e já mascarados, como chegam da Gold. A potência só existe com painel solar.
+# inventados e já mascarados, como chegam da Gold. A potência, a conexão e a energia injetada só
+# existem com painel solar, e a conexão é anterior a 2024 (o GD de cada mês é o do cadastro).
+# Todas as UCs foram ligadas antes do primeiro mês, então o n_uc é o mesmo em toda competência.
 _JABOATAO = "Jaboatão dos Guararapes"
 _CABO = "Cabo de Santo Agostinho"
 _CPF = "***.***.**{}-{}"
 _CNPJ = "**.***.***/***{}-{}"
 _ROWS = [
     # cod_uc, municipio, bairro, classe, classe_cadastro, cod_alimentador, possui_gd,
-    # consumo_medio_kwh_12m, titular_mascarado, documento_mascarado, potencia_kwp
+    # consumo_medio_kwh_12m, titular_mascarado, documento_mascarado, potencia_kwp, data_ligacao,
+    # data_conexao_gd, modalidade_gd, energia_injetada_kwh_mes
     (
         "0001",
         "Recife",
@@ -62,6 +65,10 @@ _ROWS = [
         162.5,
         "M. S.",
         _CPF.format(1, "23"),
+        None,
+        date(2015, 6, 1),
+        None,
+        None,
         None,
     ),
     (
@@ -76,6 +83,10 @@ _ROWS = [
         "A. L. P.",
         _CPF.format(4, "56"),
         3.3,
+        date(2018, 6, 1),
+        date(2022, 3, 15),
+        "geracao_propria_uc",
+        Decimal("396.000"),
     ),
     (
         "0003",
@@ -89,6 +100,10 @@ _ROWS = [
         "J. C.",
         _CPF.format(7, "89"),
         5.0,
+        date(2019, 6, 1),
+        date(2023, 6, 20),
+        "autoconsumo_remoto",
+        Decimal("600.000"),
     ),
     (
         "0004",
@@ -101,6 +116,10 @@ _ROWS = [
         1240.0,
         "E. M. P.",
         _CNPJ.format(0, "11"),
+        None,
+        date(2012, 6, 1),
+        None,
+        None,
         None,
     ),
     (
@@ -115,6 +134,10 @@ _ROWS = [
         "R. F.",
         _CPF.format(2, "34"),
         None,
+        date(2016, 6, 1),
+        None,
+        None,
+        None,
     ),
     (
         "0006",
@@ -128,6 +151,10 @@ _ROWS = [
         "S. B. A.",
         _CPF.format(5, "67"),
         10.0,
+        date(2010, 6, 1),
+        date(2021, 11, 5),
+        "geracao_propria_uc",
+        Decimal("1200.000"),
     ),
     (
         "0007",
@@ -141,6 +168,10 @@ _ROWS = [
         "P. N. L.",
         _CNPJ.format(8, "90"),
         None,
+        date(2014, 6, 1),
+        None,
+        None,
+        None,
     ),
     (
         "0008",
@@ -153,6 +184,10 @@ _ROWS = [
         48500.0,
         "M. I. N.",
         _CNPJ.format(3, "45"),
+        None,
+        date(2008, 6, 1),
+        None,
+        None,
         None,
     ),
 ]

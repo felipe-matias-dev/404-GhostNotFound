@@ -6,6 +6,7 @@ do Postgres (SQLSTATE) para garantir que cada escrita falhou pelo motivo certo.
 
 import os
 from collections.abc import Iterator
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -40,6 +41,7 @@ def gold_with_one_uc(engine: Engine) -> None:
                 cod_alimentador="AL-01",
                 possui_gd=False,
                 consumo_medio_kwh_12m=100.0,
+                data_ligacao=date(2018, 6, 1),
             )
         )
 
