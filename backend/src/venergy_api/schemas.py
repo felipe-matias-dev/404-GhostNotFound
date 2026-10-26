@@ -349,6 +349,12 @@ class InspecaoUcSchema(BaseModel):
     kwh_recuperado: Annotated[ExactNumber, Field(ge=0)]
 
 
+class ContinuidadeSerieFiltroSchema(PeriodoSchema):
+    """Período da série e, se quiser, só alguns alimentadores (o parâmetro se repete na URL)."""
+
+    cod_alimentador: list[RequiredText] = Field(default_factory=list)
+
+
 class FilaSuspeitaSchema(BaseModel):
     """Uma UC suspeita de perda não técnica, com o porquê e o quanto vale inspecionar."""
 

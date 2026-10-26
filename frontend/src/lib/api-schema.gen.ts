@@ -120,6 +120,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/continuidade/alimentadores/mensal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Serie Alimentadores
+         * @description DEC e FEC de cada alimentador por competência, como a Gold calculou.
+         */
+        get: operations["get_serie_alimentadores_continuidade_alimentadores_mensal_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/ordens-inspecao": {
         parameters: {
             query?: never;
@@ -194,6 +214,26 @@ export interface components {
             variacao_kwh_pct: number | null;
             /** Variacao Receita Pct */
             variacao_receita_pct: number | null;
+        };
+        /**
+         * ContinuidadeAlimentadorMensalSchema
+         * @description DEC e FEC de um alimentador numa competência.
+         */
+        ContinuidadeAlimentadorMensalSchema: {
+            /** Cod Alimentador */
+            cod_alimentador: string;
+            /** Competencia */
+            competencia: string;
+            /** Dec */
+            dec: number;
+            /** Fec */
+            fec: number;
+            /** N Uc */
+            n_uc: number;
+            /** N Interrupcoes */
+            n_interrupcoes: number;
+            /** Horas Interrompidas */
+            horas_interrompidas: number;
         };
         /**
          * CriarOrdensSchema
@@ -601,6 +641,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DecomposicaoLinhaSchema"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_serie_alimentadores_continuidade_alimentadores_mensal_get: {
+        parameters: {
+            query?: {
+                inicio?: string | null;
+                fim?: string | null;
+                cod_alimentador?: string[];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContinuidadeAlimentadorMensalSchema"][];
                 };
             };
             /** @description Validation Error */
