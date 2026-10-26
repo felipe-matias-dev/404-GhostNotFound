@@ -614,10 +614,11 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   - **Documento repetido (UC-12):** `flag_documento_repetido` existe só na Silver de
     `unidades_consumidoras`. A Gold não traz essa coluna (nem `gold_dim_uc`): a flag entra como
     filtro na construção da Gold, não como atributo. Confirmado por Arthur (Dados) em 23/10/2026.
-    As UCs com documento repetido contam no `n_uc` (estoque do cadastro, denominador do DEC/FEC):
-    continuam cadastradas e atendidas pelo alimentador, e o contrato define `n_uc` como UCs do
-    cadastro. Elas não têm medidor nem leitura, então ficam sem `consumo_medio_kwh_12m`; a existência
-    de faturas dessas UCs é conferida nos testes da Gold.
+    As UCs com documento repetido **não** contam no `n_uc`: o PRODIST (Módulo 8) define o denominador
+    do DEC/FEC como as UCs faturadas do conjunto no período, e essas UCs nunca são faturadas (não têm
+    medidor, leitura, fatura nem ocorrência; a Gold confere). Por isso o `n_uc` passa a ser o de UCs
+    com fatura na competência, o que também tira os meses de ligação antes da primeira fatura. Elas
+    ficam na `gold_dim_uc`, sem `consumo_medio_kwh_12m`. Proposta do Arthur na revisão deste PR.
   - **`possui_gd` na decomposição:** é o estado no último mês do período atual e vale para a UC nos
     dois períodos. A UC que conectou a GD entre eles fica no grupo com GD de ambos os lados, porque o
     PVM compara linhas de mesma chave e o efeito GD precisa ser a queda de volume das mesmas UCs. É o
