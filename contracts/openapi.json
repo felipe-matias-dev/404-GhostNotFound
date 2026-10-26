@@ -701,6 +701,73 @@
         }
       }
     },
+    "/fila-suspeitas": {
+      "get": {
+        "tags": [
+          "fila de suspeitas"
+        ],
+        "summary": "Get Fila",
+        "description": "A fila da mais para a menos suspeita, com a ordem ativa de cada UC.",
+        "operationId": "get_fila_fila_suspeitas_get",
+        "parameters": [
+          {
+            "name": "pagina",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "title": "Pagina"
+            }
+          },
+          {
+            "name": "tamanho",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Tamanho"
+            }
+          },
+          {
+            "name": "sem_ordem_ativa",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Sem Ordem Ativa"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FilaPaginaSchema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/ordens-inspecao": {
       "post": {
         "tags": [
@@ -1388,6 +1455,91 @@
         ],
         "title": "EventoSchema"
       },
+      "FilaItemSchema": {
+        "properties": {
+          "cod_uc": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Cod Uc"
+          },
+          "score_suspeita": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Score Suspeita"
+          },
+          "motivos": {
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "type": "array",
+            "title": "Motivos"
+          },
+          "kwh_recuperavel_est": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kwh Recuperavel Est"
+          },
+          "ordem_ativa": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OrdemAtivaSchema"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "cod_uc",
+          "score_suspeita",
+          "motivos",
+          "kwh_recuperavel_est",
+          "ordem_ativa"
+        ],
+        "title": "FilaItemSchema",
+        "description": "Uma UC da fila e a ordem ativa dela, para a tela não oferecer o que daria 409."
+      },
+      "FilaPaginaSchema": {
+        "properties": {
+          "itens": {
+            "items": {
+              "$ref": "#/components/schemas/FilaItemSchema"
+            },
+            "type": "array",
+            "title": "Itens"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "pagina": {
+            "type": "integer",
+            "title": "Pagina"
+          },
+          "tamanho": {
+            "type": "integer",
+            "title": "Tamanho"
+          }
+        },
+        "type": "object",
+        "required": [
+          "itens",
+          "total",
+          "pagina",
+          "tamanho"
+        ],
+        "title": "FilaPaginaSchema",
+        "description": "Uma página da fila pela posição no ranking, e quantas UCs a fila tem no filtro."
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -1478,6 +1630,24 @@
         ],
         "title": "KpisMensaisSchema",
         "description": "Indicadores executivos de uma competência."
+      },
+      "OrdemAtivaSchema": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "status": {
+            "$ref": "#/components/schemas/StatusOrdem"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "status"
+        ],
+        "title": "OrdemAtivaSchema",
+        "description": "A ordem de inspeção que já ocupa a UC (gerada ou em campo)."
       },
       "OrdemDetalheSchema": {
         "properties": {

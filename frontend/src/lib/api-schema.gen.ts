@@ -180,6 +180,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/fila-suspeitas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Fila
+         * @description A fila da mais para a menos suspeita, com a ordem ativa de cada UC.
+         */
+        get: operations["get_fila_fila_suspeitas_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/ordens-inspecao": {
         parameters: {
             query?: never;
@@ -378,6 +398,35 @@ export interface components {
              */
             ocorrido_em: string;
         };
+        /**
+         * FilaItemSchema
+         * @description Uma UC da fila e a ordem ativa dela, para a tela não oferecer o que daria 409.
+         */
+        FilaItemSchema: {
+            /** Cod Uc */
+            cod_uc: string;
+            /** Score Suspeita */
+            score_suspeita: number;
+            /** Motivos */
+            motivos: string[];
+            /** Kwh Recuperavel Est */
+            kwh_recuperavel_est: number | null;
+            ordem_ativa: components["schemas"]["OrdemAtivaSchema"] | null;
+        };
+        /**
+         * FilaPaginaSchema
+         * @description Uma página da fila pela posição no ranking, e quantas UCs a fila tem no filtro.
+         */
+        FilaPaginaSchema: {
+            /** Itens */
+            itens: components["schemas"]["FilaItemSchema"][];
+            /** Total */
+            total: number;
+            /** Pagina */
+            pagina: number;
+            /** Tamanho */
+            tamanho: number;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -404,6 +453,15 @@ export interface components {
             n_chamados: number | null;
             /** Satisfacao Media */
             satisfacao_media: number | null;
+        };
+        /**
+         * OrdemAtivaSchema
+         * @description A ordem de inspeção que já ocupa a UC (gerada ou em campo).
+         */
+        OrdemAtivaSchema: {
+            /** Id */
+            id: number;
+            status: components["schemas"]["StatusOrdem"];
         };
         /**
          * OrdemDetalheSchema
@@ -856,6 +914,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RecortesContinuidadeSchema"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_fila_fila_suspeitas_get: {
+        parameters: {
+            query?: {
+                pagina?: number;
+                tamanho?: number;
+                sem_ordem_ativa?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FilaPaginaSchema"];
                 };
             };
             /** @description Validation Error */

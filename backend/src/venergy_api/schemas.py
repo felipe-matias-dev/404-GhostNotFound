@@ -439,6 +439,39 @@ class FilaSuspeitaSchema(BaseModel):
     kwh_recuperavel_est: ExactNumber | None
 
 
+class FilaFiltroSchema(BaseModel):
+    """Página da fila e, se quiser, só as UCs que ainda não têm ordem de inspeção ativa."""
+
+    pagina: Annotated[int, Field(ge=1)] = 1
+    # Mesmo teto do pedido de ordens: uma página inteira cabe num único pedido.
+    tamanho: Annotated[int, Field(ge=1, le=MAX_ORDENS_POR_PEDIDO)] = 50
+    sem_ordem_ativa: bool = False
+
+
+class OrdemAtivaSchema(BaseModel):
+    """A ordem de inspeção que já ocupa a UC (gerada ou em campo)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    status: StatusOrdem
+
+
+class FilaItemSchema(FilaSuspeitaSchema):
+    """Uma UC da fila e a ordem ativa dela, para a tela não oferecer o que daria 409."""
+
+    ordem_ativa: OrdemAtivaSchema | None
+
+
+class FilaPaginaSchema(BaseModel):
+    """Uma página da fila pela posição no ranking, e quantas UCs a fila tem no filtro."""
+
+    itens: list[FilaItemSchema]
+    total: int
+    pagina: int
+    tamanho: int
+
+
 class CriarOrdensSchema(BaseModel):
     """UCs escolhidas na fila de suspeitas; gera uma OI para cada uma."""
 
