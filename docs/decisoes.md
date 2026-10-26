@@ -40,6 +40,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | 24/10/2026 | DEC-028: a decomposição grava todos os pares de mesmos meses em anos diferentes; pares de trechos diferentes ficam para o backend, se necessário | Gravar todas as combinações passaria de 1 bilhão de linhas; os totais de qualquer período já saem da soma dos meses | Alisson |
 | 24/10/2026 | DEC-029: método do efeito bandeira: acréscimo fixo por kWh por bandeira, conferido no dado | Fecha a pendência da DEC-023 com uma regra verificável e exata | Alisson |
 | 24/10/2026 | DEC-030: regras aplicadas na Gold: `n_uc` desde a ligação, ocorrências antes da ligação fora (OCO-04), fila de suspeitas por queda de consumo calibrada nas inspeções | Denominador do DEC/FEC fiel ao cadastro e fila explicável e medida | Alisson |
+| 26/10/2026 | DEC-031: a API lista os pares de períodos da decomposição e passa a exigir o par; API 0.5.0 | A Gold grava centenas de pares (DEC-028): sem o par, a resposta somaria períodos que não se comparam, e o seletor precisa saber quais existem | Felipe |
 
 ## DEC-001 · Localização dos arquivos de origem (landing)
 
@@ -847,3 +848,21 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   - **Outras escolhas da cópia:** potência anômala da GD (GD-02) vira nula, em vez de convertida; `receita_arrecadada` é zero na
     fatura não paga (como na amostra do backend); consumo médio na janela das 12 últimas competências; titular por iniciais e
     documento com os 3 últimos dígitos.
+
+## DEC-031 · Rota de pares da decomposição e par de períodos obrigatório
+
+- **Data:** 26/10/2026 · **Área:** Portal · **Autor:** Felipe
+- **Contexto:** a DEC-028 faz a Gold gravar todos os pares de mesmos meses em anos diferentes (cerca de 666 pares). Até a v0.2, a
+  Gold trazia um par só, e `GET /receita/decomposicao` aceitava o par como filtro opcional e somava o que houvesse.
+- **Decisão:**
+  - `GET /receita/decomposicao/periodos` devolve os pares gravados (`SELECT DISTINCT`), em ordem. É o que o seletor da tela
+    oferece, como o Alisson pediu no PR #43.
+  - `GET /receita/decomposicao` passa a exigir `periodo_base` e `periodo_atual`, no formato `AAAA-MM/AAAA-MM`; sem eles, ou fora
+    do formato, a resposta é `422`.
+  - Versão da API 0.5.0: o par obrigatório quebra quem chamava sem ele, e na série 0.x quem sobe é o número do meio.
+- **Alternativa descartada:** manter o par opcional. Sem par, a resposta seria uma linha por município de cada um dos pares
+  (666 vezes o número de municípios), e a tela não saberia qual mostrar. Nenhuma tela usa a rota ainda, então o custo de quebrar é
+  zero.
+- **Limite:** a rota só conhece os pares gravados. Pares de trechos diferentes (DEC-028) continuam fora, e entram só se o portal
+  precisar deles.
+- **Amostra:** o gerador grava os 78 pares de mesmos meses entre 2024 e 2025, para o seletor ter o que mostrar.

@@ -62,7 +62,8 @@ a UC `0003` em `GET /unidades-consumidoras/{cod_uc}`.
 | `GET /unidades-consumidoras/{cod_uc}` | Resumo de uma unidade consumidora, ou `404` se ela não existir |
 | `GET /receita/mensal?inicio=&fim=` | KPIs de cada competência (`gold_kpis_mensais`), do mês mais antigo ao mais recente, com recorte opcional (`AAAA-MM`, inclusivo) |
 | `GET /receita/comparacao` | kWh e receita de dois períodos (`base_inicio`, `base_fim`, `atual_inicio`, `atual_fim`) e a variação, com filtros opcionais de `municipio`, `bairro` e `classe` |
-| `GET /receita/decomposicao?periodo_base=&periodo_atual=&municipio=&bairro=&classe=` | Efeitos preço (com tarifa e bandeira), volume e mix. Sem filtro, uma linha por município; com `municipio`, por bairro; com `municipio` e `bairro`, por classe. `classe` filtra em qualquer nível, e `bairro` sem `municipio` dá `422`. Cada par de períodos sai separado, ordenado da maior queda para a maior alta |
+| `GET /receita/decomposicao/periodos` | Os pares de períodos (`periodo_base`, `periodo_atual`, no formato `AAAA-MM/AAAA-MM`) que a Gold gravou na decomposição: o que o seletor da tela pode oferecer ([DEC-028](../docs/decisoes.md)) |
+| `GET /receita/decomposicao?periodo_base=&periodo_atual=&municipio=&bairro=&classe=` | Efeitos preço (com tarifa e bandeira), volume e mix de um par de períodos, que é obrigatório (`422` sem ele ou fora do formato). Sem filtro, uma linha por município; com `municipio`, por bairro; com `municipio` e `bairro`, por classe. `classe` filtra em qualquer nível, e `bairro` sem `municipio` dá `422`. Ordenada da maior queda para a maior alta |
 | `POST /ordens-inspecao` | Gera uma ordem de inspeção por UC (`{"cod_ucs": [...]}`), tudo ou nada: `404` se uma UC não existir, `409` se já tiver ordem ativa |
 | `GET /ordens-inspecao?status=` | Lista as ordens, das mais recentes para as mais antigas, opcionalmente por status |
 | `GET /ordens-inspecao/{id}` | Uma ordem com o histórico de mudanças de status |
@@ -101,7 +102,7 @@ A API não sabe se os dados são de amostra ou reais: os dois chegam pelo mesmo 
   por tabela, e rode a carga (passo 6) de novo.
 
 A carga espera um CSV para cada tabela do contrato da Gold
-([`contracts/gold_schema.yaml`](../contracts/gold_schema.yaml)) que já tem chave definida:
+([`contracts/gold_schema.yaml`](../contracts/gold_schema.yaml), versão 0.3), 12 ao todo:
 
 | Arquivo | Uma linha por |
 |---|---|
@@ -109,13 +110,16 @@ A carga espera um CSV para cada tabela do contrato da Gold
 | `gold_fato_faturamento_mensal.csv` | unidade consumidora × competência (uma fatura) |
 | `gold_receita_decomposicao.csv` | par de períodos × município × bairro × classe × GD |
 | `gold_kpis_mensais.csv` | competência (total da empresa) |
-| `gold_kpis_segmento_mensal.csv` | competência × município × bairro × classe do cadastro × GD |
+| `gold_kpis_segmento_mensal.csv` | competência × município × bairro × classe do cadastro × GD × alimentador × tipo de medidor |
 | `gold_reconciliacao_faturamento.csv` | competência |
 | `gold_continuidade_alimentador_mensal.csv` | alimentador × competência |
 | `gold_fila_suspeitas.csv` | unidade consumidora suspeita |
+| `gold_interrupcoes_uc.csv` | ocorrência (UC 360) |
+| `gold_atendimentos_uc.csv` | chamado (UC 360) |
+| `gold_medidor_uc.csv` | unidade consumidora com medidor (UC 360) |
+| `gold_inspecoes_uc.csv` | inspeção de campo |
 
-`gold_interrupcoes_uc`, `gold_atendimentos_uc` e `gold_medidor_uc` entram quando o
-contrato definir as colunas e a chave delas
+O backend acompanha o contrato no mesmo PR em que ele muda
 ([DEC-014](../docs/decisoes.md#dec-014--o-backend-espelha-o-contrato-da-gold)).
 
 A carga valida cada linha contra o contrato (`src/venergy_api/schemas.py`). Se um
