@@ -280,6 +280,20 @@ class ContinuidadeAlimentadorMensalSchema(BaseModel):
     horas_interrompidas: float
 
 
+class InterrupcaoUcSchema(BaseModel):
+    """Uma interrupção que afetou uma UC."""
+
+    cod_ocorrencia: RequiredText
+    cod_uc: RequiredText
+    cod_alimentador: RequiredText
+    competencia: Competencia
+    data_abertura: datetime
+    data_encerramento: datetime
+    duracao_horas: Annotated[float, Field(gt=0)]
+    tipo: RequiredText
+    causa: RequiredText | None
+
+
 class FilaSuspeitaSchema(BaseModel):
     """Uma UC suspeita de perda não técnica, com o porquê e o quanto vale inspecionar."""
 

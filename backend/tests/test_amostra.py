@@ -11,6 +11,7 @@ from venergy_api.models import (
     ContinuidadeAlimentadorMensal,
     FatoFaturamentoMensal,
     FilaSuspeita,
+    InterrupcaoUc,
     KpisMensais,
     KpisSegmentoMensal,
     ReceitaDecomposicao,
@@ -295,3 +296,40 @@ def test_segment_invoice_and_reading_components_add_up_to_the_billing(
     # A amostra exercita a situação das faturas e as leituras estimadas.
     assert sum(valores[1] for valores in recortes.values()) > 0
     assert sum(valores[5] for valores in recortes.values()) > 0
+
+
+def test_occurrences_add_up_to_the_feeder_continuity(tmp_path: Path, engine: Engine) -> None:
+    # Check do contrato: somadas por competência e alimentador, as ocorrências por UC dão as
+    # horas e a contagem da continuidade.
+    write_sample(tmp_path / "gold", force=False)
+    load_gold(tmp_path / "gold", engine)
+
+    with Session(engine) as session:
+        ocorrencias = {
+            (competencia, cod_alimentador): (horas, quantidade)
+            for competencia, cod_alimentador, horas, quantidade in session.execute(
+                select(
+                    InterrupcaoUc.competencia,
+                    InterrupcaoUc.cod_alimentador,
+                    func.sum(InterrupcaoUc.duracao_horas),
+                    func.count(),
+                ).group_by(InterrupcaoUc.competencia, InterrupcaoUc.cod_alimentador)
+            )
+        }
+        continuidade = session.scalars(select(ContinuidadeAlimentadorMensal)).all()
+        todas = session.scalars(select(InterrupcaoUc)).all()
+
+    com_interrupcao = {
+        (linha.competencia, linha.cod_alimentador): linha
+        for linha in continuidade
+        if linha.n_interrupcoes
+    }
+    assert set(ocorrencias) == set(com_interrupcao)
+    for chave, (horas, quantidade) in ocorrencias.items():
+        assert horas == pytest.approx(com_interrupcao[chave].horas_interrompidas)
+        assert quantidade == com_interrupcao[chave].n_interrupcoes
+    for ocorrencia in todas:
+        assert ocorrencia.data_encerramento > ocorrencia.data_abertura
+        assert ocorrencia.data_abertura.strftime("%Y-%m") == ocorrencia.competencia
+    # A amostra tem ocorrência com e sem causa registrada (OCO-01).
+    assert {o.causa is None for o in todas} == {True, False}

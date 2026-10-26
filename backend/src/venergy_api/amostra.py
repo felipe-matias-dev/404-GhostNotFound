@@ -9,7 +9,7 @@ Uso: uv run python -m venergy_api.amostra [--force]
 import argparse
 import calendar
 import csv
-from datetime import date
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 
@@ -23,6 +23,7 @@ from venergy_api.models import (
     DimUc,
     FatoFaturamentoMensal,
     FilaSuspeita,
+    InterrupcaoUc,
     KpisMensais,
     KpisSegmentoMensal,
     ReceitaDecomposicao,
@@ -33,6 +34,7 @@ from venergy_api.schemas import (
     DimUcSchema,
     FaturamentoMensalSchema,
     FilaSuspeitaSchema,
+    InterrupcaoUcSchema,
     KpisMensaisSchema,
     KpisSegmentoMensalSchema,
     ReceitaDecomposicaoSchema,
@@ -416,6 +418,42 @@ def _interrupcoes(uc: DimUcSchema, competencia: str) -> tuple[int, float]:
     return interrupcoes, round(interrupcoes * dec_referencia / fec_referencia, 1)
 
 
+# Tipos e causas das ocorrências da amostra. Uma em cada três fica sem causa, como na origem
+# (OCO-01).
+_TIPOS_OCORRENCIA = ("FALTA DE ENERGIA", "OSCILACAO")
+_CAUSAS_OCORRENCIA = ("CLIMATICA", "VEGETACAO", None)
+
+
+def _interrupcoes_uc() -> tuple[InterrupcaoUcSchema, ...]:
+    # Uma linha por ocorrência, abrindo o número de interrupções do mês em ocorrências de mesma
+    # duração: a soma por alimentador bate com a continuidade, e a de cada UC com os recortes.
+    rows = []
+    for uc in SAMPLE_UCS:
+        for competencia in COMPETENCIAS:
+            quantidade, horas = _interrupcoes(uc, competencia)
+            ano, mes = int(competencia[:4]), int(competencia[5:])
+            for numero in range(quantidade):
+                duracao = horas / quantidade
+                abertura = datetime(ano, mes, 4 + 8 * numero, 8)
+                rows.append(
+                    InterrupcaoUcSchema(
+                        cod_ocorrencia=f"OC-{uc.cod_uc}-{competencia}-{numero + 1}",
+                        cod_uc=uc.cod_uc,
+                        cod_alimentador=uc.cod_alimentador,
+                        competencia=competencia,
+                        data_abertura=abertura,
+                        # Ao minuto, como a origem; a duração guarda as horas exatas do mês.
+                        data_encerramento=abertura + timedelta(minutes=round(duracao * 60)),
+                        duracao_horas=duracao,
+                        tipo=_TIPOS_OCORRENCIA[numero % len(_TIPOS_OCORRENCIA)],
+                        causa=_CAUSAS_OCORRENCIA[
+                            (int(uc.cod_uc) + mes + numero) % len(_CAUSAS_OCORRENCIA)
+                        ],
+                    )
+                )
+    return tuple(rows)
+
+
 def _chamados(uc: DimUcSchema, competencia: str) -> tuple[int, int | None]:
     """Chamados abertos pela UC no mês e a nota do atendimento, de 1 a 5."""
     mes, numero = int(competencia[5:]), int(uc.cod_uc)
@@ -676,6 +714,7 @@ SAMPLE_CONTINUIDADE = _continuidade()
 SAMPLE_KPIS = _kpis(SAMPLE_FATURAMENTO, SAMPLE_CONTINUIDADE)
 SAMPLE_KPIS_SEGMENTO = _kpis_segmento(SAMPLE_FATURAMENTO)
 SAMPLE_RECONCILIACAO = _reconciliacao(SAMPLE_FATURAMENTO)
+SAMPLE_INTERRUPCOES = _interrupcoes_uc()
 SAMPLE_DECOMPOSICAO = _decomposicao(SAMPLE_FATURAMENTO)
 
 # Linhas por tabela da Gold. A carga exige um CSV para cada tabela de GOLD_TABLES, e o
@@ -689,6 +728,7 @@ SAMPLE: dict[type[Base], tuple[BaseModel, ...]] = {
     ReconciliacaoFaturamento: SAMPLE_RECONCILIACAO,
     ContinuidadeAlimentadorMensal: SAMPLE_CONTINUIDADE,
     FilaSuspeita: SAMPLE_FILA,
+    InterrupcaoUc: SAMPLE_INTERRUPCOES,
 }
 
 

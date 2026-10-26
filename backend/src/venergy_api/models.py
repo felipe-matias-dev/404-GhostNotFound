@@ -221,6 +221,26 @@ class ContinuidadeAlimentadorMensal(Base):
     horas_interrompidas: Mapped[float] = mapped_column(Double)
 
 
+class InterrupcaoUc(Base):
+    """Interrupções que afetaram cada UC, uma linha por ocorrência: a UC 360 do atendente."""
+
+    __tablename__ = "gold_interrupcoes_uc"
+    __table_args__ = {"schema": "gold"}
+
+    cod_ocorrencia: Mapped[str] = mapped_column(primary_key=True)
+    cod_uc: Mapped[str] = mapped_column(index=True)
+    cod_alimentador: Mapped[str]
+    # Mês da abertura: a ocorrência que vira o mês entra no mês em que começou (DEC-014).
+    competencia: Mapped[str]
+    # Data e hora sem fuso, como o contrato (tipo timestamp): a origem não traz fuso.
+    data_abertura: Mapped[datetime] = mapped_column(DateTime)
+    data_encerramento: Mapped[datetime] = mapped_column(DateTime)
+    duracao_horas: Mapped[float] = mapped_column(Double)
+    tipo: Mapped[str]
+    # Vazia quando a causa não foi registrada (OCO-01).
+    causa: Mapped[str | None]
+
+
 class FilaSuspeita(Base):
     """UCs suspeitas de perda não técnica: de onde o gerente de perdas gera as OIs."""
 
