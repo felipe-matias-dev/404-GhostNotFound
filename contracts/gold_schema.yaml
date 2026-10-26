@@ -1,4 +1,4 @@
-# Contrato da camada Gold do V-Energy Grid 360 — RASCUNHO v0.2.0 (parte 1)
+# Contrato da camada Gold do V-Energy Grid 360 — RASCUNHO v0.3.0 (parte 1)
 #
 # Fonte de verdade sobre tabelas, grão, chaves, colunas e tipos. O significado e as fórmulas das
 # métricas ficam em docs/dicionario-de-dados.md. Modelo de referência: docs/arquitetura.md §6.
@@ -89,7 +89,7 @@ conventions:
     cod_alimentador: {type: text}
     municipio:       {type: text, note: "conferido na Silver (log de qualidade): uma grafia por município, sem nulos"}
     bairro:          {type: text, note: "uma grafia por bairro em cada município, sem nulos, depois da correção de encoding da Silver (UC-13); sempre junto com o município"}
-    tipo_medidor:    {type: text, allowed: [eletromecanico, eletronico, smart]}
+    tipo_medidor:    {type: text, allowed: [eletromecanico, eletronico, smart, sem_medidor], note: "sem_medidor só em gold_kpis_segmento_mensal, para a UC sem medidor instalado no mês; nas demais tabelas, os três tipos"}
 
 # Relações que não são chave estrangeira. Alinhado à DEC-018 (GenAI, proposta): o agente só junta views por
 # chave de entidade (cod_uc, cod_alimentador). Junção só por competencia ou por município/bairro gera produto
@@ -167,7 +167,7 @@ tables:
     consumers: [tela Receita, insight, diagnóstico, agente]
     owner: Dados
     columns:
-      periodo_base:   {type: text,  nullable: false, status: proposta, description: "Faixa de meses do período inicial da comparação", note: "texto AAAA-MM/AAAA-MM (ex.: 2022-07/2023-06), formato confirmado; aceita qualquer par de períodos (ex.: os mesmos meses em anos diferentes)"}
+      periodo_base:   {type: text,  nullable: false, status: proposta, description: "Faixa de meses do período inicial da comparação", note: "texto AAAA-MM/AAAA-MM (ex.: 2022-07/2023-06), formato confirmado; a Gold grava os pares de mesmos meses em anos diferentes, e outro par, se o portal precisar, o backend calcula na hora (DEC-028)"}
       periodo_atual:  {type: text,  nullable: false, status: proposta, description: "Faixa de meses do período comparado", note: "texto AAAA-MM/AAAA-MM (ex.: 2025-07/2026-06), formato confirmado"}
       municipio:      {type: text,  nullable: false, status: proposta, description: "Município"}
       bairro:         {type: text,  nullable: false, status: proposta, description: "Bairro"}
@@ -388,7 +388,7 @@ tables:
 
 open_questions:
   - "Dados (Alisson, Arthur e Gabriel) faz três cópias independentes da transformação Silver -> Gold, todas contra este contrato; as três são comparadas entre si antes de definir a Gold que será exportada."
-  - "Período base: decidido manter qualquer par de períodos em gold_receita_decomposicao. Falta alinhar docs/arquitetura.md e docs/planejamento.md, que ainda falam em primeiros e últimos 12 meses e em votação."
+  - "Período base (DECIDIDO, DEC-028): gold_receita_decomposicao grava os pares de mesmos meses em anos diferentes; os demais pares passariam de 1 bilhão de linhas e ficam para o backend calcular na hora, se necessário. Falta alinhar docs/arquitetura.md e docs/planejamento.md, que ainda falam em primeiros e últimos 12 meses e em votação."
   - "Tabelas da UC 360 (DECIDIDO, DEC-027): gold_interrupcoes_uc, gold_atendimentos_uc e gold_medidor_uc com colunas e chave, e gold_inspecoes_uc nova."
   - "Precisão numérica (energy_kwh, money) e normalização de município/bairro dependem da Silver."
   - "Titular na UC 360 (DECIDIDO, DEC-023): a Gold traz só titular_mascarado (iniciais) e documento_mascarado (3 últimos dígitos), ambos sensitive. Não há cod_cliente: a origem não tem código de cliente e, no dataset, cada titular tem uma UC só, exceto um documento de preenchimento repetido em um grupo de UCs cadastradas sem nenhum medidor (verificado: o grupo é exatamente o das UCs sem medidor, e o documento não é nulo)."

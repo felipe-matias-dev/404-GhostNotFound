@@ -1,6 +1,6 @@
 # Dicionário de dados: camada Gold
 
-Definição de cada tabela, coluna e métrica da Gold, com a fórmula e as decisões de limpeza que a afetam. Este documento descreve o **significado**; o nome, o tipo, a nulidade, os valores permitidos e as chaves vêm de [`contracts/gold_schema.yaml`](../contracts/gold_schema.yaml) (versão 0.2.0, rascunho), que é a fonte de verdade. Em caso de divergência, vale o contrato. As decisões de limpeza estão em [`qualidade-dados.md`](qualidade-dados.md), e as decisões de projeto em [`decisoes.md`](decisoes.md).
+Definição de cada tabela, coluna e métrica da Gold, com a fórmula e as decisões de limpeza que a afetam. Este documento descreve o **significado**; o nome, o tipo, a nulidade, os valores permitidos e as chaves vêm de [`contracts/gold_schema.yaml`](../contracts/gold_schema.yaml) (versão 0.3.0, rascunho), que é a fonte de verdade. Em caso de divergência, vale o contrato. As decisões de limpeza estão em [`qualidade-dados.md`](qualidade-dados.md), e as decisões de projeto em [`decisoes.md`](decisoes.md).
 
 > **Confidencialidade:** este documento descreve estrutura e regras, sem nenhum dado do dataset ([DEC-024](decisoes.md)).
 
@@ -129,7 +129,7 @@ Decomposição da variação de receita entre dois períodos (PVM com efeito mix
 
 | Coluna | Tipo | Nulo | Unidade | Status | Definição |
 |---|---|---|---|---|---|
-| `periodo_base` | text | não |  | proposta | Faixa de meses do período inicial da comparação. Texto AAAA-MM/AAAA-MM (ex.: 2022-07/2023-06), formato confirmado; aceita qualquer par de períodos (ex.: os mesmos meses em anos diferentes). |
+| `periodo_base` | text | não |  | proposta | Faixa de meses do período inicial da comparação. Texto AAAA-MM/AAAA-MM (ex.: 2022-07/2023-06), formato confirmado; a Gold grava os pares de mesmos meses em anos diferentes, e outro par, se o portal precisar, o backend calcula na hora (DEC-028). |
 | `periodo_atual` | text | não |  | proposta | Faixa de meses do período comparado. Texto AAAA-MM/AAAA-MM (ex.: 2025-07/2026-06), formato confirmado. |
 | `municipio` | text | não |  | proposta | Município. |
 | `bairro` | text | não |  | proposta | Bairro. |
@@ -378,7 +378,7 @@ UCs suspeitas de perda não técnica, ordenadas por prioridade.
 ## Pendências
 
 - Dados (Alisson, Arthur e Gabriel) faz três cópias independentes da transformação Silver -> Gold, todas contra este contrato; as três são comparadas entre si antes de definir a Gold que será exportada.
-- Período base: decidido manter qualquer par de períodos em gold_receita_decomposicao. Falta alinhar docs/arquitetura.md e docs/planejamento.md, que ainda falam em primeiros e últimos 12 meses e em votação.
+- Período base (DECIDIDO, DEC-028): gold_receita_decomposicao grava os pares de mesmos meses em anos diferentes; os demais pares passariam de 1 bilhão de linhas e ficam para o backend calcular na hora, se necessário. Falta alinhar docs/arquitetura.md e docs/planejamento.md, que ainda falam em primeiros e últimos 12 meses e em votação.
 - Tabelas da UC 360 (DECIDIDO, DEC-027): gold_interrupcoes_uc, gold_atendimentos_uc e gold_medidor_uc com colunas e chave, e gold_inspecoes_uc nova.
 - Precisão numérica (energy_kwh, money) e normalização de município/bairro dependem da Silver.
 - Titular na UC 360 (DECIDIDO, DEC-023): a Gold traz só titular_mascarado (iniciais) e documento_mascarado (3 últimos dígitos), ambos sensitive. Não há cod_cliente: a origem não tem código de cliente e, no dataset, cada titular tem uma UC só, exceto um documento de preenchimento repetido em um grupo de UCs cadastradas sem nenhum medidor (verificado: o grupo é exatamente o das UCs sem medidor, e o documento não é nulo).
