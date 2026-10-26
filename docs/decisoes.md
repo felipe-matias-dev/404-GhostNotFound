@@ -320,6 +320,8 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   - Energia e dinheiro seguem a DEC-010: `numeric` no banco, com a escala do contrato.
   - Dados faz três cópias independentes da transformação Silver → Gold (Alisson, Arthur e
     Gabriel), todas contra o contrato, e as compara antes de definir a Gold exportada.
+    Não há ordem nem dono único: cada um faz a sua versão por conta própria, e o time compara os
+    pontos fortes e fracos de cada uma para montar uma versão final mais concisa.
 - **Motivo:** o formato texto não depende de interpretação de data entre CSV, Delta e
   PostgreSQL; comparar três cópias independentes expõe erro de tratamento que uma só
   não mostraria.
@@ -607,6 +609,17 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   - **Documento repetido (UC-12):** `flag_documento_repetido` existe só na Silver de
     `unidades_consumidoras`. A Gold não traz essa coluna (nem `gold_dim_uc`): a flag entra como
     filtro na construção da Gold, não como atributo. Confirmado por Arthur (Dados) em 23/10/2026.
+    As UCs com documento repetido **não** contam no `n_uc`: o PRODIST (Módulo 8) define o denominador
+    do DEC/FEC como as UCs faturadas do conjunto no período, e essas UCs nunca são faturadas (não têm
+    medidor, leitura, fatura nem ocorrência; a Gold confere). Por isso o `n_uc` passa a ser o de UCs
+    com fatura na competência, o que também tira os meses de ligação antes da primeira fatura. Elas
+    ficam na `gold_dim_uc`, sem `consumo_medio_kwh_12m`. Proposta do Arthur na revisão deste PR.
+  - **`possui_gd` na decomposição:** é o estado no último mês do período atual e vale para a UC nos
+    dois períodos. A UC que conectou a GD entre eles fica no grupo com GD de ambos os lados, porque o
+    PVM compara linhas de mesma chave e o efeito GD precisa ser a queda de volume das mesmas UCs. É o
+    mesmo grupo do diagnóstico (as UCs da tabela de GD, todas conectadas depois do início de P1), então
+    os números do diagnóstico não mudam. Em `gold_kpis_segmento_mensal` continua por competência, a
+    partir do mês da conexão; por isso as duas tabelas podem diferir no período base.
   - `consumo_medio_kwh_12m` passa a aceitar nulo: há UCs do cadastro sem nenhuma leitura, e sem
     leitura não há média. Zero seria inventar dado.
   - `potencia_kw` passa a ser `potencia_kwp`, em kWp: a origem só traz potência de pico, e kW
