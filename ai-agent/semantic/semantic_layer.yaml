@@ -154,7 +154,7 @@ views:
         description: "verdadeiro quando as UCs do recorte já tinham geração própria conectada naquela competência"
       - name: n_uc
         unit: "contagem"
-        description: "UCs do recorte na competência; é um estoque, some só dentro do mesmo mês"
+        description: "UCs faturadas no recorte na competência (denominador do DEC/FEC, como no PRODIST); não some entre competências"
       - name: kwh_faturado
         unit: "kWh"
         description: "energia faturada no recorte"
@@ -291,6 +291,7 @@ rules:
   - text: "Para ligar uma UC ao alimentador use sem_uc.cod_alimentador = sem_continuidade_alimentador_mensal.cod_alimentador."
   - text: "Quando a pergunta compara dois períodos e não diz quais são, peça esclarecimento (clarify). Não escolha os períodos sozinho."
 
+  - text: "n_uc é o número de UCs faturadas na competência (PRODIST). Não some n_uc entre competências."
 examples:
   - question: "Quantas UCs existem em cada classe de consumo?"
     sql: "SELECT classe, count(*) AS total FROM sem_uc GROUP BY classe ORDER BY classe"

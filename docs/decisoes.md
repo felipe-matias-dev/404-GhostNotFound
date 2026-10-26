@@ -467,6 +467,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Motivo:** a spec (§5, item 5) manda montar relações a partir de `foreign_keys` e `shared_keys`. Juntar duas views só pelo período gera produto cartesiano, e o modelo tende a fazer essa junção quando a relação existe.
 - **Consequência:** `sem_faturamento_mensal` liga a `sem_uc` por `cod_uc`, e `sem_uc` liga a `sem_continuidade_alimentador_mensal` por `cod_alimentador`.
 - **Decomposição (23/10/2026):** `sem_receita_decomposicao` entra sem relação com outras views. A junção composta com `gold_dim_uc` (município, bairro, classe e GD) continua `a_confirmar` no contrato e repetiria cada efeito uma vez por UC do recorte. As perguntas de recorte se respondem filtrando a própria view.
+- **Atualização (26/10/2026):** views de recorte agregado, como `sem_kpis_segmento_mensal`, não entram nas relações por chave de entidade. Motivo: elas já trazem `cod_alimentador` como recorte, e o join com `sem_uc` ou com a continuidade repete e multiplica somas (pedido da Dados no #43).
 
 ## DEC-019 · Verificação numérica da narrativa
 

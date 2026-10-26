@@ -18,6 +18,7 @@ from venergy_agent.domain.sql import DraftStatus
 
 CONFIRMED_STATUSES = frozenset({"confirmada", "proposta"})
 ENTITY_KEYS = frozenset({"cod_uc", "cod_alimentador"})
+AGGREGATED_VIEWS = frozenset({"sem_kpis_segmento_mensal"})
 AGENT_CONSUMER = "agente"
 
 
@@ -182,7 +183,11 @@ def _relations(
                     )
 
     for key in sorted(ENTITY_KEYS):
-        holders = [definition for definition in definitions if key in definition.columns]
+        holders = [
+            definition
+            for definition in definitions
+            if key in definition.columns and definition.name not in AGGREGATED_VIEWS
+        ]
         for left, right in combinations(holders, 2):
             relations.add(
                 Relation(

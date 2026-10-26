@@ -55,25 +55,21 @@ def test_relations_come_from_the_foreign_key_and_the_entity_keys(documents):
                 ("sem_continuidade_alimentador_mensal", "cod_alimentador"),
             }
         ),
-        frozenset(
-            {
-                ("sem_uc", "cod_alimentador"),
-                ("sem_kpis_segmento_mensal", "cod_alimentador"),
-            }
-        ),
-        frozenset(
-            {
-                ("sem_continuidade_alimentador_mensal", "cod_alimentador"),
-                ("sem_kpis_segmento_mensal", "cod_alimentador"),
-            }
-        ),
     }
+
+
+def test_aggregated_view_is_not_linked_by_entity_key(documents):
+    layer = build_layer(*documents)
+
+    assert all(
+        "sem_kpis_segmento_mensal" not in (r.left_view, r.right_view) for r in layer.relations
+    )
 
 
 def test_each_link_appears_once_even_when_fk_and_shared_key_both_apply(documents):
     layer = build_layer(*documents)
 
-    assert len(layer.relations) == 4
+    assert len(layer.relations) == 2
 
 
 def test_competencia_is_not_a_join_key(documents):
