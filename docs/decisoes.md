@@ -876,8 +876,9 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
     do formato, a resposta é `422`.
   - Versão da API 0.5.0: o par obrigatório quebra quem chamava sem ele, e na série 0.x quem sobe é o número do meio.
 - **Alternativa descartada:** manter o par opcional. Sem par, a resposta seria uma linha por município de cada um dos pares
-  (666 vezes o número de municípios), e a tela não saberia qual mostrar. Nenhuma tela usa a rota ainda, então o custo de quebrar é
-  zero.
+  (666 vezes o número de municípios), e a tela não saberia qual mostrar. A tela de receita (`decomposicao-table`, `mapa-recorte` e
+  `recorte-trilha`) passou a pedir o par e o escolhe pela rota `/receita/decomposicao/periodos`: abre na janela de 12 meses com o
+  período atual mais recente e oferece só os pares gravados.
 - **Limite:** a rota só conhece os pares gravados. Pares de trechos diferentes (DEC-028) continuam fora, e entram só se o portal
   precisar deles.
 - **Amostra:** o gerador grava os 78 pares de mesmos meses entre 2024 e 2025, para o seletor ter o que mostrar.
