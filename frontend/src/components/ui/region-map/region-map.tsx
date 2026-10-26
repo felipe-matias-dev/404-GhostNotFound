@@ -2,8 +2,8 @@
 // - Cada região habilitada é um link (`getHref`): Tab percorre o mapa, Enter abre, e o
 //   botão do meio/Ctrl+clique abre em outra aba. Regiões sem dado ficam visíveis, sem link.
 // - Ao escolher, o mapa enquadra a região com mola (viewBox animado); os botões aproximam,
-//   afastam e enquadram de novo. Arrastar move o mapa; Ctrl+roda (ou pinça no trackpad) dá
-//   zoom no ponto do cursor. A roda sozinha continua rolando a página.
+//   afastam e enquadram de novo. Arrastar move o mapa; a roda (ou a pinça no trackpad) dá
+//   zoom no ponto do cursor. Fora do mapa, a roda rola a página normalmente.
 // - Cor contínua (`getIntensity`, de -1 a 1): queda em `danger`, alta em `success`, misturadas
 //   à superfície pela intensidade; quanto mais forte, mais o contorno brilha (glow). Hover e
 //   seleção são contornos por cima de tudo, então valem sobre qualquer cor.
@@ -294,11 +294,10 @@ export function RegionMap({
 		};
 	};
 
-	// Ctrl+roda: listener nativo, porque o React registra `wheel` como passivo e o
-	// preventDefault (que impede o zoom da página) seria ignorado. Registrado uma vez; o
+	// Roda: listener nativo, porque o React registra `wheel` como passivo e o preventDefault
+	// (que impede a página de rolar ou dar zoom junto) seria ignorado. Registrado uma vez; o
 	// Effect Event lê o `full` atual.
 	const onWheel = useEffectEvent((event: WheelEvent) => {
-		if (!event.ctrlKey && !event.metaKey) return;
 		event.preventDefault();
 		setInstant(true);
 		setView((v) => {
