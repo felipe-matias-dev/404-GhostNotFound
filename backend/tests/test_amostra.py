@@ -118,27 +118,25 @@ def test_segment_kpis_add_up_to_the_company_and_the_feeders(tmp_path: Path, engi
         recortes_rede = session.execute(
             select(
                 segmento.competencia,
+                segmento.cod_alimentador,
+                func.sum(segmento.n_uc),
                 func.sum(segmento.horas_interrompidas),
                 func.sum(segmento.n_interrupcoes),
-            ).group_by(segmento.competencia)
+            ).group_by(segmento.competencia, segmento.cod_alimentador)
         ).all()
         alimentadores = {
-            competencia: (horas, interrupcoes)
-            for competencia, horas, interrupcoes in session.execute(
-                select(
-                    ContinuidadeAlimentadorMensal.competencia,
-                    func.sum(ContinuidadeAlimentadorMensal.horas_interrompidas),
-                    func.sum(ContinuidadeAlimentadorMensal.n_interrupcoes),
-                ).group_by(ContinuidadeAlimentadorMensal.competencia)
-            )
+            (linha.competencia, linha.cod_alimentador): linha
+            for linha in session.scalars(select(ContinuidadeAlimentadorMensal))
         }
         linhas = session.scalars(select(segmento)).all()
 
     assert len(recortes_rede) == len(alimentadores)
-    for competencia, horas, interrupcoes in recortes_rede:
+    for competencia, cod_alimentador, n_uc, horas, interrupcoes in recortes_rede:
+        continuidade = alimentadores[(competencia, cod_alimentador)]
+        assert n_uc == continuidade.n_uc
         # Horas são double precision: a ordem da soma muda a última casa.
-        assert horas == pytest.approx(alimentadores[competencia][0])
-        assert interrupcoes == alimentadores[competencia][1]
+        assert horas == pytest.approx(continuidade.horas_interrompidas)
+        assert interrupcoes == continuidade.n_interrupcoes
     for linha in linhas:
         assert abs(linha.receita_faturada - linha.receita_energia - linha.tributos) <= Decimal(
             "0.01"
@@ -246,3 +244,54 @@ def test_does_not_overwrite_existing_csv_without_force(tmp_path: Path) -> None:
         write_sample(tmp_path / "gold", force=False)
 
     assert existing.read_text(encoding="utf-8") == "conteúdo da Gold real"
+
+
+def test_segment_invoice_and_reading_components_add_up_to_the_billing(
+    tmp_path: Path, engine: Engine
+) -> None:
+    # Os componentes de faturas e leituras dos recortes saem do fato: somados por mês, são as
+    # faturas do mês, e a situação é a da data de corte (DEC-027).
+    write_sample(tmp_path / "gold", force=False)
+    load_gold(tmp_path / "gold", engine)
+    segmento = KpisSegmentoMensal
+    fato = FatoFaturamentoMensal
+
+    with Session(engine) as session:
+        recortes = {
+            competencia: valores
+            for competencia, *valores in session.execute(
+                select(
+                    segmento.competencia,
+                    func.sum(segmento.n_faturas),
+                    func.sum(segmento.n_faturas_nao_pagas),
+                    func.sum(segmento.valor_nao_pago),
+                    func.sum(segmento.n_faturas_pagas_com_atraso),
+                    func.sum(segmento.soma_dias_em_atraso),
+                    func.sum(segmento.n_leituras),
+                    func.sum(segmento.n_leituras_estimadas),
+                    func.sum(segmento.receita_bandeira),
+                ).group_by(segmento.competencia)
+            )
+        }
+        nao_paga = fato.status_pagamento.in_(["em_aberto", "em_atraso"])
+        faturas = {
+            competencia: valores
+            for competencia, *valores in session.execute(
+                select(
+                    fato.competencia,
+                    func.count(),
+                    func.count().filter(nao_paga),
+                    func.coalesce(func.sum(fato.receita_faturada).filter(nao_paga), 0),
+                    func.count().filter(fato.status_pagamento == "paga_com_atraso"),
+                    func.coalesce(func.sum(fato.dias_em_atraso), 0),
+                    func.count(),
+                    func.count().filter(fato.tipo_leitura == "estimada"),
+                    func.sum(fato.receita_bandeira),
+                ).group_by(fato.competencia)
+            )
+        }
+
+    assert recortes == faturas
+    # A amostra exercita a situação das faturas e as leituras estimadas.
+    assert sum(valores[1] for valores in recortes.values()) > 0
+    assert sum(valores[5] for valores in recortes.values()) > 0

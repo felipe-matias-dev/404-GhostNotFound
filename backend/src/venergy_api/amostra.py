@@ -487,21 +487,32 @@ def _kpis_segmento(
     # Somados das UCs com as mesmas regras do faturamento, da continuidade e dos chamados:
     # a soma de cada mês bate com os KPIs da empresa e com a continuidade por alimentador.
     fatura = {(linha.cod_uc, linha.competencia): linha for linha in faturamento}
-    recortes: dict[tuple[str, str, str, bool], list[DimUcSchema]] = {}
-    for uc in SAMPLE_UCS:
-        # Na amostra, os painéis solares já estavam conectados antes de 2024, então o GD de
-        # cada competência é o do cadastro.
-        chave = (uc.municipio, uc.bairro, uc.classe_cadastro, uc.possui_gd)
-        recortes.setdefault(chave, []).append(uc)
-
     rows = []
     for competencia in COMPETENCIAS:
-        for (municipio, bairro, classe_cadastro, possui_gd), ucs in sorted(recortes.items()):
+        # O recorte muda de um mês para o outro quando a UC troca de medidor: o tipo é o do
+        # medidor vigente. Na amostra, os painéis solares já estavam conectados antes de 2024,
+        # então o GD de cada competência é o do cadastro.
+        recortes: dict[tuple[str, str, str, bool, str, str], list[DimUcSchema]] = {}
+        for uc in SAMPLE_UCS:
+            chave = (
+                uc.municipio,
+                uc.bairro,
+                uc.classe_cadastro,
+                uc.possui_gd,
+                uc.cod_alimentador,
+                fatura[(uc.cod_uc, competencia)].tipo_medidor,
+            )
+            recortes.setdefault(chave, []).append(uc)
+
+        for chave, ucs in sorted(recortes.items()):
+            municipio, bairro, classe_cadastro, possui_gd, cod_alimentador, tipo_medidor = chave
             faturas = [fatura[(uc.cod_uc, competencia)] for uc in ucs]
             ocorrencias = [_interrupcoes(uc, competencia) for uc in ucs]
             chamados = [_chamados(uc, competencia) for uc in ucs]
             notas = [nota for _, nota in chamados if nota is not None]
             arrecadado = [f.receita_arrecadada for f in faturas if f.receita_arrecadada is not None]
+            nao_pagas = [f for f in faturas if f.status_pagamento in ("em_aberto", "em_atraso")]
+            com_atraso = [f for f in faturas if f.dias_em_atraso is not None]
             rows.append(
                 KpisSegmentoMensalSchema(
                     competencia=competencia,
@@ -510,6 +521,8 @@ def _kpis_segmento(
                     classe_cadastro=classe_cadastro,
                     classe=ucs[0].classe,
                     possui_gd=possui_gd,
+                    cod_alimentador=cod_alimentador,
+                    tipo_medidor=tipo_medidor,
                     n_uc=len(ucs),
                     kwh_faturado=sum((f.kwh_faturado for f in faturas), Decimal(0)),
                     receita_faturada=sum((f.receita_faturada for f in faturas), Decimal(0)),
@@ -521,6 +534,16 @@ def _kpis_segmento(
                     n_chamados=sum(n for n, _ in chamados),
                     soma_notas=float(sum(notas)) if notas else None,
                     n_notas=len(notas),
+                    receita_bandeira=sum((f.receita_bandeira for f in faturas), Decimal(0)),
+                    n_faturas=len(faturas),
+                    n_faturas_nao_pagas=len(nao_pagas),
+                    valor_nao_pago=sum((f.receita_faturada for f in nao_pagas), Decimal(0)),
+                    n_faturas_pagas_com_atraso=sum(
+                        f.status_pagamento == "paga_com_atraso" for f in faturas
+                    ),
+                    soma_dias_em_atraso=sum(f.dias_em_atraso or 0 for f in com_atraso),
+                    n_leituras=len(faturas),
+                    n_leituras_estimadas=sum(f.tipo_leitura == "estimada" for f in faturas),
                 )
             )
     return tuple(rows)

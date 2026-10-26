@@ -152,6 +152,10 @@ class KpisSegmentoMensal(Base):
     classe_cadastro: Mapped[str] = mapped_column(primary_key=True)
     # Por competência: antes da conexão, a UC conta como sem GD.
     possui_gd: Mapped[bool] = mapped_column(primary_key=True)
+    # Na chave para cruzar continuidade com bairro, classe e GD (DEC-027). O medidor é o vigente
+    # no mês, e sem_medidor quando a UC não tem nenhum instalado.
+    cod_alimentador: Mapped[str] = mapped_column(primary_key=True)
+    tipo_medidor: Mapped[str] = mapped_column(primary_key=True)
     classe: Mapped[str]
     # Estoque: soma só dentro do mesmo mês. Os demais componentes são fluxos e somam entre
     # meses. Os índices (DEC, FEC, satisfação) não são guardados: calculam-se no fim, sobre
@@ -168,6 +172,16 @@ class KpisSegmentoMensal(Base):
     # Soma e contagem das notas, e não a média: média de médias daria peso errado.
     soma_notas: Mapped[float | None] = mapped_column(Double)
     n_notas: Mapped[int]
+    receita_bandeira: Mapped[Decimal] = mapped_column(_MONEY)
+    # A situação da fatura é a da data de corte, e não a do mês da fatura: numa competência
+    # antiga, "não paga" é a fatura daquele mês que continua sem pagamento hoje (DEC-027).
+    n_faturas: Mapped[int]
+    n_faturas_nao_pagas: Mapped[int]
+    valor_nao_pago: Mapped[Decimal] = mapped_column(_MONEY)
+    n_faturas_pagas_com_atraso: Mapped[int]
+    soma_dias_em_atraso: Mapped[int]
+    n_leituras: Mapped[int]
+    n_leituras_estimadas: Mapped[int]
 
 
 class ReconciliacaoFaturamento(Base):

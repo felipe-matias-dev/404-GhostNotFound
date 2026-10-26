@@ -32,6 +32,7 @@ OrigemKwh = Literal["leitura", "leitura_atual_troca_medidor", "consumo_absoluto"
 StatusPagamento = Literal["paga", "paga_com_atraso", "em_aberto", "em_atraso"]
 TipoLeitura = Literal["real", "estimada"]
 TipoMedidor = Literal["eletromecanico", "eletronico", "smart"]
+TipoMedidorRecorte = Literal["eletromecanico", "eletronico", "smart", "sem_medidor"]
 ModalidadeGd = Literal["geracao_propria_uc", "autoconsumo_remoto", "geracao_compartilhada"]
 
 # Teto por pedido na ordem da capacidade mensal da equipe de campo (~200 inspeções):
@@ -228,6 +229,8 @@ class KpisSegmentoMensalSchema(BaseModel):
     classe_cadastro: ClasseCadastro
     classe: Classe
     possui_gd: bool
+    cod_alimentador: RequiredText
+    tipo_medidor: TipoMedidorRecorte
     n_uc: int
     kwh_faturado: ExactNumber
     receita_faturada: ExactNumber
@@ -239,6 +242,14 @@ class KpisSegmentoMensalSchema(BaseModel):
     n_chamados: int
     soma_notas: float | None
     n_notas: int
+    receita_bandeira: ExactNumber
+    n_faturas: int
+    n_faturas_nao_pagas: int
+    valor_nao_pago: ExactNumber
+    n_faturas_pagas_com_atraso: int
+    soma_dias_em_atraso: int
+    n_leituras: int
+    n_leituras_estimadas: int
 
 
 class ReconciliacaoFaturamentoSchema(BaseModel):
