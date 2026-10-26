@@ -7,13 +7,16 @@ from sqlalchemy import ColumnElement, Double, cast, distinct, func, select
 from sqlalchemy.orm import InstrumentedAttribute, Session
 
 from venergy_api.database import SessionDep
-from venergy_api.models import ContinuidadeAlimentadorMensal
+from venergy_api.models import ContinuidadeAlimentadorMensal, KpisSegmentoMensal
 from venergy_api.schemas import (
     ContinuidadeAlimentadorMensalSchema,
     ContinuidadeSerieFiltroSchema,
     RankingAlimentadorSchema,
     RankingContinuidadeSchema,
     RankingFiltroSchema,
+    RecorteContinuidadeSchema,
+    RecortesContinuidadeSchema,
+    RecortesFiltroSchema,
 )
 
 router = APIRouter(prefix="/continuidade", tags=["continuidade"])
@@ -55,6 +58,13 @@ def indices(
     ]
 
 
+def _pior_primeiro(criterio: str, colunas: list[ColumnElement]) -> list[ColumnElement]:
+    # Pelo índice escolhido e, no empate, pelo outro. Nulo (sem UC atendida) vai para o fim.
+    dec, fec = colunas[0], colunas[1]
+    principal, secundario = (dec, fec) if criterio == "dec" else (fec, dec)
+    return [principal.desc().nulls_last(), secundario.desc().nulls_last()]
+
+
 @router.get("/alimentadores/mensal")
 def get_serie_alimentadores(
     filtro: Annotated[ContinuidadeSerieFiltroSchema, Query()], session: SessionDep
@@ -83,17 +93,11 @@ def get_ranking_alimentadores(
     tabela = ContinuidadeAlimentadorMensal
     n_meses = contar_meses(session, tabela.competencia, filtro.inicio, filtro.fim)
     colunas = indices(tabela.horas_interrompidas, tabela.n_interrupcoes, tabela.n_uc, n_meses)
-    dec, fec = colunas[0], colunas[1]
-    principal, secundario = (dec, fec) if filtro.criterio == "dec" else (fec, dec)
     consulta = (
         select(tabela.cod_alimentador, *colunas)
         .where(tabela.competencia.between(filtro.inicio, filtro.fim))
         .group_by(tabela.cod_alimentador)
-        .order_by(
-            principal.desc().nulls_last(),
-            secundario.desc().nulls_last(),
-            tabela.cod_alimentador,
-        )
+        .order_by(*_pior_primeiro(filtro.criterio, colunas), tabela.cod_alimentador)
     )
     return RankingContinuidadeSchema(
         inicio=filtro.inicio,
@@ -102,5 +106,51 @@ def get_ranking_alimentadores(
         n_meses=n_meses,
         alimentadores=[
             RankingAlimentadorSchema(**linha._mapping) for linha in session.execute(consulta)
+        ],
+    )
+
+
+@router.get("/recortes")
+def get_recortes(
+    filtro: Annotated[RecortesFiltroSchema, Query()], session: SessionDep
+) -> RecortesContinuidadeSchema:
+    """DEC e FEC por município, por bairro de um município ou por alimentador de um bairro."""
+    tabela = KpisSegmentoMensal
+    # O breadcrumb da tela só acrescenta filtros: o nível da resposta é o próximo abaixo,
+    # como em /receita/decomposicao. O último é o alimentador, onde a manutenção age.
+    if filtro.bairro:
+        nivel, coluna = "alimentador", tabela.cod_alimentador
+    elif filtro.municipio:
+        nivel, coluna = "bairro", tabela.bairro
+    else:
+        nivel, coluna = "municipio", tabela.municipio
+
+    n_meses = contar_meses(session, tabela.competencia, filtro.inicio, filtro.fim)
+    colunas = indices(tabela.horas_interrompidas, tabela.n_interrupcoes, tabela.n_uc, n_meses)
+    filtros = [
+        coluna_filtro == valor
+        for coluna_filtro, valor in [
+            (tabela.municipio, filtro.municipio),
+            (tabela.bairro, filtro.bairro),
+            (tabela.classe, filtro.classe),
+        ]
+        if valor is not None
+    ]
+    # Soma os componentes das linhas do filtro (inclusive as de medidor e GD diferentes) e só
+    # então divide: DEC de recorte não é média dos DEC dos alimentadores (DEC-021).
+    consulta = (
+        select(coluna.label("segmento"), *colunas)
+        .where(tabela.competencia.between(filtro.inicio, filtro.fim), *filtros)
+        .group_by(coluna)
+        .order_by(*_pior_primeiro(filtro.criterio, colunas), coluna)
+    )
+    return RecortesContinuidadeSchema(
+        inicio=filtro.inicio,
+        fim=filtro.fim,
+        criterio=filtro.criterio,
+        nivel=nivel,
+        n_meses=n_meses,
+        recortes=[
+            RecorteContinuidadeSchema(**linha._mapping) for linha in session.execute(consulta)
         ],
     )

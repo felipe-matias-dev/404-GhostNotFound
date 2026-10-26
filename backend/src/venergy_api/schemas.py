@@ -395,6 +395,39 @@ class RankingContinuidadeSchema(BaseModel):
     alimentadores: list[RankingAlimentadorSchema]
 
 
+class RecortesFiltroSchema(BaseModel):
+    """Período e onde o gerente está no drill-down: o nível da resposta é o próximo abaixo."""
+
+    inicio: Competencia
+    fim: Competencia
+    criterio: Literal["dec", "fec"] = "dec"
+    municipio: RequiredText | None = None
+    bairro: RequiredText | None = None
+    classe: Classe | None = None
+
+    @model_validator(mode="after")
+    def periodo_e_bairro_validos(self) -> "RecortesFiltroSchema":
+        _inicio_ate_o_fim(self.inicio, self.fim)
+        if self.bairro and not self.municipio:
+            raise ValueError("Informe o município junto com o bairro")
+        return self
+
+
+class RecorteContinuidadeSchema(IndicesContinuidadeSchema):
+    segmento: RequiredText
+
+
+class RecortesContinuidadeSchema(BaseModel):
+    """DEC e FEC do nível abaixo do filtro, do pior para o melhor."""
+
+    inicio: Competencia
+    fim: Competencia
+    criterio: Literal["dec", "fec"]
+    nivel: Literal["municipio", "bairro", "alimentador"]
+    n_meses: int
+    recortes: list[RecorteContinuidadeSchema]
+
+
 class FilaSuspeitaSchema(BaseModel):
     """Uma UC suspeita de perda não técnica, com o porquê e o quanto vale inspecionar."""
 

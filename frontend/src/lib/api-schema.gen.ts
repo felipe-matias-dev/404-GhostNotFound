@@ -160,6 +160,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/continuidade/recortes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Recortes
+         * @description DEC e FEC por município, por bairro de um município ou por alimentador de um bairro.
+         */
+        get: operations["get_recortes_continuidade_recortes_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/ordens-inspecao": {
         parameters: {
             query?: never;
@@ -476,6 +496,45 @@ export interface components {
             /** Alimentadores */
             alimentadores: components["schemas"]["RankingAlimentadorSchema"][];
         };
+        /** RecorteContinuidadeSchema */
+        RecorteContinuidadeSchema: {
+            /** Dec */
+            dec: number | null;
+            /** Fec */
+            fec: number | null;
+            /** Horas Interrompidas */
+            horas_interrompidas: number;
+            /** N Interrupcoes */
+            n_interrupcoes: number;
+            /** N Uc Medio */
+            n_uc_medio: number | null;
+            /** Segmento */
+            segmento: string;
+        };
+        /**
+         * RecortesContinuidadeSchema
+         * @description DEC e FEC do nível abaixo do filtro, do pior para o melhor.
+         */
+        RecortesContinuidadeSchema: {
+            /** Inicio */
+            inicio: string;
+            /** Fim */
+            fim: string;
+            /**
+             * Criterio
+             * @enum {string}
+             */
+            criterio: "dec" | "fec";
+            /**
+             * Nivel
+             * @enum {string}
+             */
+            nivel: "municipio" | "bairro" | "alimentador";
+            /** N Meses */
+            n_meses: number;
+            /** Recortes */
+            recortes: components["schemas"]["RecorteContinuidadeSchema"][];
+        };
         /**
          * ResultadoOrdem
          * @enum {string}
@@ -761,6 +820,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RankingContinuidadeSchema"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_recortes_continuidade_recortes_get: {
+        parameters: {
+            query: {
+                inicio: string;
+                fim: string;
+                criterio?: "dec" | "fec";
+                municipio?: string | null;
+                bairro?: string | null;
+                classe?: ("B1" | "B2" | "B3" | "A4") | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecortesContinuidadeSchema"];
                 };
             };
             /** @description Validation Error */

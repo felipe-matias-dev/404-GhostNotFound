@@ -577,6 +577,130 @@
         }
       }
     },
+    "/continuidade/recortes": {
+      "get": {
+        "tags": [
+          "continuidade"
+        ],
+        "summary": "Get Recortes",
+        "description": "DEC e FEC por município, por bairro de um município ou por alimentador de um bairro.",
+        "operationId": "get_recortes_continuidade_recortes_get",
+        "parameters": [
+          {
+            "name": "inicio",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+              "title": "Inicio"
+            }
+          },
+          {
+            "name": "fim",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+              "title": "Fim"
+            }
+          },
+          {
+            "name": "criterio",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "dec",
+                "fec"
+              ],
+              "type": "string",
+              "default": "dec",
+              "title": "Criterio"
+            }
+          },
+          {
+            "name": "municipio",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Municipio"
+            }
+          },
+          {
+            "name": "bairro",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Bairro"
+            }
+          },
+          {
+            "name": "classe",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "B1",
+                    "B2",
+                    "B3",
+                    "A4"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Classe"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecortesContinuidadeSchema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/ordens-inspecao": {
       "post": {
         "tags": [
@@ -1601,6 +1725,119 @@
         ],
         "title": "RankingContinuidadeSchema",
         "description": "Os alimentadores do pior para o melhor, e quantos meses entraram na média."
+      },
+      "RecorteContinuidadeSchema": {
+        "properties": {
+          "dec": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dec"
+          },
+          "fec": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fec"
+          },
+          "horas_interrompidas": {
+            "type": "number",
+            "title": "Horas Interrompidas"
+          },
+          "n_interrupcoes": {
+            "type": "integer",
+            "title": "N Interrupcoes"
+          },
+          "n_uc_medio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "N Uc Medio"
+          },
+          "segmento": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Segmento"
+          }
+        },
+        "type": "object",
+        "required": [
+          "dec",
+          "fec",
+          "horas_interrompidas",
+          "n_interrupcoes",
+          "n_uc_medio",
+          "segmento"
+        ],
+        "title": "RecorteContinuidadeSchema"
+      },
+      "RecortesContinuidadeSchema": {
+        "properties": {
+          "inicio": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+            "title": "Inicio"
+          },
+          "fim": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+            "title": "Fim"
+          },
+          "criterio": {
+            "type": "string",
+            "enum": [
+              "dec",
+              "fec"
+            ],
+            "title": "Criterio"
+          },
+          "nivel": {
+            "type": "string",
+            "enum": [
+              "municipio",
+              "bairro",
+              "alimentador"
+            ],
+            "title": "Nivel"
+          },
+          "n_meses": {
+            "type": "integer",
+            "title": "N Meses"
+          },
+          "recortes": {
+            "items": {
+              "$ref": "#/components/schemas/RecorteContinuidadeSchema"
+            },
+            "type": "array",
+            "title": "Recortes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "inicio",
+          "fim",
+          "criterio",
+          "nivel",
+          "n_meses",
+          "recortes"
+        ],
+        "title": "RecortesContinuidadeSchema",
+        "description": "DEC e FEC do nível abaixo do filtro, do pior para o melhor."
       },
       "ResultadoOrdem": {
         "type": "string",
