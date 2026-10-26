@@ -842,9 +842,10 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
     numerador, e a Gold informa quantos são.
   - **Ocorrências antes da ligação (OCO-04):** há ocorrências registradas antes do mês de ligação da UC. Ficam fora da Gold (DEC/FEC,
     recortes e UC 360), porque a UC ainda não existia; a Silver mantém a linha, e a Gold confere que Gold + excluídas = Silver.
-  - **Potência anômala da GD (GD-02):** os registros estão em Wp e são convertidos para kWp (÷ 1000). Conferido no dado: o valor
-    convertido cai na faixa das demais UCs com GD, e a energia injetada por kWp passa a bater com a delas. A Gold trava as duas
-    conferências. (Antes: nulo.)
+  - **Potência anômala da GD (GD-02):** o registro é convertido de Wp para kWp (÷ 1000) **quando o dado confirma**: o valor
+    convertido cai na faixa das UCs com GD normais, e a energia injetada por kWp também. Quase todos os registros anômalos passam;
+    os poucos que não passam (energia injetada por kWp muito acima de qualquer UC normal) ficam vazios, porque a origem não diz qual
+    é a potência. A Gold informa quantos foram convertidos e quantos ficaram vazios. (Antes: todos nulos.)
   - **Vazio e zero nos recortes:** `receita_arrecadada` fica vazia quando o recorte não tem fatura na competência, e é zero quando há
     fatura e nada foi pago; `soma_notas` fica vazia quando nenhum chamado foi avaliado. Não arrecadar e não ter fatura são coisas
     diferentes para o agente. Na fatura (fato), a não paga continua com zero.
