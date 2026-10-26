@@ -2,7 +2,7 @@
 
 Resumo para orientar quem chega ao `ai-agent/` (pessoa ou sessão de IA). A fonte da verdade continua sendo a [spec](specs/2026-10-19-architecture-design.md); este arquivo só diz o que existe hoje, onde está e o que falta. Atualize-o no mesmo PR que mudar o estado.
 
-- **Atualizado em:** 23/10/2026, com a narração (item 8) sobre a `main` depois dos PRs #29, #30, #31, #32 e #35. O que está em revisão está na spec §1.
+- **Atualizado em:** 24/10/2026: narração (item 8, PR #36) na `main`; o `InsightWriter` (item 9) chega por um PR da branch `feat/ai-agent-narracao-v2`. O que está em revisão está na spec §1.
 
 ## 1. O que o agente faz
 
@@ -44,7 +44,7 @@ pergunta → Question → SemanticLayer (carregada uma vez)
 
 Detalhes, confiança e logs: spec §5.1. O backend monta o agente uma vez por processo com `build_agent(AgentSettings())`.
 
-Em branch: `InsightWriter` (`feat/ai-agent-insight`, prompt em `prompts/insight/v1/`, item 9). O golden set está em `eval/golden_set.yaml` (66 itens, alinhado à camada v0.2, rascunho até a revisão humana).
+`InsightWriter` (item 9, `infrastructure/insight_writer.py`, prompt em `prompts/insight/v1/`): narra o JSON de métricas de uma tela e devolve `None` se algum número do texto não estiver no JSON. O backend monta o JSON, guarda o insight em cache e liga o redator (D9). O golden set está em `eval/golden_set.yaml` (66 itens, alinhado à camada v0.2, rascunho até a revisão humana).
 
 ## 4. Camada semântica hoje
 
