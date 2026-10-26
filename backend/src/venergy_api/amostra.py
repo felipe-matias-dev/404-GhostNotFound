@@ -24,6 +24,7 @@ from venergy_api.models import (
     DimUc,
     FatoFaturamentoMensal,
     FilaSuspeita,
+    InspecaoUc,
     InterrupcaoUc,
     KpisMensais,
     KpisSegmentoMensal,
@@ -37,6 +38,7 @@ from venergy_api.schemas import (
     DimUcSchema,
     FaturamentoMensalSchema,
     FilaSuspeitaSchema,
+    InspecaoUcSchema,
     InterrupcaoUcSchema,
     KpisMensaisSchema,
     KpisSegmentoMensalSchema,
@@ -757,6 +759,29 @@ def _decomposicao(
     return tuple(rows)
 
 
+# Inspeções de campo, todas em UCs fora da fila: pela DEC-030, a fila só tem UCs ainda não
+# inspecionadas. Uma confirmou irregularidade e a outra não encontrou nada.
+SAMPLE_INSPECOES = (
+    InspecaoUcSchema(
+        cod_inspecao="INS-0001",
+        cod_uc="0001",
+        data_inspecao=date(2024, 9, 18),
+        competencia="2024-09",
+        resultado="irregularidade_confirmada",
+        tipo_irregularidade="DESVIO DIRETO",
+        kwh_recuperado=Decimal("1200.000"),
+    ),
+    InspecaoUcSchema(
+        cod_inspecao="INS-0002",
+        cod_uc="0008",
+        data_inspecao=date(2025, 2, 11),
+        competencia="2025-02",
+        resultado="sem_irregularidade",
+        tipo_irregularidade=None,
+        kwh_recuperado=Decimal("0.000"),
+    ),
+)
+
 # Fila de suspeitas, pela posição no ranking (1 = mais suspeita). A UC 0004 ainda não tem estimativa
 # de energia recuperável: o gerente de perdas vê a suspeita mesmo sem o valor.
 SAMPLE_FILA = (
@@ -769,7 +794,7 @@ SAMPLE_FILA = (
     FilaSuspeitaSchema(
         cod_uc="0007",
         score_suspeita=2,
-        motivos=["inspeção anterior encontrou irregularidade"],
+        motivos=["queda de 30% ou mais no consumo médio das últimas 12 competências"],
         kwh_recuperavel_est=Decimal("4200.000"),
     ),
     FilaSuspeitaSchema(
@@ -804,6 +829,7 @@ SAMPLE: dict[type[Base], tuple[BaseModel, ...]] = {
     InterrupcaoUc: SAMPLE_INTERRUPCOES,
     AtendimentoUc: SAMPLE_ATENDIMENTOS,
     MedidorUc: SAMPLE_MEDIDORES,
+    InspecaoUc: SAMPLE_INSPECOES,
 }
 
 

@@ -33,6 +33,7 @@ StatusPagamento = Literal["paga", "paga_com_atraso", "em_aberto", "em_atraso"]
 TipoLeitura = Literal["real", "estimada"]
 TipoMedidor = Literal["eletromecanico", "eletronico", "smart"]
 TipoMedidorRecorte = Literal["eletromecanico", "eletronico", "smart", "sem_medidor"]
+ResultadoInspecao = Literal["irregularidade_confirmada", "sem_irregularidade"]
 ModalidadeGd = Literal["geracao_propria_uc", "autoconsumo_remoto", "geracao_compartilhada"]
 
 # Teto por pedido na ordem da capacidade mensal da equipe de campo (~200 inspeções):
@@ -319,6 +320,18 @@ class MedidorUcSchema(BaseModel):
     idade_anos: Annotated[float, Field(ge=0)]
     n_trocas: Annotated[int, Field(ge=0)]
     data_ultima_troca: date | None
+
+
+class InspecaoUcSchema(BaseModel):
+    """Uma inspeção de campo numa UC e o que ela encontrou."""
+
+    cod_inspecao: RequiredText
+    cod_uc: RequiredText
+    data_inspecao: date
+    competencia: Competencia
+    resultado: ResultadoInspecao
+    tipo_irregularidade: RequiredText | None
+    kwh_recuperado: Annotated[ExactNumber, Field(ge=0)]
 
 
 class FilaSuspeitaSchema(BaseModel):

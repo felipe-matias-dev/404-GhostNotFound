@@ -280,6 +280,23 @@ class MedidorUc(Base):
     data_ultima_troca: Mapped[date | None]
 
 
+class InspecaoUc(Base):
+    """Inspeções de campo por UC, uma linha por inspeção: histórico, taxa por recorte e a régua."""
+
+    __tablename__ = "gold_inspecoes_uc"
+    __table_args__ = {"schema": "gold"}
+
+    cod_inspecao: Mapped[str] = mapped_column(primary_key=True)
+    cod_uc: Mapped[str] = mapped_column(index=True)
+    # Vale a data, e não a aba de origem (INSP-05).
+    data_inspecao: Mapped[date]
+    competencia: Mapped[str]
+    resultado: Mapped[str]
+    tipo_irregularidade: Mapped[str | None]
+    # Zero sem irregularidade. O nome do inspetor não vem para a Gold: é dado pessoal sem uso.
+    kwh_recuperado: Mapped[Decimal] = mapped_column(_ENERGY)
+
+
 class FilaSuspeita(Base):
     """UCs suspeitas de perda não técnica: de onde o gerente de perdas gera as OIs."""
 

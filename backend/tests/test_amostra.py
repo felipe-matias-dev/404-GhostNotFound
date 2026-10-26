@@ -12,6 +12,7 @@ from venergy_api.models import (
     ContinuidadeAlimentadorMensal,
     FatoFaturamentoMensal,
     FilaSuspeita,
+    InspecaoUc,
     InterrupcaoUc,
     KpisMensais,
     KpisSegmentoMensal,
@@ -405,3 +406,24 @@ def test_current_meter_matches_the_last_reading_and_the_replacement(
     for medidor in medidores:
         assert (medidor.data_ultima_troca is None) == (medidor.n_trocas == 0)
         assert medidor.idade_anos > 0
+
+
+def test_inspections_follow_the_contract_and_stay_out_of_the_queue(
+    tmp_path: Path, engine: Engine
+) -> None:
+    # Pela DEC-030, a fila só tem UCs ainda não inspecionadas; e energia recuperada só existe
+    # onde a inspeção confirmou irregularidade.
+    write_sample(tmp_path / "gold", force=False)
+    load_gold(tmp_path / "gold", engine)
+
+    with Session(engine) as session:
+        inspecoes = session.scalars(select(InspecaoUc)).all()
+        fila = set(session.scalars(select(FilaSuspeita.cod_uc)))
+
+    assert {i.cod_uc for i in inspecoes}.isdisjoint(fila)
+    assert {i.resultado for i in inspecoes} == {"irregularidade_confirmada", "sem_irregularidade"}
+    for inspecao in inspecoes:
+        assert inspecao.data_inspecao.strftime("%Y-%m") == inspecao.competencia
+        confirmada = inspecao.resultado == "irregularidade_confirmada"
+        assert (inspecao.tipo_irregularidade is not None) == confirmada
+        assert (inspecao.kwh_recuperado > 0) == confirmada
