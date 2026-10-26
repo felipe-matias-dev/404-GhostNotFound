@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Pagina } from "#/components/layout/pagina";
 import { DecomposicaoTable } from "../components/decomposicao-table";
 import { MapaRecorte } from "../components/mapa-recorte";
-import { PeriodoMenu } from "../components/periodo-menu";
+import { PeriodoPicker } from "../components/periodo-picker";
 import { RecorteTrilha } from "../components/recorte-trilha";
 import { parPadrao } from "../conversions";
 import { usePeriodosDecomposicao } from "../hooks/use-decomposicao";
@@ -83,7 +83,7 @@ export function ReceitaPage() {
 						<h2 id="ponte-titulo" className="text-heading">
 							Ponte de receita
 						</h2>
-						<PeriodoMenu
+						<PeriodoPicker
 							pares={periodos.data ?? []}
 							par={par}
 							onEscolher={(escolhido) => navegar(recorte, escolhido)}
