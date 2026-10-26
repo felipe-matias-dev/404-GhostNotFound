@@ -241,6 +241,26 @@ class InterrupcaoUc(Base):
     causa: Mapped[str | None]
 
 
+class AtendimentoUc(Base):
+    """Chamados de atendimento por UC, uma linha por chamado: a UC 360 da Camila."""
+
+    __tablename__ = "gold_atendimentos_uc"
+    __table_args__ = {"schema": "gold"}
+
+    protocolo: Mapped[str] = mapped_column(primary_key=True)
+    cod_uc: Mapped[str] = mapped_column(index=True)
+    # Mês de abertura do chamado, a mesma regra de gold_kpis_segmento_mensal.
+    competencia: Mapped[str]
+    data_abertura: Mapped[datetime] = mapped_column(DateTime)
+    data_fechamento: Mapped[datetime] = mapped_column(DateTime)
+    canal: Mapped[str]
+    assunto: Mapped[str]
+    subassunto: Mapped[str | None]
+    # Vazia quando o cliente não avaliou (ATD-01). O histórico de interações do chamado, texto
+    # livre e sensível, não vem para a Gold.
+    nota_satisfacao: Mapped[float | None] = mapped_column(Double)
+
+
 class FilaSuspeita(Base):
     """UCs suspeitas de perda não técnica: de onde o gerente de perdas gera as OIs."""
 

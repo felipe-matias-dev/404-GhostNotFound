@@ -294,6 +294,20 @@ class InterrupcaoUcSchema(BaseModel):
     causa: RequiredText | None
 
 
+class AtendimentoUcSchema(BaseModel):
+    """Um chamado de atendimento de uma UC."""
+
+    protocolo: RequiredText
+    cod_uc: RequiredText
+    competencia: Competencia
+    data_abertura: datetime
+    data_fechamento: datetime
+    canal: RequiredText
+    assunto: RequiredText
+    subassunto: RequiredText | None
+    nota_satisfacao: Annotated[float, Field(ge=1, le=5)] | None
+
+
 class FilaSuspeitaSchema(BaseModel):
     """Uma UC suspeita de perda não técnica, com o porquê e o quanto vale inspecionar."""
 

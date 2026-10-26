@@ -19,6 +19,7 @@ from sqlalchemy.exc import ProgrammingError
 from venergy_api.config import get_settings
 from venergy_api.database import Base, get_engine
 from venergy_api.models import (
+    AtendimentoUc,
     ContinuidadeAlimentadorMensal,
     DimUc,
     FatoFaturamentoMensal,
@@ -30,6 +31,7 @@ from venergy_api.models import (
     ReconciliacaoFaturamento,
 )
 from venergy_api.schemas import (
+    AtendimentoUcSchema,
     ContinuidadeAlimentadorMensalSchema,
     DimUcSchema,
     FaturamentoMensalSchema,
@@ -75,6 +77,7 @@ GOLD_TABLES = (
     GoldTable(model=ContinuidadeAlimentadorMensal, schema=ContinuidadeAlimentadorMensalSchema),
     GoldTable(model=FilaSuspeita, schema=FilaSuspeitaSchema),
     GoldTable(model=InterrupcaoUc, schema=InterrupcaoUcSchema),
+    GoldTable(model=AtendimentoUc, schema=AtendimentoUcSchema),
 )
 
 

@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from venergy_api.amostra import SAMPLE, SAMPLE_FILA, write_sample
 from venergy_api.carga import load_gold
 from venergy_api.models import (
+    AtendimentoUc,
     ContinuidadeAlimentadorMensal,
     FatoFaturamentoMensal,
     FilaSuspeita,
@@ -333,3 +334,39 @@ def test_occurrences_add_up_to_the_feeder_continuity(tmp_path: Path, engine: Eng
         assert ocorrencia.data_abertura.strftime("%Y-%m") == ocorrencia.competencia
     # A amostra tem ocorrência com e sem causa registrada (OCO-01).
     assert {o.causa is None for o in todas} == {True, False}
+
+
+def test_calls_add_up_to_the_segment_components(tmp_path: Path, engine: Engine) -> None:
+    # n_chamados, soma_notas e n_notas dos recortes saem dos chamados por UC: o que a UC 360
+    # mostra e o que a diretoria soma são os mesmos chamados.
+    write_sample(tmp_path / "gold", force=False)
+    load_gold(tmp_path / "gold", engine)
+    segmento = KpisSegmentoMensal
+
+    with Session(engine) as session:
+        recortes = {
+            competencia: (chamados, soma_notas, notas)
+            for competencia, chamados, soma_notas, notas in session.execute(
+                select(
+                    segmento.competencia,
+                    func.sum(segmento.n_chamados),
+                    func.sum(segmento.soma_notas),
+                    func.sum(segmento.n_notas),
+                ).group_by(segmento.competencia)
+            )
+        }
+        chamados = {
+            competencia: (quantidade, soma_notas, notas)
+            for competencia, quantidade, soma_notas, notas in session.execute(
+                select(
+                    AtendimentoUc.competencia,
+                    func.count(),
+                    func.sum(AtendimentoUc.nota_satisfacao),
+                    func.count(AtendimentoUc.nota_satisfacao),
+                ).group_by(AtendimentoUc.competencia)
+            )
+        }
+
+    # Mês sem chamado fica de fora da tabela por chamado; no recorte, tem zero.
+    for competencia, (quantidade, soma_notas, notas) in recortes.items():
+        assert chamados.get(competencia, (0, None, 0)) == (quantidade, soma_notas, notas)

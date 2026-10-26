@@ -19,6 +19,7 @@ from venergy_api.carga import ARRAY_SEPARATOR, GOLD_TABLES
 from venergy_api.config import get_settings
 from venergy_api.database import Base
 from venergy_api.models import (
+    AtendimentoUc,
     ContinuidadeAlimentadorMensal,
     DimUc,
     FatoFaturamentoMensal,
@@ -30,6 +31,7 @@ from venergy_api.models import (
     ReconciliacaoFaturamento,
 )
 from venergy_api.schemas import (
+    AtendimentoUcSchema,
     ContinuidadeAlimentadorMensalSchema,
     DimUcSchema,
     FaturamentoMensalSchema,
@@ -464,6 +466,38 @@ def _chamados(uc: DimUcSchema, competencia: str) -> tuple[int, int | None]:
     return 1, nota
 
 
+_CANAIS = ("TELEFONE", "APP", "WHATSAPP")
+_ASSUNTOS = (("FALTA DE ENERGIA", "SEM ENERGIA NA UC"), ("FATURA", None), ("LIGACAO", "NOVA"))
+
+
+def _atendimentos_uc() -> tuple[AtendimentoUcSchema, ...]:
+    # Uma linha por chamado: n_chamados, soma_notas e n_notas dos recortes saem destas linhas, e
+    # o chamado sem nota fica fora da média (ATD-01).
+    rows = []
+    for uc in SAMPLE_UCS:
+        for competencia in COMPETENCIAS:
+            quantidade, nota = _chamados(uc, competencia)
+            if not quantidade:
+                continue
+            ano, mes = int(competencia[:4]), int(competencia[5:])
+            abertura = datetime(ano, mes, 12, 9)
+            assunto, subassunto = _ASSUNTOS[(int(uc.cod_uc) + mes) % len(_ASSUNTOS)]
+            rows.append(
+                AtendimentoUcSchema(
+                    protocolo=f"AT-{uc.cod_uc}-{competencia}",
+                    cod_uc=uc.cod_uc,
+                    competencia=competencia,
+                    data_abertura=abertura,
+                    data_fechamento=abertura + timedelta(days=1, hours=mes),
+                    canal=_CANAIS[(int(uc.cod_uc) + mes) % len(_CANAIS)],
+                    assunto=assunto,
+                    subassunto=subassunto,
+                    nota_satisfacao=float(nota) if nota is not None else None,
+                )
+            )
+    return tuple(rows)
+
+
 def _continuidade() -> tuple[ContinuidadeAlimentadorMensalSchema, ...]:
     # Somada das UCs da amostra, para bater com os KPIs por recorte: n_uc é o número de UCs
     # do cadastro que o alimentador atende. Pelo contrato, dec = horas_interrompidas ÷ n_uc
@@ -715,6 +749,7 @@ SAMPLE_KPIS = _kpis(SAMPLE_FATURAMENTO, SAMPLE_CONTINUIDADE)
 SAMPLE_KPIS_SEGMENTO = _kpis_segmento(SAMPLE_FATURAMENTO)
 SAMPLE_RECONCILIACAO = _reconciliacao(SAMPLE_FATURAMENTO)
 SAMPLE_INTERRUPCOES = _interrupcoes_uc()
+SAMPLE_ATENDIMENTOS = _atendimentos_uc()
 SAMPLE_DECOMPOSICAO = _decomposicao(SAMPLE_FATURAMENTO)
 
 # Linhas por tabela da Gold. A carga exige um CSV para cada tabela de GOLD_TABLES, e o
@@ -729,6 +764,7 @@ SAMPLE: dict[type[Base], tuple[BaseModel, ...]] = {
     ContinuidadeAlimentadorMensal: SAMPLE_CONTINUIDADE,
     FilaSuspeita: SAMPLE_FILA,
     InterrupcaoUc: SAMPLE_INTERRUPCOES,
+    AtendimentoUc: SAMPLE_ATENDIMENTOS,
 }
 
 
