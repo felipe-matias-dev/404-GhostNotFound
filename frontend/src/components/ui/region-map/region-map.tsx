@@ -220,12 +220,33 @@ export function RegionMap({
 		x: number;
 		y: number;
 	} | null>(null);
-	// A roda só dá zoom depois que a pessoa usou o mapa (clique ou foco dentro dele); antes,
-	// rola a página. Assim o mapa não prende quem só está passando por cima dele.
+	// A roda só dá zoom depois que a pessoa clicou no mapa; antes, rola a página. Assim o mapa
+	// não prende quem só está passando por cima dele, nem quem chegou a ele pelo Tab. Um clique
+	// ou foco fora do mapa desativa de novo; sair com o ponteiro, não.
 	const ativo = useRef(false);
 	const [avisoRoda, setAvisoRoda] = useState(false);
 	const avisoTimer = useRef<number | undefined>(undefined);
 	useEffect(() => () => window.clearTimeout(avisoTimer.current), []);
+	useEffect(() => {
+		const cliqueFora = (event: Event) => {
+			if (!containerRef.current?.contains(event.target as Node))
+				ativo.current = false;
+		};
+		// Clicar numa área do mapa sem link leva o foco a um ancestral focável (ex.: o
+		// conteúdo da página): isso não é sair do mapa.
+		const focoFora = (event: FocusEvent) => {
+			const mapa = containerRef.current;
+			const alvo = event.target as Node;
+			if (mapa && !mapa.contains(alvo) && !alvo.contains(mapa))
+				ativo.current = false;
+		};
+		document.addEventListener("pointerdown", cliqueFora);
+		document.addEventListener("focusin", focoFora);
+		return () => {
+			document.removeEventListener("pointerdown", cliqueFora);
+			document.removeEventListener("focusin", focoFora);
+		};
+	}, []);
 
 	// Nova seleção (clique, menu, URL): enquadra de novo.
 	const [previousSelected, setPreviousSelected] = useState(selectedId);
@@ -426,7 +447,6 @@ export function RegionMap({
 	const apagado = (id: string) => focusIds !== undefined && !focusIds.has(id);
 
 	return (
-		// biome-ignore lint/a11y/noStaticElementInteractions: só registra se o mapa está em uso (para a roda); a interação é dos links e botões de dentro.
 		<div
 			ref={containerRef}
 			className={cn(
@@ -436,16 +456,6 @@ export function RegionMap({
 			onPointerDownCapture={() => {
 				ativo.current = true;
 				setAvisoRoda(false);
-			}}
-			onPointerLeave={() => {
-				ativo.current = false;
-			}}
-			onFocus={() => {
-				ativo.current = true;
-			}}
-			onBlur={(event) => {
-				if (!event.currentTarget.contains(event.relatedTarget))
-					ativo.current = false;
 			}}
 		>
 			{avisoRoda && (
