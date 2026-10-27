@@ -73,14 +73,19 @@ export function RankingQueda({
 		: undefined;
 
 	// A tabela logo abaixo já mostra erro (com nova tentativa) e o recorte vazio.
-	if (isError || ranking?.total === 0) return null;
+	if (isError || data?.length === 0) return null;
 
-	const leitura = ranking?.houveQueda
-		? `${ranking.quedas} de ${ranking.total} ${PLURAL[nivel]} ${
-				ranking.quedas === 1 ? "perdeu" : "perderam"
-			} receita${POR[efeito]}.`
-		: ranking &&
-			`${NENHUM[nivel]} perdeu receita${POR[efeito]}: abaixo, quem subiu menos.`;
+	// Em %, segmento sem receita base fica de fora; se só há desses (ex.: classe nova no
+	// bairro), a seção continua, com o botão para voltar ao R$.
+	const semBase = ranking?.total === 0;
+	const leitura = semBase
+		? "Sem receita base para comparar em %: veja em R$."
+		: ranking?.houveQueda
+			? `${ranking.quedas} de ${ranking.total} ${PLURAL[nivel]} ${
+					ranking.quedas === 1 ? "perdeu" : "perderam"
+				} receita${POR[efeito]}.`
+			: ranking &&
+				`${NENHUM[nivel]} perdeu receita${POR[efeito]}: abaixo, quem subiu menos.`;
 
 	return (
 		<section
@@ -91,7 +96,7 @@ export function RankingQueda({
 			<div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1">
 				<div className="flex min-w-0 flex-col gap-0.5">
 					<h3 id="ranking-titulo" className="text-body font-medium text-text">
-						{ranking && !ranking.houveQueda
+						{ranking && !semBase && !ranking.houveQueda
 							? "Menores altas"
 							: "Maiores contribuintes da queda"}
 						{efeito !== "variacao" && (
