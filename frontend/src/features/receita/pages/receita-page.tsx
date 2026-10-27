@@ -6,14 +6,17 @@ import { MapaRecorte } from "../components/mapa-recorte";
 import { PeriodoPicker } from "../components/periodo-picker";
 import { PonteWaterfall } from "../components/ponte-waterfall";
 import { RecorteTrilha } from "../components/recorte-trilha";
-import { parPadrao } from "../conversions";
+import { type Efeito, parPadrao } from "../conversions";
 import { usePeriodosDecomposicao } from "../hooks/use-decomposicao";
 import type { DecomposicaoLinha, ParPeriodos, Recorte } from "../types";
 
 const route = getRouteApi("/receita");
 
 export function ReceitaPage() {
-	const { municipio, bairro, periodo_base, periodo_atual } = route.useSearch();
+	const { municipio, bairro, periodo_base, periodo_atual, efeito } =
+		route.useSearch();
+	// A causa escolhida na ponte acompanha o drill-down e a troca de período.
+	const causa: Efeito = efeito ?? "variacao";
 	const navigate = route.useNavigate();
 	// Bairro sem município é recusado pela API (o mesmo nome existe em mais de um município).
 	const recorte: Recorte = {
@@ -29,15 +32,26 @@ export function ReceitaPage() {
 				p.periodo_base === periodo_base && p.periodo_atual === periodo_atual,
 		) ?? (periodos.data ? parPadrao(periodos.data) : undefined);
 
+	// Mapa, trilha e tabela só conhecem município e bairro: a causa segue da URL.
 	const navegar = (proximo: Recorte, comPar: ParPeriodos | undefined) =>
 		navigate({
 			search: {
-				...proximo,
+				municipio: proximo.municipio,
+				bairro: proximo.bairro,
 				periodo_base: comPar?.periodo_base,
 				periodo_atual: comPar?.periodo_atual,
+				efeito,
 			},
 		});
 	const mudar = (proximo: Recorte) => navegar(proximo, par);
+	const escolherCausa = (proxima: Efeito) =>
+		navigate({
+			search: (atual) => ({
+				...atual,
+				efeito: proxima === "variacao" ? undefined : proxima,
+			}),
+			resetScroll: false,
+		});
 
 	// Linha da tabela sob o ponteiro, contornada no mapa. Ao trocar de recorte ou de período,
 	// a linha some sem disparar o "saiu" (a tabela troca de linhas): limpa aqui.
@@ -87,10 +101,16 @@ export function ReceitaPage() {
 							onEscolher={(escolhido) => navegar(recorte, escolhido)}
 						/>
 					</div>
-					<PonteWaterfall par={par} recorte={recorte} />
+					<PonteWaterfall
+						par={par}
+						recorte={recorte}
+						efeito={causa}
+						onEfeito={escolherCausa}
+					/>
 					<DecomposicaoTable
 						par={par}
 						filtro={recorte}
+						efeito={causa}
 						onAbrir={mudar}
 						onDestaque={setDestaque}
 					/>

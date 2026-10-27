@@ -231,3 +231,8 @@ export const EFEITO_ROTULO: Record<Efeito, string> = {
 	volume: "Volume",
 	mix: "Mix",
 };
+
+/** Etapa da ponte → causa; os totais (receita base e atual) não são causa. */
+export function causaDoPasso(id: string): Causa | null {
+	return (CAUSAS as string[]).includes(id) ? (id as Causa) : null;
+}

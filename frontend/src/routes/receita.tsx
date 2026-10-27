@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
-import { ReceitaPage } from "#/features/receita";
+import { EFEITOS, ReceitaPage } from "#/features/receita";
 
 const periodo = z
 	.string()
@@ -13,6 +13,7 @@ const searchSchema = z.object({
 	bairro: z.string().min(1).optional().catch(undefined),
 	periodo_base: periodo,
 	periodo_atual: periodo,
+	efeito: z.enum(EFEITOS).optional().catch(undefined),
 });
 
 export const Route = createFileRoute("/receita")({

@@ -1,15 +1,20 @@
 import { WaterfallChart } from "#/components/ui/waterfall-chart";
 import { formatBRL, formatPct, formatPeriodoCurto } from "#/lib/format";
-import { passosDaPonte } from "../conversions";
+import { causaDoPasso, type Efeito, passosDaPonte } from "../conversions";
 import { useDecomposicao } from "../hooks/use-decomposicao";
 import type { ParPeriodos, Recorte } from "../types";
 
 export function PonteWaterfall({
 	par,
 	recorte,
+	efeito,
+	onEfeito,
 }: {
 	par: ParPeriodos | undefined;
 	recorte: Recorte;
+	/** Causa que ordena a tabela e o ranking; clicar na mesma etapa volta para a variação. */
+	efeito: Efeito;
+	onEfeito: (efeito: Efeito) => void;
 }) {
 	const { data, isPending, isPlaceholderData, isError, refetch } =
 		useDecomposicao(par, recorte);
@@ -66,6 +71,12 @@ export function PonteWaterfall({
 			error={isError ? "Não foi possível carregar a ponte de receita." : null}
 			onRetry={() => refetch()}
 			emptyMessage="Sem decomposição de receita para este recorte."
+			selectedId={efeito}
+			onSelect={(passo) => {
+				const causa = causaDoPasso(passo.id);
+				if (causa) onEfeito(causa === efeito ? "variacao" : causa);
+			}}
+			selectHint="Clique num efeito para ver onde ele pesou."
 		/>
 	);
 }
