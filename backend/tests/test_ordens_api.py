@@ -1,3 +1,5 @@
+from datetime import date
+
 import pytest
 from fastapi.testclient import TestClient
 from httpx2 import Response
@@ -17,6 +19,7 @@ UC_BASE = {
     "cod_alimentador": "AL-01",
     "possui_gd": False,
     "consumo_medio_kwh_12m": 150.0,
+    "data_ligacao": date(2018, 6, 1),
 }
 
 

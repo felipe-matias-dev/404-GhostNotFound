@@ -36,6 +36,11 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | 22/10/2026 | DEC-024: resultados agregados necessários para sustentar uma hipótese podem ir ao repositório; identificação de pessoas e de UCs e dado de LGPD ficam mascarados; linha a linha, amostras e outputs nunca sobem | O diagnóstico precisa mostrar a evidência, mas o dataset é confidencial e há dado pessoal | Alisson |
 | 23/10/2026 | DEC-025 (proposta): mapa da RMR com a malha municipal 2025 e a malha de bairros do Censo 2022 do IBGE, os 15 municípios da LC estadual 382/2018, e município e bairro da Gold casados com os do mapa pelo nome normalizado | O mapa vira o seletor principal de município e bairro sem mudar o contrato da Gold; o que está na Gold é clicável, o resto aparece apagado | João Euclides |
 | 23/10/2026 | DEC-026: ações das OIs na tela de perdas (enviar a campo, concluir, cancelar, histórico, gerar) com Kanban das ativas e troca Kanban ⇄ tabela lembrada no navegador | O gerente acompanha e move as OIs sem sair da tela; o backend continua sendo o dono da máquina de estados | João Euclides |
+| 24/10/2026 | DEC-027: contrato da Gold v0.3: tabelas da UC 360 com colunas e chave, `gold_inspecoes_uc`, GD e ligação na dimensão, leitura, medidor e bandeira no fato, alimentador e tipo de medidor na chave dos recortes, componentes de faturas e leituras | Responder a UC 360, as hipóteses H1, H2 e H5 e filtrar qualquer período por alimentador, medidor e inadimplência | Alisson |
+| 24/10/2026 | DEC-028: a decomposição grava todos os pares de mesmos meses em anos diferentes; pares de trechos diferentes ficam para o backend, se necessário | Gravar todas as combinações passaria de 1 bilhão de linhas; os totais de qualquer período já saem da soma dos meses | Alisson |
+| 24/10/2026 | DEC-029: método do efeito bandeira: acréscimo fixo por kWh por bandeira, conferido no dado | Fecha a pendência da DEC-023 com uma regra verificável e exata | Alisson |
+| 24/10/2026 | DEC-030: regras aplicadas na Gold: `n_uc` de UCs faturadas (PRODIST), ocorrências antes da ligação fora (OCO-04), potência em Wp convertida, vazio × zero nos recortes, fila de suspeitas calibrada e medida na data das inspeções | Denominador do DEC/FEC como no PRODIST e fila explicável e medida; revisada com a comparação das cópias | Alisson |
+| 26/10/2026 | DEC-031: a API lista os pares de períodos da decomposição e passa a exigir o par; API 0.5.0 | A Gold grava centenas de pares (DEC-028): sem o par, a resposta somaria períodos que não se comparam, e o seletor precisa saber quais existem | Felipe |
 
 ## DEC-001 · Localização dos arquivos de origem (landing)
 
@@ -760,3 +765,123 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   - Vitest no frontend só para funções puras (`src/**/__tests__/*.test.ts`, sem DOM).
 - **Motivo:** cobre o ciclo de vida da OI sem regra de negócio nova no frontend; o Kanban dá a visão do trabalho em andamento sem a lista de finalizadas crescer sem limite.
 - **Em aberto:** (1) gerar a partir da fila de suspeitas quando houver `GET` da `gold_fila_suspeitas`; (2) autoria das mudanças no histórico quando houver autenticação.
+
+## DEC-027 · Contrato da Gold v0.3: UC 360, inspeções e recortes completos
+
+- **Data:** 24/10/2026 · **Área:** Dados, Portal e IA · **Autor:** Alisson
+- **Status:** proposta; pela DEC-014, o backend entra no mesmo PR, e o GenAI é avisado (camada semântica).
+- **Contexto:** o check da Gold contra os consumidores mostrou lacunas: a UC 360 não tinha medidor, interrupções nem chamados
+  (as tabelas estavam sem colunas); H1 não comparava a UC antes e depois da conexão da GD; H2 não tinha a taxa de irregularidade
+  das inspeções por recorte; H5 não tinha leituras estimadas nem tipo de medidor; o portal não cruzava alimentador com bairro e
+  classe nem tinha inadimplência por recorte.
+- **Decisão:**
+  - `gold_dim_uc` ganha `data_ligacao`, `data_conexao_gd`, `modalidade_gd` e `energia_injetada_kwh_mes`.
+  - `gold_fato_faturamento_mensal` ganha `receita_bandeira`, `tipo_leitura`, `tipo_medidor` (o medidor da leitura) e
+    `dias_faturados` (dias desde a leitura anterior, para o insight de conta alta).
+  - `gold_kpis_segmento_mensal` ganha `cod_alimentador` e `tipo_medidor` na chave (medidor vigente no mês, pela instalação e
+    retirada; `sem_medidor` quando não há) e os componentes `receita_bandeira`, `n_faturas`, `n_faturas_nao_pagas`,
+    `valor_nao_pago`, `n_faturas_pagas_com_atraso`, `soma_dias_em_atraso`, `n_leituras` e `n_leituras_estimadas`. Cada bairro é
+    atendido por 1 ou 2 alimentadores, então a chave nova quase não aumenta a tabela (cerca de 3% a mais de recortes).
+  - A situação da fatura nos recortes é a da data de corte, e não a do mês da fatura: numa competência antiga, "não paga" quer
+    dizer "daquele mês e ainda sem pagamento hoje". Está escrito nas colunas para o portal e o agente não lerem errado.
+  - Tabelas da UC 360: `gold_interrupcoes_uc` (1 linha por ocorrência), `gold_atendimentos_uc` (1 linha por chamado, sem o
+    histórico de texto livre, que é sensível) e `gold_medidor_uc` (medidor vigente, idade e trocas).
+  - `gold_inspecoes_uc` nova (1 linha por inspeção, sem o nome do inspetor), fora do agente, como a fila de suspeitas.
+  - Tipo `timestamp` no contrato, para a hora de abertura das ocorrências e dos chamados.
+- **Limites:** "medidor sem manutenção" não é respondível, porque a data de manutenção vem vazia na origem (MED-06). As faturas de
+  UCs fora do cadastro (cerca de 1,5% da receita) só existem por competência na reconciliação: sem cadastro, não há município,
+  bairro nem classe para cruzar.
+- **Impacto:** muda colunas e chaves. Backend (modelos, schemas, amostra, `test_contrato_gold.py`, OpenAPI e cliente) no mesmo PR;
+  views `sem_*` e golden set no GenAI.
+
+## DEC-028 · Pares de períodos da decomposição e o que fica para o backend
+
+- **Data:** 24/10/2026 · **Área:** Dados e Portal · **Autor:** Alisson
+- **Contexto:** o portal precisa comparar qualquer período (ex.: jan–abr de um ano contra o outro, jan–fev, 12 meses contra 12
+  meses). Totais e comparações já saem da soma dos meses em `gold_kpis_segmento_mensal`. A decomposição (preço, volume, mix e
+  bandeira) não: o efeito preço usa o preço do período base e o mix usa o peso das classes no período inteiro, então ela não se
+  soma mês a mês e cada par precisa ser calculado inteiro.
+- **Decisão:**
+  - `gold_receita_decomposicao` grava todos os pares de **mesmos meses em anos diferentes** com dado nos dois lados: cada mês de
+    início, cada duração de 1 a 12 meses e cada par de anos. Com 48 competências, são algumas centenas de pares e cerca de
+    1 milhão de linhas. Inclui o par da pergunta da diretoria (os 12 primeiros meses contra os 12 últimos).
+  - Pares de **trechos diferentes** (ex.: jan–abr de um ano contra mar–jun de outro) **não** são gravados: todas as combinações de
+    intervalos passariam de 1 bilhão de linhas (milhares de pares só entre intervalos do mesmo tamanho), com CSV de dezenas de GB,
+    carga de horas e quase nenhuma consulta. Comparar trechos diferentes também distorce pela sazonalidade.
+  - Se o portal precisar desses pares, o **backend calcula na hora**, com a mesma fórmula, a partir de
+    `gold_fato_faturamento_mensal` (que agora traz `receita_bandeira`), da dimensão e da data de conexão da GD. Um teste garante
+    que, nos pares gravados, o backend dá o mesmo resultado da Gold. Cálculo de negócio no backend é permitido pelo projeto.
+  - O agente fica com os pares gravados: ele lê métricas, não recalcula.
+  - Período sem dado (antes de jul/2022) não tem decomposição em nenhum caso; a tela mostra "sem dados".
+- **Impacto no portal:** o seletor da decomposição oferece os pares que existem (lista de pares ou mesmo trecho em dois anos); o
+  seletor de totais continua livre.
+
+## DEC-029 · Método do efeito bandeira
+
+- **Data:** 24/10/2026 · **Área:** Dados · **Autor:** Alisson
+- **Contexto:** a DEC-023 separou `efeito_preco` em `efeito_tarifa` e `efeito_bandeira`, mas deixou o método pendente.
+- **Conferência no dado:** a tarifa efetiva de cada mês (energia da fatura ÷ kWh, com leituras limpas) é a tarifa base da classe
+  mais um acréscimo por kWh que depende só da bandeira e é igual em todas as classes. Sem o acréscimo, a tarifa base fica
+  constante dentro de cada ciclo de reajuste (maio), em todas as classes; a única mudança fora de maio é no B1, em jan/2026.
+- **Decisão:**
+  - Acréscimo por kWh: verde 0; amarela 0,01885; vermelha P1 0,04463; vermelha P2 0,07877 (R$/kWh).
+  - `receita_bandeira = kwh_faturado × acréscimo`; receita pela tarifa base = `receita_energia − receita_bandeira`.
+  - Na decomposição, com `P0 = R0/Q0`, `pb0` a tarifa base média do período base e `β0 = P0 − pb0`:
+    `efeito_tarifa = (Rb1 − Q1·pb0) − (Rb0 − Q0·pb0)` e `efeito_bandeira = (B1 − Q1·β0) − (B0 − Q0·β0)`, onde `Rb` é a receita
+    pela tarifa base e `B` a receita de bandeira. Com volume e mix, os quatro efeitos somam exatamente `R1 − R0`.
+- **Conferência:** no par da pergunta da diretoria, a variação, o efeito mix e o efeito bandeira reproduzem o diagnóstico.
+- **Tolerância (revisão do #43, Arthur):** a checagem preço + volume + mix = variação soma quatro parcelas arredondadas ao
+  centavo (tarifa, bandeira, volume e mix), e não três. O pior caso é exatamente R$ 0,02, e com double a trava pode falhar
+  por acaso numa recarga. A tolerância passa a R$ 0,025 por linha, no contrato e na trava da Gold.
+
+## DEC-030 · Regras aplicadas na Gold: UCs, ocorrências, GD e fila de suspeitas
+
+- **Data:** 24/10/2026, revisada em 26/10/2026 com a comparação das cópias do Alisson e do Arthur · **Área:** Dados · **Autor:** Alisson
+- **Status:** as duas cópias batem tabela por tabela; falta a cópia do Gabriel para fechar a versão oficial (DEC-011).
+- **Decisão:**
+  - **`n_uc`:** UCs **faturadas** na competência, como no PRODIST (denominador do DEC/FEC = UCs faturadas do conjunto). Ficam fora
+    as UCs da UC-12, que nunca são faturadas, e os meses de ligação antes da primeira fatura. A base dos recortes e da continuidade
+    tem as UCs ligadas com fatura ou com algum evento no mês; as poucas interrupções e chamados em mês sem fatura continuam no
+    numerador, e a Gold informa quantos são.
+  - **Ocorrências antes da ligação (OCO-04):** há ocorrências registradas antes do mês de ligação da UC. Ficam fora da Gold (DEC/FEC,
+    recortes e UC 360), porque a UC ainda não existia; a Silver mantém a linha, e a Gold confere que Gold + excluídas = Silver.
+  - **Potência anômala da GD (GD-02):** o registro é convertido de Wp para kWp (÷ 1000) **quando o dado confirma**: o valor
+    convertido cai na faixa das UCs com GD normais, e a energia injetada por kWp também. Quase todos os registros anômalos passam;
+    os poucos que não passam (energia injetada por kWp muito acima de qualquer UC normal) ficam vazios, porque a origem não diz qual
+    é a potência. A Gold informa quantos foram convertidos e quantos ficaram vazios. (Antes: todos nulos.)
+  - **Vazio e zero nos recortes:** `receita_arrecadada` fica vazia quando o recorte não tem fatura na competência, e é zero quando há
+    fatura e nada foi pago; `soma_notas` fica vazia quando nenhum chamado foi avaliado. Não arrecadar e não ter fatura são coisas
+    diferentes para o agente. Na fatura (fato), a não paga continua com zero.
+  - **Fila de suspeitas:**
+    - **Quem entra:** UCs sem GD, com medidor, com pelo menos 6 meses em cada janela e queda de 15% ou mais no consumo médio
+      (`kwh_faturado`) das 12 últimas competências contra as 12 anteriores.
+    - **Quem sai:** UCs com irregularidade confirmada (já regularizadas) e UCs inspecionadas sem irregularidade nos 12 meses antes
+      do fim dos dados. Uma UC inspecionada sem irregularidade há mais tempo pode voltar à fila.
+    - **Ordem:** pontos (queda de 30% ou mais: 3; de 15% a 30%: 1; medidor eletromecânico: 1; 25% ou mais de leituras estimadas: 1)
+      e depois o kWh a recuperar (`kwh_recuperavel_est` = média anterior − média recente).
+    - **Validação:** nas UCs inspecionadas, a regra é medida com a janela na **data de cada inspeção** (as 12 competências antes dela
+      contra as 12 anteriores), que é o que a equipe via ao decidir; a janela atual inclui meses depois da regularização. Precisão e
+      cobertura saem a cada carga.
+    - **Volume:** a regra é precisa, mas conservadora: a fila fica menor que a capacidade de inspeção de um mês. Ganhar volume
+      (entrada mais solta ou outro sinal) fica para uma próxima calibração, medida do mesmo jeito.
+  - **Outras escolhas da cópia:** `receita_arrecadada` é zero na fatura não paga (como na amostra do backend); consumo médio na
+    janela das 12 últimas competências; titular por iniciais e documento com os 3 últimos dígitos.
+
+## DEC-031 · Rota de pares da decomposição e par de períodos obrigatório
+
+- **Data:** 26/10/2026 · **Área:** Portal · **Autor:** Felipe
+- **Contexto:** a DEC-028 faz a Gold gravar todos os pares de mesmos meses em anos diferentes (cerca de 666 pares). Até a v0.2, a
+  Gold trazia um par só, e `GET /receita/decomposicao` aceitava o par como filtro opcional e somava o que houvesse.
+- **Decisão:**
+  - `GET /receita/decomposicao/periodos` devolve os pares gravados (`SELECT DISTINCT`), em ordem. É o que o seletor da tela
+    oferece, como o Alisson pediu no PR #43.
+  - `GET /receita/decomposicao` passa a exigir `periodo_base` e `periodo_atual`, no formato `AAAA-MM/AAAA-MM`; sem eles, ou fora
+    do formato, a resposta é `422`.
+  - Versão da API 0.5.0: o par obrigatório quebra quem chamava sem ele, e na série 0.x quem sobe é o número do meio.
+- **Alternativa descartada:** manter o par opcional. Sem par, a resposta seria uma linha por município de cada um dos pares
+  (666 vezes o número de municípios), e a tela não saberia qual mostrar. A tela de receita (`decomposicao-table`, `mapa-recorte` e
+  `recorte-trilha`) passou a pedir o par e o escolhe pela rota `/receita/decomposicao/periodos`: abre na janela de 12 meses com o
+  período atual mais recente e oferece só os pares gravados.
+- **Limite:** a rota só conhece os pares gravados. Pares de trechos diferentes (DEC-028) continuam fora, e entram só se o portal
+  precisar deles.
+- **Amostra:** o gerador grava os 78 pares de mesmos meses entre 2024 e 2025, para o seletor ter o que mostrar.

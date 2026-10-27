@@ -30,6 +30,17 @@ ClasseCadastro = Literal["Residencial", "Comercial", "Industrial", "Rural", "Pod
 Bandeira = Literal["verde", "amarela", "vermelha_p1", "vermelha_p2"]
 OrigemKwh = Literal["leitura", "leitura_atual_troca_medidor", "consumo_absoluto"]
 StatusPagamento = Literal["paga", "paga_com_atraso", "em_aberto", "em_atraso"]
+TipoLeitura = Literal["real", "estimada"]
+TipoMedidor = Literal["eletromecanico", "eletronico", "smart"]
+TipoMedidorRecorte = Literal["eletromecanico", "eletronico", "smart", "sem_medidor"]
+ResultadoInspecao = Literal["irregularidade_confirmada", "sem_irregularidade"]
+ModalidadeGd = Literal["geracao_propria_uc", "autoconsumo_remoto", "geracao_compartilhada"]
+
+# Um período da decomposição, no formato do contrato: AAAA-MM/AAAA-MM, da primeira à última
+# competência.
+PeriodoDecomposicao = Annotated[
+    str, StringConstraints(pattern=r"^\d{4}-(0[1-9]|1[0-2])/\d{4}-(0[1-9]|1[0-2])$")
+]
 
 # Teto por pedido na ordem da capacidade mensal da equipe de campo (~200 inspeções):
 # acima disso é engano de seleção, e o limite evita um pedido gigante travar o banco.
@@ -52,6 +63,10 @@ class DimUcSchema(BaseModel):
     titular_mascarado: RequiredText | None
     documento_mascarado: RequiredText | None
     potencia_kwp: float | None
+    data_ligacao: date
+    data_conexao_gd: date | None
+    modalidade_gd: ModalidadeGd | None
+    energia_injetada_kwh_mes: Annotated[ExactNumber, Field(ge=0)] | None
 
 
 class FaturamentoMensalSchema(BaseModel):
@@ -74,6 +89,10 @@ class FaturamentoMensalSchema(BaseModel):
     data_pagamento: date | None
     status_pagamento: StatusPagamento
     dias_em_atraso: int | None
+    receita_bandeira: Annotated[ExactNumber, Field(ge=0)]
+    tipo_leitura: TipoLeitura
+    tipo_medidor: TipoMedidor
+    dias_faturados: Annotated[int, Field(ge=1)] | None
 
 
 class ReceitaDecomposicaoSchema(BaseModel):
@@ -175,11 +194,20 @@ class ComparacaoReceitaSchema(BaseModel):
     variacao_receita_pct: float | None
 
 
+class ParPeriodosSchema(BaseModel):
+    """Um par de períodos que a Gold gravou na decomposição (DEC-028)."""
+
+    periodo_base: PeriodoDecomposicao
+    periodo_atual: PeriodoDecomposicao
+
+
 class DecomposicaoFiltroSchema(BaseModel):
     """Onde está o Henrique no drill-down: o nível da resposta é o próximo abaixo do filtro."""
 
-    periodo_base: RequiredText | None = None
-    periodo_atual: RequiredText | None = None
+    # Obrigatório: a Gold guarda centenas de pares, e a ponte de um par só faz sentido sozinha.
+    # Os pares válidos vêm de /receita/decomposicao/periodos.
+    periodo_base: PeriodoDecomposicao
+    periodo_atual: PeriodoDecomposicao
     municipio: RequiredText | None = None
     bairro: RequiredText | None = None
     classe: Classe | None = None
@@ -217,6 +245,8 @@ class KpisSegmentoMensalSchema(BaseModel):
     classe_cadastro: ClasseCadastro
     classe: Classe
     possui_gd: bool
+    cod_alimentador: RequiredText
+    tipo_medidor: TipoMedidorRecorte
     n_uc: int
     kwh_faturado: ExactNumber
     receita_faturada: ExactNumber
@@ -228,6 +258,14 @@ class KpisSegmentoMensalSchema(BaseModel):
     n_chamados: int
     soma_notas: float | None
     n_notas: int
+    receita_bandeira: ExactNumber
+    n_faturas: int
+    n_faturas_nao_pagas: int
+    valor_nao_pago: ExactNumber
+    n_faturas_pagas_com_atraso: int
+    soma_dias_em_atraso: int
+    n_leituras: int
+    n_leituras_estimadas: int
 
 
 class ReconciliacaoFaturamentoSchema(BaseModel):
@@ -256,6 +294,59 @@ class ContinuidadeAlimentadorMensalSchema(BaseModel):
     n_uc: int
     n_interrupcoes: int
     horas_interrompidas: float
+
+
+class InterrupcaoUcSchema(BaseModel):
+    """Uma interrupção que afetou uma UC."""
+
+    cod_ocorrencia: RequiredText
+    cod_uc: RequiredText
+    cod_alimentador: RequiredText
+    competencia: Competencia
+    data_abertura: datetime
+    data_encerramento: datetime
+    duracao_horas: Annotated[float, Field(gt=0)]
+    tipo: RequiredText
+    causa: RequiredText | None
+
+
+class AtendimentoUcSchema(BaseModel):
+    """Um chamado de atendimento de uma UC."""
+
+    protocolo: RequiredText
+    cod_uc: RequiredText
+    competencia: Competencia
+    data_abertura: datetime
+    data_fechamento: datetime
+    canal: RequiredText
+    assunto: RequiredText
+    subassunto: RequiredText | None
+    nota_satisfacao: Annotated[float, Field(ge=1, le=5)] | None
+
+
+class MedidorUcSchema(BaseModel):
+    """O medidor vigente de uma UC e quantas vezes ele já foi trocado."""
+
+    cod_uc: RequiredText
+    cod_medidor: RequiredText
+    tipo_medidor: TipoMedidor
+    modelo: RequiredText | None
+    data_instalacao: date
+    idade_anos: Annotated[float, Field(ge=0)]
+    n_trocas: Annotated[int, Field(ge=0)]
+    data_ultima_troca: date | None
+
+
+class InspecaoUcSchema(BaseModel):
+    """Uma inspeção de campo numa UC e o que ela encontrou."""
+
+    cod_inspecao: RequiredText
+    cod_uc: RequiredText
+    data_inspecao: date
+    competencia: Competencia
+    resultado: ResultadoInspecao
+    tipo_irregularidade: RequiredText | None
+    kwh_recuperado: Annotated[ExactNumber, Field(ge=0)]
 
 
 class FilaSuspeitaSchema(BaseModel):

@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "V-Energy Grid 360 API",
-    "version": "0.4.0"
+    "version": "0.5.0"
   },
   "paths": {
     "/health": {
@@ -284,46 +284,58 @@
         }
       }
     },
+    "/receita/decomposicao/periodos": {
+      "get": {
+        "tags": [
+          "receita"
+        ],
+        "summary": "Get Pares De Periodos",
+        "description": "Os pares de períodos gravados na decomposição: o que o seletor da tela pode oferecer.",
+        "operationId": "get_pares_de_periodos_receita_decomposicao_periodos_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ParPeriodosSchema"
+                  },
+                  "type": "array",
+                  "title": "Response Get Pares De Periodos Receita Decomposicao Periodos Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/receita/decomposicao": {
       "get": {
         "tags": [
           "receita"
         ],
         "summary": "Get Decomposicao",
-        "description": "Ponte de receita por município, por bairro de um município ou por classe de um bairro.\n\nOrdenada da maior queda para a maior alta: o topo é onde a receita mais caiu.",
+        "description": "Ponte de receita de um par de períodos, por município, por bairro ou por classe.\n\nOrdenada da maior queda para a maior alta: o topo é onde a receita mais caiu.",
         "operationId": "get_decomposicao_receita_decomposicao_get",
         "parameters": [
           {
             "name": "periodo_base",
             "in": "query",
-            "required": false,
+            "required": true,
             "schema": {
-              "anyOf": [
-                {
-                  "type": "string",
-                  "minLength": 1
-                },
-                {
-                  "type": "null"
-                }
-              ],
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])/\\d{4}-(0[1-9]|1[0-2])$",
               "title": "Periodo Base"
             }
           },
           {
             "name": "periodo_atual",
             "in": "query",
-            "required": false,
+            "required": true,
             "schema": {
-              "anyOf": [
-                {
-                  "type": "string",
-                  "minLength": 1
-                },
-                {
-                  "type": "null"
-                }
-              ],
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])/\\d{4}-(0[1-9]|1[0-2])$",
               "title": "Periodo Atual"
             }
           },
@@ -932,6 +944,50 @@
               }
             ],
             "title": "Potencia Kwp"
+          },
+          "data_ligacao": {
+            "type": "string",
+            "format": "date",
+            "title": "Data Ligacao"
+          },
+          "data_conexao_gd": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data Conexao Gd"
+          },
+          "modalidade_gd": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "geracao_propria_uc",
+                  "autoconsumo_remoto",
+                  "geracao_compartilhada"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modalidade Gd"
+          },
+          "energia_injetada_kwh_mes": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Energia Injetada Kwh Mes"
           }
         },
         "type": "object",
@@ -946,7 +1002,11 @@
           "consumo_medio_kwh_12m",
           "titular_mascarado",
           "documento_mascarado",
-          "potencia_kwp"
+          "potencia_kwp",
+          "data_ligacao",
+          "data_conexao_gd",
+          "modalidade_gd",
+          "energia_injetada_kwh_mes"
         ],
         "title": "DimUcSchema"
       },
@@ -1218,6 +1278,27 @@
           "atualizada_em"
         ],
         "title": "OrdemSchema"
+      },
+      "ParPeriodosSchema": {
+        "properties": {
+          "periodo_base": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])/\\d{4}-(0[1-9]|1[0-2])$",
+            "title": "Periodo Base"
+          },
+          "periodo_atual": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])/\\d{4}-(0[1-9]|1[0-2])$",
+            "title": "Periodo Atual"
+          }
+        },
+        "type": "object",
+        "required": [
+          "periodo_base",
+          "periodo_atual"
+        ],
+        "title": "ParPeriodosSchema",
+        "description": "Um par de períodos que a Gold gravou na decomposição (DEC-028)."
       },
       "ResultadoOrdem": {
         "type": "string",

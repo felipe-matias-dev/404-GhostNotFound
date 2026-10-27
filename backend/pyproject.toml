@@ -1,6 +1,6 @@
 [project]
 name = "venergy-api"
-version = "0.4.0"
+version = "0.5.0"
 description = "API do portal V-Energy Grid 360"
 readme = "README.md"
 requires-python = ">=3.12"

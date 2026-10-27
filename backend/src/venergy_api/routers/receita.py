@@ -15,6 +15,7 @@ from venergy_api.schemas import (
     DecomposicaoFiltroSchema,
     DecomposicaoLinhaSchema,
     KpisMensaisSchema,
+    ParPeriodosSchema,
     PeriodoSchema,
     TotaisPeriodoSchema,
 )
@@ -98,11 +99,28 @@ def get_comparacao(
     )
 
 
+@router.get("/decomposicao/periodos")
+def get_pares_de_periodos(session: SessionDep) -> list[ParPeriodosSchema]:
+    """Os pares de períodos gravados na decomposição: o que o seletor da tela pode oferecer."""
+    # Só os pares que a Gold gravou (DEC-028): pares de trechos diferentes não existem lá, e
+    # pedir um deles devolveria uma lista vazia sem explicação. Ordem de texto AAAA-MM.
+    decomposicao = ReceitaDecomposicao
+    consulta = (
+        select(decomposicao.periodo_base, decomposicao.periodo_atual)
+        .distinct()
+        .order_by(decomposicao.periodo_base, decomposicao.periodo_atual)
+    )
+    return [
+        ParPeriodosSchema(periodo_base=base, periodo_atual=atual)
+        for base, atual in session.execute(consulta)
+    ]
+
+
 @router.get("/decomposicao")
 def get_decomposicao(
     filtro: Annotated[DecomposicaoFiltroSchema, Query()], session: SessionDep
 ) -> list[DecomposicaoLinhaSchema]:
-    """Ponte de receita por município, por bairro de um município ou por classe de um bairro.
+    """Ponte de receita de um par de períodos, por município, por bairro ou por classe.
 
     Ordenada da maior queda para a maior alta: o topo é onde a receita mais caiu.
     """
@@ -148,9 +166,8 @@ def get_decomposicao(
             func.sum(decomposicao.efeito_mix).label("efeito_mix"),
         )
         .where(*filtros)
-        # O par de períodos entra no agrupamento: se a Gold trouxer mais de um par, cada
-        # comparação sai separada, em vez de somar anos que não se comparam. As linhas com e
-        # sem GD do mesmo segmento somam juntas.
+        # O par de períodos é filtro e também sai na resposta. As linhas com e sem GD do mesmo
+        # segmento somam juntas.
         .group_by(decomposicao.periodo_base, decomposicao.periodo_atual, coluna)
         .order_by(decomposicao.periodo_base, decomposicao.periodo_atual, variacao, coluna)
     )

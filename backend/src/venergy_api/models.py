@@ -53,6 +53,13 @@ class DimUc(Base):
     documento_mascarado: Mapped[str | None]
     # Double, o tipo "ratio" do contrato. Potência de pico em kWp, como vem da origem.
     potencia_kwp: Mapped[float | None] = mapped_column(Double)
+    # Cliente desde: a UC conta no n_uc a partir do mês da ligação (DEC-030).
+    data_ligacao: Mapped[date]
+    # Os três de baixo só existem para UCs com GD. A data permite comparar o consumo antes e
+    # depois da conexão (H1, UC 360).
+    data_conexao_gd: Mapped[date | None]
+    modalidade_gd: Mapped[str | None]
+    energia_injetada_kwh_mes: Mapped[Decimal | None] = mapped_column(_ENERGY)
 
 
 class FatoFaturamentoMensal(Base):
@@ -83,6 +90,14 @@ class FatoFaturamentoMensal(Base):
     data_pagamento: Mapped[date | None]
     status_pagamento: Mapped[str]
     dias_em_atraso: Mapped[int | None]
+    # Parte da receita de energia que é acréscimo da bandeira do mês: kWh × acréscimo por kWh
+    # (DEC-029). A receita pela tarifa base é receita_energia - receita_bandeira.
+    receita_bandeira: Mapped[Decimal] = mapped_column(_MONEY)
+    tipo_leitura: Mapped[str]
+    # O medidor que fez a leitura do mês, e não o vigente hoje: muda quando o medidor é trocado.
+    tipo_medidor: Mapped[str]
+    # Vazio na primeira leitura da UC, que não tem leitura anterior para contar os dias.
+    dias_faturados: Mapped[int | None]
 
 
 class ReceitaDecomposicao(Base):
@@ -137,6 +152,10 @@ class KpisSegmentoMensal(Base):
     classe_cadastro: Mapped[str] = mapped_column(primary_key=True)
     # Por competência: antes da conexão, a UC conta como sem GD.
     possui_gd: Mapped[bool] = mapped_column(primary_key=True)
+    # Na chave para cruzar continuidade com bairro, classe e GD (DEC-027). O medidor é o vigente
+    # no mês, e sem_medidor quando a UC não tem nenhum instalado.
+    cod_alimentador: Mapped[str] = mapped_column(primary_key=True)
+    tipo_medidor: Mapped[str] = mapped_column(primary_key=True)
     classe: Mapped[str]
     # Estoque: soma só dentro do mesmo mês. Os demais componentes são fluxos e somam entre
     # meses. Os índices (DEC, FEC, satisfação) não são guardados: calculam-se no fim, sobre
@@ -153,6 +172,16 @@ class KpisSegmentoMensal(Base):
     # Soma e contagem das notas, e não a média: média de médias daria peso errado.
     soma_notas: Mapped[float | None] = mapped_column(Double)
     n_notas: Mapped[int]
+    receita_bandeira: Mapped[Decimal] = mapped_column(_MONEY)
+    # A situação da fatura é a da data de corte, e não a do mês da fatura: numa competência
+    # antiga, "não paga" é a fatura daquele mês que continua sem pagamento hoje (DEC-027).
+    n_faturas: Mapped[int]
+    n_faturas_nao_pagas: Mapped[int]
+    valor_nao_pago: Mapped[Decimal] = mapped_column(_MONEY)
+    n_faturas_pagas_com_atraso: Mapped[int]
+    soma_dias_em_atraso: Mapped[int]
+    n_leituras: Mapped[int]
+    n_leituras_estimadas: Mapped[int]
 
 
 class ReconciliacaoFaturamento(Base):
@@ -190,6 +219,82 @@ class ContinuidadeAlimentadorMensal(Base):
     n_uc: Mapped[int]
     n_interrupcoes: Mapped[int]
     horas_interrompidas: Mapped[float] = mapped_column(Double)
+
+
+class InterrupcaoUc(Base):
+    """Interrupções que afetaram cada UC, uma linha por ocorrência: a UC 360 do atendente."""
+
+    __tablename__ = "gold_interrupcoes_uc"
+    __table_args__ = {"schema": "gold"}
+
+    cod_ocorrencia: Mapped[str] = mapped_column(primary_key=True)
+    cod_uc: Mapped[str] = mapped_column(index=True)
+    cod_alimentador: Mapped[str]
+    # Mês da abertura: a ocorrência que vira o mês entra no mês em que começou (DEC-014).
+    competencia: Mapped[str]
+    # Data e hora sem fuso, como o contrato (tipo timestamp): a origem não traz fuso.
+    data_abertura: Mapped[datetime] = mapped_column(DateTime)
+    data_encerramento: Mapped[datetime] = mapped_column(DateTime)
+    duracao_horas: Mapped[float] = mapped_column(Double)
+    tipo: Mapped[str]
+    # Vazia quando a causa não foi registrada (OCO-01).
+    causa: Mapped[str | None]
+
+
+class AtendimentoUc(Base):
+    """Chamados de atendimento por UC, uma linha por chamado: a UC 360 da Camila."""
+
+    __tablename__ = "gold_atendimentos_uc"
+    __table_args__ = {"schema": "gold"}
+
+    protocolo: Mapped[str] = mapped_column(primary_key=True)
+    cod_uc: Mapped[str] = mapped_column(index=True)
+    # Mês de abertura do chamado, a mesma regra de gold_kpis_segmento_mensal.
+    competencia: Mapped[str]
+    data_abertura: Mapped[datetime] = mapped_column(DateTime)
+    data_fechamento: Mapped[datetime] = mapped_column(DateTime)
+    canal: Mapped[str]
+    assunto: Mapped[str]
+    subassunto: Mapped[str | None]
+    # Vazia quando o cliente não avaliou (ATD-01). O histórico de interações do chamado, texto
+    # livre e sensível, não vem para a Gold.
+    nota_satisfacao: Mapped[float | None] = mapped_column(Double)
+
+
+class MedidorUc(Base):
+    """Medidor vigente de cada UC, com a idade e o histórico de trocas: a UC 360 e a fila."""
+
+    __tablename__ = "gold_medidor_uc"
+    __table_args__ = {"schema": "gold"}
+
+    # Uma linha por UC com medidor: a UC sem medidor (UC-12) não tem linha aqui.
+    cod_uc: Mapped[str] = mapped_column(primary_key=True)
+    cod_medidor: Mapped[str]
+    tipo_medidor: Mapped[str]
+    modelo: Mapped[str | None]
+    data_instalacao: Mapped[date]
+    # Em anos com fração, no fim da última competência dos dados, e não na data de hoje.
+    idade_anos: Mapped[float] = mapped_column(Double)
+    n_trocas: Mapped[int]
+    # Vazia se nunca houve troca.
+    data_ultima_troca: Mapped[date | None]
+
+
+class InspecaoUc(Base):
+    """Inspeções de campo por UC, uma linha por inspeção: histórico, taxa por recorte e a régua."""
+
+    __tablename__ = "gold_inspecoes_uc"
+    __table_args__ = {"schema": "gold"}
+
+    cod_inspecao: Mapped[str] = mapped_column(primary_key=True)
+    cod_uc: Mapped[str] = mapped_column(index=True)
+    # Vale a data, e não a aba de origem (INSP-05).
+    data_inspecao: Mapped[date]
+    competencia: Mapped[str]
+    resultado: Mapped[str]
+    tipo_irregularidade: Mapped[str | None]
+    # Zero sem irregularidade. O nome do inspetor não vem para a Gold: é dado pessoal sem uso.
+    kwh_recuperado: Mapped[Decimal] = mapped_column(_ENERGY)
 
 
 class FilaSuspeita(Base):

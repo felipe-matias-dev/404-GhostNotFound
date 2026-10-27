@@ -50,6 +50,7 @@ def store_billing(engine: Engine) -> None:
                 cod_alimentador="AL-01",
                 possui_gd=False,
                 consumo_medio_kwh_12m=Decimal("100"),
+                data_ligacao=date(2018, 6, 1),
             )
             for cod_uc, municipio, bairro, classe in UCS
         )
@@ -65,6 +66,9 @@ def store_billing(engine: Engine) -> None:
                 tributos=Decimal("0.00"),
                 data_vencimento=date(2026, 1, 10),
                 status_pagamento="paga",
+                receita_bandeira=Decimal("0.00"),
+                tipo_leitura="real",
+                tipo_medidor="eletronico",
             )
             for cod_uc, competencia, kwh, receita in BILLING
         )

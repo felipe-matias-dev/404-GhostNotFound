@@ -7,8 +7,9 @@ Uso: uv run python -m venergy_api.amostra [--force]
 """
 
 import argparse
+import calendar
 import csv
-from datetime import date
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 
@@ -18,22 +19,30 @@ from venergy_api.carga import ARRAY_SEPARATOR, GOLD_TABLES
 from venergy_api.config import get_settings
 from venergy_api.database import Base
 from venergy_api.models import (
+    AtendimentoUc,
     ContinuidadeAlimentadorMensal,
     DimUc,
     FatoFaturamentoMensal,
     FilaSuspeita,
+    InspecaoUc,
+    InterrupcaoUc,
     KpisMensais,
     KpisSegmentoMensal,
+    MedidorUc,
     ReceitaDecomposicao,
     ReconciliacaoFaturamento,
 )
 from venergy_api.schemas import (
+    AtendimentoUcSchema,
     ContinuidadeAlimentadorMensalSchema,
     DimUcSchema,
     FaturamentoMensalSchema,
     FilaSuspeitaSchema,
+    InspecaoUcSchema,
+    InterrupcaoUcSchema,
     KpisMensaisSchema,
     KpisSegmentoMensalSchema,
+    MedidorUcSchema,
     ReceitaDecomposicaoSchema,
     ReconciliacaoFaturamentoSchema,
 )
@@ -43,14 +52,17 @@ FIELDS = list(DimUcSchema.model_fields)
 # Cobre as 4 classes de consumo e as 5 do cadastro (o B3 aparece como Poder Público e como
 # Comercial), UCs com e sem painel solar e municípios citados pelas lideranças. Os códigos
 # são fixos para que o time possa citá-los ("busque a UC 0003"). Titular e documento são
-# inventados e já mascarados, como chegam da Gold. A potência só existe com painel solar.
+# inventados e já mascarados, como chegam da Gold. A potência, a conexão e a energia injetada só
+# existem com painel solar, e a conexão é anterior a 2024 (o GD de cada mês é o do cadastro).
+# Todas as UCs foram ligadas antes do primeiro mês, então o n_uc é o mesmo em toda competência.
 _JABOATAO = "Jaboatão dos Guararapes"
 _CABO = "Cabo de Santo Agostinho"
 _CPF = "***.***.**{}-{}"
 _CNPJ = "**.***.***/***{}-{}"
 _ROWS = [
     # cod_uc, municipio, bairro, classe, classe_cadastro, cod_alimentador, possui_gd,
-    # consumo_medio_kwh_12m, titular_mascarado, documento_mascarado, potencia_kwp
+    # consumo_medio_kwh_12m, titular_mascarado, documento_mascarado, potencia_kwp, data_ligacao,
+    # data_conexao_gd, modalidade_gd, energia_injetada_kwh_mes
     (
         "0001",
         "Recife",
@@ -62,6 +74,10 @@ _ROWS = [
         162.5,
         "M. S.",
         _CPF.format(1, "23"),
+        None,
+        date(2015, 6, 1),
+        None,
+        None,
         None,
     ),
     (
@@ -76,6 +92,10 @@ _ROWS = [
         "A. L. P.",
         _CPF.format(4, "56"),
         3.3,
+        date(2018, 6, 1),
+        date(2022, 3, 15),
+        "geracao_propria_uc",
+        Decimal("396.000"),
     ),
     (
         "0003",
@@ -89,6 +109,10 @@ _ROWS = [
         "J. C.",
         _CPF.format(7, "89"),
         5.0,
+        date(2019, 6, 1),
+        date(2023, 6, 20),
+        "autoconsumo_remoto",
+        Decimal("600.000"),
     ),
     (
         "0004",
@@ -101,6 +125,10 @@ _ROWS = [
         1240.0,
         "E. M. P.",
         _CNPJ.format(0, "11"),
+        None,
+        date(2012, 6, 1),
+        None,
+        None,
         None,
     ),
     (
@@ -115,6 +143,10 @@ _ROWS = [
         "R. F.",
         _CPF.format(2, "34"),
         None,
+        date(2016, 6, 1),
+        None,
+        None,
+        None,
     ),
     (
         "0006",
@@ -128,6 +160,10 @@ _ROWS = [
         "S. B. A.",
         _CPF.format(5, "67"),
         10.0,
+        date(2010, 6, 1),
+        date(2021, 11, 5),
+        "geracao_propria_uc",
+        Decimal("1200.000"),
     ),
     (
         "0007",
@@ -141,6 +177,10 @@ _ROWS = [
         "P. N. L.",
         _CNPJ.format(8, "90"),
         None,
+        date(2014, 6, 1),
+        None,
+        None,
+        None,
     ),
     (
         "0008",
@@ -153,6 +193,10 @@ _ROWS = [
         48500.0,
         "M. I. N.",
         _CNPJ.format(3, "45"),
+        None,
+        date(2008, 6, 1),
+        None,
+        None,
         None,
     ),
 ]
@@ -201,8 +245,6 @@ _ADICIONAL_BANDEIRA = {
     "vermelha_p1": Decimal("0.045"),
     "vermelha_p2": Decimal("0.079"),
 }
-# Formato confirmado no contrato v0.2: AAAA-MM/AAAA-MM.
-_PERIODO = {2024: "2024-01/2024-12", 2025: "2025-01/2025-12"}
 
 
 def _bandeira(competencia: str) -> str:
@@ -217,6 +259,25 @@ _ALIQUOTA_TRIBUTOS = Decimal("0.25")
 _TROCA_MEDIDOR = ("0003", "2025-03")
 _SINAL_INVERTIDO = ("0006", "2024-08")
 _PAGOU_COM_ATRASO = ("0001", "2025-03")
+# Leituras estimadas (o leiturista não chegou ao medidor), nos últimos seis meses das UCs da
+# fila de suspeitas: 3 de 6 na UC 0005 e 2 de 6 na UC 0004.
+_LEITURAS_ESTIMADAS = {
+    "0005": ("2025-08", "2025-10", "2025-12"),
+    "0004": ("2025-09", "2025-11"),
+}
+# Tipo do medidor de cada UC. A UC 0003 troca o eletromecânico por um eletrônico no mês da
+# troca de medidor (a mesma em que a leitura vem negativa).
+_MEDIDOR = {
+    "0001": "eletronico",
+    "0002": "smart",
+    "0003": "eletronico",
+    "0004": "eletronico",
+    "0005": "eletromecanico",
+    "0006": "eletronico",
+    "0007": "smart",
+    "0008": "smart",
+}
+_MEDIDOR_ANTES_DA_TROCA = "eletromecanico"
 
 
 def _mes_seguinte(competencia: str, dia: int) -> date:
@@ -233,6 +294,21 @@ def _leitura(cod_uc: str, competencia: str, kwh_faturado: Decimal) -> tuple[Deci
     if (cod_uc, competencia) == _SINAL_INVERTIDO:
         return -kwh_faturado, "consumo_absoluto"
     return kwh_faturado, "leitura"
+
+
+def tipo_medidor_da_leitura(cod_uc: str, competencia: str) -> str:
+    """Tipo do medidor que fez a leitura do mês."""
+    if cod_uc == _TROCA_MEDIDOR[0] and competencia < _TROCA_MEDIDOR[1]:
+        return _MEDIDOR_ANTES_DA_TROCA
+    return _MEDIDOR[cod_uc]
+
+
+def _dias_faturados(competencia: str) -> int | None:
+    # A leitura é feita no mesmo dia de todo mês, então os dias entre duas leituras são os do
+    # mês. A primeira leitura da UC não tem anterior.
+    if competencia == COMPETENCIAS[0]:
+        return None
+    return calendar.monthrange(int(competencia[:4]), int(competencia[5:]))[1]
 
 
 def _situacao(vencimento: date, pagamento: date | None, corte: date) -> tuple[str, int | None]:
@@ -275,6 +351,9 @@ def _faturamento() -> tuple[FaturamentoMensalSchema, ...]:
                     "emissao": _mes_seguinte(competencia, 1),
                     "vencimento": _mes_seguinte(competencia, 10),
                     "pagamento": None if nao_pagou else _mes_seguinte(competencia, dia_pagamento),
+                    "bandeira": (kwh * _ADICIONAL_BANDEIRA[_bandeira(competencia)]).quantize(
+                        _CENTAVO
+                    ),
                 }
             )
 
@@ -305,6 +384,14 @@ def _faturamento() -> tuple[FaturamentoMensalSchema, ...]:
                 data_pagamento=f["pagamento"],
                 status_pagamento=status,
                 dias_em_atraso=dias_em_atraso,
+                receita_bandeira=f["bandeira"],
+                tipo_leitura=(
+                    "estimada"
+                    if f["competencia"] in _LEITURAS_ESTIMADAS.get(f["uc"].cod_uc, ())
+                    else "real"
+                ),
+                tipo_medidor=tipo_medidor_da_leitura(f["uc"].cod_uc, f["competencia"]),
+                dias_faturados=_dias_faturados(f["competencia"]),
             )
         )
     return tuple(rows)
@@ -335,6 +422,77 @@ def _interrupcoes(uc: DimUcSchema, competencia: str) -> tuple[int, float]:
     return interrupcoes, round(interrupcoes * dec_referencia / fec_referencia, 1)
 
 
+# Tipos e causas das ocorrências da amostra. Uma em cada três fica sem causa, como na origem
+# (OCO-01).
+_TIPOS_OCORRENCIA = ("FALTA DE ENERGIA", "OSCILACAO")
+_CAUSAS_OCORRENCIA = ("CLIMATICA", "VEGETACAO", None)
+
+
+def _interrupcoes_uc() -> tuple[InterrupcaoUcSchema, ...]:
+    # Uma linha por ocorrência, abrindo o número de interrupções do mês em ocorrências de mesma
+    # duração: a soma por alimentador bate com a continuidade, e a de cada UC com os recortes.
+    rows = []
+    for uc in SAMPLE_UCS:
+        for competencia in COMPETENCIAS:
+            quantidade, horas = _interrupcoes(uc, competencia)
+            ano, mes = int(competencia[:4]), int(competencia[5:])
+            for numero in range(quantidade):
+                duracao = horas / quantidade
+                abertura = datetime(ano, mes, 4 + 8 * numero, 8)
+                rows.append(
+                    InterrupcaoUcSchema(
+                        cod_ocorrencia=f"OC-{uc.cod_uc}-{competencia}-{numero + 1}",
+                        cod_uc=uc.cod_uc,
+                        cod_alimentador=uc.cod_alimentador,
+                        competencia=competencia,
+                        data_abertura=abertura,
+                        # Ao minuto, como a origem; a duração guarda as horas exatas do mês.
+                        data_encerramento=abertura + timedelta(minutes=round(duracao * 60)),
+                        duracao_horas=duracao,
+                        tipo=_TIPOS_OCORRENCIA[numero % len(_TIPOS_OCORRENCIA)],
+                        causa=_CAUSAS_OCORRENCIA[
+                            (int(uc.cod_uc) + mes + numero) % len(_CAUSAS_OCORRENCIA)
+                        ],
+                    )
+                )
+    return tuple(rows)
+
+
+# Instalação do medidor vigente de cada UC. A UC 0003 tem o medidor da troca de 2025-03, a UC
+# 0005 tem o mais antigo (mais de 15 anos, um dos motivos da fila) e a UC 0004 não traz o modelo.
+_INSTALACAO_MEDIDOR = {
+    "0001": date(2018, 6, 12),
+    "0002": date(2021, 9, 3),
+    "0003": date(2025, 3, 5),
+    "0004": date(2016, 2, 20),
+    "0005": date(2009, 8, 14),
+    "0006": date(2019, 11, 25),
+    "0007": date(2022, 5, 17),
+    "0008": date(2023, 1, 9),
+}
+_FIM_DOS_DADOS = date(2025, 12, 31)
+
+
+def _medidores() -> tuple[MedidorUcSchema, ...]:
+    rows = []
+    for uc in SAMPLE_UCS:
+        trocas = 1 if uc.cod_uc == _TROCA_MEDIDOR[0] else 0
+        instalacao = _INSTALACAO_MEDIDOR[uc.cod_uc]
+        rows.append(
+            MedidorUcSchema(
+                cod_uc=uc.cod_uc,
+                cod_medidor=f"MD-{uc.cod_uc}-{trocas + 1:02d}",
+                tipo_medidor=_MEDIDOR[uc.cod_uc],
+                modelo=None if uc.cod_uc == "0004" else f"MOD-{_MEDIDOR[uc.cod_uc].upper()}",
+                data_instalacao=instalacao,
+                idade_anos=(_FIM_DOS_DADOS - instalacao).days / 365.25,
+                n_trocas=trocas,
+                data_ultima_troca=instalacao if trocas else None,
+            )
+        )
+    return tuple(rows)
+
+
 def _chamados(uc: DimUcSchema, competencia: str) -> tuple[int, int | None]:
     """Chamados abertos pela UC no mês e a nota do atendimento, de 1 a 5."""
     mes, numero = int(competencia[5:]), int(uc.cod_uc)
@@ -343,6 +501,38 @@ def _chamados(uc: DimUcSchema, competencia: str) -> tuple[int, int | None]:
     # Parte dos chamados fica sem nota, e fica fora da média (ATD-01).
     nota = None if mes % 3 == 0 else 1 + (mes + 2 * numero) % 5
     return 1, nota
+
+
+_CANAIS = ("TELEFONE", "APP", "WHATSAPP")
+_ASSUNTOS = (("FALTA DE ENERGIA", "SEM ENERGIA NA UC"), ("FATURA", None), ("LIGACAO", "NOVA"))
+
+
+def _atendimentos_uc() -> tuple[AtendimentoUcSchema, ...]:
+    # Uma linha por chamado: n_chamados, soma_notas e n_notas dos recortes saem destas linhas, e
+    # o chamado sem nota fica fora da média (ATD-01).
+    rows = []
+    for uc in SAMPLE_UCS:
+        for competencia in COMPETENCIAS:
+            quantidade, nota = _chamados(uc, competencia)
+            if not quantidade:
+                continue
+            ano, mes = int(competencia[:4]), int(competencia[5:])
+            abertura = datetime(ano, mes, 12, 9)
+            assunto, subassunto = _ASSUNTOS[(int(uc.cod_uc) + mes) % len(_ASSUNTOS)]
+            rows.append(
+                AtendimentoUcSchema(
+                    protocolo=f"AT-{uc.cod_uc}-{competencia}",
+                    cod_uc=uc.cod_uc,
+                    competencia=competencia,
+                    data_abertura=abertura,
+                    data_fechamento=abertura + timedelta(days=1, hours=mes),
+                    canal=_CANAIS[(int(uc.cod_uc) + mes) % len(_CANAIS)],
+                    assunto=assunto,
+                    subassunto=subassunto,
+                    nota_satisfacao=float(nota) if nota is not None else None,
+                )
+            )
+    return tuple(rows)
 
 
 def _continuidade() -> tuple[ContinuidadeAlimentadorMensalSchema, ...]:
@@ -406,21 +596,32 @@ def _kpis_segmento(
     # Somados das UCs com as mesmas regras do faturamento, da continuidade e dos chamados:
     # a soma de cada mês bate com os KPIs da empresa e com a continuidade por alimentador.
     fatura = {(linha.cod_uc, linha.competencia): linha for linha in faturamento}
-    recortes: dict[tuple[str, str, str, bool], list[DimUcSchema]] = {}
-    for uc in SAMPLE_UCS:
-        # Na amostra, os painéis solares já estavam conectados antes de 2024, então o GD de
-        # cada competência é o do cadastro.
-        chave = (uc.municipio, uc.bairro, uc.classe_cadastro, uc.possui_gd)
-        recortes.setdefault(chave, []).append(uc)
-
     rows = []
     for competencia in COMPETENCIAS:
-        for (municipio, bairro, classe_cadastro, possui_gd), ucs in sorted(recortes.items()):
+        # O recorte muda de um mês para o outro quando a UC troca de medidor: o tipo é o do
+        # medidor vigente. Na amostra, os painéis solares já estavam conectados antes de 2024,
+        # então o GD de cada competência é o do cadastro.
+        recortes: dict[tuple[str, str, str, bool, str, str], list[DimUcSchema]] = {}
+        for uc in SAMPLE_UCS:
+            chave = (
+                uc.municipio,
+                uc.bairro,
+                uc.classe_cadastro,
+                uc.possui_gd,
+                uc.cod_alimentador,
+                fatura[(uc.cod_uc, competencia)].tipo_medidor,
+            )
+            recortes.setdefault(chave, []).append(uc)
+
+        for chave, ucs in sorted(recortes.items()):
+            municipio, bairro, classe_cadastro, possui_gd, cod_alimentador, tipo_medidor = chave
             faturas = [fatura[(uc.cod_uc, competencia)] for uc in ucs]
             ocorrencias = [_interrupcoes(uc, competencia) for uc in ucs]
             chamados = [_chamados(uc, competencia) for uc in ucs]
             notas = [nota for _, nota in chamados if nota is not None]
             arrecadado = [f.receita_arrecadada for f in faturas if f.receita_arrecadada is not None]
+            nao_pagas = [f for f in faturas if f.status_pagamento in ("em_aberto", "em_atraso")]
+            com_atraso = [f for f in faturas if f.dias_em_atraso is not None]
             rows.append(
                 KpisSegmentoMensalSchema(
                     competencia=competencia,
@@ -429,6 +630,8 @@ def _kpis_segmento(
                     classe_cadastro=classe_cadastro,
                     classe=ucs[0].classe,
                     possui_gd=possui_gd,
+                    cod_alimentador=cod_alimentador,
+                    tipo_medidor=tipo_medidor,
                     n_uc=len(ucs),
                     kwh_faturado=sum((f.kwh_faturado for f in faturas), Decimal(0)),
                     receita_faturada=sum((f.receita_faturada for f in faturas), Decimal(0)),
@@ -440,6 +643,16 @@ def _kpis_segmento(
                     n_chamados=sum(n for n, _ in chamados),
                     soma_notas=float(sum(notas)) if notas else None,
                     n_notas=len(notas),
+                    receita_bandeira=sum((f.receita_bandeira for f in faturas), Decimal(0)),
+                    n_faturas=len(faturas),
+                    n_faturas_nao_pagas=len(nao_pagas),
+                    valor_nao_pago=sum((f.receita_faturada for f in nao_pagas), Decimal(0)),
+                    n_faturas_pagas_com_atraso=sum(
+                        f.status_pagamento == "paga_com_atraso" for f in faturas
+                    ),
+                    soma_dias_em_atraso=sum(f.dias_em_atraso or 0 for f in com_atraso),
+                    n_leituras=len(faturas),
+                    n_leituras_estimadas=sum(f.tipo_leitura == "estimada" for f in faturas),
                 )
             )
     return tuple(rows)
@@ -492,57 +705,100 @@ def _reconciliacao(
     return tuple(rows)
 
 
+def _janelas() -> list[tuple[int, int]]:
+    """Todo trecho do ano, do mês de início ao mês final: 78 trechos."""
+    return [(inicio, fim) for inicio in range(1, 13) for fim in range(inicio, 13)]
+
+
 def _decomposicao(
     faturamento: tuple[FaturamentoMensalSchema, ...],
 ) -> tuple[ReceitaDecomposicaoSchema, ...]:
-    # Totais de kWh, receita de energia e acréscimo de bandeira por segmento e ano. A base é a
-    # receita de energia, sem tributos (DEC-023).
+    # Totais de kWh, receita de energia e acréscimo de bandeira por segmento e competência. A base
+    # é a receita de energia, sem tributos (DEC-023).
     segmento_da_uc = {
         uc.cod_uc: (uc.municipio, uc.bairro, uc.classe, uc.possui_gd) for uc in SAMPLE_UCS
     }
-    totais: dict[tuple[tuple[str, str, str, bool], int], list[Decimal]] = {}
+    totais: dict[tuple[tuple[str, str, str, bool], str], list[Decimal]] = {}
     for linha in faturamento:
-        chave = (segmento_da_uc[linha.cod_uc], int(linha.competencia[:4]))
+        chave = (segmento_da_uc[linha.cod_uc], linha.competencia)
         kwh, receita, bandeira = totais.get(chave, [Decimal(0), Decimal(0), Decimal(0)])
         totais[chave] = [
             kwh + linha.kwh_faturado,
             receita + linha.receita_energia,
-            bandeira + linha.kwh_faturado * _ADICIONAL_BANDEIRA[linha.bandeira],
+            bandeira + linha.receita_bandeira,
         ]
 
+    def soma(
+        segmento: tuple[str, str, str, bool], ano: int, inicio: int, fim: int
+    ) -> list[Decimal]:
+        meses = [totais[(segmento, f"{ano}-{mes:02d}")] for mes in range(inicio, fim + 1)]
+        return [sum((mes[i] for mes in meses), Decimal(0)) for i in range(3)]
+
+    # Todos os pares de mesmos meses em anos diferentes (DEC-028), aqui entre 2024 e 2025. Cada
+    # par tem o formato do contrato, AAAA-MM/AAAA-MM.
     rows = []
-    for segmento in sorted({segmento for segmento, _ in totais}):
-        municipio, bairro, classe, possui_gd = segmento
-        kwh_base, receita_base, bandeira_base = totais[(segmento, 2024)]
-        kwh_atual, receita_atual, bandeira_atual = totais[(segmento, 2025)]
-        tarifa_base, tarifa_atual = receita_base / kwh_base, receita_atual / kwh_atual
-        efeito_preco = ((tarifa_atual - tarifa_base) * kwh_atual).quantize(_CENTAVO)
-        # A parte do preço que veio da bandeira: o acréscimo médio por kWh mudou entre os
-        # períodos. O resto do efeito preço é o reajuste da tarifa base.
-        adicional_base, adicional_atual = bandeira_base / kwh_base, bandeira_atual / kwh_atual
-        efeito_bandeira = ((adicional_atual - adicional_base) * kwh_atual).quantize(_CENTAVO)
-        rows.append(
-            ReceitaDecomposicaoSchema(
-                periodo_base=_PERIODO[2024],
-                periodo_atual=_PERIODO[2025],
-                municipio=municipio,
-                bairro=bairro,
-                classe=classe,
-                possui_gd=possui_gd,
-                receita_base=receita_base,
-                receita_atual=receita_atual,
-                efeito_preco=efeito_preco,
-                efeito_tarifa=efeito_preco - efeito_bandeira,
-                efeito_bandeira=efeito_bandeira,
-                efeito_volume=((kwh_atual - kwh_base) * tarifa_base).quantize(_CENTAVO),
-                # Calculado, e não resíduo (contrato v0.2): num segmento de uma classe só, o
-                # peso entre classes não muda, então o mix é zero. Preço e volume fecham com a
-                # variação dentro da tolerância de arredondamento (R$ 0,02 por linha).
-                efeito_mix=Decimal("0.00"),
+    for inicio, fim in _janelas():
+        periodo_base = f"2024-{inicio:02d}/2024-{fim:02d}"
+        periodo_atual = f"2025-{inicio:02d}/2025-{fim:02d}"
+        for segmento in sorted({segmento for segmento, _ in totais}):
+            municipio, bairro, classe, possui_gd = segmento
+            kwh_base, receita_base, bandeira_base = soma(segmento, 2024, inicio, fim)
+            kwh_atual, receita_atual, bandeira_atual = soma(segmento, 2025, inicio, fim)
+            if not kwh_base or not kwh_atual:
+                # Sem energia faturada num dos lados não há tarifa média para decompor: o par
+                # não existe para este segmento (a UC 0002 compensa todo o consumo de janeiro).
+                continue
+            tarifa_base, tarifa_atual = receita_base / kwh_base, receita_atual / kwh_atual
+            efeito_preco = ((tarifa_atual - tarifa_base) * kwh_atual).quantize(_CENTAVO)
+            # A parte do preço que veio da bandeira, pela DEC-029: o acréscimo médio por kWh
+            # mudou entre os períodos. O resto do efeito preço é o reajuste da tarifa base.
+            adicional_base, adicional_atual = bandeira_base / kwh_base, bandeira_atual / kwh_atual
+            efeito_bandeira = ((adicional_atual - adicional_base) * kwh_atual).quantize(_CENTAVO)
+            rows.append(
+                ReceitaDecomposicaoSchema(
+                    periodo_base=periodo_base,
+                    periodo_atual=periodo_atual,
+                    municipio=municipio,
+                    bairro=bairro,
+                    classe=classe,
+                    possui_gd=possui_gd,
+                    receita_base=receita_base,
+                    receita_atual=receita_atual,
+                    efeito_preco=efeito_preco,
+                    efeito_tarifa=efeito_preco - efeito_bandeira,
+                    efeito_bandeira=efeito_bandeira,
+                    efeito_volume=((kwh_atual - kwh_base) * tarifa_base).quantize(_CENTAVO),
+                    # Calculado, e não resíduo (contrato v0.2): num segmento de uma classe só,
+                    # o peso entre classes não muda, então o mix é zero. Preço e volume fecham
+                    # com a variação dentro da tolerância de arredondamento (R$ 0,02 por linha).
+                    efeito_mix=Decimal("0.00"),
+                )
             )
-        )
     return tuple(rows)
 
+
+# Inspeções de campo, todas em UCs fora da fila: pela DEC-030, a fila só tem UCs ainda não
+# inspecionadas. Uma confirmou irregularidade e a outra não encontrou nada.
+SAMPLE_INSPECOES = (
+    InspecaoUcSchema(
+        cod_inspecao="INS-0001",
+        cod_uc="0001",
+        data_inspecao=date(2024, 9, 18),
+        competencia="2024-09",
+        resultado="irregularidade_confirmada",
+        tipo_irregularidade="DESVIO DIRETO",
+        kwh_recuperado=Decimal("1200.000"),
+    ),
+    InspecaoUcSchema(
+        cod_inspecao="INS-0002",
+        cod_uc="0008",
+        data_inspecao=date(2025, 2, 11),
+        competencia="2025-02",
+        resultado="sem_irregularidade",
+        tipo_irregularidade=None,
+        kwh_recuperado=Decimal("0.000"),
+    ),
+)
 
 # Fila de suspeitas, pela posição no ranking (1 = mais suspeita). A UC 0004 ainda não tem estimativa
 # de energia recuperável: o gerente de perdas vê a suspeita mesmo sem o valor.
@@ -556,7 +812,7 @@ SAMPLE_FILA = (
     FilaSuspeitaSchema(
         cod_uc="0007",
         score_suspeita=2,
-        motivos=["inspeção anterior encontrou irregularidade"],
+        motivos=["queda de 30% ou mais no consumo médio das últimas 12 competências"],
         kwh_recuperavel_est=Decimal("4200.000"),
     ),
     FilaSuspeitaSchema(
@@ -572,6 +828,9 @@ SAMPLE_CONTINUIDADE = _continuidade()
 SAMPLE_KPIS = _kpis(SAMPLE_FATURAMENTO, SAMPLE_CONTINUIDADE)
 SAMPLE_KPIS_SEGMENTO = _kpis_segmento(SAMPLE_FATURAMENTO)
 SAMPLE_RECONCILIACAO = _reconciliacao(SAMPLE_FATURAMENTO)
+SAMPLE_INTERRUPCOES = _interrupcoes_uc()
+SAMPLE_ATENDIMENTOS = _atendimentos_uc()
+SAMPLE_MEDIDORES = _medidores()
 SAMPLE_DECOMPOSICAO = _decomposicao(SAMPLE_FATURAMENTO)
 
 # Linhas por tabela da Gold. A carga exige um CSV para cada tabela de GOLD_TABLES, e o
@@ -585,6 +844,10 @@ SAMPLE: dict[type[Base], tuple[BaseModel, ...]] = {
     ReconciliacaoFaturamento: SAMPLE_RECONCILIACAO,
     ContinuidadeAlimentadorMensal: SAMPLE_CONTINUIDADE,
     FilaSuspeita: SAMPLE_FILA,
+    InterrupcaoUc: SAMPLE_INTERRUPCOES,
+    AtendimentoUc: SAMPLE_ATENDIMENTOS,
+    MedidorUc: SAMPLE_MEDIDORES,
+    InspecaoUc: SAMPLE_INSPECOES,
 }
 
 
