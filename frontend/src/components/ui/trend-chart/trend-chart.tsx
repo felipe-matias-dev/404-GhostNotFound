@@ -1,7 +1,8 @@
 // Gráfico de tendência: uma ou mais séries em linha sobre categorias em ordem (meses, anos).
 // SVG próprio; escalas e curva do d3 (`d3-scale`, `d3-shape`), movimento do `motion`.
-// - a série em destaque (`emphasis`; sozinha, ela é o destaque) fica por cima, mais grossa,
-//   com área em degradê e um ponto no último valor; as outras ficam finas, atrás;
+// - a série em destaque (`emphasis`; sozinha, ela é o destaque) fica por cima, mais grossa e
+//   com um ponto no último valor; as outras ficam finas, atrás. A área em degradê só aparece
+//   com `zeroBaseline`: num eixo que não começa no zero, a área exageraria a variação;
 // - eixo y com ticks redondos (`nice`), opcionalmente a partir do zero; o eixo x mostra só os
 //   rótulos que cabem, contados a partir do último (o mais recente sempre aparece);
 // - dados novos: a série que continua (mesmo `id`, mesmos pontos) muda de forma com mola, a
@@ -159,7 +160,10 @@ export type TrendChartProps = {
 	/** Cabeçalho da coluna de categorias na tabela do leitor de tela. */
 	categoryLabel?: string;
 	markers?: TrendMarker[];
-	/** Eixo y a partir do zero. Padrão: só a faixa dos dados, que é o que mostra tendência. */
+	/**
+	 * Eixo y a partir do zero, com área sob a série em destaque. Padrão: só a faixa dos dados,
+	 * que é o que mostra tendência, e sem área.
+	 */
 	zeroBaseline?: boolean;
 	/**
 	 * Altura da área do gráfico, em px, ou `"fill"` para ocupar a altura que sobra no card
@@ -219,6 +223,8 @@ type Layout = {
 	py: (value: number) => number;
 	ticks: number[];
 	labelEvery: number;
+	/** Eixo a partir do zero: só nele a série em destaque ganha área. */
+	zeroBaseline: boolean;
 };
 
 function layout(
@@ -265,6 +271,7 @@ function layout(
 		py: (value) => y(value),
 		ticks,
 		labelEvery,
+		zeroBaseline,
 	};
 }
 
@@ -330,7 +337,7 @@ function geometryOf(
 		.map((d) => ({
 			...d,
 			path: toLine(d.values) ?? "",
-			areaPath: d.emphasis ? (toArea(d.values) ?? "") : "",
+			areaPath: d.emphasis && geo.zeroBaseline ? (toArea(d.values) ?? "") : "",
 		}));
 	const emphasized = drawn.filter((d) => d.emphasis);
 	const end = emphasized.flatMap((d) => {
@@ -736,27 +743,29 @@ function Plot({
 				className="block overflow-visible"
 			>
 				<defs>
-					{chart.emphasized.map((d) => (
-						<linearGradient
-							key={d.s.id}
-							id={`${gradientId}-${d.s.id}`}
-							x1="0"
-							x2="0"
-							y1="0"
-							y2="1"
-						>
-							<stop
-								offset="0%"
-								stopOpacity={0.16}
-								style={{ stopColor: COLORS[d.color].stop }}
-							/>
-							<stop
-								offset="100%"
-								stopOpacity={0}
-								style={{ stopColor: COLORS[d.color].stop }}
-							/>
-						</linearGradient>
-					))}
+					{chart.emphasized
+						.filter((d) => d.areaPath)
+						.map((d) => (
+							<linearGradient
+								key={d.s.id}
+								id={`${gradientId}-${d.s.id}`}
+								x1="0"
+								x2="0"
+								y1="0"
+								y2="1"
+							>
+								<stop
+									offset="0%"
+									stopOpacity={0.16}
+									style={{ stopColor: COLORS[d.color].stop }}
+								/>
+								<stop
+									offset="100%"
+									stopOpacity={0}
+									style={{ stopColor: COLORS[d.color].stop }}
+								/>
+							</linearGradient>
+						))}
 				</defs>
 				<g transform={`translate(${left} ${MARGIN.top})`}>
 					<StaticLayers
@@ -869,16 +878,18 @@ const StaticLayers = memo(function StaticLayers({
 			</AnimatePresence>
 
 			<AnimatePresence>
-				{chart.emphasized.map((d) => (
-					<motion.path
-						key={`area-${d.s.id}`}
-						fill={`url(#${gradientId}-${d.s.id})`}
-						initial={reduced ? false : { d: d.areaPath, opacity: 0 }}
-						animate={{ d: d.areaPath, opacity: 1 }}
-						exit={{ opacity: 0, transition: FADE }}
-						transition={{ ...motionFor, opacity: enter }}
-					/>
-				))}
+				{chart.emphasized
+					.filter((d) => d.areaPath)
+					.map((d) => (
+						<motion.path
+							key={`area-${d.s.id}`}
+							fill={`url(#${gradientId}-${d.s.id})`}
+							initial={reduced ? false : { d: d.areaPath, opacity: 0 }}
+							animate={{ d: d.areaPath, opacity: 1 }}
+							exit={{ opacity: 0, transition: FADE }}
+							transition={{ ...motionFor, opacity: enter }}
+						/>
+					))}
 			</AnimatePresence>
 
 			<AnimatePresence>
