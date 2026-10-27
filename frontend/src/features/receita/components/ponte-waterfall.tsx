@@ -1,6 +1,11 @@
 import { WaterfallChart } from "#/components/ui/waterfall-chart";
 import { formatBRL, formatPct, formatPeriodoCurto } from "#/lib/format";
-import { causaDoPasso, type Efeito, passosDaPonte } from "../conversions";
+import {
+	CLASSE_ROTULO,
+	causaDoPasso,
+	type Efeito,
+	passosDaPonte,
+} from "../conversions";
 import { useDecomposicao } from "../hooks/use-decomposicao";
 import type { ParPeriodos, Recorte } from "../types";
 
@@ -20,6 +25,9 @@ export function PonteWaterfall({
 		useDecomposicao(par, recorte);
 	const passos = data ? passosDaPonte(data) : undefined;
 	const nome = recorte.bairro ?? recorte.municipio;
+	const daClasse = recorte.classe
+		? ` da classe ${recorte.classe} (${CLASSE_ROTULO[recorte.classe].toLowerCase()})`
+		: "";
 
 	// Períodos das linhas, e não da URL: no drill-down as linhas ainda podem ser do par anterior.
 	const linha = data?.[0];
@@ -33,7 +41,7 @@ export function PonteWaterfall({
 
 	const resumo = linha && quedas && (
 		<>
-			A receita{" "}
+			A receita{daClasse}{" "}
 			<span className="font-medium text-text">
 				{variacao === 0
 					? "ficou estável"
@@ -62,7 +70,7 @@ export function PonteWaterfall({
 
 	return (
 		<WaterfallChart
-			label={`Ponte de receita ${nome ? `de ${nome}` : "da empresa"}`}
+			label={`Ponte de receita${daClasse} ${nome ? `de ${nome}` : "da empresa"}`}
 			steps={passos}
 			summary={resumo}
 			compareLabel="vs. receita base"

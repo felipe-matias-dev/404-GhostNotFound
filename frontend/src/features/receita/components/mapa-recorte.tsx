@@ -45,10 +45,10 @@ export function MapaRecorte({
 	className?: string;
 }) {
 	const router = useRouter();
-	const municipios = useDecomposicao(par, {});
+	const municipios = useDecomposicao(par, { classe: recorte.classe });
 	const bairros = useDecomposicao(
 		par,
-		{ municipio: recorte.municipio },
+		{ municipio: recorte.municipio, classe: recorte.classe },
 		Boolean(recorte.municipio),
 	);
 	const geoBairros = useBairrosRmr(Boolean(recorte.municipio));

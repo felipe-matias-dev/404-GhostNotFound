@@ -1,2 +1,2 @@
-export { EFEITOS } from "./conversions";
+export { CLASSES, EFEITOS } from "./conversions";
 export { ReceitaPage } from "./pages/receita-page";

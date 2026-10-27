@@ -1,7 +1,7 @@
 import type { RegionMapProps } from "#/components/ui/region-map";
 import type { WaterfallStep } from "#/components/ui/waterfall-chart";
 import { formatPct } from "#/lib/format";
-import type { DecomposicaoLinha, ParPeriodos, Recorte } from "./types";
+import type { Classe, DecomposicaoLinha, ParPeriodos, Recorte } from "./types";
 
 export type Nivel = DecomposicaoLinha["nivel"];
 
@@ -9,6 +9,21 @@ export const NIVEL_ROTULO: Record<Nivel, string> = {
 	municipio: "Município",
 	bairro: "Bairro",
 	classe: "Classe",
+};
+
+export const CLASSES = [
+	"B1",
+	"B2",
+	"B3",
+	"A4",
+] as const satisfies readonly Classe[];
+
+/** Classes de consumo como no case (`gold_receita_decomposicao.classe`). */
+export const CLASSE_ROTULO: Record<Classe, string> = {
+	B1: "Residencial",
+	B2: "Rural",
+	B3: "Comercial e poder público",
+	A4: "Industrial MT",
 };
 
 export function nivelDoFiltro(filtro: Recorte): Nivel {

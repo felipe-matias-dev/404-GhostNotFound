@@ -1,6 +1,7 @@
 import { getRouteApi } from "@tanstack/react-router";
 import { useState } from "react";
 import { Pagina } from "#/components/layout/pagina";
+import { ClassePicker } from "../components/classe-picker";
 import { DecomposicaoTable } from "../components/decomposicao-table";
 import { MapaRecorte } from "../components/mapa-recorte";
 import { PeriodoPicker } from "../components/periodo-picker";
@@ -9,20 +10,22 @@ import { RankingQueda } from "../components/ranking-queda";
 import { RecorteTrilha } from "../components/recorte-trilha";
 import { type Efeito, parPadrao } from "../conversions";
 import { usePeriodosDecomposicao } from "../hooks/use-decomposicao";
-import type { DecomposicaoLinha, ParPeriodos, Recorte } from "../types";
+import type { Classe, DecomposicaoLinha, ParPeriodos, Recorte } from "../types";
 
 const route = getRouteApi("/receita");
 
 export function ReceitaPage() {
-	const { municipio, bairro, periodo_base, periodo_atual, efeito } =
+	const { municipio, bairro, classe, periodo_base, periodo_atual, efeito } =
 		route.useSearch();
 	// A causa escolhida na ponte acompanha o drill-down e a troca de período.
 	const causa: Efeito = efeito ?? "variacao";
 	const navigate = route.useNavigate();
 	// Bairro sem município é recusado pela API (o mesmo nome existe em mais de um município).
+	// A classe não é um nível: filtra todos ("como foi a B1 na RMR inteira?").
 	const recorte: Recorte = {
 		municipio,
 		bairro: municipio ? bairro : undefined,
+		classe,
 	};
 
 	// O par da URL só vale se a Gold o gravou; senão, o padrão.
@@ -33,12 +36,13 @@ export function ReceitaPage() {
 				p.periodo_base === periodo_base && p.periodo_atual === periodo_atual,
 		) ?? (periodos.data ? parPadrao(periodos.data) : undefined);
 
-	// Mapa, trilha e tabela só conhecem município e bairro: a causa segue da URL.
+	// Mapa, trilha e tabela só conhecem município e bairro: classe e causa seguem da URL.
 	const navegar = (proximo: Recorte, comPar: ParPeriodos | undefined) =>
 		navigate({
 			search: {
 				municipio: proximo.municipio,
 				bairro: proximo.bairro,
+				classe,
 				periodo_base: comPar?.periodo_base,
 				periodo_atual: comPar?.periodo_atual,
 				efeito,
@@ -53,11 +57,16 @@ export function ReceitaPage() {
 			}),
 			resetScroll: false,
 		});
+	const escolherClasse = (proxima: Classe | undefined) =>
+		navigate({
+			search: (atual) => ({ ...atual, classe: proxima }),
+			resetScroll: false,
+		});
 
 	// Linha da tabela sob o ponteiro, contornada no mapa. Ao trocar de recorte ou de período,
 	// a linha some sem disparar o "saiu" (a tabela troca de linhas): limpa aqui.
 	const [destaque, setDestaque] = useState<DecomposicaoLinha | null>(null);
-	const chaveRecorte = `${recorte.municipio ?? ""}|${recorte.bairro ?? ""}|${par?.periodo_base ?? ""}|${par?.periodo_atual ?? ""}`;
+	const chaveRecorte = `${recorte.municipio ?? ""}|${recorte.bairro ?? ""}|${recorte.classe ?? ""}|${par?.periodo_base ?? ""}|${par?.periodo_atual ?? ""}`;
 	const [recorteAnterior, setRecorteAnterior] = useState(chaveRecorte);
 	if (chaveRecorte !== recorteAnterior) {
 		setRecorteAnterior(chaveRecorte);
@@ -97,11 +106,14 @@ export function ReceitaPage() {
 						<h2 id="ponte-titulo" className="text-heading">
 							Ponte de receita
 						</h2>
-						<PeriodoPicker
-							pares={periodos.data ?? []}
-							par={par}
-							onEscolher={(escolhido) => navegar(recorte, escolhido)}
-						/>
+						<div className="flex flex-wrap items-center gap-2">
+							<ClassePicker classe={classe} onEscolher={escolherClasse} />
+							<PeriodoPicker
+								pares={periodos.data ?? []}
+								par={par}
+								onEscolher={(escolhido) => navegar(recorte, escolhido)}
+							/>
+						</div>
 					</div>
 					{/* Largo: ponte e ranking lado a lado, sem a ponte esticar por toda a largura. */}
 					<div className="grid gap-3 @4xl:grid-cols-[minmax(0,1fr)_minmax(22rem,0.8fr)]">
