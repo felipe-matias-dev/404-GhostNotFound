@@ -1,11 +1,20 @@
 """Rotas de unidades consumidoras: a busca que o atendente faz com o número da conta."""
 
 from fastapi import APIRouter, HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from venergy_api.database import SessionDep
-from venergy_api.models import DimUc, MedidorUc
-from venergy_api.schemas import DimUcSchema, ErroSchema, MedidorUcSchema, Uc360Schema
+from venergy_api.models import AtendimentoUc, DimUc, InspecaoUc, InterrupcaoUc, MedidorUc
+from venergy_api.schemas import (
+    AtendimentoUcSchema,
+    DimUcSchema,
+    ErroSchema,
+    InspecaoUcSchema,
+    InterrupcaoUcSchema,
+    MedidorUcSchema,
+    Uc360Schema,
+)
 
 router = APIRouter(prefix="/unidades-consumidoras", tags=["unidades consumidoras"])
 
@@ -39,7 +48,28 @@ def get_visao_360(cod_uc: str, session: SessionDep) -> Uc360Schema:
     """Cadastro, medidor e histórico da UC: o que o atendente precisa com o cliente na linha."""
     uc = _buscar_uc(session, cod_uc)
     medidor = session.get(MedidorUc, cod_uc)
+    # Todo o histórico, e não só os últimos 12 meses: são poucas linhas por UC (cerca de 4
+    # interrupções e 7 chamados em 4 anos) e o atendente precisa do que o cliente já abriu.
+    # O desempate pela chave deixa a ordem estável quando duas datas coincidem.
+    interrupcoes = session.scalars(
+        select(InterrupcaoUc)
+        .where(InterrupcaoUc.cod_uc == cod_uc)
+        .order_by(InterrupcaoUc.data_abertura.desc(), InterrupcaoUc.cod_ocorrencia)
+    )
+    atendimentos = session.scalars(
+        select(AtendimentoUc)
+        .where(AtendimentoUc.cod_uc == cod_uc)
+        .order_by(AtendimentoUc.data_abertura.desc(), AtendimentoUc.protocolo)
+    )
+    inspecoes = session.scalars(
+        select(InspecaoUc)
+        .where(InspecaoUc.cod_uc == cod_uc)
+        .order_by(InspecaoUc.data_inspecao.desc(), InspecaoUc.cod_inspecao)
+    )
     return Uc360Schema(
         cadastro=DimUcSchema.model_validate(uc),
         medidor=MedidorUcSchema.model_validate(medidor) if medidor is not None else None,
+        interrupcoes=[InterrupcaoUcSchema.model_validate(item) for item in interrupcoes],
+        atendimentos=[AtendimentoUcSchema.model_validate(item) for item in atendimentos],
+        inspecoes=[InspecaoUcSchema.model_validate(item) for item in inspecoes],
     )

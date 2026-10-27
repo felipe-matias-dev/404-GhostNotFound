@@ -167,3 +167,65 @@ def test_returns_404_when_the_consumer_unit_does_not_exist(client: TestClient, s
 
     assert response.status_code == 404
     assert response.json() == {"detail": "Unidade consumidora 9999 não encontrada"}
+
+
+def test_lists_only_the_history_of_the_requested_unit(client: TestClient, seed) -> None:
+    seed(
+        make_uc("0001"),
+        make_uc("0002"),
+        make_outage("OC-1", "0001", datetime(2025, 3, 5, 10)),
+        make_outage("OC-2", "0002", datetime(2025, 3, 5, 10)),
+        make_ticket("AT-1", "0001", datetime(2025, 4, 2, 9)),
+        make_ticket("AT-2", "0002", datetime(2025, 4, 2, 9)),
+        make_inspection("IN-1", "0001", date(2025, 5, 20)),
+        make_inspection("IN-2", "0002", date(2025, 5, 20)),
+    )
+
+    body = client.get(URL.format(cod_uc="0001")).json()
+
+    assert [item["cod_ocorrencia"] for item in body["interrupcoes"]] == ["OC-1"]
+    assert [item["protocolo"] for item in body["atendimentos"]] == ["AT-1"]
+    assert [item["cod_inspecao"] for item in body["inspecoes"]] == ["IN-1"]
+
+
+def test_history_comes_newest_first(client: TestClient, seed) -> None:
+    seed(
+        make_uc("0001"),
+        make_outage("OC-1", "0001", datetime(2024, 1, 5, 10)),
+        make_outage("OC-2", "0001", datetime(2025, 6, 5, 10)),
+        make_outage("OC-3", "0001", datetime(2025, 2, 5, 10)),
+        make_ticket("AT-1", "0001", datetime(2024, 8, 2, 9)),
+        make_ticket("AT-2", "0001", datetime(2025, 8, 2, 9)),
+        make_inspection("IN-1", "0001", date(2023, 5, 20)),
+        make_inspection("IN-2", "0001", date(2025, 5, 20)),
+    )
+
+    body = client.get(URL.format(cod_uc="0001")).json()
+
+    assert [item["cod_ocorrencia"] for item in body["interrupcoes"]] == ["OC-2", "OC-3", "OC-1"]
+    assert [item["protocolo"] for item in body["atendimentos"]] == ["AT-2", "AT-1"]
+    assert [item["cod_inspecao"] for item in body["inspecoes"]] == ["IN-2", "IN-1"]
+
+
+def test_unit_without_history_gets_empty_lists(client: TestClient, seed) -> None:
+    seed(make_uc("0001"))
+
+    body = client.get(URL.format(cod_uc="0001")).json()
+
+    assert body["interrupcoes"] == []
+    assert body["atendimentos"] == []
+    assert body["inspecoes"] == []
+
+
+def test_unrated_ticket_and_unknown_cause_stay_empty(client: TestClient, seed) -> None:
+    # Vazio, e não zero nem texto: o cliente não avaliou, e a causa não foi registrada.
+    seed(
+        make_uc("0001"),
+        make_outage("OC-1", "0001", datetime(2025, 3, 5, 10), causa=None),
+        make_ticket("AT-1", "0001", datetime(2025, 4, 2, 9), nota_satisfacao=None),
+    )
+
+    body = client.get(URL.format(cod_uc="0001")).json()
+
+    assert body["interrupcoes"][0]["causa"] is None
+    assert body["atendimentos"][0]["nota_satisfacao"] is None

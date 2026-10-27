@@ -270,6 +270,36 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         /**
+         * AtendimentoUcSchema
+         * @description Um chamado de atendimento de uma UC.
+         */
+        AtendimentoUcSchema: {
+            /** Protocolo */
+            protocolo: string;
+            /** Cod Uc */
+            cod_uc: string;
+            /** Competencia */
+            competencia: string;
+            /**
+             * Data Abertura
+             * Format: date-time
+             */
+            data_abertura: string;
+            /**
+             * Data Fechamento
+             * Format: date-time
+             */
+            data_fechamento: string;
+            /** Canal */
+            canal: string;
+            /** Assunto */
+            assunto: string;
+            /** Subassunto */
+            subassunto: string | null;
+            /** Nota Satisfacao */
+            nota_satisfacao: number | null;
+        };
+        /**
          * AtualizarOrdemSchema
          * @description Mudança de status de uma OI. Cancelar é mudar para CANCELADA.
          */
@@ -451,6 +481,62 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /**
+         * InspecaoUcSchema
+         * @description Uma inspeção de campo numa UC e o que ela encontrou.
+         */
+        InspecaoUcSchema: {
+            /** Cod Inspecao */
+            cod_inspecao: string;
+            /** Cod Uc */
+            cod_uc: string;
+            /**
+             * Data Inspecao
+             * Format: date
+             */
+            data_inspecao: string;
+            /** Competencia */
+            competencia: string;
+            /**
+             * Resultado
+             * @enum {string}
+             */
+            resultado: "irregularidade_confirmada" | "sem_irregularidade";
+            /** Tipo Irregularidade */
+            tipo_irregularidade: string | null;
+            /** Kwh Recuperado */
+            kwh_recuperado: number;
+        };
+        /**
+         * InterrupcaoUcSchema
+         * @description Uma interrupção que afetou uma UC.
+         */
+        InterrupcaoUcSchema: {
+            /** Cod Ocorrencia */
+            cod_ocorrencia: string;
+            /** Cod Uc */
+            cod_uc: string;
+            /** Cod Alimentador */
+            cod_alimentador: string;
+            /** Competencia */
+            competencia: string;
+            /**
+             * Data Abertura
+             * Format: date-time
+             */
+            data_abertura: string;
+            /**
+             * Data Encerramento
+             * Format: date-time
+             */
+            data_encerramento: string;
+            /** Duracao Horas */
+            duracao_horas: number;
+            /** Tipo */
+            tipo: string;
+            /** Causa */
+            causa: string | null;
         };
         /**
          * KpisMensaisSchema
@@ -672,6 +758,12 @@ export interface components {
         Uc360Schema: {
             cadastro: components["schemas"]["DimUcSchema"];
             medidor: components["schemas"]["MedidorUcSchema"] | null;
+            /** Interrupcoes */
+            interrupcoes: components["schemas"]["InterrupcaoUcSchema"][];
+            /** Atendimentos */
+            atendimentos: components["schemas"]["AtendimentoUcSchema"][];
+            /** Inspecoes */
+            inspecoes: components["schemas"]["InspecaoUcSchema"][];
         };
         /** ValidationError */
         ValidationError: {

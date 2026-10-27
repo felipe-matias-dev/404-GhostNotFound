@@ -1065,6 +1065,84 @@
   },
   "components": {
     "schemas": {
+      "AtendimentoUcSchema": {
+        "properties": {
+          "protocolo": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Protocolo"
+          },
+          "cod_uc": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Cod Uc"
+          },
+          "competencia": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+            "title": "Competencia"
+          },
+          "data_abertura": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Data Abertura"
+          },
+          "data_fechamento": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Data Fechamento"
+          },
+          "canal": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Canal"
+          },
+          "assunto": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Assunto"
+          },
+          "subassunto": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subassunto"
+          },
+          "nota_satisfacao": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 5.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nota Satisfacao"
+          }
+        },
+        "type": "object",
+        "required": [
+          "protocolo",
+          "cod_uc",
+          "competencia",
+          "data_abertura",
+          "data_fechamento",
+          "canal",
+          "assunto",
+          "subassunto",
+          "nota_satisfacao"
+        ],
+        "title": "AtendimentoUcSchema",
+        "description": "Um chamado de atendimento de uma UC."
+      },
       "AtualizarOrdemSchema": {
         "properties": {
           "status": {
@@ -1605,6 +1683,136 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "InspecaoUcSchema": {
+        "properties": {
+          "cod_inspecao": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Cod Inspecao"
+          },
+          "cod_uc": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Cod Uc"
+          },
+          "data_inspecao": {
+            "type": "string",
+            "format": "date",
+            "title": "Data Inspecao"
+          },
+          "competencia": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+            "title": "Competencia"
+          },
+          "resultado": {
+            "type": "string",
+            "enum": [
+              "irregularidade_confirmada",
+              "sem_irregularidade"
+            ],
+            "title": "Resultado"
+          },
+          "tipo_irregularidade": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tipo Irregularidade"
+          },
+          "kwh_recuperado": {
+            "type": "number",
+            "title": "Kwh Recuperado"
+          }
+        },
+        "type": "object",
+        "required": [
+          "cod_inspecao",
+          "cod_uc",
+          "data_inspecao",
+          "competencia",
+          "resultado",
+          "tipo_irregularidade",
+          "kwh_recuperado"
+        ],
+        "title": "InspecaoUcSchema",
+        "description": "Uma inspeção de campo numa UC e o que ela encontrou."
+      },
+      "InterrupcaoUcSchema": {
+        "properties": {
+          "cod_ocorrencia": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Cod Ocorrencia"
+          },
+          "cod_uc": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Cod Uc"
+          },
+          "cod_alimentador": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Cod Alimentador"
+          },
+          "competencia": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+            "title": "Competencia"
+          },
+          "data_abertura": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Data Abertura"
+          },
+          "data_encerramento": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Data Encerramento"
+          },
+          "duracao_horas": {
+            "type": "number",
+            "exclusiveMinimum": 0.0,
+            "title": "Duracao Horas"
+          },
+          "tipo": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Tipo"
+          },
+          "causa": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Causa"
+          }
+        },
+        "type": "object",
+        "required": [
+          "cod_ocorrencia",
+          "cod_uc",
+          "cod_alimentador",
+          "competencia",
+          "data_abertura",
+          "data_encerramento",
+          "duracao_horas",
+          "tipo",
+          "causa"
+        ],
+        "title": "InterrupcaoUcSchema",
+        "description": "Uma interrupção que afetou uma UC."
       },
       "KpisMensaisSchema": {
         "properties": {
@@ -2201,12 +2409,36 @@
                 "type": "null"
               }
             ]
+          },
+          "interrupcoes": {
+            "items": {
+              "$ref": "#/components/schemas/InterrupcaoUcSchema"
+            },
+            "type": "array",
+            "title": "Interrupcoes"
+          },
+          "atendimentos": {
+            "items": {
+              "$ref": "#/components/schemas/AtendimentoUcSchema"
+            },
+            "type": "array",
+            "title": "Atendimentos"
+          },
+          "inspecoes": {
+            "items": {
+              "$ref": "#/components/schemas/InspecaoUcSchema"
+            },
+            "type": "array",
+            "title": "Inspecoes"
           }
         },
         "type": "object",
         "required": [
           "cadastro",
-          "medidor"
+          "medidor",
+          "interrupcoes",
+          "atendimentos",
+          "inspecoes"
         ],
         "title": "Uc360Schema",
         "description": "Tudo o que o atendente precisa de uma UC numa tela só."

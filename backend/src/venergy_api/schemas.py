@@ -366,6 +366,10 @@ class Uc360Schema(BaseModel):
     cadastro: DimUcSchema
     # Vazio na UC sem medidor instalado: não há linha em gold_medidor_uc.
     medidor: MedidorUcSchema | None
+    # Do mais recente para o mais antigo: o atendente olha primeiro o que aconteceu há pouco.
+    interrupcoes: list[InterrupcaoUcSchema]
+    atendimentos: list[AtendimentoUcSchema]
+    inspecoes: list[InspecaoUcSchema]
 
 
 class ContinuidadeSerieFiltroSchema(PeriodoSchema):
