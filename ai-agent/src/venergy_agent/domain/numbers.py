@@ -2,7 +2,7 @@ import re
 from collections.abc import Iterable
 from decimal import Decimal, InvalidOperation
 
-PT_BR_NUMBER = re.compile(r"\d+(?:[.,]\d+)*")
+PT_BR_NUMBER = re.compile(r"(?<![\d.,])(?<![^\W\d_])(?<![^\W\d_]-)\d+(?:[.,]\d+)*")
 MACHINE_NUMBER = re.compile(r"\d+(?:\.\d+)?")
 
 
