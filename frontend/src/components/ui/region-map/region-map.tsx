@@ -203,7 +203,6 @@ export function RegionMap({
 	const titleId = useId();
 	// O id vai num `url(#…)`: só letras e dígitos.
 	const hatchId = `hachura-${useId().replace(/[^\w-]/g, "")}`;
-	const hatch = viewBox.width / 90;
 	const svgRef = useRef<SVGSVGElement>(null);
 	const containerRef = useRef<HTMLDivElement>(null);
 	const full: View = { x: 0, y: 0, w: viewBox.width, h: viewBox.height };
@@ -272,6 +271,10 @@ export function RegionMap({
 		([w, h, bw, bh]: number[]) =>
 			bw && bh ? Math.max(w / bw, h / bh) : w / 300,
 	);
+	// Hachura de "Sem dado" em pixels da tela, como a da legenda (listra de 2 a cada 5): em
+	// unidades do viewBox, ela engrossaria a cada zoom.
+	const hatch = useTransform(unitsPerPixel, (u) => u * 5);
+	const hatchLine = useTransform(unitsPerPixel, (u) => u * 2);
 
 	useEffect(() => {
 		const pares: [typeof vx, number][] = [
@@ -485,23 +488,27 @@ export function RegionMap({
 				<title id={titleId}>{label}</title>
 				{/* Sem dado: hachurado, para não se confundir com uma variação perto de zero. */}
 				<defs>
-					<pattern
+					<motion.pattern
 						id={hatchId}
 						patternUnits="userSpaceOnUse"
 						width={hatch}
 						height={hatch}
 						patternTransform="rotate(45)"
 					>
-						<rect width={hatch} height={hatch} className="fill-surface-1" />
-						<line
+						<motion.rect
+							width={hatch}
+							height={hatch}
+							className="fill-surface-1"
+						/>
+						<motion.line
 							x1={0}
 							y1={0}
 							x2={0}
 							y2={hatch}
 							className="stroke-border-strong"
-							strokeWidth={hatch * 0.4}
+							strokeWidth={hatchLine}
 						/>
-					</pattern>
+					</motion.pattern>
 				</defs>
 				<g aria-hidden className="fill-none stroke-border" style={stroke(1)}>
 					{context.map((d, i) => (
