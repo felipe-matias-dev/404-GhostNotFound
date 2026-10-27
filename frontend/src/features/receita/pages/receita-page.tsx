@@ -84,6 +84,7 @@ export function ReceitaPage() {
 				<MapaRecorte
 					par={par}
 					recorte={recorte}
+					efeito={causa}
 					destaque={destaque}
 					onChange={mudar}
 					className="h-96 lg:sticky lg:top-5 lg:h-[calc(100svh-8rem)]"

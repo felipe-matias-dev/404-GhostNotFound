@@ -6,11 +6,15 @@ import {
 	RMR_MUNICIPIOS,
 	RMR_VIEWBOX,
 } from "#/components/ui/region-map";
-import { formatBRL } from "#/lib/format";
+import { formatBRL, formatPct } from "#/lib/format";
 import {
 	chaveNome,
-	intensidadeVariacao,
-	LEGENDA_VARIACAO,
+	EFEITO_CAMPO,
+	EFEITO_ROTULO,
+	type Efeito,
+	intensidade,
+	legendaDoMapa,
+	sobreABase,
 } from "../conversions";
 import { useBairrosRmr } from "../hooks/use-bairros-rmr";
 import { useDecomposicao } from "../hooks/use-decomposicao";
@@ -27,12 +31,15 @@ function indexar(linhas: DecomposicaoLinha[] | undefined) {
 export function MapaRecorte({
 	par,
 	recorte,
+	efeito,
 	destaque = null,
 	onChange,
 	className,
 }: {
 	par: ParPeriodos | undefined;
 	recorte: Recorte;
+	/** Causa escolhida na ponte: a cor do mapa passa a ser ela, e não a variação total. */
+	efeito: Efeito;
 	destaque?: DecomposicaoLinha | null;
 	onChange: (proximo: Recorte) => void;
 	className?: string;
@@ -137,12 +144,16 @@ export function MapaRecorte({
 			}
 			getIntensity={(f) => {
 				const linha = linhaDe(f);
-				return linha ? intensidadeVariacao(linha) : 0;
+				return linha ? intensidade(linha, efeito) : 0;
 			}}
-			legend={LEGENDA_VARIACAO}
+			legend={legendaDoMapa(efeito)}
 			describe={(f) => {
 				const linha = linhaDe(f);
-				return linha ? `Variação: ${formatBRL(linha.variacao_receita)}` : null;
+				if (!linha) return null;
+				const pct = sobreABase(linha, efeito);
+				return `${EFEITO_ROTULO[efeito]}: ${formatBRL(linha[EFEITO_CAMPO[efeito]])}${
+					pct === null ? "" : ` (${pct > 0 ? "+" : ""}${formatPct(pct)})`
+				}`;
 			}}
 			className={className}
 		/>

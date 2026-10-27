@@ -151,23 +151,29 @@ export function sobreABase(
 }
 
 /**
- * Intensidade do mapa, de -1 a 1: variação da receita sobre a receita base do próprio
- * segmento, para um bairro pequeno e um município grande ficarem comparáveis. Só define a
- * cor e o brilho; o número exibido continua sendo a variação em R$ que vem da API.
+ * Intensidade do mapa, de -1 a 1: o efeito escolhido sobre a receita base. Só define a cor e
+ * o brilho; o número exibido continua sendo o valor em R$ que vem da API.
  */
-export function intensidadeVariacao(linha: DecomposicaoLinha): number {
-	const { variacao_receita: variacao, receita_base: base } = linha;
-	if (base <= 0) return variacao > 0 ? 1 : 0;
-	const fracao = variacao / base;
+export function intensidade(linha: DecomposicaoLinha, efeito: Efeito): number {
+	const fracao = sobreABase(linha, efeito);
+	if (fracao === null) return Math.sign(linha[EFEITO_CAMPO[efeito]]);
 	if (Math.abs(fracao) < ESTAVEL) return 0;
 	return Math.max(-1, Math.min(1, fracao / SATURA));
 }
 
-export const LEGENDA_VARIACAO: NonNullable<RegionMapProps["legend"]> = {
-	title: "Variação da receita",
-	ticks: [formatPct(-SATURA), formatPct(0), formatPct(SATURA)],
-	description: `vermelho para queda, verde para alta; a cor fica mais forte e brilha mais até ${formatPct(SATURA)} de variação sobre a receita base`,
-};
+export function legendaDoMapa(
+	efeito: Efeito,
+): NonNullable<RegionMapProps["legend"]> {
+	const titulo =
+		efeito === "variacao"
+			? "Variação da receita"
+			: `Efeito ${EFEITO_ROTULO[efeito].toLowerCase()}`;
+	return {
+		title: titulo,
+		ticks: [formatPct(-SATURA), formatPct(0), formatPct(SATURA)],
+		description: `${titulo} sobre a receita base de cada região: vermelho para queda, verde para alta; a cor fica mais forte e brilha mais até ${formatPct(SATURA)}`,
+	};
+}
 
 /** Campos numéricos da linha (receitas, variação e efeitos). */
 export type CampoValor = {
