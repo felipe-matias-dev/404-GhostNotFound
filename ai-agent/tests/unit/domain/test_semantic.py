@@ -52,3 +52,23 @@ def test_relation_to_unknown_view_or_column_is_rejected(views, relation):
 def test_duplicate_view_names_are_rejected(views):
     with pytest.raises(ValidationError):
         SemanticLayer(version="v0", views=views + views[:1])
+
+
+def test_column_units_map_each_column_to_its_unit_and_drop_ambiguous_names():
+    def view(name, *columns):
+        return ViewSpec(name=name, description="d", grain="g", columns=columns)
+
+    def column(name, unit=None):
+        return ColumnSpec(name=name, type="numeric", description="d", unit=unit)
+
+    layer = SemanticLayer(
+        version="1",
+        views=(
+            view(
+                "sem_a", column("receita_faturada", "R$"), column("competencia"), column("x", "h")
+            ),
+            view("sem_b", column("receita_faturada", "R$"), column("x", "kWh")),
+        ),
+    )
+
+    assert layer.column_units == {"receita_faturada": "R$"}
