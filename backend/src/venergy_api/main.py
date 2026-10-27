@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from venergy_api.agente import montar_agente, montar_redator_insights
 from venergy_api.config import Settings, get_settings
+from venergy_api.insights import CacheInsights
 from venergy_api.routers import ai, continuidade, fila, health, ordens, receita, unidades
 
 
@@ -30,6 +31,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
 
     app = FastAPI(title="V-Energy Grid 360 API", version="0.7.0", lifespan=lifespan)
+    # Criado com o app, e não no lifespan: o cache não depende de nada externo, e o app dos
+    # testes (sem lifespan) também precisa dele.
+    app.state.cache_insights = CacheInsights()
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,

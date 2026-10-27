@@ -3,17 +3,23 @@
 from decimal import Decimal
 from typing import Annotated
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, status
+from fastapi.concurrency import run_in_threadpool
 from sqlalchemy import ColumnElement, case, func, or_, select
 from sqlalchemy.orm import InstrumentedAttribute, Session
 
+from venergy_api.agente import RedatorInsightsDep
 from venergy_api.database import SessionDep
+from venergy_api.insight_receita import metricas_da_receita
+from venergy_api.insights import CacheInsightsDep, chave_do_cache
 from venergy_api.models import DimUc, FatoFaturamentoMensal, KpisMensais, ReceitaDecomposicao
 from venergy_api.schemas import (
     ComparacaoFiltroSchema,
     ComparacaoReceitaSchema,
     DecomposicaoFiltroSchema,
     DecomposicaoLinhaSchema,
+    ErroSchema,
+    InsightReceitaSchema,
     KpisMensaisSchema,
     ParPeriodosSchema,
     PeriodoSchema,
@@ -186,3 +192,30 @@ def get_decomposicao(
     Ordenada da maior queda para a maior alta: o topo é onde a receita mais caiu.
     """
     return consultar_decomposicao(filtro, session)
+
+
+@router.get("/insight", responses={status.HTTP_503_SERVICE_UNAVAILABLE: {"model": ErroSchema}})
+async def get_insight(
+    filtro: Annotated[DecomposicaoFiltroSchema, Query()],
+    session: SessionDep,
+    redator: RedatorInsightsDep,
+    cache: CacheInsightsDep,
+) -> InsightReceitaSchema:
+    """Um insight de IA sobre a ponte de receita do recorte que a tela está mostrando."""
+    # A sessão do backend é síncrona: a consulta sai do laço de eventos para não travar as
+    # outras requisições, como na gravação da auditoria.
+    linhas = await run_in_threadpool(consultar_decomposicao, filtro, session)
+    metricas = metricas_da_receita(filtro, linhas)
+    if metricas is None:
+        return InsightReceitaSchema(texto=None, metricas=None)
+
+    chave = chave_do_cache("receita", metricas)
+    texto = cache.obter(chave)
+    if texto is None:
+        insight = await redator.narrate("receita", metricas)
+        # None: o redator descartou o texto (número fora das métricas) ou o provedor falhou.
+        # A tela aparece sem insight, e a falha não fica no cache.
+        if insight is not None:
+            texto = insight.text
+            cache.guardar(chave, texto)
+    return InsightReceitaSchema(texto=texto, metricas=metricas)
