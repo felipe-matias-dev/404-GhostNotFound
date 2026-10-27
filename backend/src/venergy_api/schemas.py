@@ -302,6 +302,8 @@ class ContinuidadeAlimentadorMensalSchema(BaseModel):
 class InterrupcaoUcSchema(BaseModel):
     """Uma interrupção que afetou uma UC."""
 
+    model_config = ConfigDict(from_attributes=True)
+
     cod_ocorrencia: RequiredText
     cod_uc: RequiredText
     cod_alimentador: RequiredText
@@ -315,6 +317,8 @@ class InterrupcaoUcSchema(BaseModel):
 
 class AtendimentoUcSchema(BaseModel):
     """Um chamado de atendimento de uma UC."""
+
+    model_config = ConfigDict(from_attributes=True)
 
     protocolo: RequiredText
     cod_uc: RequiredText
@@ -330,6 +334,8 @@ class AtendimentoUcSchema(BaseModel):
 class MedidorUcSchema(BaseModel):
     """O medidor vigente de uma UC e quantas vezes ele já foi trocado."""
 
+    model_config = ConfigDict(from_attributes=True)
+
     cod_uc: RequiredText
     cod_medidor: RequiredText
     tipo_medidor: TipoMedidor
@@ -343,6 +349,8 @@ class MedidorUcSchema(BaseModel):
 class InspecaoUcSchema(BaseModel):
     """Uma inspeção de campo numa UC e o que ela encontrou."""
 
+    model_config = ConfigDict(from_attributes=True)
+
     cod_inspecao: RequiredText
     cod_uc: RequiredText
     data_inspecao: date
@@ -350,6 +358,14 @@ class InspecaoUcSchema(BaseModel):
     resultado: ResultadoInspecao
     tipo_irregularidade: RequiredText | None
     kwh_recuperado: Annotated[ExactNumber, Field(ge=0)]
+
+
+class Uc360Schema(BaseModel):
+    """Tudo o que o atendente precisa de uma UC numa tela só."""
+
+    cadastro: DimUcSchema
+    # Vazio na UC sem medidor instalado: não há linha em gold_medidor_uc.
+    medidor: MedidorUcSchema | None
 
 
 class ContinuidadeSerieFiltroSchema(PeriodoSchema):

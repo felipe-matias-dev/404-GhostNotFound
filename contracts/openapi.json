@@ -82,6 +82,59 @@
         }
       }
     },
+    "/unidades-consumidoras/{cod_uc}/visao-360": {
+      "get": {
+        "tags": [
+          "unidades consumidoras"
+        ],
+        "summary": "Get Visao 360",
+        "description": "Cadastro, medidor e histórico da UC: o que o atendente precisa com o cliente na linha.",
+        "operationId": "get_visao_360_unidades_consumidoras__cod_uc__visao_360_get",
+        "parameters": [
+          {
+            "name": "cod_uc",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Cod Uc"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Uc360Schema"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErroSchema"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/receita/mensal": {
       "get": {
         "tags": [
@@ -1631,6 +1684,81 @@
         "title": "KpisMensaisSchema",
         "description": "Indicadores executivos de uma competência."
       },
+      "MedidorUcSchema": {
+        "properties": {
+          "cod_uc": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Cod Uc"
+          },
+          "cod_medidor": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Cod Medidor"
+          },
+          "tipo_medidor": {
+            "type": "string",
+            "enum": [
+              "eletromecanico",
+              "eletronico",
+              "smart"
+            ],
+            "title": "Tipo Medidor"
+          },
+          "modelo": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modelo"
+          },
+          "data_instalacao": {
+            "type": "string",
+            "format": "date",
+            "title": "Data Instalacao"
+          },
+          "idade_anos": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Idade Anos"
+          },
+          "n_trocas": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "N Trocas"
+          },
+          "data_ultima_troca": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data Ultima Troca"
+          }
+        },
+        "type": "object",
+        "required": [
+          "cod_uc",
+          "cod_medidor",
+          "tipo_medidor",
+          "modelo",
+          "data_instalacao",
+          "idade_anos",
+          "n_trocas",
+          "data_ultima_troca"
+        ],
+        "title": "MedidorUcSchema",
+        "description": "O medidor vigente de uma UC e quantas vezes ele já foi trocado."
+      },
       "OrdemAtivaSchema": {
         "properties": {
           "id": {
@@ -2058,6 +2186,30 @@
         ],
         "title": "TotaisPeriodoSchema",
         "description": "kWh e receita faturados, somados num período."
+      },
+      "Uc360Schema": {
+        "properties": {
+          "cadastro": {
+            "$ref": "#/components/schemas/DimUcSchema"
+          },
+          "medidor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MedidorUcSchema"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "cadastro",
+          "medidor"
+        ],
+        "title": "Uc360Schema",
+        "description": "Tudo o que o atendente precisa de uma UC numa tela só."
       },
       "ValidationError": {
         "properties": {

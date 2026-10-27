@@ -38,6 +38,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/unidades-consumidoras/{cod_uc}/visao-360": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Visao 360
+         * @description Cadastro, medidor e histórico da UC: o que o atendente precisa com o cliente na linha.
+         */
+        get: operations["get_visao_360_unidades_consumidoras__cod_uc__visao_360_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/receita/mensal": {
         parameters: {
             query?: never;
@@ -455,6 +475,34 @@ export interface components {
             satisfacao_media: number | null;
         };
         /**
+         * MedidorUcSchema
+         * @description O medidor vigente de uma UC e quantas vezes ele já foi trocado.
+         */
+        MedidorUcSchema: {
+            /** Cod Uc */
+            cod_uc: string;
+            /** Cod Medidor */
+            cod_medidor: string;
+            /**
+             * Tipo Medidor
+             * @enum {string}
+             */
+            tipo_medidor: "eletromecanico" | "eletronico" | "smart";
+            /** Modelo */
+            modelo: string | null;
+            /**
+             * Data Instalacao
+             * Format: date
+             */
+            data_instalacao: string;
+            /** Idade Anos */
+            idade_anos: number;
+            /** N Trocas */
+            n_trocas: number;
+            /** Data Ultima Troca */
+            data_ultima_troca: string | null;
+        };
+        /**
          * OrdemAtivaSchema
          * @description A ordem de inspeção que já ocupa a UC (gerada ou em campo).
          */
@@ -617,6 +665,14 @@ export interface components {
             /** Receita Faturada */
             receita_faturada: number;
         };
+        /**
+         * Uc360Schema
+         * @description Tudo o que o atendente precisa de uma UC numa tela só.
+         */
+        Uc360Schema: {
+            cadastro: components["schemas"]["DimUcSchema"];
+            medidor: components["schemas"]["MedidorUcSchema"] | null;
+        };
         /** ValidationError */
         ValidationError: {
             /** Location */
@@ -679,6 +735,46 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DimUcSchema"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErroSchema"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_visao_360_unidades_consumidoras__cod_uc__visao_360_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cod_uc: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Uc360Schema"];
                 };
             };
             /** @description Not Found */
