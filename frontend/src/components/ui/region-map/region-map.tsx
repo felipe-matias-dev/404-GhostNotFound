@@ -3,8 +3,9 @@
 //   botão do meio/Ctrl+clique abre em outra aba. Regiões sem dado ficam visíveis, sem link e
 //   hachuradas (com "Sem dado" na legenda), para não passarem por variação zero.
 // - Ao escolher, o mapa enquadra a região com mola (viewBox animado); os botões aproximam,
-//   afastam e enquadram de novo. Arrastar move o mapa; a roda (ou a pinça no trackpad) dá
-//   zoom no ponto do cursor. Fora do mapa, a roda rola a página normalmente.
+//   afastam e enquadram de novo. Arrastar move o mapa; Ctrl+roda (ou a pinça no trackpad) dá
+//   zoom no ponto do cursor, e a roda sozinha também, depois de um clique no mapa. Antes
+//   disso, ou afastando além do limite, a roda rola a página.
 // - Cor contínua (`getIntensity`, de -1 a 1): queda em `danger`, alta em `success`, misturadas
 //   à superfície pela intensidade; quanto mais forte, mais o contorno brilha (glow). Hover e
 //   seleção são contornos por cima de tudo, então valem sobre qualquer cor.
@@ -219,6 +220,12 @@ export function RegionMap({
 		x: number;
 		y: number;
 	} | null>(null);
+	// A roda só dá zoom depois que a pessoa usou o mapa (clique ou foco dentro dele); antes,
+	// rola a página. Assim o mapa não prende quem só está passando por cima dele.
+	const ativo = useRef(false);
+	const [avisoRoda, setAvisoRoda] = useState(false);
+	const avisoTimer = useRef<number | undefined>(undefined);
+	useEffect(() => () => window.clearTimeout(avisoTimer.current), []);
 
 	// Nova seleção (clique, menu, URL): enquadra de novo.
 	const [previousSelected, setPreviousSelected] = useState(selectedId);
@@ -300,8 +307,21 @@ export function RegionMap({
 
 	// Roda: listener nativo, porque o React registra `wheel` como passivo e o preventDefault
 	// (que impede a página de rolar ou dar zoom junto) seria ignorado. Registrado uma vez; o
-	// Effect Event lê o `full` atual.
+	// Effect Event lê o `full` e a `view` atuais.
+	// - Ctrl/⌘ (e a pinça do trackpad, que chega com ctrlKey) sempre dão zoom.
+	// - A roda sozinha só depois que o mapa está ativo; antes, a página rola e aparece a dica.
+	// - Afastando com o mapa já no limite, a roda volta para a página.
 	const onWheel = useEffectEvent((event: WheelEvent) => {
+		const comando = event.ctrlKey || event.metaKey;
+		if (!comando && !ativo.current) {
+			setAvisoRoda(true);
+			window.clearTimeout(avisoTimer.current);
+			avisoTimer.current = window.setTimeout(() => setAvisoRoda(false), 1500);
+			return;
+		}
+		// Limite da roda: o mapa inteiro na tela (os botões ainda afastam um pouco além).
+		const noLimite = view.w >= full.w - 1e-6;
+		if (!comando && event.deltaY > 0 && noLimite) return;
 		event.preventDefault();
 		setInstant(true);
 		setView((v) => {
@@ -406,13 +426,38 @@ export function RegionMap({
 	const apagado = (id: string) => focusIds !== undefined && !focusIds.has(id);
 
 	return (
+		// biome-ignore lint/a11y/noStaticElementInteractions: só registra se o mapa está em uso (para a roda); a interação é dos links e botões de dentro.
 		<div
 			ref={containerRef}
 			className={cn(
 				"relative overflow-hidden rounded-lg border border-border bg-surface-1",
 				className,
 			)}
+			onPointerDownCapture={() => {
+				ativo.current = true;
+				setAvisoRoda(false);
+			}}
+			onPointerLeave={() => {
+				ativo.current = false;
+			}}
+			onFocus={() => {
+				ativo.current = true;
+			}}
+			onBlur={(event) => {
+				if (!event.currentTarget.contains(event.relatedTarget))
+					ativo.current = false;
+			}}
 		>
+			{avisoRoda && (
+				<div
+					aria-hidden
+					className="pointer-events-none absolute inset-x-0 top-3 z-10 flex justify-center"
+				>
+					<span className="rounded-md border border-border bg-surface-1 px-2.5 py-1 text-small text-text-muted">
+						Clique no mapa para dar zoom com a roda, ou use Ctrl + roda
+					</span>
+				</div>
+			)}
 			<motion.svg
 				ref={svgRef}
 				aria-labelledby={titleId}
