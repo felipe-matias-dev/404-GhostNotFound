@@ -613,7 +613,7 @@ itens:
     reference_sql: null
     expected_status: unknown
     follow_up_of: null
-    notes: "Pergunta da Camila (case p. 5; RESUMO §1.7). Ocorrências por UC (gold_interrupcoes_uc) não têm chave definida e não estão nas views. Conferência de Dados (27/10/2026, achado do case): a Camila pede, na tela da UC, saber se a rua dele teve falta de luz, e o glossário do case define o alimentador como o circuito que abastece um conjunto de ruas e bairros; cada ocorrência de rede é uma UC interrompida. A resposta pelo alimentador da UC atende o que o case pede, e o unknown é mais rígido que o case. O esperado fica como está por ora; a decisão é trocar para answered, com a resposta dizendo que é do alimentador, e acrescentar um item por UC quando a camada v0.3 expuser as interrupções por UC."
+    notes: "Pergunta da Camila (case p. 5; RESUMO §1.7). Ocorrências por UC (gold_interrupcoes_uc) não têm chave definida e não estão nas views. Pergunta aberta ao GenAI (Dados, 27/10/2026): o case (Camila) pede, na tela da UC, saber se a rua dele teve falta de luz, e o glossário define o alimentador como o circuito que abastece um conjunto de ruas e bairros. Se 'rua' for o alimentador da UC, o item é answered (a camada já permite responder, e a resposta deve dizer que é do alimentador). Se a pergunta for sobre a própria UC, o unknown vale até a camada v0.3 expor as interrupções por UC. Esperado mantido até a decisão."
     revisado_por: null
 
   - id: G063
