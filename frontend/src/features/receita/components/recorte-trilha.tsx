@@ -89,10 +89,10 @@ export function RecorteTrilha({
 	recorte: Recorte;
 	onChange: (proximo: Recorte) => void;
 }) {
-	const municipios = useDecomposicao(par, {});
+	const municipios = useDecomposicao(par, { classe: recorte.classe });
 	const bairros = useDecomposicao(
 		par,
-		{ municipio: recorte.municipio },
+		{ municipio: recorte.municipio, classe: recorte.classe },
 		Boolean(recorte.municipio),
 	);
 

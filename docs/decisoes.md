@@ -988,3 +988,24 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
     sendo uma tarefa própria.
 - **Consequências:** a DEC-021 deixa de valer na frase "DEC, FEC… não têm recorte por segmento": desde esta decisão eles têm, calculados
   sobre os componentes. O agente continua somando os mesmos componentes, então portal e agente dão o mesmo número.
+
+
+## DEC-035 · Soma dos efeitos e percentual sobre a base na tela de receita
+
+- **Data:** 27/10/2026 · **Área:** Portal · **Autor:** João Euclides
+- **Contexto:** a regra do projeto é que os cálculos de negócio ficam na Gold e no backend e que o frontend só exibe. Na revisão
+  do PR #51, Felipe apontou que a tela de receita faz duas contas sobre as linhas de `GET /receita/decomposicao`.
+- **Decisão:** a tela continua fazendo essas duas contas, e só elas:
+  - **Ponte do recorte:** soma a `receita_base` e os `efeito_tarifa`, `efeito_bandeira`, `efeito_volume` e `efeito_mix` dos
+    segmentos do nível abaixo (os efeitos são somáveis, DEC-023), como o backend já faz em SQL para cada segmento. A receita atual
+    da ponte é a base mais os efeitos, e não a soma de `receita_atual`. Cada linha fecha só dentro da tolerância do contrato
+    (R$ 0,025, DEC-029); somada sobre uns 90 bairros, a sobra passaria de R$ 1 e desalinharia o último degrau.
+  - **Percentual sobre a base:** efeito ÷ `receita_base` do próprio segmento, para a coluna "Var. %", o ranking em % e a cor do
+    mapa. Sem receita base (segmento novo), não há percentual.
+- **Por que não é cálculo de negócio:** nenhuma fórmula do PVM é refeita. A tela soma e divide valores que a Gold já calculou, do
+  mesmo jeito que formata R$ e %.
+- **Limite:** a receita atual da ponte pode ficar alguns centavos acima ou abaixo da soma da coluna "Receita atual" da tabela.
+- **Alternativa descartada por enquanto:** a API devolver a linha agregada do recorte e os percentuais. Isso pede campos novos no
+  schema, OpenAPI e cliente, e não muda nenhum número da tela. Volta a valer se outro consumidor precisar dos mesmos números
+  (por exemplo, o JSON de métricas que o backend monta para o insight da tela, D9): aí a conta passa para o backend, e a tela só
+  exibe.
