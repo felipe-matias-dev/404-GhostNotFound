@@ -10,9 +10,34 @@ const brlComSinal = new Intl.NumberFormat("pt-BR", {
 	currency: "BRL",
 	signDisplay: "exceptZero",
 });
+// Compacto para números de destaque: 45712401.17 → "R$ 45,7 mi".
+const brlCompacto = new Intl.NumberFormat("pt-BR", {
+	style: "currency",
+	currency: "BRL",
+	notation: "compact",
+	minimumFractionDigits: 0,
+	maximumFractionDigits: 1,
+});
+const brlCompactoComSinal = new Intl.NumberFormat("pt-BR", {
+	style: "currency",
+	currency: "BRL",
+	notation: "compact",
+	minimumFractionDigits: 0,
+	maximumFractionDigits: 1,
+	signDisplay: "exceptZero",
+});
 const inteiro = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 });
 const inteiroComSinal = new Intl.NumberFormat("pt-BR", {
 	maximumFractionDigits: 0,
+	signDisplay: "exceptZero",
+});
+const numeroCompacto = new Intl.NumberFormat("pt-BR", {
+	notation: "compact",
+	maximumFractionDigits: 1,
+});
+const numeroCompactoComSinal = new Intl.NumberFormat("pt-BR", {
+	notation: "compact",
+	maximumFractionDigits: 1,
 	signDisplay: "exceptZero",
 });
 const percentual = new Intl.NumberFormat("pt-BR", {
@@ -50,17 +75,36 @@ const MESES = [
 
 type Valor = number | null | undefined;
 
-/** 1234.5 → "R$ 1.234,50"; com sinal: "+R$ 1.234,50" */
-export function formatBRL(valor: Valor, { sinal = false } = {}): string {
+/** 1234.5 → "R$ 1.234,50"; com sinal: "+R$ 1.234,50"; compacto: 45712401 → "R$ 45,7 mi" */
+export function formatBRL(
+	valor: Valor,
+	{ sinal = false, compacto = false } = {},
+): string {
 	if (valor == null) return VAZIO;
+	if (compacto)
+		return (sinal ? brlCompactoComSinal : brlCompacto).format(valor);
 	return (sinal ? brlComSinal : brl).format(valor);
 }
 
-/** 1234.5 → "1.235 kWh"; com sinal: "+1.235 kWh" */
-export function formatKWh(valor: Valor, { sinal = false } = {}): string {
-	return valor == null
-		? VAZIO
-		: `${(sinal ? inteiroComSinal : inteiro).format(valor)} kWh`;
+/** 1234.5 → "1.235 kWh"; com sinal: "+1.235 kWh"; compacto: 12345678 → "12,3 mi kWh" */
+export function formatKWh(
+	valor: Valor,
+	{ sinal = false, compacto = false } = {},
+): string {
+	if (valor == null) return VAZIO;
+	const numero = compacto
+		? sinal
+			? numeroCompactoComSinal
+			: numeroCompacto
+		: sinal
+			? inteiroComSinal
+			: inteiro;
+	return `${numero.format(valor)} kWh`;
+}
+
+/** Número sem unidade, até uma casa: 12.43 → "12,4"; 1234 → "1.234" */
+export function formatNumero(valor: Valor): string {
+	return valor == null ? VAZIO : decimal1.format(valor);
 }
 
 /** Fração → percentual: -0.039 → "-3,9%"; com sinal, 0.039 → "+3,9%" */
