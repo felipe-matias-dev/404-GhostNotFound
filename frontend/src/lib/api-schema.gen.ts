@@ -265,6 +265,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/ai/audit/{audit_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Obter Auditoria
+         * @description O registro completo de uma resposta: pergunta, SQL, views, linhas, modelo e horário.
+         */
+        get: operations["obter_auditoria_ai_audit__audit_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -283,6 +303,53 @@ export interface components {
             resultado?: components["schemas"]["ResultadoOrdem"] | null;
             /** Observacao */
             observacao?: string | null;
+        };
+        /**
+         * AuditoriaIaSchema
+         * @description O registro completo da auditoria: a resposta com a pergunta e o momento em que veio.
+         */
+        AuditoriaIaSchema: {
+            /** Audit Id */
+            audit_id: number;
+            /** Answer */
+            answer: string;
+            status: components["schemas"]["AnswerStatus"];
+            /** Sql */
+            sql: string | null;
+            /** Rows */
+            rows: {
+                [key: string]: unknown;
+            }[];
+            /** Row Count */
+            row_count: number;
+            /** Truncated */
+            truncated: boolean;
+            confidence: components["schemas"]["Confidence"];
+            /** Sources */
+            sources: string[];
+            /** Assumptions */
+            assumptions: string[];
+            /** Clarification */
+            clarification: string | null;
+            /** Refused Reason */
+            refused_reason: string | null;
+            /** Request Id */
+            request_id: string;
+            /** Model */
+            model: string;
+            /** Prompt Version */
+            prompt_version: string;
+            /** Latency Ms */
+            latency_ms: number;
+            /** Pergunta */
+            pergunta: string;
+            /** Session Id */
+            session_id: string;
+            /**
+             * Criado Em
+             * Format: date-time
+             */
+            criado_em: string;
         };
         /**
          * ComparacaoReceitaSchema
@@ -1251,6 +1318,46 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErroSchema"];
+                };
+            };
+        };
+    };
+    obter_auditoria_ai_audit__audit_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                audit_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditoriaIaSchema"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErroSchema"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

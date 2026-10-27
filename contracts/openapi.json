@@ -1060,6 +1060,61 @@
           }
         }
       }
+    },
+    "/ai/audit/{audit_id}": {
+      "get": {
+        "tags": [
+          "agente de IA"
+        ],
+        "summary": "Obter Auditoria",
+        "description": "O registro completo de uma resposta: pergunta, SQL, views, linhas, modelo e horário.",
+        "operationId": "obter_auditoria_ai_audit__audit_id__get",
+        "parameters": [
+          {
+            "name": "audit_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 2147483647,
+              "minimum": 1,
+              "title": "Audit Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditoriaIaSchema"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErroSchema"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1110,6 +1165,140 @@
         ],
         "title": "AtualizarOrdemSchema",
         "description": "Mudança de status de uma OI. Cancelar é mudar para CANCELADA."
+      },
+      "AuditoriaIaSchema": {
+        "properties": {
+          "audit_id": {
+            "type": "integer",
+            "title": "Audit Id"
+          },
+          "answer": {
+            "type": "string",
+            "title": "Answer"
+          },
+          "status": {
+            "$ref": "#/components/schemas/AnswerStatus"
+          },
+          "sql": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sql"
+          },
+          "rows": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Rows"
+          },
+          "row_count": {
+            "type": "integer",
+            "title": "Row Count"
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated"
+          },
+          "confidence": {
+            "$ref": "#/components/schemas/Confidence"
+          },
+          "sources": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Sources"
+          },
+          "assumptions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Assumptions"
+          },
+          "clarification": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clarification"
+          },
+          "refused_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refused Reason"
+          },
+          "request_id": {
+            "type": "string",
+            "title": "Request Id"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "prompt_version": {
+            "type": "string",
+            "title": "Prompt Version"
+          },
+          "latency_ms": {
+            "type": "integer",
+            "title": "Latency Ms"
+          },
+          "pergunta": {
+            "type": "string",
+            "title": "Pergunta"
+          },
+          "session_id": {
+            "type": "string",
+            "title": "Session Id"
+          },
+          "criado_em": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Criado Em"
+          }
+        },
+        "type": "object",
+        "required": [
+          "audit_id",
+          "answer",
+          "status",
+          "sql",
+          "rows",
+          "row_count",
+          "truncated",
+          "confidence",
+          "sources",
+          "assumptions",
+          "clarification",
+          "refused_reason",
+          "request_id",
+          "model",
+          "prompt_version",
+          "latency_ms",
+          "pergunta",
+          "session_id",
+          "criado_em"
+        ],
+        "title": "AuditoriaIaSchema",
+        "description": "O registro completo da auditoria: a resposta com a pergunta e o momento em que veio."
       },
       "ComparacaoReceitaSchema": {
         "properties": {

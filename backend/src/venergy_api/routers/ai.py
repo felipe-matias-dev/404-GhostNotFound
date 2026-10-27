@@ -1,17 +1,21 @@
 """Rotas do agente de IA: perguntar em linguagem natural e auditar como ele respondeu."""
 
 import logging
+from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Path, status
 from fastapi.concurrency import run_in_threadpool
 from sqlalchemy.exc import SQLAlchemyError
 
 from venergy_api.agente import AgenteDep
 from venergy_api.auditoria import gravar_auditoria
 from venergy_api.database import SessionDep
-from venergy_api.schemas import ErroSchema, PerguntaIaSchema, RespostaIaSchema
+from venergy_api.models import AiAuditoria
+from venergy_api.schemas import AuditoriaIaSchema, ErroSchema, PerguntaIaSchema, RespostaIaSchema
 
 router = APIRouter(prefix="/ai", tags=["agente de IA"])
+
+MAX_ID_AUDITORIA = 2_147_483_647
 
 logger = logging.getLogger(__name__)
 
@@ -42,3 +46,20 @@ async def perguntar(
             detail="Não foi possível gravar a auditoria, então a resposta não foi entregue.",
         ) from error
     return RespostaIaSchema.model_validate(auditoria)
+
+
+@router.get("/audit/{audit_id}", responses={status.HTTP_404_NOT_FOUND: {"model": ErroSchema}})
+def obter_auditoria(
+    # O teto é o de uma coluna int4: sem ele, um id enorme viraria erro do banco (500) em
+    # vez de um 422 de entrada inválida.
+    audit_id: Annotated[int, Path(ge=1, le=MAX_ID_AUDITORIA)],
+    session: SessionDep,
+) -> AuditoriaIaSchema:
+    """O registro completo de uma resposta: pergunta, SQL, views, linhas, modelo e horário."""
+    auditoria = session.get(AiAuditoria, audit_id)
+    if auditoria is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Registro de auditoria {audit_id} não encontrado",
+        )
+    return AuditoriaIaSchema.model_validate(auditoria)

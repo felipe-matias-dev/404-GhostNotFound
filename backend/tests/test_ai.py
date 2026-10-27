@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from venergy_agent.domain.answer import AgentAnswer, AnswerStatus, Confidence
 
 from venergy_api.agente import get_agente
+from venergy_api.auditoria import gravar_auditoria
 from venergy_api.database import Base
 from venergy_api.models import AiAuditoria
 from venergy_api.schemas import MAX_PERGUNTA_IA, MAX_SESSAO_IA
@@ -197,7 +198,6 @@ def test_rejects_an_invalid_request_without_calling_the_agent(
 
 
 def test_does_not_deliver_the_answer_when_the_audit_cannot_be_stored(
-    engine: Engine,
     client_with_agent: Callable[[AgentAnswer], tuple[TestClient, AgenteFalso]],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -213,6 +213,72 @@ def test_does_not_deliver_the_answer_when_the_audit_cannot_be_stored(
     assert response.status_code == 500
     assert "R$ 1.234,50" not in response.text
     assert PERGUNTA not in response.text
+
+
+def test_audit_returns_what_the_post_answered(
+    client_with_agent: Callable[[AgentAnswer], tuple[TestClient, AgenteFalso]],
+) -> None:
+    client, _ = client_with_agent(answered_answer())
+    resposta = client.post("/ai/ask", json={"question": PERGUNTA, "session_id": "sessao-1"}).json()
+
+    response = client.get(f"/ai/audit/{resposta['audit_id']}")
+
+    assert response.status_code == 200, response.text
+    auditoria = response.json()
+    # Tudo o que o POST entregou volta igual, inclusive a amostra com Decimal e data.
+    assert {campo: auditoria[campo] for campo in resposta} == resposta
+    assert auditoria["pergunta"] == PERGUNTA
+    assert auditoria["session_id"] == "sessao-1"
+    assert auditoria["criado_em"]
+    assert auditoria["sql"].startswith("SELECT competencia")
+    assert auditoria["rows"][0]["receita_faturada"] == "1234.50"
+
+
+def test_audit_of_a_refused_answer_shows_the_reason(
+    client_with_agent: Callable[[AgentAnswer], tuple[TestClient, AgenteFalso]],
+) -> None:
+    client, _ = client_with_agent(refused_answer())
+    resposta = client.post("/ai/ask", json={"question": "Me conta uma piada", "session_id": "s"})
+
+    auditoria = client.get(f"/ai/audit/{resposta.json()['audit_id']}").json()
+
+    assert auditoria["status"] == "refused"
+    assert auditoria["refused_reason"] == "Pergunta fora do escopo da V-Energy."
+    assert auditoria["sql"] is None
+
+
+def test_audit_is_readable_without_the_agent(
+    engine: Engine, client_for: Callable[[Engine], TestClient]
+) -> None:
+    # Ler a trilha não depende da chave do Gemini: o histórico continua consultável.
+    with Session(engine) as session:
+        gravar_auditoria(session, PERGUNTA, "sessao-1", answered_answer())
+    [auditoria] = stored_audits(engine)
+
+    response = client_for(engine).get(f"/ai/audit/{auditoria.id}")
+
+    assert response.status_code == 200
+    assert response.json()["audit_id"] == auditoria.id
+
+
+def test_audit_not_found_answers_404(
+    client_with_agent: Callable[[AgentAnswer], tuple[TestClient, AgenteFalso]],
+) -> None:
+    client, _ = client_with_agent(answered_answer())
+
+    response = client.get("/ai/audit/999")
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Registro de auditoria 999 não encontrado"}
+
+
+@pytest.mark.parametrize("audit_id", ["0", "-1", "2147483648", "abc"])
+def test_audit_rejects_an_id_the_table_cannot_hold(
+    client_with_agent: Callable[[AgentAnswer], tuple[TestClient, AgenteFalso]], audit_id: str
+) -> None:
+    client, _ = client_with_agent(answered_answer())
+
+    assert client.get(f"/ai/audit/{audit_id}").status_code == 422
 
 
 def test_each_question_gets_its_own_audit_record(
