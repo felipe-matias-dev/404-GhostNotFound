@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from venergy_api.config import Settings, get_settings
-from venergy_api.routers import health, ordens, receita, unidades
+from venergy_api.routers import continuidade, fila, health, ordens, receita, unidades
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -15,7 +15,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # com as suas próprias, sem depender de um .env na máquina.
     settings = settings or get_settings()
 
-    app = FastAPI(title="V-Energy Grid 360 API", version="0.5.0")
+    app = FastAPI(title="V-Energy Grid 360 API", version="0.6.0")
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
@@ -25,5 +25,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(health.router)
     app.include_router(unidades.router)
     app.include_router(receita.router)
+    app.include_router(continuidade.router)
+    app.include_router(fila.router)
     app.include_router(ordens.router)
     return app
