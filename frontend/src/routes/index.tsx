@@ -1,6 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
-import { VisaoGeralPage } from "#/features/visaoGeral";
+import {
+	INDICADORES,
+	VISOES_TENDENCIA,
+	VisaoGeralPage,
+} from "#/features/visaoGeral";
 
 // Mesmo formato da tela de Receita (AAAA-MM/AAAA-MM): o período segue de uma tela para a outra.
 const periodo = z
@@ -12,6 +16,8 @@ const periodo = z
 const searchSchema = z.object({
 	periodo_base: periodo,
 	periodo_atual: periodo,
+	indicador: z.enum(INDICADORES).optional().catch(undefined),
+	tendencia: z.enum(VISOES_TENDENCIA).optional().catch(undefined),
 });
 
 export const Route = createFileRoute("/")({

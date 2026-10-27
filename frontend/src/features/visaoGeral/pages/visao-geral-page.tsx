@@ -2,6 +2,7 @@ import { getRouteApi } from "@tanstack/react-router";
 import { Pagina } from "#/components/layout/pagina";
 import { ComparacaoPicker } from "../components/comparacao-picker";
 import { IndicadoresCards } from "../components/indicadores-cards";
+import { TendenciaPainel } from "../components/tendencia-painel";
 import { parEscolhido } from "../conversions";
 import {
 	useComparacaoIndicadores,
@@ -12,7 +13,8 @@ import type { ParPeriodos } from "../types";
 const route = getRouteApi("/");
 
 export function VisaoGeralPage() {
-	const { periodo_base, periodo_atual } = route.useSearch();
+	const { periodo_base, periodo_atual, indicador, tendencia } =
+		route.useSearch();
 	const navigate = route.useNavigate();
 
 	// O par da URL só vale se os dois meses existem na série; senão, o padrão.
@@ -24,10 +26,11 @@ export function VisaoGeralPage() {
 
 	const escolher = (proximo: ParPeriodos) =>
 		navigate({
-			search: {
+			search: (atual) => ({
+				...atual,
 				periodo_base: proximo.periodo_base,
 				periodo_atual: proximo.periodo_atual,
-			},
+			}),
 			resetScroll: false,
 		});
 
@@ -54,6 +57,23 @@ export function VisaoGeralPage() {
 				}
 				semDados={semDados}
 				onRetry={() => competencias.refetch()}
+			/>
+			<TendenciaPainel
+				indicador={indicador ?? "receita_faturada"}
+				visao={tendencia ?? "mes"}
+				par={par}
+				onIndicador={(proximo) =>
+					navigate({
+						search: (atual) => ({ ...atual, indicador: proximo }),
+						resetScroll: false,
+					})
+				}
+				onVisao={(proxima) =>
+					navigate({
+						search: (atual) => ({ ...atual, tendencia: proxima }),
+						resetScroll: false,
+					})
+				}
 			/>
 		</Pagina>
 	);

@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
 	compararMeses,
+	marcadores,
 	parDoMes,
 	parEscolhido,
 	parPadrao,
+	tendencia,
+	variacaoNoPonto,
 } from "../conversions";
 import type { KpisMensais, ParPeriodos } from "../types";
 
@@ -119,5 +122,101 @@ describe("compararMeses", () => {
 		expect(resultado.variacao.dec).toBeNull();
 		expect(resultado.variacao.satisfacao_media).toBeNull();
 		expect(resultado.variacao.n_chamados).toBeNull();
+	});
+});
+
+describe("tendencia", () => {
+	const linha = (competencia: string, receita: number): KpisMensais => ({
+		competencia,
+		kwh_faturado: 1000,
+		receita_faturada: receita,
+		receita_energia: 700,
+		dec: null,
+		fec: 0.5,
+		n_chamados: 10,
+		satisfacao_media: 4,
+	});
+	const linhas = [
+		linha("2023-12", 90),
+		linha("2024-01", 100),
+		linha("2024-02", 110),
+		linha("2025-01", 120),
+	];
+
+	it("mês a mês mantém o id da série ao trocar de indicador", () => {
+		const receita = tendencia(linhas, "receita_faturada", "mes", "Receita");
+		const dec = tendencia(linhas, "dec", "mes", "DEC");
+		expect(receita.series[0]?.id).toBe(dec.series[0]?.id);
+		expect(receita.series[0]?.values).toEqual([90, 100, 110, 120]);
+		expect(dec.series[0]?.values).toEqual([null, null, null, null]);
+	});
+
+	it("ano a ano põe cada ano em jan–dez, com lacuna onde falta o mês", () => {
+		const { series, categories } = tendencia(
+			linhas,
+			"receita_faturada",
+			"ano",
+			"Receita",
+		);
+		expect(categories).toHaveLength(12);
+		expect(series.map((s) => s.id)).toEqual(["2023", "2024", "2025"]);
+		const s2024 = series[1]?.values ?? [];
+		expect(s2024.slice(0, 3)).toEqual([100, 110, null]);
+		expect(series[0]?.values[11]).toBe(90);
+	});
+
+	it("destaca o ano mais recente e compara com o anterior", () => {
+		const { series } = tendencia(linhas, "receita_faturada", "ano", "Receita");
+		expect(series.map((s) => [s.color, s.emphasis])).toEqual([
+			["muted", false],
+			[2, false],
+			[1, true],
+		]);
+	});
+});
+
+describe("variacaoNoPonto", () => {
+	const linha = (competencia: string, receita: number): KpisMensais => ({
+		competencia,
+		kwh_faturado: 1000,
+		receita_faturada: receita,
+		receita_energia: 700,
+		dec: 1,
+		fec: 0.5,
+		n_chamados: 10,
+		satisfacao_media: 4,
+	});
+	const linhas = [
+		linha("2024-01", 100),
+		linha("2024-02", 110),
+		linha("2025-01", 120),
+	];
+
+	it("mês a mês compara com o mês anterior da série", () => {
+		const t = tendencia(linhas, "receita_faturada", "mes", "Receita");
+		expect(variacaoNoPonto(t, 0)).toBeUndefined();
+		const ponto = variacaoNoPonto(t, 1);
+		expect(ponto?.valor).toBeCloseTo(0.1);
+		expect(ponto?.base).toBe("jan/2024");
+	});
+
+	it("ano a ano compara o ano em destaque com o mesmo mês do anterior", () => {
+		const t = tendencia(linhas, "receita_faturada", "ano", "Receita");
+		const ponto = variacaoNoPonto(t, 0);
+		expect(ponto?.valor).toBeCloseTo(0.2);
+		expect(ponto?.base).toBe("jan/2024");
+		expect(variacaoNoPonto(t, 1)).toBeUndefined();
+	});
+});
+
+describe("marcadores", () => {
+	it("marca base e atual no mês a mês e só o mês no ano a ano", () => {
+		const comparado = par("2024-09", "2025-09");
+		expect(marcadores(comparado, "mes").map((m) => m.at)).toEqual([
+			"2024-09",
+			"2025-09",
+		]);
+		expect(marcadores(comparado, "ano").map((m) => m.at)).toEqual(["09"]);
+		expect(marcadores(undefined, "mes")).toEqual([]);
 	});
 });
