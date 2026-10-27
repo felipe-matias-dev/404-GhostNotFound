@@ -89,7 +89,7 @@ views:
       - name: fec
         description: "frequência equivalente de interrupção por UC (FEC), já calculada na Gold; não recalcule"
       - name: n_uc
-        description: "número de UCs atendidas pelo alimentador na competência"
+        description: "UCs faturadas pelo alimentador na competência (denominador do DEC/FEC, como no PRODIST)"
       - name: n_interrupcoes
         description: "número de interrupções do alimentador na competência"
       - name: horas_interrompidas
@@ -135,6 +135,7 @@ views:
     source: gold_kpis_segmento_mensal
     description: "Componentes somáveis dos indicadores por competência, município, bairro, classe e geração própria"
     grain: "uma linha por competência, município, bairro, classe do cadastro e possui_gd"
+    standalone: true
     columns:
       - name: competencia
         description: "mês de referência, no formato AAAA-MM"
@@ -154,7 +155,7 @@ views:
         description: "verdadeiro quando as UCs do recorte já tinham geração própria conectada naquela competência"
       - name: n_uc
         unit: "contagem"
-        description: "UCs faturadas no recorte na competência (denominador do DEC/FEC, como no PRODIST); não some entre competências"
+        description: "UCs faturadas no recorte na competência (denominador do DEC/FEC, como no PRODIST); num período, use a média mensal"
       - name: kwh_faturado
         unit: "kWh"
         description: "energia faturada no recorte"
@@ -291,7 +292,7 @@ rules:
   - text: "Para ligar uma UC ao alimentador use sem_uc.cod_alimentador = sem_continuidade_alimentador_mensal.cod_alimentador."
   - text: "Quando a pergunta compara dois períodos e não diz quais são, peça esclarecimento (clarify). Não escolha os períodos sozinho."
 
-  - text: "n_uc é o número de UCs faturadas na competência (PRODIST). Não some n_uc entre competências."
+  - text: "n_uc é o número de UCs faturadas na competência (PRODIST). Para a quantidade de UCs num período, use a média mensal (soma dividida pelo número de meses), nunca a soma sozinha."
 examples:
   - question: "Quantas UCs existem em cada classe de consumo?"
     sql: "SELECT classe, count(*) AS total FROM sem_uc GROUP BY classe ORDER BY classe"

@@ -58,12 +58,35 @@ def test_relations_come_from_the_foreign_key_and_the_entity_keys(documents):
     }
 
 
-def test_aggregated_view_is_not_linked_by_entity_key(documents):
+def test_standalone_view_is_not_linked_by_entity_key(documents):
     layer = build_layer(*documents)
 
     assert all(
         "sem_kpis_segmento_mensal" not in (r.left_view, r.right_view) for r in layer.relations
     )
+
+
+def test_standalone_flag_takes_a_view_out_of_entity_links(documents):
+    layer, contract = documents
+    for view in layer["views"]:
+        if view["name"] == "sem_uc":
+            view["standalone"] = True
+
+    built = build_layer(layer, contract)
+
+    assert all(
+        "sem_uc" not in (r.left_view, r.right_view)
+        for r in built.relations
+        if r.left_column == "cod_alimentador" or r.right_column == "cod_alimentador"
+    )
+
+
+def test_standalone_must_be_a_boolean(documents):
+    layer, contract = documents
+    layer["views"][0]["standalone"] = "sim"
+
+    with pytest.raises(SemanticLayerError, match="standalone"):
+        build_layer(layer, contract)
 
 
 def test_each_link_appears_once_even_when_fk_and_shared_key_both_apply(documents):

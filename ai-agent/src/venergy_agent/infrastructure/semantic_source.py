@@ -18,7 +18,6 @@ from venergy_agent.domain.sql import DraftStatus
 
 CONFIRMED_STATUSES = frozenset({"confirmada", "proposta"})
 ENTITY_KEYS = frozenset({"cod_uc", "cod_alimentador"})
-AGGREGATED_VIEWS = frozenset({"sem_kpis_segmento_mensal"})
 AGENT_CONSUMER = "agente"
 
 
@@ -33,6 +32,7 @@ class ViewDefinition:
     name: str
     source_table: str
     columns: tuple[str, ...]
+    standalone: bool = False
 
 
 def read_documents(layer_path: Path, contract_path: Path) -> tuple[dict[str, Any], dict[str, Any]]:
@@ -83,7 +83,14 @@ def view_definitions(layer: dict[str, Any], contract: dict[str, Any]) -> tuple[V
                 )
             elif spec.get("sensitive", False):
                 problems.append(f"view {name!r}: coluna {column_name!r} é sensível")
-        definitions.append(ViewDefinition(name=name, source_table=source, columns=ordered))
+        standalone = view.get("standalone", False)
+        if not isinstance(standalone, bool):
+            problems.append(f"view {name!r}: standalone deve ser true ou false")
+        definitions.append(
+            ViewDefinition(
+                name=name, source_table=source, columns=ordered, standalone=standalone is True
+            )
+        )
 
     if problems:
         raise SemanticLayerError(problems)
@@ -186,7 +193,7 @@ def _relations(
         holders = [
             definition
             for definition in definitions
-            if key in definition.columns and definition.name not in AGGREGATED_VIEWS
+            if key in definition.columns and not definition.standalone
         ]
         for left, right in combinations(holders, 2):
             relations.add(
