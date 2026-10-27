@@ -9,7 +9,7 @@ from sqlalchemy import Engine
 from venergy_agent.config import AgentSettings
 from venergy_agent.infrastructure.semantic_source import SemanticLayerError
 
-from venergy_api.agente import AgenteDep, montar_agente
+from venergy_api.agente import AgenteDep, RedatorInsightsDep, montar_agente, montar_redator_insights
 
 DATABASE_URL = "postgresql://agente@127.0.0.1/venergy"
 
@@ -19,6 +19,14 @@ def no_agent_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     # Quem roda os testes pode ter a chave exportada no terminal: o teste não pode depender disso.
     for name in ("GOOGLE_API_KEY", "OPENROUTER_API_KEY", "DATABASE_URL"):
         monkeypatch.delenv(f"VENERGY_AGENT_{name}", raising=False)
+
+
+@pytest.fixture(autouse=True)
+def no_insight_writer(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def montar_redator_ausente() -> None:
+        return None
+
+    monkeypatch.setattr("venergy_api.main.montar_redator_insights", montar_redator_ausente)
 
 
 class AgenteFalso:
@@ -129,6 +137,82 @@ def test_dependency_answers_503_when_there_is_no_agent() -> None:
 
     @app.get("/probe")
     def probe(agente: AgenteDep) -> dict[str, str]:
+        return {}
+
+    response = TestClient(app).get("/probe")
+
+    assert response.status_code == 503
+    assert "VENERGY_AGENT_GOOGLE_API_KEY" in response.json()["detail"]
+
+
+def valid_settings() -> AgentSettings:
+    return AgentSettings(_env_file=None, database_url=DATABASE_URL, google_api_key="chave")
+
+
+def test_insight_writer_is_none_without_a_key(caplog: pytest.LogCaptureFixture) -> None:
+    with caplog.at_level(logging.WARNING):
+        redator = asyncio.run(montar_redator_insights(settings_without_key))
+
+    assert redator is None
+    assert "VENERGY_AGENT_GOOGLE_API_KEY" in caplog.text
+    assert "insights" in caplog.text.lower()
+
+
+def test_builds_the_insight_writer_with_a_valid_configuration(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    montados = []
+
+    def build_insight_writer_falso(settings: AgentSettings) -> AgenteFalso:
+        montados.append(settings)
+        return AgenteFalso()
+
+    monkeypatch.setattr("venergy_api.agente.build_insight_writer", build_insight_writer_falso)
+
+    redator = asyncio.run(montar_redator_insights(valid_settings))
+
+    assert isinstance(redator, AgenteFalso)
+    assert len(montados) == 1
+
+
+def test_insight_writer_is_none_when_the_prompt_version_does_not_exist(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    def settings_with_unknown_prompt() -> AgentSettings:
+        return AgentSettings(
+            _env_file=None,
+            database_url=DATABASE_URL,
+            google_api_key="chave-secreta",
+            insight_prompt_version="v99",
+        )
+
+    with caplog.at_level(logging.WARNING):
+        redator = asyncio.run(montar_redator_insights(settings_with_unknown_prompt))
+
+    assert redator is None
+    assert "v99" in caplog.text
+    assert "chave-secreta" not in caplog.text
+
+
+def test_api_starts_with_the_insight_writer_stored_in_the_app_state(
+    engine: Engine, client_for: Callable[[Engine], TestClient], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    redator = AgenteFalso()
+
+    async def montar_redator_falso() -> AgenteFalso:
+        return redator
+
+    monkeypatch.setattr("venergy_api.main.montar_redator_insights", montar_redator_falso)
+
+    with client_for(engine) as client:
+        assert client.app.state.redator_insights is redator
+
+
+def test_insight_dependency_answers_503_when_there_is_no_writer() -> None:
+    app = FastAPI()
+
+    @app.get("/probe")
+    def probe(redator: RedatorInsightsDep) -> dict[str, str]:
         return {}
 
     response = TestClient(app).get("/probe")

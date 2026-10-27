@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from venergy_api.agente import montar_agente
+from venergy_api.agente import montar_agente, montar_redator_insights
 from venergy_api.config import Settings, get_settings
 from venergy_api.routers import ai, continuidade, fila, health, ordens, receita, unidades
 
@@ -20,6 +20,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     # modelo a cada pergunta seria custo à toa. Fica no estado do app para os testes
     # trocarem o agente por um falso (dependency_overrides), sem chamar o Gemini.
     app.state.agente = await montar_agente()
+    app.state.redator_insights = await montar_redator_insights()
     yield
 
 
