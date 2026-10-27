@@ -394,6 +394,36 @@ async def test_narrative_with_the_word_sem_alone_is_kept(layer):
     assert answer.answer == "Há 3 UCs, sem interrupções registradas."
 
 
+@pytest.mark.parametrize(
+    "text",
+    [
+        "A receita_faturada foi de 3 UCs.",
+        "Há 3 UCs em SEM_UC.",
+    ],
+)
+async def test_narrative_naming_a_column_or_in_uppercase_falls_back(layer, text):
+    writer = FixedWriter(text=text)
+
+    answer = await use_case(layer, ScriptedGenerator(generation()), writer=writer).ask(
+        "quantas?", "s1"
+    )
+
+    assert answer.answer.startswith("A consulta devolveu 1 linha(s).")
+
+
+async def test_assumption_naming_a_technical_name_is_left_out_of_the_text(layer):
+    writer = FixedWriter(text="Há 999 UCs em sem_uc.")
+    assumptions = ("Considerei só o mês atual", "Os dados vêm de sem_kpis_mensais")
+
+    answer = await use_case(
+        layer, ScriptedGenerator(generation(assumptions=assumptions)), writer=writer
+    ).ask("quantas?", "s1")
+
+    assert "Considerei só o mês atual" in answer.answer
+    assert "sem_kpis_mensais" not in answer.answer
+    assert answer.assumptions == assumptions
+
+
 def table(columns, *rows):
     return QueryResult(
         columns=columns,
