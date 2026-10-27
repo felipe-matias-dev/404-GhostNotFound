@@ -109,6 +109,15 @@ describe("passosDaPonte", () => {
 		const fim = efeitos.reduce((total, p) => total + p.value, base?.value ?? 0);
 		expect(fim).toBeCloseTo(passos.at(-1)?.value ?? Number.NaN, 2);
 	});
+
+	it("fecha a receita atual pelos passos quando as linhas só fecham dentro da tolerância", () => {
+		const linhas = Array.from({ length: 90 }, (_, i) => ({
+			...linha(`B${i}`, 1000, 10, -5, 20, -3),
+			receita_atual: 1022.02,
+		}));
+		const passos = passosDaPonte(linhas);
+		expect(passos.at(-1)?.value).toBe(90 * 1022);
+	});
 });
 
 describe("rankingDaQueda", () => {

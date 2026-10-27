@@ -199,33 +199,33 @@ export type CampoValor = {
 
 /**
  * Ponte do recorte na tela: a soma dos segmentos do nível abaixo (os efeitos são somáveis,
- * DEC-023). O efeito preço entra aberto em tarifa e bandeira, que somam o `efeito_preco`;
- * somar os três contaria o preço duas vezes.
+ * DEC-023; o frontend só soma o que a Gold calculou, DEC-035). O efeito preço entra aberto em
+ * tarifa e bandeira, que somam o `efeito_preco`; somar os três contaria o preço duas vezes.
+ * A receita atual sai dos passos: cada linha fecha com a variação só dentro da tolerância do
+ * contrato, e somada sobre dezenas de segmentos a sobra desalinharia o último degrau.
  */
 export function passosDaPonte(linhas: DecomposicaoLinha[]): WaterfallStep[] {
 	if (linhas.length === 0) return [];
 	// Em centavos: somar dezenas de valores em ponto flutuante deixa resíduo na última casa.
+	const centavos = (valor: number) => Math.round(valor * 100) / 100;
 	const soma = (campo: CampoValor) =>
-		Math.round(linhas.reduce((total, l) => total + l[campo], 0) * 100) / 100;
+		centavos(linhas.reduce((total, l) => total + l[campo], 0));
+	const base = soma("receita_base");
+	const efeitos = CAUSAS.map(
+		(efeito): WaterfallStep => ({
+			id: efeito,
+			label: EFEITO_ROTULO[efeito],
+			value: soma(EFEITO_CAMPO[efeito]),
+			kind: "delta",
+		}),
+	);
 	return [
-		{
-			id: "base",
-			label: "Receita base",
-			value: soma("receita_base"),
-			kind: "total",
-		},
-		...CAUSAS.map(
-			(efeito): WaterfallStep => ({
-				id: efeito,
-				label: EFEITO_ROTULO[efeito],
-				value: soma(EFEITO_CAMPO[efeito]),
-				kind: "delta",
-			}),
-		),
+		{ id: "base", label: "Receita base", value: base, kind: "total" },
+		...efeitos,
 		{
 			id: "atual",
 			label: "Receita atual",
-			value: soma("receita_atual"),
+			value: centavos(efeitos.reduce((total, p) => total + p.value, base)),
 			kind: "total",
 		},
 	];
