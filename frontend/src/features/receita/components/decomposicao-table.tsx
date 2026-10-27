@@ -4,7 +4,7 @@ import {
 	type DataTableColumn,
 	type SortState,
 } from "#/components/ui/data-table";
-import { formatBRL } from "#/lib/format";
+import { formatBRL, formatPct } from "#/lib/format";
 import { cn } from "#/lib/utils";
 import {
 	type CampoValor,
@@ -13,6 +13,7 @@ import {
 	filtroAoAbrir,
 	NIVEL_ROTULO,
 	nivelDoFiltro,
+	sobreABase,
 } from "../conversions";
 import { useDecomposicao } from "../hooks/use-decomposicao";
 import type { DecomposicaoLinha, ParPeriodos, Recorte } from "../types";
@@ -41,15 +42,33 @@ function valor(
 	};
 }
 
-const VALORES: [CampoValor, string][] = [
-	["receita_base", "Receita base"],
-	["receita_atual", "Receita atual"],
-	["variacao_receita", "Variação"],
-	["efeito_preco", "Efeito preço"],
-	["efeito_volume", "Efeito volume"],
-	["efeito_mix", "Efeito mix"],
-	["efeito_tarifa", "Efeito tarifa"],
-	["efeito_bandeira", "Efeito bandeira"],
+// Variação em % da receita base: sem ela, o maior município sempre domina a ordem em R$.
+const VARIACAO_PCT: DataTableColumn<DecomposicaoLinha> = {
+	id: "variacao_pct",
+	header: "Var. %",
+	width: "minmax(0, 0.8fr)",
+	align: "end",
+	numeric: true,
+	value: (l) => sobreABase(l, "variacao"),
+	cell: (l) => {
+		const pct = sobreABase(l, "variacao");
+		return pct === null ? (
+			<span className="text-text-muted">—</span>
+		) : (
+			<span className={tomDoSinal(pct)}>
+				{pct > 0 ? "+" : ""}
+				{formatPct(pct)}
+			</span>
+		);
+	},
+};
+
+// Efeitos na ordem da ponte. O efeito preço fica de fora: é tarifa + bandeira.
+const EFEITOS_DA_PONTE: [CampoValor, string][] = [
+	["efeito_tarifa", "Tarifa"],
+	["efeito_bandeira", "Bandeira"],
+	["efeito_volume", "Volume"],
+	["efeito_mix", "Mix"],
 ];
 
 /** Escolher uma causa na ponte ordena pela coluna dela, da maior queda para a maior alta. */
@@ -96,12 +115,12 @@ export function DecomposicaoTable({
 			width: "minmax(120px, 1.4fr)",
 			value: (l) => l.segmento,
 		},
-		...VALORES.map(([campo, header]) =>
-			valor(
-				campo,
-				header,
-				campo === "variacao_receita" || campo === campoDestacado,
-			),
+		valor("receita_base", "Receita base", false),
+		valor("receita_atual", "Receita atual", false),
+		valor("variacao_receita", "Variação", true),
+		VARIACAO_PCT,
+		...EFEITOS_DA_PONTE.map(([campo, header]) =>
+			valor(campo, header, campo === campoDestacado),
 		),
 	];
 
@@ -116,7 +135,7 @@ export function DecomposicaoTable({
 			error={isError ? "Não foi possível carregar a ponte de receita." : null}
 			onRetry={() => refetch()}
 			emptyMessage="Sem decomposição de receita para este recorte."
-			cardsBelow="4xl"
+			cardsBelow="5xl"
 			sort={ordem}
 			onSortChange={setOrdem}
 			onRowClick={
