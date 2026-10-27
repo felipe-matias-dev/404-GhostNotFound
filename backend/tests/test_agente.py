@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine
 from venergy_agent.config import AgentSettings
+from venergy_agent.infrastructure.semantic_source import SemanticLayerError
 
 from venergy_api.agente import AgenteDep, montar_agente
 
@@ -75,6 +76,25 @@ def test_builds_the_agent_once_with_a_valid_configuration(
 
     assert isinstance(agente, AgenteFalso)
     assert len(montados) == 1
+
+
+def test_returns_none_and_logs_the_problems_when_the_semantic_layer_is_invalid(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    async def build_agent_com_camada_invalida(settings: AgentSettings) -> AgenteFalso:
+        raise SemanticLayerError(["view 'sem_uc': coluna 'bairro' não existe em gold_dim_uc"])
+
+    monkeypatch.setattr("venergy_api.agente.build_agent", build_agent_com_camada_invalida)
+
+    def valid_settings() -> AgentSettings:
+        return AgentSettings(_env_file=None, database_url=DATABASE_URL, google_api_key="chave")
+
+    with caplog.at_level(logging.WARNING):
+        agente = asyncio.run(montar_agente(valid_settings))
+
+    assert agente is None
+    assert "coluna 'bairro' não existe em gold_dim_uc" in caplog.text
+    assert "chave" not in caplog.text.replace("chave primária", "")
 
 
 def test_api_starts_with_the_agent_stored_in_the_app_state(

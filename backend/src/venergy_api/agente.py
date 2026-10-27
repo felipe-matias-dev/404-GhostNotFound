@@ -9,6 +9,7 @@ from pydantic import ValidationError
 from venergy_agent.application.ports import TextToSqlAgent
 from venergy_agent.bootstrap import build_agent
 from venergy_agent.config import AgentSettings
+from venergy_agent.infrastructure.semantic_source import SemanticLayerError
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +17,7 @@ logger = logging.getLogger(__name__)
 async def montar_agente(
     carregar_config: Callable[[], AgentSettings] = AgentSettings,
 ) -> TextToSqlAgent | None:
-    """Monta o agente, ou devolve None se a configuração dele estiver incompleta ou inválida."""
+    """Monta o agente, ou devolve None se a configuração ou a camada semântica forem inválidas."""
     # None, e não uma exceção: sem a chave do Gemini só o /ai fica de fora. Se a subida
     # falhasse, o /health e todas as telas cairiam junto por causa de um recurso opcional.
     try:
@@ -30,7 +31,16 @@ async def montar_agente(
         )
         logger.warning("Agente de IA desativado, o /ai responde 503. %s", problemas)
         return None
-    return await build_agent(settings)
+    try:
+        return await build_agent(settings)
+    except SemanticLayerError as error:
+        # Uma mudança no contrato da Gold pode deixar a camada semântica do agente inválida
+        # antes de o GenAI regerá-la. É problema do /ai, e não pode derrubar o resto da API.
+        # A lista traz só nomes de view e coluna, nada de segredo.
+        logger.warning(
+            "Agente de IA desativado, o /ai responde 503. Camada semântica inválida:\n%s", error
+        )
+        return None
 
 
 def get_agente(request: Request) -> TextToSqlAgent:

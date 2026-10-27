@@ -1007,8 +1007,9 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
     `request_id` e o tipo do erro, porque a mensagem do SQLAlchemy traz a pergunta e as linhas.
   - **Agente montado uma vez, no `lifespan`**, guardado em `app.state` e entregue por `AgenteDep`. Os testes trocam o agente por um falso
     com `dependency_overrides` e nunca chamam o Gemini.
-  - **Sem a chave (ou com configuração inválida) a API sobe:** o log diz só os campos com erro, sem o valor digitado, e `/ai/*` responde
-    `503` com a variável que falta. O `/health` e as telas seguem de pé.
+  - **Sem a chave, com configuração inválida ou com a camada semântica inválida, a API sobe:** o log diz só os campos com erro (sem o
+    valor digitado) ou a lista de problemas da camada (só nomes de view e coluna), e `/ai/*` responde `503`. Uma mudança no contrato da
+    Gold que deixe `semantic_layer.yaml` inválido derruba o `/ai`, e não o `/health` nem as telas (revisão do #52).
   - **Credenciais separadas:** a gravação usa a sessão do backend. O agente continua com o usuário `venergy_agent`, que não acessa `app`.
   - **Entrada limitada:** `question` até 2000 caracteres e `session_id` até 100. O teto de 500 da pergunta continua sendo do agente.
   - **Rotas `async def`:** `await agente.ask(...)` e a gravação em `run_in_threadpool`, porque a sessão do backend é síncrona. A gravação
@@ -1032,5 +1033,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   - Resposta em envelope (`{audit_id, resposta: {...}}`): o campo plano deixa o client do portal usar o `AgentAnswer` como ele é.
 - **Limitações conhecidas:**
   - Sem expurgo: a tabela só cresce. A pergunta e as linhas ficam guardadas como o agente as devolveu, e podem conter dados de UC.
+    A `pergunta` é o texto livre que o usuário digitou (até 2000 caracteres): se alguém digitar um CPF ou um nome, ele fica em `app`.
+    Expurgo e mascaramento ficam para quando houver autenticação.
   - Sem autenticação: nenhuma rota da API tem hoje, então quem alcança a API lê qualquer auditoria.
   - Sem migrações, mudar uma coluna da tabela exige apagá-la e recriá-la à mão, como nas ordens de inspeção.
