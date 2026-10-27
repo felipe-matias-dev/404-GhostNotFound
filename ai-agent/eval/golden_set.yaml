@@ -209,7 +209,7 @@ itens:
     reference_sql: "SELECT sum(f.receita_energia) / NULLIF(sum(f.kwh_faturado), 0) AS tarifa_media FROM sem_faturamento_mensal f JOIN sem_uc u ON u.cod_uc = f.cod_uc WHERE u.classe = 'B1' AND f.competencia = '2021-07'"
     expected_status: answered
     follow_up_of: null
-    notes: "Competência fora dos dados da amostra (2024-01 a 2025-12). Pela spec §5.1 (item 6), resultado vazio é answered com confiança low: o agente não distingue zero de dado ausente e diz que nenhum registro atende. A Gold real vai de 2022-07 a 2026-06, e por isso a pergunta usa julho de 2021, fora das duas bases. Achado 1 da §9.6. Mudança de 0.2.0 para 0.4.0 (24/10/2026, feita depois de ver rodadas do modelo): período fora dos dados. O esperado `unknown` contradizia a spec §5.1 (item 6), que manda responder resultado vazio com confiança low. O esperado passou a `answered`, com uma referência de resultado vazio. Revisão de Dados (27/10/2026): a pergunta pedia julho de 2022, que existe na Gold real e deixaria de testar o resultado vazio; passou a julho de 2021, fora da amostra e da Gold. Pendente de revisão por Dados."
+    notes: "Competência fora dos dados da amostra (2024-01 a 2025-12). Pela spec §5.1 (item 6), resultado vazio é answered com confiança low: o agente não distingue zero de dado ausente e diz que nenhum registro atende. A Gold real vai de 2022-07 a 2026-06, e por isso a pergunta usa julho de 2021, fora das duas bases. Achado 1 da §9.6. Mudança de 0.2.0 para 0.4.0 (24/10/2026, feita depois de ver rodadas do modelo): período fora dos dados. O esperado `unknown` contradizia a spec §5.1 (item 6), que manda responder resultado vazio com confiança low. O esperado passou a `answered`, com uma referência de resultado vazio. Revisão de Dados (27/10/2026): a pergunta pedia julho de 2022, que existe na Gold real e deixaria de testar o resultado vazio; passou a julho de 2021, fora da amostra e da Gold. Pendente de revisão por Dados. Conferência de Dados (27/10/2026): a Patrícia exige que o agente diga que não sabe quando não souber. Este item só atende isso se a resposta disser que não há dados do período, e não zero. O período está fora da Gold real (conferido). Sem revisor até o GenAI decidir o critério: resposta com 'sem dados' ou status unknown."
     revisado_por: null
 
   - id: G020
@@ -218,7 +218,7 @@ itens:
     reference_sql: "SELECT sum(CASE WHEN competencia BETWEEN '2024-01' AND '2024-06' THEN dec END) AS dec_2024, sum(CASE WHEN competencia BETWEEN '2025-01' AND '2025-06' THEN dec END) AS dec_2025 FROM sem_continuidade_alimentador_mensal WHERE cod_alimentador = 'AL-07'"
     expected_status: answered
     follow_up_of: null
-    notes: "O DEC de cada semestre é a soma do DEC mensal pronto da view, calculada no SQL; a resposta compara os dois números, sem fazer conta. Mudança de 0.2.0 para 0.4.0 (24/10/2026, feita depois de ver rodadas do modelo): a referência devolvia 12 linhas mensais e deixava a comparação para a resposta, o que obriga o LLM a fazer contas (contra o CLAUDE.md do agente). Agora devolve o DEC de cada semestre somado no SQL. A soma depende da DEC-032 (proposta). Pendente de revisão por Dados."
+    notes: "O DEC de cada semestre é a soma do DEC mensal pronto da view, calculada no SQL; a resposta compara os dois números, sem fazer conta. Mudança de 0.2.0 para 0.4.0 (24/10/2026, feita depois de ver rodadas do modelo): a referência devolvia 12 linhas mensais e deixava a comparação para a resposta, o que obriga o LLM a fazer contas (contra o CLAUDE.md do agente). Agora devolve o DEC de cada semestre somado no SQL. A soma depende da DEC-032 (proposta). Pendente de revisão por Dados. Conferência de Dados (27/10/2026): bate com o pedido da Beatriz (DEC por alimentador ao longo do tempo) e com o glossário do case (DEC calculado pelo PRODIST; os valores servem para comparar alimentadores e períodos). A soma dos DEC mensais é a forma da DEC-032, aprovada por Dados. Sem revisor: o alimentador é fictício da amostra, e o resultado só pode ser conferido na amostra."
     revisado_por: null
 
   # --- linguagem do dia a dia: sinônimos do glossário ---
@@ -303,7 +303,7 @@ itens:
     reference_sql: "SELECT receita_faturada FROM sem_kpis_mensais WHERE competencia = '2030-03'"
     expected_status: answered
     follow_up_of: null
-    notes: "Competência que não existe nos dados. Resultado vazio é answered com confiança low (spec §5.1, item 6); a resposta diz que nenhum registro atende. Achado 1 da §9.6. Mudança de 0.2.0 para 0.4.0 (24/10/2026, feita depois de ver rodadas do modelo): mesmo motivo de G019 (spec §5.1, item 6). A categoria passou a `temporal`. Pendente de revisão por Dados."
+    notes: "Competência que não existe nos dados. Resultado vazio é answered com confiança low (spec §5.1, item 6); a resposta diz que nenhum registro atende. Achado 1 da §9.6. Mudança de 0.2.0 para 0.4.0 (24/10/2026, feita depois de ver rodadas do modelo): mesmo motivo de G019 (spec §5.1, item 6). A categoria passou a `temporal`. Pendente de revisão por Dados. Conferência de Dados (27/10/2026): mesmo ponto do G019 (a Patrícia exige que o agente diga que não sabe). Março de 2030 está fora da Gold real (conferido). Sem revisor até o GenAI decidir o critério."
     revisado_por: null
 
   - id: G030
@@ -312,7 +312,7 @@ itens:
     reference_sql: "SELECT sum(receita_energia) / NULLIF(sum(kwh_faturado), 0) AS tarifa_media FROM sem_faturamento_mensal WHERE competencia LIKE '2019-%'"
     expected_status: answered
     follow_up_of: null
-    notes: "Preço do kWh é a tarifa média (receita de energia ÷ energia faturada). 2019 está fora dos dados: resultado vazio, answered com confiança low (spec §5.1, item 6). Achado 1 da §9.6. Mudança de 0.2.0 para 0.4.0 (24/10/2026, feita depois de ver rodadas do modelo): mesmo motivo de G019 (spec §5.1, item 6). A categoria passou a `temporal`. Pendente de revisão por Dados."
+    notes: "Preço do kWh é a tarifa média (receita de energia ÷ energia faturada). 2019 está fora dos dados: resultado vazio, answered com confiança low (spec §5.1, item 6). Achado 1 da §9.6. Mudança de 0.2.0 para 0.4.0 (24/10/2026, feita depois de ver rodadas do modelo): mesmo motivo de G019 (spec §5.1, item 6). A categoria passou a `temporal`. Pendente de revisão por Dados. Conferência de Dados (27/10/2026): mesmo ponto do G019 (a Patrícia exige que o agente diga que não sabe). O ano de 2019 está fora da Gold real (conferido). Sem revisor até o GenAI decidir o critério."
     revisado_por: null
 
   - id: G031
@@ -415,7 +415,7 @@ itens:
     reference_sql: "WITH meses AS (SELECT competencia, row_number() OVER (ORDER BY competencia) AS ordem_inicio, row_number() OVER (ORDER BY competencia DESC) AS ordem_fim FROM (SELECT DISTINCT competencia FROM sem_faturamento_mensal) c) SELECT sum(CASE WHEN m.ordem_inicio <= 12 THEN f.receita_energia END) / NULLIF(sum(CASE WHEN m.ordem_inicio <= 12 THEN f.kwh_faturado END), 0) AS tarifa_primeiro_ano, sum(CASE WHEN m.ordem_fim <= 12 THEN f.receita_energia END) / NULLIF(sum(CASE WHEN m.ordem_fim <= 12 THEN f.kwh_faturado END), 0) AS tarifa_ultimos_12_meses FROM sem_faturamento_mensal f JOIN meses m ON m.competencia = f.competencia JOIN sem_uc u ON u.cod_uc = f.cod_uc WHERE u.classe = 'B1'"
     expected_status: answered
     follow_up_of: null
-    notes: "Pergunta do case (planejamento §3, '10,5%'). A referência devolve as duas tarifas, que respondem 'subiu?'. A variação percentual é opcional, porque colunas extras do agente são ignoradas. Primeiro ano e últimos 12 meses saem das competências que existem (row_number). Tarifa é receita de energia (sem tributos) ÷ energia faturada (DEC-023). A resposta declara a suposição. Mudança de 0.2.0 para 0.4.0 (24/10/2026, feita depois de ver rodadas do modelo): (1) a referência usava 2024 e 2025 fixos, que não valem para a Gold real; agora usa os meses existentes (row_number), com o mesmo resultado na amostra. (2) Passou a devolver as duas tarifas, em vez de só a variação percentual. A mudança (2) é discutível, porque aproxima o gabarito da forma que o agente responde. Pendente de revisão por Dados."
+    notes: "Pergunta do case (planejamento §3, '10,5%'). A referência devolve as duas tarifas, que respondem 'subiu?'. A variação percentual é opcional, porque colunas extras do agente são ignoradas. Primeiro ano e últimos 12 meses saem das competências que existem (row_number). Tarifa é receita de energia (sem tributos) ÷ energia faturada (DEC-023). A resposta declara a suposição. Mudança de 0.2.0 para 0.4.0 (24/10/2026, feita depois de ver rodadas do modelo): (1) a referência usava 2024 e 2025 fixos, que não valem para a Gold real; agora usa os meses existentes (row_number), com o mesmo resultado na amostra. (2) Passou a devolver as duas tarifas, em vez de só a variação percentual. A mudança (2) é discutível, porque aproxima o gabarito da forma que o agente responde. Pendente de revisão por Dados. Conferência de Dados (27/10/2026): bate com o case (Henrique: reajuste da tarifa residencial, volume e receita dos últimos 12 meses contra o primeiro ano). A referência roda na Gold real e a tarifa média efetiva sobe. O reajuste de 10,5% do case é o da tarifa base, sem a bandeira, então a tarifa média efetiva sobe mais que isso. Revisado por Dados."
     revisado_por: "Alisson Ramos"
 
   - id: G042
@@ -424,7 +424,7 @@ itens:
     reference_sql: "WITH meses AS (SELECT competencia, row_number() OVER (ORDER BY competencia) AS ordem_inicio, row_number() OVER (ORDER BY competencia DESC) AS ordem_fim FROM (SELECT DISTINCT competencia FROM sem_faturamento_mensal) c) SELECT sum(CASE WHEN m.ordem_inicio <= 12 THEN f.kwh_faturado END) AS kwh_primeiro_ano, sum(CASE WHEN m.ordem_fim <= 12 THEN f.kwh_faturado END) AS kwh_ultimos_12_meses FROM sem_faturamento_mensal f JOIN meses m ON m.competencia = f.competencia"
     expected_status: answered
     follow_up_of: null
-    notes: "Pergunta do case: a energia faturada caiu cerca de 4%. A referência devolve os dois totais, que respondem 'caiu?'; a variação é opcional. Mesma janela de G041. A resposta declara os períodos usados. Mudança de 0.2.0 para 0.4.0 (24/10/2026, feita depois de ver rodadas do modelo): mesmos dois motivos de G041, com a energia faturada. Pendente de revisão por Dados."
+    notes: "Pergunta do case: a energia faturada caiu cerca de 4%. A referência devolve os dois totais, que respondem 'caiu?'; a variação é opcional. Mesma janela de G041. A resposta declara os períodos usados. Mudança de 0.2.0 para 0.4.0 (24/10/2026, feita depois de ver rodadas do modelo): mesmos dois motivos de G041, com a energia faturada. Pendente de revisão por Dados. Conferência de Dados (27/10/2026): bate com o case (a energia faturada cai quase 4% nos últimos 12 meses contra o primeiro ano). Na Gold real a referência devolve essa queda. Revisado por Dados."
     revisado_por: "Alisson Ramos"
 
   - id: G043
@@ -433,7 +433,7 @@ itens:
     reference_sql: "WITH meses AS (SELECT competencia, row_number() OVER (ORDER BY competencia) AS ordem_inicio, row_number() OVER (ORDER BY competencia DESC) AS ordem_fim FROM (SELECT DISTINCT competencia FROM sem_faturamento_mensal) c) SELECT sum(CASE WHEN m.ordem_inicio <= 12 THEN f.receita_faturada END) AS receita_primeiro_ano, sum(CASE WHEN m.ordem_fim <= 12 THEN f.receita_faturada END) AS receita_ultimos_12_meses FROM sem_faturamento_mensal f JOIN meses m ON m.competencia = f.competencia"
     expected_status: answered
     follow_up_of: null
-    notes: "Pergunta do case: a receita subiu cerca de 8%. A referência devolve os dois totais, que respondem 'subiu?'; a variação é opcional. Usa a receita faturada, a suposição do glossário. Mesma janela de G041 e G042. Mudança de 0.2.0 para 0.4.0 (24/10/2026, feita depois de ver rodadas do modelo): mesmos dois motivos de G041, com a receita faturada. Pendente de revisão por Dados."
+    notes: "Pergunta do case: a receita subiu cerca de 8%. A referência devolve os dois totais, que respondem 'subiu?'; a variação é opcional. Usa a receita faturada, a suposição do glossário. Mesma janela de G041 e G042. Mudança de 0.2.0 para 0.4.0 (24/10/2026, feita depois de ver rodadas do modelo): mesmos dois motivos de G041, com a receita faturada. Pendente de revisão por Dados. Conferência de Dados (27/10/2026): bate com o case (a receita sobe 8% na mesma comparação). Na Gold real a referência devolve essa alta. Revisado por Dados."
     revisado_por: "Alisson Ramos"
 
   - id: G044
@@ -462,7 +462,7 @@ itens:
     reference_sql: "SELECT count(*) AS total FROM sem_uc WHERE municipio ILIKE 'Olinda'"
     expected_status: answered
     follow_up_of: G045
-    notes: "Só passa com histórico por session_id (diferencial). Sem ele, o agente deve pedir esclarecimento: este item mede o diferencial. Fica fora da conta do runner enquanto a memória não existir (follow_up_of preenchido; achado 3 da §9.6). Mudança de 0.2.0 para 0.4.0 (24/10/2026, feita depois de ver rodadas do modelo): só a nota. O item fica fora da conta do runner até existir memória (follow_up_of). Pendente de revisão por Dados."
+    notes: "Só passa com histórico por session_id (diferencial). Sem ele, o agente deve pedir esclarecimento: este item mede o diferencial. Fica fora da conta do runner enquanto a memória não existir (follow_up_of preenchido; achado 3 da §9.6). Mudança de 0.2.0 para 0.4.0 (24/10/2026, feita depois de ver rodadas do modelo): só a nota. O item fica fora da conta do runner até existir memória (follow_up_of). Pendente de revisão por Dados. Conferência de Dados (27/10/2026): só nota. Depende de memória de sessão, que o case não pede (diferencial). Sem revisor."
     revisado_por: null
 
   # --- injeção: texto que tenta mudar as regras (guia §5.3) ---
@@ -568,7 +568,7 @@ itens:
     reference_sql: "WITH base AS (SELECT f.cod_uc, avg(f.kwh_faturado) AS kwh FROM sem_faturamento_mensal f JOIN sem_uc u ON u.cod_uc = f.cod_uc WHERE u.possui_gd AND u.municipio ILIKE 'Olinda' AND f.competencia LIKE '2024-%' GROUP BY f.cod_uc), atual AS (SELECT f.cod_uc, avg(f.kwh_faturado) AS kwh FROM sem_faturamento_mensal f JOIN sem_uc u ON u.cod_uc = f.cod_uc WHERE u.possui_gd AND u.municipio ILIKE 'Olinda' AND f.competencia LIKE '2025-%' GROUP BY f.cod_uc) SELECT count(*) AS total FROM base b JOIN atual a ON a.cod_uc = b.cod_uc WHERE a.kwh < 0.7 * b.kwh"
     expected_status: answered
     follow_up_of: null
-    notes: "Versão da pergunta da Patrícia com os períodos. Suposição a declarar: queda = média mensal de 2025 contra a média de 2024, por UC. Queda acima de 30% = média atual abaixo de 70% da anterior. Mudança de 0.2.0 para 0.4.0 (24/10/2026, feita depois de ver rodadas do modelo): só a nota; a referência não mudou. Pendente de revisão por Dados."
+    notes: "Versão da pergunta da Patrícia com os períodos. Suposição a declarar: queda = média mensal de 2025 contra a média de 2024, por UC. Queda acima de 30% = média atual abaixo de 70% da anterior. Mudança de 0.2.0 para 0.4.0 (24/10/2026, feita depois de ver rodadas do modelo): só a nota; a referência não mudou. Pendente de revisão por Dados. Conferência de Dados (27/10/2026): bate com a pergunta da Patrícia (UCs com painel solar em Olinda com queda de consumo acima de 30%). O case não fixa o período, então 2024 e 2025 é suposição declarada. A referência roda na Gold real e devolve resultado. Revisado por Dados."
     revisado_por: "Alisson Ramos"
 
   - id: G058
@@ -604,7 +604,7 @@ itens:
     reference_sql: "SELECT sum(CASE WHEN competencia LIKE '2024-%' THEN kwh_faturado END) AS kwh_2024, sum(CASE WHEN competencia LIKE '2025-%' THEN kwh_faturado END) AS kwh_2025 FROM sem_faturamento_mensal WHERE cod_uc = '0003'"
     expected_status: answered
     follow_up_of: null
-    notes: "Consumo contra o ano anterior, pedido da Camila (case p. 5; RESUMO §1.7). A pergunta pede o total de cada ano, e a soma é feita no SQL, não na resposta (o LLM não faz contas). Mudança de 0.2.0 para 0.4.0 (24/10/2026, feita depois de ver rodadas do modelo): a referência devolvia 24 linhas mensais e deixava a soma por ano para a resposta (o LLM não faz contas). Agora devolve o total de cada ano, somado no SQL. Pendente de revisão por Dados."
+    notes: "Consumo contra o ano anterior, pedido da Camila (case p. 5; RESUMO §1.7). A pergunta pede o total de cada ano, e a soma é feita no SQL, não na resposta (o LLM não faz contas). Mudança de 0.2.0 para 0.4.0 (24/10/2026, feita depois de ver rodadas do modelo): a referência devolvia 24 linhas mensais e deixava a soma por ano para a resposta (o LLM não faz contas). Agora devolve o total de cada ano, somado no SQL. Pendente de revisão por Dados. Conferência de Dados (27/10/2026): bate com o pedido da Camila (consumo ao lado do mesmo período do ano passado). A UC é fictícia da amostra, então o resultado só pode ser conferido na amostra. Sem revisor."
     revisado_por: null
 
   - id: G062
@@ -613,7 +613,7 @@ itens:
     reference_sql: null
     expected_status: unknown
     follow_up_of: null
-    notes: "Pergunta da Camila (case p. 5; RESUMO §1.7). Ocorrências por UC (gold_interrupcoes_uc) não têm chave definida e não estão nas views."
+    notes: "Pergunta da Camila (case p. 5; RESUMO §1.7). Ocorrências por UC (gold_interrupcoes_uc) não têm chave definida e não estão nas views. Conferência de Dados (27/10/2026, achado do case): a Camila pede, na tela da UC, saber se a rua dele teve falta de luz, e o glossário do case define o alimentador como o circuito que abastece um conjunto de ruas e bairros; cada ocorrência de rede é uma UC interrompida. A resposta pelo alimentador da UC atende o que o case pede, e o unknown é mais rígido que o case. O esperado fica como está por ora; a decisão é trocar para answered, com a resposta dizendo que é do alimentador, e acrescentar um item por UC quando a camada v0.3 expuser as interrupções por UC."
     revisado_por: null
 
   - id: G063
@@ -651,5 +651,5 @@ itens:
     reference_sql: "SELECT sum(efeito_bandeira) AS efeito_bandeira FROM sem_receita_decomposicao WHERE periodo_base = '2024-01/2024-12' AND periodo_atual = '2025-01/2025-12'"
     expected_status: answered
     follow_up_of: null
-    notes: "Versão com períodos explícitos da pergunta do Henrique (G060). A pergunta pede só o efeito bandeira; o efeito preço e a variação total são contexto opcional para a resposta. Os efeitos são lidos e somados, nunca recalculados. A receita da decomposição é de energia, sem tributos (DEC-023). Mudança de 0.2.0 para 0.4.0 (24/10/2026, feita depois de ver rodadas do modelo): a referência pedia efeito preço e variação total, que a pergunta não pede. Agora devolve só o efeito bandeira. Pendente de revisão por Dados."
+    notes: "Versão com períodos explícitos da pergunta do Henrique (G060). A pergunta pede só o efeito bandeira; o efeito preço e a variação total são contexto opcional para a resposta. Os efeitos são lidos e somados, nunca recalculados. A receita da decomposição é de energia, sem tributos (DEC-023). Mudança de 0.2.0 para 0.4.0 (24/10/2026, feita depois de ver rodadas do modelo): a referência pedia efeito preço e variação total, que a pergunta não pede. Agora devolve só o efeito bandeira. Pendente de revisão por Dados. Conferência de Dados (27/10/2026): bate com o case (a bandeira muda a receita sem mudar o consumo, e Henrique quer o preço separado do volume). O par de períodos existe na Gold real e a referência devolve o efeito. Revisado por Dados."
     revisado_por: "Alisson Ramos"
