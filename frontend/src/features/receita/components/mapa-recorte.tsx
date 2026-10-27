@@ -14,7 +14,7 @@ import {
 } from "../conversions";
 import { useBairrosRmr } from "../hooks/use-bairros-rmr";
 import { useDecomposicao } from "../hooks/use-decomposicao";
-import type { DecomposicaoLinha, Recorte } from "../types";
+import type { DecomposicaoLinha, ParPeriodos, Recorte } from "../types";
 
 function indexar(linhas: DecomposicaoLinha[] | undefined) {
 	const porNome = new Map<string, DecomposicaoLinha>();
@@ -25,19 +25,22 @@ function indexar(linhas: DecomposicaoLinha[] | undefined) {
 
 /** Só é clicável o que tem linha na Gold; o nome da Gold vai para a URL. */
 export function MapaRecorte({
+	par,
 	recorte,
 	destaque = null,
 	onChange,
 	className,
 }: {
+	par: ParPeriodos | undefined;
 	recorte: Recorte;
 	destaque?: DecomposicaoLinha | null;
 	onChange: (proximo: Recorte) => void;
 	className?: string;
 }) {
 	const router = useRouter();
-	const municipios = useDecomposicao({});
+	const municipios = useDecomposicao(par, {});
 	const bairros = useDecomposicao(
+		par,
 		{ municipio: recorte.municipio },
 		Boolean(recorte.municipio),
 	);

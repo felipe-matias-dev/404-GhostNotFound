@@ -146,6 +146,10 @@ views:
         description: "classe da UC no cadastro comercial"
       - name: classe
         description: "classe de consumo: B1, B2, B3 ou A4"
+      - name: cod_alimentador
+        description: "alimentador que atende as UCs do recorte (do cadastro da UC)"
+      - name: tipo_medidor
+        description: "tipo do medidor vigente na UC na competência; sem_medidor quando a UC não tem medidor instalado no mês"
       - name: possui_gd
         description: "verdadeiro quando as UCs do recorte já tinham geração própria conectada naquela competência"
       - name: n_uc
@@ -165,7 +169,7 @@ views:
         description: "tributos no recorte"
       - name: receita_arrecadada
         unit: "R$"
-        description: "valor efetivamente pago no recorte"
+        description: "valor efetivamente pago no recorte; vazio quando o recorte não tem fatura na competência"
       - name: horas_interrompidas
         unit: "UC·h"
         description: "soma das horas de interrupção das UCs do recorte; componente do DEC"
@@ -177,13 +181,13 @@ views:
         description: "chamados de atendimento abertos no mês pelas UCs do recorte"
       - name: soma_notas
         unit: "nota"
-        description: "soma das notas de satisfação dos chamados avaliados; componente da satisfação média"
+        description: "soma das notas de satisfação dos chamados avaliados; componente da satisfação média; vazio quando o recorte não tem chamado avaliado"
       - name: n_notas
         unit: "contagem"
         description: "chamados que receberam nota de satisfação; componente da satisfação média"
     sample_rows:
-      - {competencia: "2025-03", municipio: "Município Exemplo A", bairro: "Bairro exemplo 1", classe_cadastro: "Residencial", classe: "B1", possui_gd: false, n_uc: 1200, kwh_faturado: 300000.0, receita_faturada: 240000.0, receita_energia: 210000.0, tributos: 30000.0, receita_arrecadada: 228000.0, horas_interrompidas: 1800.0, n_interrupcoes: 950, n_chamados: 85, soma_notas: 280.0, n_notas: 70}
-      - {competencia: "2025-03", municipio: "Município Exemplo A", bairro: "Bairro exemplo 1", classe_cadastro: "Poder Público", classe: "B3", possui_gd: true, n_uc: 4, kwh_faturado: 0.0, receita_faturada: 0.0, receita_energia: 0.0, tributos: 0.0, receita_arrecadada: null, horas_interrompidas: 0.0, n_interrupcoes: 0, n_chamados: 0, soma_notas: null, n_notas: 0}
+      - {competencia: "2025-03", municipio: "Município Exemplo A", bairro: "Bairro exemplo 1", classe_cadastro: "Residencial", classe: "B1", cod_alimentador: "AL-01", tipo_medidor: "smart", possui_gd: false, n_uc: 1200, kwh_faturado: 300000.0, receita_faturada: 240000.0, receita_energia: 210000.0, tributos: 30000.0, receita_arrecadada: 228000.0, horas_interrompidas: 1800.0, n_interrupcoes: 950, n_chamados: 85, soma_notas: 280.0, n_notas: 70}
+      - {competencia: "2025-03", municipio: "Município Exemplo A", bairro: "Bairro exemplo 1", classe_cadastro: "Poder Público", classe: "B3", cod_alimentador: "AL-02", tipo_medidor: "sem_medidor", possui_gd: true, n_uc: 4, kwh_faturado: 0.0, receita_faturada: 0.0, receita_energia: 0.0, tributos: 0.0, receita_arrecadada: null, horas_interrompidas: 0.0, n_interrupcoes: 0, n_chamados: 0, soma_notas: null, n_notas: 0}
 
   - name: sem_receita_decomposicao
     source: gold_receita_decomposicao

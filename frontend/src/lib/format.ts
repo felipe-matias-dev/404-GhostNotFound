@@ -68,6 +68,21 @@ export function formatPeriodo(periodo: string | null | undefined): string {
 	return `${formatCompetencia(inicio)} a ${formatCompetencia(fim)}`;
 }
 
+/**
+ * Período em forma curta, para seletores: "2025-01/2025-12" → "jan–dez 2025",
+ * "2025-03/2025-03" → "mar 2025", "2024-07/2025-06" → "jul 2024–jun 2025".
+ */
+export function formatPeriodoCurto(periodo: string | null | undefined): string {
+	if (!periodo) return VAZIO;
+	const match = /^(\d{4})-(\d{2})\/(\d{4})-(\d{2})$/.exec(periodo);
+	if (!match) return formatPeriodo(periodo);
+	const [, ai, mi, af, mf] = match;
+	const inicio = MESES[Number(mi) - 1];
+	const fim = MESES[Number(mf) - 1];
+	if (ai !== af) return `${inicio} ${ai}–${fim} ${af}`;
+	return mi === mf ? `${inicio} ${af}` : `${inicio}–${fim} ${af}`;
+}
+
 /** Data ISO "2025-03-10" → "10/03/2025" */
 export function formatData(iso: string | null | undefined): string {
 	if (!iso) return VAZIO;

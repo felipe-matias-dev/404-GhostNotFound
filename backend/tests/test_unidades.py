@@ -18,6 +18,10 @@ STORED_UC = {
     "titular_mascarado": "M. S.",
     "documento_mascarado": "***.***.**1-23",
     "potencia_kwp": 3.3,
+    "data_ligacao": "2018-06-01",
+    "data_conexao_gd": "2022-03-15",
+    "modalidade_gd": "geracao_propria_uc",
+    "energia_injetada_kwh_mes": 396.0,
 }
 
 UC_WITHOUT_READING = {
@@ -28,6 +32,9 @@ UC_WITHOUT_READING = {
     "titular_mascarado": None,
     "documento_mascarado": None,
     "potencia_kwp": None,
+    "data_conexao_gd": None,
+    "modalidade_gd": None,
+    "energia_injetada_kwh_mes": None,
 }
 
 

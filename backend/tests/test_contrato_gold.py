@@ -5,7 +5,7 @@ muda o YAML, estes testes apontam o que o backend precisa acompanhar, antes de a
 falhar com a Gold real.
 """
 
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
 from types import UnionType
@@ -27,14 +27,16 @@ CONTRACT_PYTHON_TYPES = {
     "integer": int,
     "boolean": bool,
     "date": date,
+    "timestamp": datetime,
     "money": Decimal,
     "energy_kwh": Decimal,
     "ratio": float,
     "text_array": list,
 }
 
-# Dependem da Silver: o contrato ainda não define as colunas nem a chave delas.
-PENDING_TABLES = {"gold_interrupcoes_uc", "gold_atendimentos_uc", "gold_medidor_uc"}
+# Dependem da Silver: o contrato ainda não define as colunas nem a chave delas. Vazia desde a
+# v0.3, que definiu as tabelas da UC 360 (DEC-027).
+PENDING_TABLES: set[str] = set()
 
 backend_tables = pytest.mark.parametrize(
     "table", GOLD_TABLES, ids=[table.model.__tablename__ for table in GOLD_TABLES]
@@ -49,7 +51,9 @@ def normalize_type(sql_type: str) -> str:
     # "NUMERIC(16, 3)" e "numeric(16,3)" são o mesmo tipo. VARCHAR sem tamanho e TEXT
     # também: no Postgres, os dois guardam texto de qualquer tamanho.
     normalized = sql_type.lower().replace(" ", "")
-    return "text" if normalized == "varchar" else normalized
+    # O DateTime do SQLAlchemy sem fuso sai como "TIMESTAMP WITHOUT TIME ZONE", que é o "timestamp".
+    aliases = {"varchar": "text", "timestampwithouttimezone": "timestamp"}
+    return aliases.get(normalized, normalized)
 
 
 def literal_values(annotation: object) -> set[object]:

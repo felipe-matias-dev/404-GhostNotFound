@@ -17,7 +17,7 @@ import {
 	DropdownMenuTrigger,
 } from "#/components/ui/dropdown-menu";
 import { useDecomposicao } from "../hooks/use-decomposicao";
-import type { Recorte } from "../types";
+import type { ParPeriodos, Recorte } from "../types";
 
 const TODOS = "";
 
@@ -81,14 +81,17 @@ const ordenar = (nomes: string[]) =>
 	[...new Set(nomes)].sort((a, b) => a.localeCompare(b, "pt-BR"));
 
 export function RecorteTrilha({
+	par,
 	recorte,
 	onChange,
 }: {
+	par: ParPeriodos | undefined;
 	recorte: Recorte;
 	onChange: (proximo: Recorte) => void;
 }) {
-	const municipios = useDecomposicao({});
+	const municipios = useDecomposicao(par, {});
 	const bairros = useDecomposicao(
+		par,
 		{ municipio: recorte.municipio },
 		Boolean(recorte.municipio),
 	);

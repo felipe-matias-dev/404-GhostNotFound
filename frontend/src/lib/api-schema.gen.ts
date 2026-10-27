@@ -78,6 +78,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/receita/decomposicao/periodos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Pares De Periodos
+         * @description Os pares de períodos gravados na decomposição: o que o seletor da tela pode oferecer.
+         */
+        get: operations["get_pares_de_periodos_receita_decomposicao_periodos_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/receita/decomposicao": {
         parameters: {
             query?: never;
@@ -87,7 +107,7 @@ export interface paths {
         };
         /**
          * Get Decomposicao
-         * @description Ponte de receita por município, por bairro de um município ou por classe de um bairro.
+         * @description Ponte de receita de um par de períodos, por município, por bairro ou por classe.
          *
          *     Ordenada da maior queda para a maior alta: o topo é onde a receita mais caiu.
          */
@@ -246,6 +266,17 @@ export interface components {
             documento_mascarado: string | null;
             /** Potencia Kwp */
             potencia_kwp: number | null;
+            /**
+             * Data Ligacao
+             * Format: date
+             */
+            data_ligacao: string;
+            /** Data Conexao Gd */
+            data_conexao_gd: string | null;
+            /** Modalidade Gd */
+            modalidade_gd: ("geracao_propria_uc" | "autoconsumo_remoto" | "geracao_compartilhada") | null;
+            /** Energia Injetada Kwh Mes */
+            energia_injetada_kwh_mes: number | null;
         };
         /**
          * ErroSchema
@@ -340,6 +371,16 @@ export interface components {
              * Format: date-time
              */
             atualizada_em: string;
+        };
+        /**
+         * ParPeriodosSchema
+         * @description Um par de períodos que a Gold gravou na decomposição (DEC-028).
+         */
+        ParPeriodosSchema: {
+            /** Periodo Base */
+            periodo_base: string;
+            /** Periodo Atual */
+            periodo_atual: string;
         };
         /**
          * ResultadoOrdem
@@ -518,11 +559,31 @@ export interface operations {
             };
         };
     };
+    get_pares_de_periodos_receita_decomposicao_periodos_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ParPeriodosSchema"][];
+                };
+            };
+        };
+    };
     get_decomposicao_receita_decomposicao_get: {
         parameters: {
-            query?: {
-                periodo_base?: string | null;
-                periodo_atual?: string | null;
+            query: {
+                periodo_base: string;
+                periodo_atual: string;
                 municipio?: string | null;
                 bairro?: string | null;
                 classe?: ("B1" | "B2" | "B3" | "A4") | null;
