@@ -21,6 +21,11 @@ def agent_database_url() -> str:
 
 
 @pytest.fixture
+def owner_database_url() -> str:
+    return OWNER_DATABASE_URL
+
+
+@pytest.fixture
 def owner() -> Iterator[psycopg.Connection]:
     try:
         connection = psycopg.connect(OWNER_DATABASE_URL, autocommit=True)
@@ -64,13 +69,15 @@ GOLD_TABLES = (
         satisfacao_media double precision)""",
     """CREATE TABLE gold.gold_kpis_segmento_mensal (
         competencia text NOT NULL, municipio text NOT NULL, bairro text NOT NULL,
-        classe_cadastro text NOT NULL, classe text NOT NULL, possui_gd boolean NOT NULL,
+        classe_cadastro text NOT NULL, classe text NOT NULL, cod_alimentador text NOT NULL,
+        tipo_medidor text NOT NULL, possui_gd boolean NOT NULL,
         n_uc integer NOT NULL, kwh_faturado numeric(16,3) NOT NULL,
         receita_faturada numeric(14,2) NOT NULL, receita_energia numeric(14,2) NOT NULL,
         tributos numeric(14,2) NOT NULL, receita_arrecadada numeric(14,2),
         horas_interrompidas double precision NOT NULL, n_interrupcoes integer NOT NULL,
         n_chamados integer NOT NULL, soma_notas double precision, n_notas integer NOT NULL,
-        PRIMARY KEY (competencia, municipio, bairro, classe_cadastro, possui_gd))""",
+        PRIMARY KEY (competencia, municipio, bairro, classe_cadastro, possui_gd,
+        cod_alimentador, tipo_medidor))""",
     """CREATE TABLE gold.gold_receita_decomposicao (
         periodo_base text NOT NULL, periodo_atual text NOT NULL, municipio text NOT NULL,
         bairro text NOT NULL, classe text NOT NULL, possui_gd boolean NOT NULL,
@@ -96,11 +103,14 @@ GOLD_ROWS = (
     "('AL-03','2025-01',0.0,0.0,800,0,0.0)",
     "INSERT INTO gold.gold_kpis_mensais VALUES ('2025-03',9240,7290.10,6470.00,0.8,0.3,12,4.0)",
     "INSERT INTO gold.gold_kpis_segmento_mensal VALUES "
-    "('2025-01','Olinda','Bairro 1','Residencial','B1',false,100,500,400.00,350.00,50.00,"
+    "('2025-01','Olinda','Bairro 1','Residencial','B1','AL-01','smart',false,"
+    "100,500,400.00,350.00,50.00,"
     "400.00,30,10,4,15,4),"
-    "('2025-02','Olinda','Bairro 1','Residencial','B1',false,100,500,400.00,350.00,50.00,"
+    "('2025-02','Olinda','Bairro 1','Residencial','B1','AL-01','smart',false,"
+    "100,500,400.00,350.00,50.00,"
     "400.00,10,5,2,8,2),"
-    "('2025-02','Olinda','Bairro 1','Residencial','B1',true,100,0,0.00,0.00,0.00,"
+    "('2025-02','Olinda','Bairro 1','Residencial','B1','AL-01','smart',true,"
+    "100,0,0.00,0.00,0.00,"
     "NULL,20,5,0,NULL,0)",
     "INSERT INTO gold.gold_receita_decomposicao VALUES "
     "('2024-01/2024-12','2025-01/2025-12','Olinda','Bairro 1','B1',false,"

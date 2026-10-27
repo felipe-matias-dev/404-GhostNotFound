@@ -55,6 +55,17 @@ O backend monta o agente com `venergy_agent.bootstrap.build_agent(AgentSettings(
 
 As configurações são lidas de variáveis com prefixo `VENERGY_AGENT_` (ou do `.env`), conforme `src/venergy_agent/config.py`. O `.env` não vai para o Git.
 
+## Avaliação
+
+O golden set (`eval/golden_set.yaml`) e o red team (`eval/red_team.yaml`) rodam com o modelo real. A avaliação é paga e lenta, e fica fora do `pytest`. Precisa do banco com a amostra carregada e das views `sem_*`, aplicadas pela carga do backend.
+
+```bash
+uv run python -m venergy_agent.evaluation                 # os dois conjuntos
+uv run python -m venergy_agent.evaluation --only red_team  # só o red team
+```
+
+Cada execução grava `eval/runs/<data>.json`, com as métricas da spec §9.3, e imprime a tabela. A linha de base e os achados estão na spec §9.6. Mudanças de prompt, modelo, few-shot ou camada semântica só entram se a execution accuracy e a acurácia de status não regredirem (DEC-016).
+
 ## Chave do modelo
 
 Cada integrante usa a própria chave, no próprio `ai-agent/.env` (fora do Git):

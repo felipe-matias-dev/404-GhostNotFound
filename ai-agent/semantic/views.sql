@@ -58,6 +58,8 @@ SELECT
     bairro,
     classe_cadastro,
     classe,
+    cod_alimentador,
+    tipo_medidor,
     possui_gd,
     n_uc,
     kwh_faturado,
