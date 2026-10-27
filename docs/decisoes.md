@@ -882,9 +882,11 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 
       **Por que 5% (o top-200 do backlog):** o critério de aceite da D3-07 pede a "taxa de acerto do top-200" da fila, e só com o
       corte de 5% a fila tem o tamanho desse teste (194 UCs; com 8%, 95). A faixa de 5% a 10% ainda acerta 83% (151 irregularidades
-      confirmadas para 30 sem irregularidade), bem acima da taxa base das inspeções (63%). Abaixo de 5% a precisão da faixa cai para
+      confirmadas para 30 sem irregularidade), bem acima da taxa base das inspeções (0,64, nas mesmas UCs medidas). Abaixo de 5% a precisão da faixa cai para
       22% (45 para 163), então 5% é o ponto onde a UC marginal deixa de valer a inspeção. Nas UCs inspecionadas, ordenadas pela queda
-      que a equipe via na data da inspeção, a precisão do top-200 é 0,92, contra a taxa base de 0,64 (o backlog supunha cerca de 50%).
+      que a equipe via na data da inspeção, a precisão do top-200 é 0,92, contra a taxa base de 0,64 (o backlog supunha cerca de 50%). Essa medida ordena só pela queda; a fila de fato ordena
+      por pontos (queda forte, medidor eletromecânico, leituras estimadas) e depois por kWh a recuperar, e essa ordem não foi medida na data da
+      inspeção. O 0,92 vale para o sinal principal, e não para a ordem final da fila.
       Faixas, na data da inspeção:
 
       | Queda | Com irregularidade | Sem irregularidade | Precisão |
@@ -897,6 +899,8 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
       (recomendação 1 do diagnóstico), e não porque já foram regularizadas: a Gold não sabe se houve regularização, e o consumo
       delas continua baixo depois da inspeção (cerca de 57% do histórico antes e 62% depois, com até 6 meses de dados). A energia a
       recuperar nesse grupo (cerca de 2,65 GWh por ano) é muito maior que a das UCs novas da fila, e é o que sustenta a recomendação.
+    - **Em aberto:** o portal precisa de uma lista de "regularização pendente" para as confirmadas, já que elas saem da fila (sugestão da
+      revisão do #54).
     - **Limites desta calibração:** as UCs inspecionadas não são uma amostra aleatória (a distribuidora já escolhia quem
       inspecionar), então a precisão tende a ser menor na população toda; o corte foi escolhido no mesmo grupo em que foi medido;
       e só cerca de 7% das irregularidades confirmadas aparecem com consumo estável ou em alta, fora do alcance de qualquer regra
