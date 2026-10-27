@@ -830,6 +830,9 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
     `efeito_tarifa = (Rb1 − Q1·pb0) − (Rb0 − Q0·pb0)` e `efeito_bandeira = (B1 − Q1·β0) − (B0 − Q0·β0)`, onde `Rb` é a receita
     pela tarifa base e `B` a receita de bandeira. Com volume e mix, os quatro efeitos somam exatamente `R1 − R0`.
 - **Conferência:** no par da pergunta da diretoria, a variação, o efeito mix e o efeito bandeira reproduzem o diagnóstico.
+- **Tolerância (revisão do #43, Arthur):** a checagem preço + volume + mix = variação soma quatro parcelas arredondadas ao
+  centavo (tarifa, bandeira, volume e mix), e não três. O pior caso é exatamente R$ 0,02, e com double a trava pode falhar
+  por acaso numa recarga. A tolerância passa a R$ 0,025 por linha, no contrato e na trava da Gold.
 
 ## DEC-030 · Regras aplicadas na Gold: UCs, ocorrências, GD e fila de suspeitas
 

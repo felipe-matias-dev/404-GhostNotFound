@@ -35,7 +35,7 @@ Unidades usadas: `R$` (reais); `R$/kWh` (reais por quilowatt-hora); `kWh` (quilo
 | Efeito preço | Parte da variação da receita explicada pelo preço: `efeito_tarifa + efeito_bandeira`. | `efeito_tarifa` é o reajuste da tarifa base; `efeito_bandeira` é o acréscimo da bandeira (meses com bandeira amarela ou vermelha). No dado, a bandeira é um acréscimo fixo por kWh, igual em todas as classes: a receita sem bandeira é `receita_energia − receita_bandeira` ([DEC-029](decisoes.md)). |
 | Efeito volume | Parte da variação explicada pela mudança de energia faturada. | As linhas com `possui_gd = true` isolam o efeito da geração própria. |
 | Efeito mix | Parte da variação explicada pela mudança de peso entre classes, medida na empresa inteira. | Calculado, não resíduo. Filtrando um bairro, o efeito mix é a parte daquele bairro no mix da empresa, e não a troca de classes dentro do bairro; volume + mix de cada linha não depende dessa escolha ([DEC-029](decisoes.md)). |
-| Checagem do PVM | `abs(efeito_preco + efeito_volume + efeito_mix − (receita_atual − receita_base)) ≤ R$ 0,02` por linha (só o arredondamento dos três efeitos). | É regra de qualidade de dados, não da carga ([DEC-014](decisoes.md)). |
+| Checagem do PVM | `abs(efeito_preco + efeito_volume + efeito_mix − (receita_atual − receita_base)) ≤ R$ 0,025` por linha (só o arredondamento das quatro parcelas: tarifa, bandeira, volume e mix; o pior caso é R$ 0,02). | É regra de qualidade de dados, não da carga ([DEC-014](decisoes.md), [DEC-029](decisoes.md)). |
 | Score de suspeita | Posição da UC na fila de suspeitas: 1 = mais suspeita. Entram UCs sem GD, com queda de 15% ou mais no consumo médio das 12 últimas competências contra as 12 anteriores; saem as com irregularidade confirmada e as inspecionadas sem irregularidade nos últimos 12 meses. A ordem vem de pontos (queda forte, medidor eletromecânico, leituras estimadas) e depois do kWh a recuperar. | Posição no ranking, e não uma nota. Regras explicáveis, medidas nas inspeções de campo com a janela na data de cada inspeção (precisão e cobertura saem a cada carga) ([DEC-030](decisoes.md)). |
 | `possui_gd` | A UC tem geração própria conectada. Em `gold_kpis_segmento_mensal`, vale por competência (a partir do mês da conexão); em `gold_receita_decomposicao`, é o estado no último mês do período atual. | A UC que conectou entre os períodos fica no grupo com GD dos dois lados da decomposição (DEC-023). |
 | Potência | Potência de pico instalada, em kWp. | A origem só traz potência de pico. Os registros com potência muito acima do normal (GD-02) são convertidos de Wp para kWp quando a faixa e a energia injetada por kWp confirmam; os que não confirmam ficam vazios ([DEC-030](decisoes.md)). |
@@ -109,7 +109,7 @@ Faturamento por UC e competência.
 | `dias_em_atraso` | integer | sim | dias | proposta | Dias de atraso: da data de pagamento depois do vencimento (paga com atraso) ou da data de corte depois do vencimento (em atraso); vazio nos demais casos. Dá ao portal a gravidade do atraso sem precisar conhecer a data de corte. |
 | `receita_bandeira` | numeric(14,2) | não | R$ | proposta | Parte da receita de energia que é acréscimo da bandeira tarifária do mês (zero na bandeira verde). kwh_faturado × acréscimo da bandeira por kWh (DEC-029); receita_energia - receita_bandeira é a receita pela tarifa base. |
 | `tipo_leitura` | text (real, estimada) | não |  | proposta | Se a leitura do mês foi feita no medidor (real) ou estimada. |
-| `tipo_medidor` | text (eletromecanico, eletronico, smart) | não |  | proposta | Tipo do medidor que fez a leitura do mês. |
+| `tipo_medidor` | text (eletromecanico, eletronico, smart) | não |  | proposta | Tipo do medidor que fez a leitura do mês. No mês da troca de medidor pode diferir do tipo_medidor de gold_kpis_segmento_mensal, que é o medidor vigente pelas datas: n_leituras por tipo no recorte não bate com a contagem do fato por tipo nesse mês (DEC-027). |
 | `dias_faturados` | integer | sim | dias | proposta | Dias entre a leitura do mês e a do mês anterior; vazio na primeira leitura da UC. Explica parte da variação da conta (insight conta alta, G2-05). |
 
 **Validações:**
@@ -145,7 +145,7 @@ Decomposição da variação de receita entre dois períodos (PVM com efeito mix
 
 **Validações:**
 - |efeito_preco - (efeito_tarifa + efeito_bandeira)| <= R$ 0,01 por linha
-- |efeito_preco + efeito_volume + efeito_mix - (receita_atual - receita_base)| <= R$ 0,02 por linha (só o arredondamento dos três efeitos; DEC-014). O mix é calculado, não resíduo.
+- |efeito_preco + efeito_volume + efeito_mix - (receita_atual - receita_base)| <= R$ 0,025 por linha (só o arredondamento das quatro parcelas gravadas, tarifa, bandeira, volume e mix, cujo pior caso é R$ 0,02; DEC-014, DEC-029). O mix é calculado, não resíduo.
 
 ### `gold_kpis_mensais`
 
@@ -188,7 +188,7 @@ KPIs por recorte (município, bairro, classe e geração própria) e competênci
 | `classe` | text (B1, B2, B3, A4) | não |  | proposta | Classe de consumo (B1, B2, B3, A4); determinada pela classe do cadastro. |
 | `possui_gd` | boolean | não |  | proposta | A UC já tinha geração própria conectada na competência (data de conexão até o mês). Por competência, e não o estado atual: antes da conexão a UC conta como sem GD, o que permite comparar antes e depois. |
 | `cod_alimentador` | text | não |  | proposta | Alimentador que atende as UCs do recorte (do cadastro da UC). Cada bairro é atendido por 1 ou 2 alimentadores; permite cruzar continuidade com bairro, classe e GD (DEC-027). |
-| `tipo_medidor` | text (eletromecanico, eletronico, smart, sem_medidor) | não |  | proposta | Tipo do medidor vigente na UC na competência; sem_medidor quando a UC não tem medidor instalado no mês. Vigente pela data de instalação e de retirada: muda quando o medidor é trocado (DEC-027). |
+| `tipo_medidor` | text (eletromecanico, eletronico, smart, sem_medidor) | não |  | proposta | Tipo do medidor vigente na UC na competência; sem_medidor quando a UC não tem medidor instalado no mês. Vigente pela data de instalação e de retirada: muda quando o medidor é trocado (DEC-027). Não é o medidor da leitura (tipo_medidor do fato): no mês da troca os dois podem divergir. |
 | `n_uc` | integer | não | contagem | proposta | UCs faturadas no recorte, na competência (denominador do DEC/FEC, como no PRODIST). É um estoque: some só dentro do mesmo mês. Para um período de vários meses, o DEC e o FEC usam a média mensal (soma de n_uc ÷ número de meses). |
 | `kwh_faturado` | numeric(16,3) | não | kWh | proposta | Energia faturada no recorte. |
 | `receita_faturada` | numeric(14,2) | não | R$ | proposta | Receita faturada no recorte (energia + tributos). |
