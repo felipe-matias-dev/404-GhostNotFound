@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { atalhos, parDoAtual, passosDaPonte } from "../conversions";
+import {
+	atalhos,
+	parDoAtual,
+	passosDaPonte,
+	type Ranking,
+	rankingDaQueda,
+} from "../conversions";
 import type { DecomposicaoLinha, ParPeriodos } from "../types";
 
 const par = (periodo_base: string, periodo_atual: string): ParPeriodos => ({
@@ -102,5 +108,74 @@ describe("passosDaPonte", () => {
 		const efeitos = resto.filter((p) => p.kind === "delta");
 		const fim = efeitos.reduce((total, p) => total + p.value, base?.value ?? 0);
 		expect(fim).toBeCloseTo(passos.at(-1)?.value ?? Number.NaN, 2);
+	});
+});
+
+describe("rankingDaQueda", () => {
+	const nomes = (r: Ranking) =>
+		r.itens.map((c) => [c.linha.segmento, c.valor, c.fracao]);
+
+	it("lista só quem caiu na causa escolhida, da maior queda, com barra relativa à maior", () => {
+		const linhas = [
+			linha("Recife", 1000, 50, -10, -40, 0),
+			linha("Olinda", 500, -5, -20, -10, 0),
+			linha("Paulista", 300, 0, 0, 25, 0),
+		];
+		const porVolume = rankingDaQueda(linhas, "volume");
+		expect(porVolume.houveQueda).toBe(true);
+		expect([porVolume.quedas, porVolume.total]).toEqual([2, 3]);
+		expect(nomes(porVolume)).toEqual([
+			["Recife", -40, 1],
+			["Olinda", -10, 0.25],
+		]);
+		expect(nomes(rankingDaQueda(linhas, "variacao"))).toEqual([
+			["Olinda", -35, 1],
+		]);
+	});
+
+	it("sem queda, traz quem subiu menos e avisa que não houve queda", () => {
+		const linhas = [
+			linha("Recife", 1000, 0, 0, 40, 0),
+			linha("Olinda", 500, 0, 0, 0, 0),
+			linha("Paulista", 300, 0, 0, 20, 0),
+		];
+		const r = rankingDaQueda(linhas, "volume", "brl", 2);
+		expect(r.houveQueda).toBe(false);
+		expect(nomes(r)).toEqual([
+			["Olinda", 0, 0],
+			["Paulista", 20, 1],
+		]);
+	});
+
+	it("corta no limite", () => {
+		const linhas = Array.from({ length: 8 }, (_, i) =>
+			linha(`S${i}`, 100, 0, 0, -(i + 1), 0),
+		);
+		const r = rankingDaQueda(linhas, "volume");
+		expect(r.quedas).toBe(8);
+		expect(r.itens.map((c) => c.linha.segmento)).toEqual([
+			"S7",
+			"S6",
+			"S5",
+			"S4",
+			"S3",
+		]);
+	});
+
+	it("em %, ranqueia pelo peso sobre a receita base e deixa de fora quem não tem base", () => {
+		const linhas = [
+			linha("Recife", 1000, 0, 0, -50, 0),
+			linha("Olinda", 100, 0, 0, -20, 0),
+			linha("Nova", 0, 0, 0, -5, 0),
+		];
+		expect(nomes(rankingDaQueda(linhas, "volume", "brl"))[0]?.[0]).toBe(
+			"Recife",
+		);
+		const r = rankingDaQueda(linhas, "volume", "pct");
+		expect(r.total).toBe(2);
+		expect(r.itens.map((c) => [c.linha.segmento, c.pct, c.fracao])).toEqual([
+			["Olinda", -0.2, 1],
+			["Recife", -0.05, 0.25],
+		]);
 	});
 });

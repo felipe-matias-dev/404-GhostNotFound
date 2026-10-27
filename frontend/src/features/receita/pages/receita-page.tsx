@@ -5,6 +5,7 @@ import { DecomposicaoTable } from "../components/decomposicao-table";
 import { MapaRecorte } from "../components/mapa-recorte";
 import { PeriodoPicker } from "../components/periodo-picker";
 import { PonteWaterfall } from "../components/ponte-waterfall";
+import { RankingQueda } from "../components/ranking-queda";
 import { RecorteTrilha } from "../components/recorte-trilha";
 import { type Efeito, parPadrao } from "../conversions";
 import { usePeriodosDecomposicao } from "../hooks/use-decomposicao";
@@ -89,7 +90,7 @@ export function ReceitaPage() {
 				/>
 				<section
 					aria-labelledby="ponte-titulo"
-					className="flex min-w-0 flex-col gap-3"
+					className="@container flex min-w-0 flex-col gap-3"
 				>
 					<div className="flex flex-wrap items-center justify-between gap-2">
 						<h2 id="ponte-titulo" className="text-heading">
@@ -101,12 +102,23 @@ export function ReceitaPage() {
 							onEscolher={(escolhido) => navegar(recorte, escolhido)}
 						/>
 					</div>
-					<PonteWaterfall
-						par={par}
-						recorte={recorte}
-						efeito={causa}
-						onEfeito={escolherCausa}
-					/>
+					{/* Largo: ponte e ranking lado a lado, sem a ponte esticar por toda a largura. */}
+					<div className="grid gap-3 @4xl:grid-cols-[minmax(0,1fr)_minmax(22rem,0.8fr)]">
+						<PonteWaterfall
+							par={par}
+							recorte={recorte}
+							efeito={causa}
+							onEfeito={escolherCausa}
+						/>
+						<RankingQueda
+							par={par}
+							recorte={recorte}
+							efeito={causa}
+							onEfeito={escolherCausa}
+							onAbrir={mudar}
+							onDestaque={setDestaque}
+						/>
+					</div>
 					<DecomposicaoTable
 						par={par}
 						filtro={recorte}

@@ -139,6 +139,18 @@ const ESTAVEL = 0.005;
 const SATURA = 0.1;
 
 /**
+ * Quanto o efeito pesa sobre a receita base do próprio segmento, para um bairro pequeno e um
+ * município grande ficarem comparáveis. `null` sem receita base (segmento novo).
+ */
+export function sobreABase(
+	linha: DecomposicaoLinha,
+	efeito: Efeito,
+): number | null {
+	if (linha.receita_base <= 0) return null;
+	return linha[EFEITO_CAMPO[efeito]] / linha.receita_base;
+}
+
+/**
  * Intensidade do mapa, de -1 a 1: variação da receita sobre a receita base do próprio
  * segmento, para um bairro pequeno e um município grande ficarem comparáveis. Só define a
  * cor e o brilho; o número exibido continua sendo a variação em R$ que vem da API.
@@ -235,4 +247,62 @@ export const EFEITO_ROTULO: Record<Efeito, string> = {
 /** Etapa da ponte → causa; os totais (receita base e atual) não são causa. */
 export function causaDoPasso(id: string): Causa | null {
 	return (CAUSAS as string[]).includes(id) ? (id as Causa) : null;
+}
+
+/** Ranquear pelo valor em R$ ou pelo peso sobre a receita base do segmento. */
+export type Medida = "brl" | "pct";
+
+export type Contribuinte = {
+	linha: DecomposicaoLinha;
+	/** Valor do efeito em R$. */
+	valor: number;
+	/** Efeito sobre a receita base; `null` sem receita base. */
+	pct: number | null;
+	/** Tamanho da barra na medida escolhida, sobre o maior da lista, de 0 a 1. */
+	fracao: number;
+};
+
+export type Ranking = {
+	/** `false`: nenhum segmento caiu, e a lista traz as menores altas. */
+	houveQueda: boolean;
+	quedas: number;
+	total: number;
+	itens: Contribuinte[];
+};
+
+/**
+ * Maiores contribuintes da queda no efeito escolhido, da maior queda para a menor. Só entram
+ * segmentos que caíram; se nenhum caiu, a lista mostra quem subiu menos, sem chamar de queda.
+ * Em %, segmento sem receita base fica de fora: não há base para comparar.
+ */
+export function rankingDaQueda(
+	linhas: DecomposicaoLinha[],
+	efeito: Efeito,
+	medida: Medida = "brl",
+	limite = 5,
+): Ranking {
+	const campo = EFEITO_CAMPO[efeito];
+	const ordenados = linhas
+		.map((linha) => {
+			const pct = sobreABase(linha, efeito);
+			const chave = medida === "pct" ? pct : linha[campo];
+			return { linha, valor: linha[campo], pct, chave };
+		})
+		.filter((c): c is typeof c & { chave: number } => c.chave !== null)
+		.sort(
+			(a, b) =>
+				a.chave - b.chave || a.linha.segmento.localeCompare(b.linha.segmento),
+		);
+	const quedas = ordenados.filter((c) => c.chave < 0);
+	const escolhidos = (quedas.length ? quedas : ordenados).slice(0, limite);
+	const maior = Math.max(0, ...escolhidos.map((c) => Math.abs(c.chave)));
+	return {
+		houveQueda: quedas.length > 0,
+		quedas: quedas.length,
+		total: ordenados.length,
+		itens: escolhidos.map(({ chave, ...c }) => ({
+			...c,
+			fracao: maior ? Math.abs(chave) / maior : 0,
+		})),
+	};
 }
