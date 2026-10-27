@@ -134,6 +134,21 @@ export function formatCompetencia(
 	return match && mes ? `${mes}/${match[1]}` : competencia;
 }
 
+/** Competência "2025-03" → "mar 25": rótulo de eixo, onde cabe pouco */
+export function formatCompetenciaCurta(
+	competencia: string | null | undefined,
+): string {
+	if (!competencia) return VAZIO;
+	const match = /^\d{2}(\d{2})-(\d{2})$/.exec(competencia);
+	const mes = match ? MESES[Number(match[2]) - 1] : undefined;
+	return match && mes ? `${mes} ${match[1]}` : competencia;
+}
+
+/** Número do mês (1 a 12) → "mar" */
+export function formatMes(mes: number): string {
+	return MESES[mes - 1] ?? VAZIO;
+}
+
 /** Período "2024-01/2024-12" → "jan/2024 a dez/2024" */
 export function formatPeriodo(periodo: string | null | undefined): string {
 	if (!periodo) return VAZIO;
