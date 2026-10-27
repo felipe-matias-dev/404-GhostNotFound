@@ -326,6 +326,47 @@ export interface components {
             variacao_receita_pct: number | null;
         };
         /**
+         * ConsumoMesSchema
+         * @description Um mês do consumo da UC ao lado do mesmo mês do ano anterior.
+         */
+        ConsumoMesSchema: {
+            /** Competencia */
+            competencia: string;
+            /** Kwh Faturado */
+            kwh_faturado: number | null;
+            /** Kwh Ano Anterior */
+            kwh_ano_anterior: number | null;
+            /** Receita Faturada */
+            receita_faturada: number | null;
+            /** Bandeira */
+            bandeira: ("verde" | "amarela" | "vermelha_p1" | "vermelha_p2") | null;
+            /** Dias Faturados */
+            dias_faturados: number | null;
+        };
+        /**
+         * ConsumoUcSchema
+         * @description Os 12 meses até a última competência da Gold, contra o mesmo período do ano anterior.
+         */
+        ConsumoUcSchema: {
+            /** Referencia */
+            referencia: string | null;
+            /** Meses */
+            meses: components["schemas"]["ConsumoMesSchema"][];
+            /** Kwh 12M */
+            kwh_12m: number;
+            /** Kwh 12M Ano Anterior */
+            kwh_12m_ano_anterior: number;
+            /** Variacao 12M Pct */
+            variacao_12m_pct: number | null;
+            /** Variacao Ultimo Mes Pct */
+            variacao_ultimo_mes_pct: number | null;
+            /**
+             * Tendencia
+             * @enum {string}
+             */
+            tendencia: "subiu" | "estavel" | "caiu" | "sem_comparacao";
+        };
+        /**
          * ContinuidadeAlimentadorMensalSchema
          * @description DEC e FEC de um alimentador numa competência.
          */
@@ -791,6 +832,7 @@ export interface components {
          */
         Uc360Schema: {
             cadastro: components["schemas"]["DimUcSchema"];
+            consumo: components["schemas"]["ConsumoUcSchema"];
             faturas_nao_pagas: components["schemas"]["FaturasNaoPagasSchema"];
             medidor: components["schemas"]["MedidorUcSchema"] | null;
             /** Interrupcoes */

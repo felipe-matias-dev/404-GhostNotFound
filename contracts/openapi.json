@@ -1230,6 +1230,162 @@
         "title": "ComparacaoReceitaSchema",
         "description": "Totais de dois períodos e quanto o atual variou sobre a base."
       },
+      "ConsumoMesSchema": {
+        "properties": {
+          "competencia": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+            "title": "Competencia"
+          },
+          "kwh_faturado": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kwh Faturado"
+          },
+          "kwh_ano_anterior": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kwh Ano Anterior"
+          },
+          "receita_faturada": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receita Faturada"
+          },
+          "bandeira": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "verde",
+                  "amarela",
+                  "vermelha_p1",
+                  "vermelha_p2"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bandeira"
+          },
+          "dias_faturados": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dias Faturados"
+          }
+        },
+        "type": "object",
+        "required": [
+          "competencia",
+          "kwh_faturado",
+          "kwh_ano_anterior",
+          "receita_faturada",
+          "bandeira",
+          "dias_faturados"
+        ],
+        "title": "ConsumoMesSchema",
+        "description": "Um mês do consumo da UC ao lado do mesmo mês do ano anterior."
+      },
+      "ConsumoUcSchema": {
+        "properties": {
+          "referencia": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\d{4}-(0[1-9]|1[0-2])$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Referencia"
+          },
+          "meses": {
+            "items": {
+              "$ref": "#/components/schemas/ConsumoMesSchema"
+            },
+            "type": "array",
+            "title": "Meses"
+          },
+          "kwh_12m": {
+            "type": "number",
+            "title": "Kwh 12M"
+          },
+          "kwh_12m_ano_anterior": {
+            "type": "number",
+            "title": "Kwh 12M Ano Anterior"
+          },
+          "variacao_12m_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variacao 12M Pct"
+          },
+          "variacao_ultimo_mes_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variacao Ultimo Mes Pct"
+          },
+          "tendencia": {
+            "type": "string",
+            "enum": [
+              "subiu",
+              "estavel",
+              "caiu",
+              "sem_comparacao"
+            ],
+            "title": "Tendencia"
+          }
+        },
+        "type": "object",
+        "required": [
+          "referencia",
+          "meses",
+          "kwh_12m",
+          "kwh_12m_ano_anterior",
+          "variacao_12m_pct",
+          "variacao_ultimo_mes_pct",
+          "tendencia"
+        ],
+        "title": "ConsumoUcSchema",
+        "description": "Os 12 meses até a última competência da Gold, contra o mesmo período do ano anterior."
+      },
       "ContinuidadeAlimentadorMensalSchema": {
         "properties": {
           "cod_alimentador": {
@@ -2474,6 +2630,9 @@
           "cadastro": {
             "$ref": "#/components/schemas/DimUcSchema"
           },
+          "consumo": {
+            "$ref": "#/components/schemas/ConsumoUcSchema"
+          },
           "faturas_nao_pagas": {
             "$ref": "#/components/schemas/FaturasNaoPagasSchema"
           },
@@ -2512,6 +2671,7 @@
         "type": "object",
         "required": [
           "cadastro",
+          "consumo",
           "faturas_nao_pagas",
           "medidor",
           "interrupcoes",

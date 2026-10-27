@@ -35,6 +35,7 @@ TipoMedidor = Literal["eletromecanico", "eletronico", "smart"]
 TipoMedidorRecorte = Literal["eletromecanico", "eletronico", "smart", "sem_medidor"]
 ResultadoInspecao = Literal["irregularidade_confirmada", "sem_irregularidade"]
 ModalidadeGd = Literal["geracao_propria_uc", "autoconsumo_remoto", "geracao_compartilhada"]
+Tendencia = Literal["subiu", "estavel", "caiu", "sem_comparacao"]
 
 # Um período da decomposição, no formato do contrato: AAAA-MM/AAAA-MM, da primeira à última
 # competência.
@@ -360,6 +361,34 @@ class InspecaoUcSchema(BaseModel):
     kwh_recuperado: Annotated[ExactNumber, Field(ge=0)]
 
 
+class ConsumoMesSchema(BaseModel):
+    """Um mês do consumo da UC ao lado do mesmo mês do ano anterior."""
+
+    competencia: Competencia
+    # Vazio, e não zero, no mês sem fatura: zero diria que a UC não consumiu.
+    kwh_faturado: ExactNumber | None
+    kwh_ano_anterior: ExactNumber | None
+    # Mostram por que a conta mudou sem o consumo mudar: bandeira mais cara ou mais dias.
+    receita_faturada: ExactNumber | None
+    bandeira: Bandeira | None
+    dias_faturados: int | None
+
+
+class ConsumoUcSchema(BaseModel):
+    """Os 12 meses até a última competência da Gold, contra o mesmo período do ano anterior."""
+
+    # Vazia só se a Gold não tem nenhuma fatura.
+    referencia: Competencia | None
+    meses: list[ConsumoMesSchema]
+    kwh_12m: ExactNumber
+    kwh_12m_ano_anterior: ExactNumber
+    # Em %, vazias quando a base é zero ou falta a fatura de um dos meses.
+    variacao_12m_pct: float | None
+    variacao_ultimo_mes_pct: float | None
+    # A resposta para "minha conta veio alta": o último mês contra o mesmo mês do ano anterior.
+    tendencia: Tendencia
+
+
 class FaturaNaoPagaSchema(BaseModel):
     """Uma fatura da UC que ainda não foi paga."""
 
@@ -385,6 +414,7 @@ class Uc360Schema(BaseModel):
     """Tudo o que o atendente precisa de uma UC numa tela só."""
 
     cadastro: DimUcSchema
+    consumo: ConsumoUcSchema
     faturas_nao_pagas: FaturasNaoPagasSchema
     # Vazio na UC sem medidor instalado: não há linha em gold_medidor_uc.
     medidor: MedidorUcSchema | None

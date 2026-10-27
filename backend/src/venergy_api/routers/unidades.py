@@ -3,9 +3,10 @@
 from decimal import Decimal
 
 from fastapi import APIRouter, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from venergy_api.consumo_uc import inicio_da_consulta, montar_consumo
 from venergy_api.database import SessionDep
 from venergy_api.models import (
     AtendimentoUc,
@@ -59,10 +60,23 @@ def get_visao_360(cod_uc: str, session: SessionDep) -> Uc360Schema:
     """Cadastro, medidor e histórico da UC: o que o atendente precisa com o cliente na linha."""
     uc = _buscar_uc(session, cod_uc)
     medidor = session.get(MedidorUc, cod_uc)
+    # A janela termina na última competência da Gold, e não na da própria UC nem no mês de
+    # hoje (DEC-036): o dado é uma extração única, e uma UC que parou de faturar não pode
+    # passar por "recente" só porque a última fatura dela é a última que ela tem.
+    fato = FatoFaturamentoMensal
+    referencia = session.scalar(select(func.max(fato.competencia)))
+    faturas = (
+        session.scalars(
+            select(fato).where(
+                fato.cod_uc == cod_uc, fato.competencia >= inicio_da_consulta(referencia)
+            )
+        ).all()
+        if referencia is not None
+        else []
+    )
     # Toda fatura não paga, e não só as dos últimos 12 meses: dívida antiga continua sendo
     # dívida. A situação já vem calculada pela Gold, contra a data de corte (em_aberto ainda
     # no prazo, em_atraso vencida). A mais antiga primeiro, que é a que o cliente deve há mais.
-    fato = FatoFaturamentoMensal
     nao_pagas = session.scalars(
         select(fato)
         .where(fato.cod_uc == cod_uc, fato.status_pagamento.in_(("em_aberto", "em_atraso")))
@@ -90,6 +104,7 @@ def get_visao_360(cod_uc: str, session: SessionDep) -> Uc360Schema:
     )
     return Uc360Schema(
         cadastro=DimUcSchema.model_validate(uc),
+        consumo=montar_consumo(referencia, faturas),
         faturas_nao_pagas=FaturasNaoPagasSchema(
             quantidade=len(nao_pagas),
             valor_total=valor_total,
