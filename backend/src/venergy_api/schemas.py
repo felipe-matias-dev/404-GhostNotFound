@@ -98,8 +98,8 @@ class FaturamentoMensalSchema(BaseModel):
 class ReceitaDecomposicaoSchema(BaseModel):
     """Variação da receita entre dois períodos, separada em efeito preço, volume e mix."""
 
-    periodo_base: RequiredText
-    periodo_atual: RequiredText
+    periodo_base: PeriodoDecomposicao
+    periodo_atual: PeriodoDecomposicao
     municipio: RequiredText
     bairro: RequiredText
     classe: Classe
