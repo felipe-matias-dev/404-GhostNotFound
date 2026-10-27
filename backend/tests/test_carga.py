@@ -1,6 +1,8 @@
 import csv
 import re
+from collections import Counter
 from decimal import Decimal
+from itertools import islice
 from pathlib import Path
 
 import pytest
@@ -189,6 +191,89 @@ def test_unit_without_reading_loads_with_empty_average(tmp_path: Path, engine: E
     load_gold(tmp_path / "gold", engine)
 
     assert stored_ucs(engine)[0].consumo_medio_kwh_12m is None
+
+
+def test_small_batches_load_exactly_what_the_default_batch_loads(
+    tmp_path: Path, engine: Engine
+) -> None:
+    write_sample(tmp_path / "gold", force=True)
+    counts = load_gold(tmp_path / "gold", engine)
+    expected_ucs = [uc.cod_uc for uc in stored_ucs(engine)]
+
+    # Lotes de 2 linhas partem cada tabela da amostra em dezenas de INSERTs.
+    small_batch_counts = load_gold(tmp_path / "gold", engine, tamanho_lote=2)
+
+    assert small_batch_counts == counts
+    assert [uc.cod_uc for uc in stored_ucs(engine)] == expected_ucs
+
+
+def test_invalid_row_in_the_last_table_changes_nothing(tmp_path: Path, engine: Engine) -> None:
+    # A conferência roda em todos os arquivos antes de a transação abrir: um erro na última
+    # tabela não pode deixar a Gold anterior apagada nem as tabelas travadas por minutos.
+    write_gold_dim_uc(tmp_path / "gold", [VALID_ROW])
+    load_gold(tmp_path / "gold", engine)
+    write_gold_dim_uc(tmp_path / "gold", [{**VALID_ROW, "cod_uc": "0002"}])
+    last_csv = tmp_path / "gold" / carga.GOLD_TABLES[-1].file_name
+    lines = last_csv.read_text(encoding="utf-8").splitlines()
+    # Uma linha com uma célula só: as demais colunas ficam vazias e o contrato recusa.
+    last_csv.write_text("\n".join([*lines, "linha-quebrada"]) + "\n", encoding="utf-8")
+
+    with pytest.raises(GoldLoadError, match=last_csv.name):
+        load_gold(tmp_path / "gold", engine, tamanho_lote=1)
+
+    assert [uc.cod_uc for uc in stored_ucs(engine)] == ["0001"]
+    assert gold_views(engine) == AGENT_VIEWS
+
+
+def test_a_failure_while_writing_undoes_the_whole_load(
+    tmp_path: Path, engine: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    write_gold_dim_uc(tmp_path / "gold", [VALID_ROW])
+    load_gold(tmp_path / "gold", engine)
+    write_gold_dim_uc(tmp_path / "gold", [{**VALID_ROW, "cod_uc": "0002"}])
+    real_iter_rows = carga.iter_rows
+    reads: Counter[str] = Counter()
+
+    def file_that_breaks_on_the_second_read(csv_path: Path, schema: type[BaseModel]):
+        reads[csv_path.name] += 1
+        if csv_path.name == "gold_receita_decomposicao.csv" and reads[csv_path.name] == 2:
+            raise GoldLoadError("erro na segunda leitura")
+        return real_iter_rows(csv_path, schema)
+
+    monkeypatch.setattr(carga, "iter_rows", file_that_breaks_on_the_second_read)
+
+    with pytest.raises(GoldLoadError, match="erro na segunda leitura"):
+        load_gold(tmp_path / "gold", engine)
+
+    # A dim_uc nova já tinha sido gravada na transação quando a decomposição falhou.
+    assert [uc.cod_uc for uc in stored_ucs(engine)] == ["0001"]
+    assert gold_views(engine) == AGENT_VIEWS
+
+
+def test_a_file_that_changed_between_the_two_reads_cancels_the_load(
+    tmp_path: Path, engine: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    write_gold_dim_uc(tmp_path / "gold", [VALID_ROW])
+    load_gold(tmp_path / "gold", engine)
+    write_gold_dim_uc(
+        tmp_path / "gold", [{**VALID_ROW, "cod_uc": "0002"}, {**VALID_ROW, "cod_uc": "0003"}]
+    )
+    real_iter_rows = carga.iter_rows
+    reads: Counter[str] = Counter()
+
+    def file_that_lost_a_row(csv_path: Path, schema: type[BaseModel]):
+        reads[csv_path.name] += 1
+        rows = real_iter_rows(csv_path, schema)
+        if csv_path.name == "gold_dim_uc.csv" and reads[csv_path.name] == 2:
+            return islice(rows, 1)
+        return rows
+
+    monkeypatch.setattr(carga, "iter_rows", file_that_lost_a_row)
+
+    with pytest.raises(GoldLoadError, match="gold_dim_uc.csv.*mudou durante a carga"):
+        load_gold(tmp_path / "gold", engine)
+
+    assert [uc.cod_uc for uc in stored_ucs(engine)] == ["0001"]
 
 
 class OptionalColumnSchema(BaseModel):

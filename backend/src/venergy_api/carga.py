@@ -54,7 +54,7 @@ ARRAY_SEPARATOR = ";"
 
 # Linhas por INSERT. A memória da carga é a de um lote, e não a do arquivo: a Gold real tem
 # milhões de linhas, e guardar todas derrubou a carga numa máquina de 8 GB.
-BATCH_SIZE = 10_000
+TAMANHO_LOTE = 10_000
 
 # Views da camada semântica do agente de IA: o GenAI gera o arquivo, e a carga o aplica a
 # cada execução, porque as views dependem das tabelas que ela recria (spec do agente, D7).
@@ -175,20 +175,29 @@ def drop_agent_views(connection: Connection) -> None:
     connection.execute(text(f"DROP VIEW {', '.join(f'gold.{quote(nome)}' for nome in nomes)}"))
 
 
-def load_gold(gold_dir: Path, engine: Engine) -> dict[str, int]:
+def load_gold(gold_dir: Path, engine: Engine, tamanho_lote: int = TAMANHO_LOTE) -> dict[str, int]:
     """Substitui as tabelas da Gold pelo conteúdo dos CSVs e devolve as linhas por tabela."""
-    # Valida tudo antes de gravar: um arquivo ruim não pode deixar o banco pela metade.
-    validated: dict[GoldTable, list[dict[str, object]]] = {}
+    csv_paths: dict[GoldTable, Path] = {}
     for table in GOLD_TABLES:
         csv_path = gold_dir / table.file_name
         if not csv_path.exists():
             raise GoldLoadError(f"arquivo não encontrado: {csv_path}")
-        validated[table] = read_rows(csv_path, table.schema)
+        csv_paths[table] = csv_path
     if not AGENT_VIEWS_SQL.exists():
         raise GoldLoadError(f"views do agente não encontradas: {AGENT_VIEWS_SQL}")
     views_sql = AGENT_VIEWS_SQL.read_text(encoding="utf-8")
 
+    # Primeira rodada: confere todas as linhas de todos os arquivos e só conta, sem guardar
+    # nada. Um arquivo ruim falha aqui, antes de a transação abrir: a Gold anterior não é
+    # apagada e as tabelas não ficam travadas por minutos até o erro aparecer. A segunda
+    # rodada valida de novo porque lê o arquivo de novo, e custa o dobro de validações.
+    expected_counts = {
+        table: sum(1 for _ in iter_rows(csv_path, table.schema))
+        for table, csv_path in csv_paths.items()
+    }
+
     gold_tables = [table.model.__table__ for table in GOLD_TABLES]
+    counts: dict[str, int] = {}
     # Tudo numa transação (no Postgres, DROP e CREATE também voltam atrás): rodar duas
     # vezes não duplica, e uma falha no meio desfaz tudo, inclusive o DROP.
     with engine.begin() as connection:
@@ -202,9 +211,17 @@ def load_gold(gold_dir: Path, engine: Engine) -> dict[str, int]:
         Base.metadata.drop_all(connection, tables=gold_tables)
         # Cria a Gold e o que faltar no schema app, sem mexer no que já está lá.
         Base.metadata.create_all(connection)
-        for table, rows in validated.items():
-            if rows:
-                connection.execute(insert(table.model), rows)
+        for table, csv_path in csv_paths.items():
+            rows = iter_rows(csv_path, table.schema)
+            written = _inserir_em_lotes(connection, table.model, rows, tamanho_lote)
+            if written != expected_counts[table]:
+                # Alguém trocou o arquivo entre as duas leituras: gravar assim seria carregar
+                # o que ninguém conferiu. Falhar desfaz a transação inteira.
+                raise GoldLoadError(
+                    f"{csv_path.name}: o arquivo mudou durante a carga "
+                    f"({expected_counts[table]} linhas conferidas, {written} gravadas)"
+                )
+            counts[table.model.__tablename__] = written
         try:
             connection.exec_driver_sql(views_sql)
         except ProgrammingError as error:
@@ -213,7 +230,7 @@ def load_gold(gold_dir: Path, engine: Engine) -> dict[str, int]:
             # a view quebrada deixaria o agente sem consulta, e ninguém perceberia.
             raise GoldLoadError(f"as views do agente não batem com a Gold: {error.orig}") from error
 
-    return {table.model.__tablename__: len(rows) for table, rows in validated.items()}
+    return counts
 
 
 def main() -> None:
