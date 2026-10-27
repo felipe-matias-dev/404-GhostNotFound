@@ -1,8 +1,9 @@
 import pytest
 
 from venergy_agent.application.ask import AskUseCase
-from venergy_agent.bootstrap import build_agent
+from venergy_agent.bootstrap import build_agent, build_insight_writer
 from venergy_agent.config import AgentSettings
+from venergy_agent.infrastructure.insight_writer import PydanticAiInsightWriter
 from venergy_agent.infrastructure.semantic_source import SemanticLayerError
 
 
@@ -45,3 +46,16 @@ async def test_answers_name_the_model_as_the_provider_does_without_the_prefix(se
     answer = await agent.ask("x" * (settings.max_question_chars + 1), "s1")
 
     assert answer.model == settings.llm_model.partition(":")[2]
+
+
+def test_builds_the_insight_writer_from_the_real_prompt(settings):
+    writer = build_insight_writer(settings)
+
+    assert isinstance(writer, PydanticAiInsightWriter)
+
+
+def test_unknown_insight_prompt_version_fails_at_startup(settings):
+    settings = settings.model_copy(update={"insight_prompt_version": "v99"})
+
+    with pytest.raises(FileNotFoundError):
+        build_insight_writer(settings)
