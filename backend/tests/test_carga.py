@@ -10,7 +10,14 @@ from sqlalchemy.orm import Session
 
 from venergy_api import carga
 from venergy_api.amostra import write_sample
-from venergy_api.carga import AGENT_VIEWS_SQL, GoldLoadError, iter_rows, load_gold, read_rows
+from venergy_api.carga import (
+    AGENT_VIEWS_SQL,
+    GoldLoadError,
+    _inserir_em_lotes,
+    iter_rows,
+    load_gold,
+    read_rows,
+)
 from venergy_api.models import DimUc
 from venergy_api.schemas import RequiredText
 
@@ -208,6 +215,35 @@ def test_rows_are_read_one_at_a_time_and_not_all_at_once(tmp_path: Path) -> None
     assert next(rows) == {"cod_uc": "0001", "receita": 10.0}
     with pytest.raises(GoldLoadError, match="linha 3: receita"):
         next(rows)
+
+
+class ConexaoFalsa:
+    """Anota o tamanho de cada lote que chegaria ao banco, sem banco nenhum."""
+
+    def __init__(self) -> None:
+        self.lotes: list[int] = []
+
+    def execute(self, statement: object, rows: list[dict[str, object]]) -> None:
+        self.lotes.append(len(rows))
+
+
+def test_rows_are_inserted_in_batches_of_the_requested_size() -> None:
+    conexao = ConexaoFalsa()
+    linhas = ({"cod_uc": str(numero)} for numero in range(5))
+
+    gravadas = _inserir_em_lotes(conexao, DimUc, linhas, tamanho_lote=2)
+
+    assert conexao.lotes == [2, 2, 1]
+    assert gravadas == 5
+
+
+def test_nothing_reaches_the_database_when_there_are_no_rows() -> None:
+    conexao = ConexaoFalsa()
+
+    gravadas = _inserir_em_lotes(conexao, DimUc, iter([]), tamanho_lote=2)
+
+    assert conexao.lotes == []
+    assert gravadas == 0
 
 
 class ListColumnSchema(BaseModel):

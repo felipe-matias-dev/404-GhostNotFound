@@ -8,8 +8,9 @@ Uso: uv run python -m venergy_api.carga
 """
 
 import csv
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
+from itertools import batched
 from pathlib import Path
 from typing import get_args, get_origin
 
@@ -50,6 +51,10 @@ from venergy_api.schemas import (
 
 # conventions.delivery.array_separator do contrato da Gold.
 ARRAY_SEPARATOR = ";"
+
+# Linhas por INSERT. A memória da carga é a de um lote, e não a do arquivo: a Gold real tem
+# milhões de linhas, e guardar todas derrubou a carga numa máquina de 8 GB.
+BATCH_SIZE = 10_000
 
 # Views da camada semântica do agente de IA: o GenAI gera o arquivo, e a carga o aplica a
 # cada execução, porque as views dependem das tabelas que ela recria (spec do agente, D7).
@@ -139,6 +144,20 @@ def iter_rows(csv_path: Path, schema: type[BaseModel]) -> Iterator[dict[str, obj
 def read_rows(csv_path: Path, schema: type[BaseModel]) -> list[dict[str, object]]:
     """Todas as linhas do CSV numa lista: só para arquivos pequenos. A carga usa iter_rows."""
     return list(iter_rows(csv_path, schema))
+
+
+def _inserir_em_lotes(
+    connection: Connection,
+    model: type[Base],
+    rows: Iterable[dict[str, object]],
+    tamanho_lote: int,
+) -> int:
+    """Grava as linhas de um lote por vez, sem guardar mais do que um lote, e conta o que gravou."""
+    gravadas = 0
+    for lote in batched(rows, tamanho_lote):
+        connection.execute(insert(model), list(lote))
+        gravadas += len(lote)
+    return gravadas
 
 
 def drop_agent_views(connection: Connection) -> None:
