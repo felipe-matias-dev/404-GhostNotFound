@@ -1,6 +1,7 @@
 // Mapa de regiões em SVG para escolher um recorte geográfico (ex.: município e bairro da RMR).
 // - Cada região habilitada é um link (`getHref`): Tab percorre o mapa, Enter abre, e o
-//   botão do meio/Ctrl+clique abre em outra aba. Regiões sem dado ficam visíveis, sem link.
+//   botão do meio/Ctrl+clique abre em outra aba. Regiões sem dado ficam visíveis, sem link e
+//   hachuradas (com "Sem dado" na legenda), para não passarem por variação zero.
 // - Ao escolher, o mapa enquadra a região com mola (viewBox animado); os botões aproximam,
 //   afastam e enquadram de novo. Arrastar move o mapa; a roda (ou a pinça no trackpad) dá
 //   zoom no ponto do cursor. Fora do mapa, a roda rola a página normalmente.
@@ -199,6 +200,9 @@ export function RegionMap({
 }: RegionMapProps) {
 	const reduced = useReducedMotion() ?? false;
 	const titleId = useId();
+	// O id vai num `url(#…)`: só letras e dígitos.
+	const hatchId = `hachura-${useId().replace(/[^\w-]/g, "")}`;
+	const hatch = viewBox.width / 90;
 	const svgRef = useRef<SVGSVGElement>(null);
 	const containerRef = useRef<HTMLDivElement>(null);
 	const full: View = { x: 0, y: 0, w: viewBox.width, h: viewBox.height };
@@ -424,6 +428,26 @@ export function RegionMap({
 				onClickCapture={onClickCapture}
 			>
 				<title id={titleId}>{label}</title>
+				{/* Sem dado: hachurado, para não se confundir com uma variação perto de zero. */}
+				<defs>
+					<pattern
+						id={hatchId}
+						patternUnits="userSpaceOnUse"
+						width={hatch}
+						height={hatch}
+						patternTransform="rotate(45)"
+					>
+						<rect width={hatch} height={hatch} className="fill-surface-1" />
+						<line
+							x1={0}
+							y1={0}
+							x2={0}
+							y2={hatch}
+							className="stroke-border-strong"
+							strokeWidth={hatch * 0.4}
+						/>
+					</pattern>
+				</defs>
 				<g aria-hidden className="fill-none stroke-border" style={stroke(1)}>
 					{context.map((d, i) => (
 						// biome-ignore lint/suspicious/noArrayIndexKey: contorno estático, sem identidade.
@@ -458,6 +482,11 @@ export function RegionMap({
 								data-region-id={shape.id}
 								d={shape.d}
 								className={fill}
+								style={
+									containerIds?.has(shape.id)
+										? undefined
+										: { fill: `url(#${hatchId})` }
+								}
 							/>
 						);
 					const extra = describe?.(shape);
@@ -635,6 +664,15 @@ export function RegionMap({
 							<span key={tick}>{tick}</span>
 						))}
 					</div>
+					{semDado.some((s) => !containerIds?.has(s.id)) && (
+						<div className="mt-1.5 flex items-center gap-1.5 text-small text-text-muted">
+							<span
+								aria-hidden
+								className="size-2.5 rounded-sm border border-border-strong bg-[repeating-linear-gradient(45deg,var(--color-border-strong)_0_2px,transparent_2px_5px)]"
+							/>
+							Sem dado
+						</div>
+					)}
 				</figure>
 			)}
 		</div>
