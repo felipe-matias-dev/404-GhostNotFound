@@ -95,7 +95,7 @@ export function TendenciaPainel({
 			: "Um ano por linha; o mais recente em destaque.";
 
 	return (
-		<section aria-labelledby="tendencia" className="flex flex-col gap-3">
+		<section aria-labelledby="tendencia" className="flex flex-1 flex-col gap-3">
 			<h2 id="tendencia" className="text-heading">
 				Tendência
 			</h2>
@@ -134,6 +134,8 @@ export function TendenciaPainel({
 				error={serie.isError ? "Não foi possível carregar a série." : null}
 				onRetry={() => serie.refetch()}
 				emptyMessage="Sem meses carregados."
+				height="fill"
+				className="flex-1"
 			/>
 		</section>
 	);

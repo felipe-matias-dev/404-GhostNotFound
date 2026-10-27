@@ -37,7 +37,7 @@ export function VisaoGeralPage() {
 	// Série carregada sem nenhum par possível (menos de dois meses): não há o que comparar.
 	const semDados = Boolean(competencias.data) && !par;
 	return (
-		<Pagina>
+		<Pagina className="min-h-full max-w-none">
 			<div className="flex justify-end">
 				<ComparacaoPicker
 					competencias={competencias.data ?? []}
