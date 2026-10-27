@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "V-Energy Grid 360 API",
-    "version": "0.5.0"
+    "version": "0.6.0"
   },
   "paths": {
     "/health": {
@@ -424,6 +424,350 @@
         }
       }
     },
+    "/continuidade/alimentadores/mensal": {
+      "get": {
+        "tags": [
+          "continuidade"
+        ],
+        "summary": "Get Serie Alimentadores",
+        "description": "DEC e FEC de cada alimentador por competência, como a Gold calculou.",
+        "operationId": "get_serie_alimentadores_continuidade_alimentadores_mensal_get",
+        "parameters": [
+          {
+            "name": "inicio",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^\\d{4}-(0[1-9]|1[0-2])$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Inicio"
+            }
+          },
+          {
+            "name": "fim",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^\\d{4}-(0[1-9]|1[0-2])$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Fim"
+            }
+          },
+          {
+            "name": "cod_alimentador",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "title": "Cod Alimentador"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ContinuidadeAlimentadorMensalSchema"
+                  },
+                  "title": "Response Get Serie Alimentadores Continuidade Alimentadores Mensal Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/continuidade/alimentadores/ranking": {
+      "get": {
+        "tags": [
+          "continuidade"
+        ],
+        "summary": "Get Ranking Alimentadores",
+        "description": "Os piores alimentadores do período, pelo DEC ou pelo FEC.",
+        "operationId": "get_ranking_alimentadores_continuidade_alimentadores_ranking_get",
+        "parameters": [
+          {
+            "name": "inicio",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+              "title": "Inicio"
+            }
+          },
+          {
+            "name": "fim",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+              "title": "Fim"
+            }
+          },
+          {
+            "name": "criterio",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "dec",
+                "fec"
+              ],
+              "type": "string",
+              "default": "dec",
+              "title": "Criterio"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RankingContinuidadeSchema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/continuidade/recortes": {
+      "get": {
+        "tags": [
+          "continuidade"
+        ],
+        "summary": "Get Recortes",
+        "description": "DEC e FEC por município, por bairro de um município ou por alimentador de um bairro.",
+        "operationId": "get_recortes_continuidade_recortes_get",
+        "parameters": [
+          {
+            "name": "inicio",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+              "title": "Inicio"
+            }
+          },
+          {
+            "name": "fim",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+              "title": "Fim"
+            }
+          },
+          {
+            "name": "criterio",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "dec",
+                "fec"
+              ],
+              "type": "string",
+              "default": "dec",
+              "title": "Criterio"
+            }
+          },
+          {
+            "name": "municipio",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Municipio"
+            }
+          },
+          {
+            "name": "bairro",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Bairro"
+            }
+          },
+          {
+            "name": "classe",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "B1",
+                    "B2",
+                    "B3",
+                    "A4"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Classe"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecortesContinuidadeSchema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/fila-suspeitas": {
+      "get": {
+        "tags": [
+          "fila de suspeitas"
+        ],
+        "summary": "Get Fila",
+        "description": "A fila da mais para a menos suspeita, com a ordem ativa de cada UC.",
+        "operationId": "get_fila_fila_suspeitas_get",
+        "parameters": [
+          {
+            "name": "pagina",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "title": "Pagina"
+            }
+          },
+          {
+            "name": "tamanho",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Tamanho"
+            }
+          },
+          {
+            "name": "sem_ordem_ativa",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Sem Ordem Ativa"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FilaPaginaSchema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/ordens-inspecao": {
       "post": {
         "tags": [
@@ -755,6 +1099,52 @@
         "title": "ComparacaoReceitaSchema",
         "description": "Totais de dois períodos e quanto o atual variou sobre a base."
       },
+      "ContinuidadeAlimentadorMensalSchema": {
+        "properties": {
+          "cod_alimentador": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Cod Alimentador"
+          },
+          "competencia": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+            "title": "Competencia"
+          },
+          "dec": {
+            "type": "number",
+            "title": "Dec"
+          },
+          "fec": {
+            "type": "number",
+            "title": "Fec"
+          },
+          "n_uc": {
+            "type": "integer",
+            "title": "N Uc"
+          },
+          "n_interrupcoes": {
+            "type": "integer",
+            "title": "N Interrupcoes"
+          },
+          "horas_interrompidas": {
+            "type": "number",
+            "title": "Horas Interrompidas"
+          }
+        },
+        "type": "object",
+        "required": [
+          "cod_alimentador",
+          "competencia",
+          "dec",
+          "fec",
+          "n_uc",
+          "n_interrupcoes",
+          "horas_interrompidas"
+        ],
+        "title": "ContinuidadeAlimentadorMensalSchema",
+        "description": "DEC e FEC de um alimentador numa competência."
+      },
       "CriarOrdensSchema": {
         "properties": {
           "cod_ucs": {
@@ -1065,6 +1455,91 @@
         ],
         "title": "EventoSchema"
       },
+      "FilaItemSchema": {
+        "properties": {
+          "cod_uc": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Cod Uc"
+          },
+          "score_suspeita": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Score Suspeita"
+          },
+          "motivos": {
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "type": "array",
+            "title": "Motivos"
+          },
+          "kwh_recuperavel_est": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kwh Recuperavel Est"
+          },
+          "ordem_ativa": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OrdemAtivaSchema"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "cod_uc",
+          "score_suspeita",
+          "motivos",
+          "kwh_recuperavel_est",
+          "ordem_ativa"
+        ],
+        "title": "FilaItemSchema",
+        "description": "Uma UC da fila e a ordem ativa dela, para a tela não oferecer o que daria 409."
+      },
+      "FilaPaginaSchema": {
+        "properties": {
+          "itens": {
+            "items": {
+              "$ref": "#/components/schemas/FilaItemSchema"
+            },
+            "type": "array",
+            "title": "Itens"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "pagina": {
+            "type": "integer",
+            "title": "Pagina"
+          },
+          "tamanho": {
+            "type": "integer",
+            "title": "Tamanho"
+          }
+        },
+        "type": "object",
+        "required": [
+          "itens",
+          "total",
+          "pagina",
+          "tamanho"
+        ],
+        "title": "FilaPaginaSchema",
+        "description": "Uma página da fila pela posição no ranking, e quantas UCs a fila tem no filtro."
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -1155,6 +1630,24 @@
         ],
         "title": "KpisMensaisSchema",
         "description": "Indicadores executivos de uma competência."
+      },
+      "OrdemAtivaSchema": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "status": {
+            "$ref": "#/components/schemas/StatusOrdem"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "status"
+        ],
+        "title": "OrdemAtivaSchema",
+        "description": "A ordem de inspeção que já ocupa a UC (gerada ou em campo)."
       },
       "OrdemDetalheSchema": {
         "properties": {
@@ -1299,6 +1792,222 @@
         ],
         "title": "ParPeriodosSchema",
         "description": "Um par de períodos que a Gold gravou na decomposição (DEC-028)."
+      },
+      "RankingAlimentadorSchema": {
+        "properties": {
+          "dec": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dec"
+          },
+          "fec": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fec"
+          },
+          "horas_interrompidas": {
+            "type": "number",
+            "title": "Horas Interrompidas"
+          },
+          "n_interrupcoes": {
+            "type": "integer",
+            "title": "N Interrupcoes"
+          },
+          "n_uc_medio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "N Uc Medio"
+          },
+          "cod_alimentador": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Cod Alimentador"
+          }
+        },
+        "type": "object",
+        "required": [
+          "dec",
+          "fec",
+          "horas_interrompidas",
+          "n_interrupcoes",
+          "n_uc_medio",
+          "cod_alimentador"
+        ],
+        "title": "RankingAlimentadorSchema"
+      },
+      "RankingContinuidadeSchema": {
+        "properties": {
+          "inicio": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+            "title": "Inicio"
+          },
+          "fim": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+            "title": "Fim"
+          },
+          "criterio": {
+            "type": "string",
+            "enum": [
+              "dec",
+              "fec"
+            ],
+            "title": "Criterio"
+          },
+          "n_meses": {
+            "type": "integer",
+            "title": "N Meses"
+          },
+          "alimentadores": {
+            "items": {
+              "$ref": "#/components/schemas/RankingAlimentadorSchema"
+            },
+            "type": "array",
+            "title": "Alimentadores"
+          }
+        },
+        "type": "object",
+        "required": [
+          "inicio",
+          "fim",
+          "criterio",
+          "n_meses",
+          "alimentadores"
+        ],
+        "title": "RankingContinuidadeSchema",
+        "description": "Os alimentadores do pior para o melhor, e quantos meses entraram na média."
+      },
+      "RecorteContinuidadeSchema": {
+        "properties": {
+          "dec": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dec"
+          },
+          "fec": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fec"
+          },
+          "horas_interrompidas": {
+            "type": "number",
+            "title": "Horas Interrompidas"
+          },
+          "n_interrupcoes": {
+            "type": "integer",
+            "title": "N Interrupcoes"
+          },
+          "n_uc_medio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "N Uc Medio"
+          },
+          "segmento": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Segmento"
+          }
+        },
+        "type": "object",
+        "required": [
+          "dec",
+          "fec",
+          "horas_interrompidas",
+          "n_interrupcoes",
+          "n_uc_medio",
+          "segmento"
+        ],
+        "title": "RecorteContinuidadeSchema"
+      },
+      "RecortesContinuidadeSchema": {
+        "properties": {
+          "inicio": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+            "title": "Inicio"
+          },
+          "fim": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+            "title": "Fim"
+          },
+          "criterio": {
+            "type": "string",
+            "enum": [
+              "dec",
+              "fec"
+            ],
+            "title": "Criterio"
+          },
+          "nivel": {
+            "type": "string",
+            "enum": [
+              "municipio",
+              "bairro",
+              "alimentador"
+            ],
+            "title": "Nivel"
+          },
+          "n_meses": {
+            "type": "integer",
+            "title": "N Meses"
+          },
+          "recortes": {
+            "items": {
+              "$ref": "#/components/schemas/RecorteContinuidadeSchema"
+            },
+            "type": "array",
+            "title": "Recortes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "inicio",
+          "fim",
+          "criterio",
+          "nivel",
+          "n_meses",
+          "recortes"
+        ],
+        "title": "RecortesContinuidadeSchema",
+        "description": "DEC e FEC do nível abaixo do filtro, do pior para o melhor."
       },
       "ResultadoOrdem": {
         "type": "string",

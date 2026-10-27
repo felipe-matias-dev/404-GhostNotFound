@@ -60,3 +60,14 @@ def test_token_that_is_not_a_pt_br_number_is_reported_instead_of_raising(text):
 
 def test_numbers_inside_a_code_are_not_a_source():
     assert unsupported_numbers("Há 7 alimentadores", ["AL-07"]) == ("7",)
+
+
+@pytest.mark.parametrize(
+    "text", ["A classe B1 tem 3 UCs", "O alimentador AL-07 teve 3 interrupções"]
+)
+def test_digits_inside_a_code_in_the_text_are_not_numbers(text):
+    assert unsupported_numbers(text, [3]) == ()
+
+
+def test_a_negative_number_in_the_text_is_still_checked():
+    assert unsupported_numbers("O efeito mix foi de -999", [Decimal("-10.5")]) == ("999",)

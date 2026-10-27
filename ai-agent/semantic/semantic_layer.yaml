@@ -13,7 +13,7 @@
 # As linhas de exemplo são sintéticas, escritas à mão. Nenhum valor real da Gold entra aqui.
 # Depois de cada mudança, gere o views.sql (ver a seção Camada semântica em ai-agent/README.md).
 
-version: "0.2.0"
+version: "0.3.5"
 
 views:
   - name: sem_uc
@@ -68,7 +68,7 @@ views:
         description: "valor efetivamente pago da fatura"
       - name: tarifa_media
         unit: "R$/kWh"
-        description: "receita de energia dividida pela energia faturada, sem tributos; vazia quando a energia é zero"
+        description: "tarifa de uma UC numa competência: receita de energia dividida pela energia faturada, sem tributos; vazia quando a energia é zero. Não some nem faça média desta coluna entre UCs ou meses"
       - name: bandeira
         description: "bandeira tarifária da competência"
     sample_rows:
@@ -206,7 +206,7 @@ views:
       - name: classe
         description: "classe de consumo: B1, B2, B3 ou A4"
       - name: possui_gd
-        description: "verdadeiro quando as UCs do recorte tinham geração própria no último mês do período atual; o efeito GD é o efeito_volume dessas linhas"
+        description: "verdadeiro quando as UCs do recorte tinham geração própria no último mês do período atual; o grupo vale para a UC nos dois períodos, então quem conectou a GD entre eles fica no grupo com GD dos dois lados (PR #42); o efeito GD é o efeito_volume dessas linhas"
       - name: receita_base
         unit: "R$"
         description: "receita de energia, sem tributos, no período base"
@@ -276,8 +276,9 @@ glossary:
 rules:
   - text: "Quando a pergunta fala de receita sem dizer qual, use receita_faturada (energia e tributos) e declare essa suposição. Em pergunta que não envolve receita, não declare suposição sobre receita."
   - text: "Receita por classe do cadastro (comercial, poder público, residencial, rural, industrial) sai de sem_faturamento_mensal ligada a sem_uc por cod_uc, filtrando sem_uc.classe_cadastro. sem_receita_decomposicao não tem classe_cadastro: não a use para separar comercial de poder público, e não troque classe_cadastro por classe."
+  - text: "Variação por UC entre dois períodos (quantas UCs subiram ou caíram mais de X%): calcule a média mensal de cada UC em cada período, numa CTE por período, junte por cod_uc e conte as UCs que passam do limite. Declare como suposição que a comparação usa a média mensal."
   - text: "Crescimento ou variação de receita entre dois períodos: devolva o total de cada período, a variação absoluta e a percentual, todas calculadas no SQL, com NULLIF no divisor."
-  - text: "Tarifa média é receita_energia ÷ kwh_faturado, sem tributos. Leia tarifa_media pronta; não recalcule."
+  - text: "Tarifa média é receita_energia ÷ kwh_faturado, sem tributos. Para uma UC numa competência, leia tarifa_media pronta. Para um período, classe, bairro, município ou qualquer grupo de UCs ou de meses, a tarifa é sum(receita_energia) / NULLIF(sum(kwh_faturado), 0); nunca avg(tarifa_media), que é média de razões e dá peso igual a UCs e meses de consumo diferente."
   - text: "Energia faturada é kwh_faturado, já líquida de geração distribuída."
   - text: "Competência é texto no formato AAAA-MM. Filtre por igualdade (competencia = '2025-03') ou por intervalo de texto (competencia BETWEEN '2025-01' AND '2025-03')."
   - text: "Não suponha quais competências existem. Consulte as views; se nenhuma linha atender ao filtro, o resultado vazio é a resposta."
@@ -285,12 +286,14 @@ rules:
   - text: "Bairro só identifica um lugar junto com o município: filtre e agrupe sempre por municipio e bairro."
   - text: "Totais da empresa por mês (energia, receita, DEC, FEC, chamados e satisfação) vêm prontos de sem_kpis_mensais."
   - text: "DEC e FEC por alimentador vêm prontos de sem_continuidade_alimentador_mensal; da empresa, de sem_kpis_mensais. Leia; não recalcule."
+  - text: "DEC e FEC de um período de vários meses (semestre, ano) são a soma dos valores mensais prontos, porque são indicadores acumulados: sum(dec) e sum(fec) sobre as competências do período. Nunca use a média (avg) dos meses (DEC-032, proposta). Por recorte de sem_kpis_segmento_mensal, use a fórmula dos componentes da regra de recortes."
   - text: "Por município, bairro, classe ou GD, use sem_kpis_segmento_mensal e some os componentes antes de dividir; nunca faça média de índices. Num mês: DEC = sum(horas_interrompidas) / sum(n_uc) e FEC = sum(n_interrupcoes) / sum(n_uc). Num período de vários meses, divida pela média mensal de UCs: sum(n_uc) dividido pelo número de meses do período pedido (3 num trimestre), e não pelos meses que aparecem no resultado. Satisfação = sum(soma_notas) / sum(n_notas), com NULLIF no divisor."
   - text: "Efeitos de preço, tarifa, bandeira, volume e mix são lidos de sem_receita_decomposicao e somados sobre o recorte; não recalcule. receita_base e receita_atual são receita de energia, sem tributos."
   - text: "Em sem_receita_decomposicao, periodo_base e periodo_atual são faixas AAAA-MM/AAAA-MM. Filtre pelo par exato de períodos. Se a pergunta não disser os dois períodos, peça esclarecimento (clarify)."
   - text: "Score de suspeita, perda não técnica, atendimento por UC, interrupções por UC e medidor não estão nas views: pergunta sobre eles é unknown."
   - text: "Para ligar uma UC ao alimentador use sem_uc.cod_alimentador = sem_continuidade_alimentador_mensal.cod_alimentador."
-  - text: "Quando a pergunta compara dois períodos e não diz quais são, peça esclarecimento (clarify). Não escolha os períodos sozinho."
+  - text: "Períodos relativos à base ('primeiro ano da base', 'últimos 12 meses') saem das competências que existem. Numere as competências distintas com row_number() OVER (ORDER BY competencia) para o início e OVER (ORDER BY competencia DESC) para o fim, filtre por ordem <= 12 e declare os períodos usados como suposição. Nesse caso, não peça esclarecimento. A regra vale só para essas duas expressões. 'Último ano', 'ano passado' e 'último trimestre' são ambíguos (ano civil ou 12 meses móveis): peça esclarecimento, e nunca escreva anos ou meses fixos que a pergunta não trouxe."
+  - text: "Quando a pergunta compara dois períodos e não diz quais são, peça esclarecimento (clarify). Não escolha os períodos sozinho. Períodos relativos à base, como 'primeiro ano da base' e 'últimos 12 meses', contam como ditos."
 
   - text: "n_uc é o número de UCs faturadas na competência (PRODIST). Para a quantidade de UCs num período, use a média mensal (soma dividida pelo número de meses), nunca a soma sozinha."
 examples:
@@ -311,6 +314,12 @@ examples:
     expected_status: ok
   - question: "Quanto a receita comercial de Recife cresceu entre 2023 e 2024?"
     sql: "SELECT sum(CASE WHEN f.competencia LIKE '2023-%' THEN f.receita_faturada END) AS receita_2023, sum(CASE WHEN f.competencia LIKE '2024-%' THEN f.receita_faturada END) AS receita_2024, sum(CASE WHEN f.competencia LIKE '2024-%' THEN f.receita_faturada END) - sum(CASE WHEN f.competencia LIKE '2023-%' THEN f.receita_faturada END) AS variacao, round(100.0 * (sum(CASE WHEN f.competencia LIKE '2024-%' THEN f.receita_faturada END) - sum(CASE WHEN f.competencia LIKE '2023-%' THEN f.receita_faturada END)) / NULLIF(sum(CASE WHEN f.competencia LIKE '2023-%' THEN f.receita_faturada END), 0), 2) AS variacao_percentual FROM sem_faturamento_mensal f JOIN sem_uc u ON u.cod_uc = f.cod_uc WHERE u.classe_cadastro = 'Comercial' AND u.municipio ILIKE 'Recife%'"
+    expected_status: ok
+  - question: "O número de chamados caiu nos últimos 12 meses em relação ao primeiro ano da base?"
+    sql: "WITH meses AS (SELECT competencia, row_number() OVER (ORDER BY competencia) AS ordem_inicio, row_number() OVER (ORDER BY competencia DESC) AS ordem_fim FROM sem_kpis_mensais) SELECT sum(CASE WHEN m.ordem_inicio <= 12 THEN k.n_chamados END) AS chamados_primeiro_ano, sum(CASE WHEN m.ordem_fim <= 12 THEN k.n_chamados END) AS chamados_ultimos_12_meses FROM sem_kpis_mensais k JOIN meses m ON m.competencia = k.competencia"
+    expected_status: ok
+  - question: "Entre 2023 e 2024, quantas UCs residenciais de Recife aumentaram o consumo em mais de 20%?"
+    sql: "WITH base AS (SELECT f.cod_uc, avg(f.kwh_faturado) AS kwh FROM sem_faturamento_mensal f JOIN sem_uc u ON u.cod_uc = f.cod_uc WHERE u.classe_cadastro = 'Residencial' AND u.municipio ILIKE 'Recife%' AND f.competencia LIKE '2023-%' GROUP BY f.cod_uc), atual AS (SELECT f.cod_uc, avg(f.kwh_faturado) AS kwh FROM sem_faturamento_mensal f JOIN sem_uc u ON u.cod_uc = f.cod_uc WHERE u.classe_cadastro = 'Residencial' AND u.municipio ILIKE 'Recife%' AND f.competencia LIKE '2024-%' GROUP BY f.cod_uc) SELECT count(*) AS total FROM base b JOIN atual a ON a.cod_uc = b.cod_uc WHERE a.kwh > 1.2 * b.kwh"
     expected_status: ok
   - question: "Por que a receita caiu?"
     sql: null

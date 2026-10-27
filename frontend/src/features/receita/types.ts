@@ -9,5 +9,10 @@ export type DecomposicaoFiltro = NonNullable<
 
 export type ParPeriodos = components["schemas"]["ParPeriodosSchema"];
 
-/** Onde o usuário está no drill-down (vem da URL). */
-export type Recorte = { municipio?: string; bairro?: string };
+export type Classe = NonNullable<DecomposicaoFiltro["classe"]>;
+
+/**
+ * Onde o usuário está (vem da URL): o drill-down município → bairro e, à parte, a classe, que
+ * filtra todos os níveis.
+ */
+export type Recorte = { municipio?: string; bairro?: string; classe?: Classe };
