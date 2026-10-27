@@ -43,6 +43,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | 26/10/2026 | DEC-031: a API lista os pares de períodos da decomposição e passa a exigir o par; API 0.5.0 | A Gold grava centenas de pares (DEC-028): sem o par, a resposta somaria períodos que não se comparam, e o seletor precisa saber quais existem | Felipe |
 | 24/10/2026 | DEC-032 (proposta): DEC e FEC de um período de vários meses somam os valores mensais, nunca a média | Indicador de continuidade é acumulado; a média dos meses subestima o período e o agente alternava entre as duas formas | Luis Felipe |
 | 26/10/2026 | DEC-033: DEC e FEC de um período saem da soma dos componentes ÷ média mensal de UCs, no backend, com rotas por alimentador, ranking e recortes; fila de suspeitas paginada com a ordem de inspeção ativa; API 0.6.0 | DEC e FEC não se somam nem se tiram a média entre recortes; a fila mostra quais UCs já têm ordem, para a tela não oferecer o que daria 409 | Felipe |
+| 27/10/2026 | DEC-034: cada resposta do agente de IA é gravada em `app.ai_auditoria` (qualquer status) por `POST /ai/ask`, e lida por `GET /ai/audit/{id}`; sem a chave do Gemini a API sobe e o `/ai` responde 503; API 0.7.0 | A auditoria só serve se ninguém recebe uma resposta que não dá para conferir depois; e a chave ausente não pode derrubar o `/health` nem as telas | Felipe |
 
 ## DEC-001 · Localização dos arquivos de origem (landing)
 
@@ -988,3 +989,48 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
     sendo uma tarefa própria.
 - **Consequências:** a DEC-021 deixa de valer na frase "DEC, FEC… não têm recorte por segmento": desde esta decisão eles têm, calculados
   sobre os componentes. O agente continua somando os mesmos componentes, então portal e agente dão o mesmo número.
+
+## DEC-034 · Auditoria do agente de IA: gravação, leitura e subida sem a chave
+
+- **Data:** 27/10/2026 · **Área:** Portal e GenAI · **Autor:** Felipe · **Atende:** issue #48 (G1-06 e G1-09, spec do agente §10 D3)
+- **Contexto:** o analista só confia na resposta da IA se puder ver como ela chegou lá (SQL executado, views, linhas, modelo, versão do
+  prompt). O agente é somente leitura e não grava nada (DEC-020): persistir cada `AgentAnswer` e entregá-lo ao portal é do backend.
+- **Decisão:**
+  - **Tabela `app.ai_auditoria`**, criada pelo `create_all` que a carga já roda e que nunca apaga o schema `app`. Uma coluna por campo do
+    `AgentAnswer`, mais `id`, `criado_em` (com fuso), `session_id` e `pergunta`. `rows`, `sources` e `assumptions` em `jsonb`. `status` e
+    `confidence` em texto, sem `CHECK`.
+  - **`POST /ai/ask`** (`{question, session_id}`): chama o agente, grava e devolve os campos do `AgentAnswer` mais o `audit_id`. Grava
+    todo status (`answered`, `unknown`, `clarify`, `refused`, `failed`): o que o agente recusou também é auditável.
+  - **`GET /ai/audit/{id}`**: o mesmo conteúdo do POST, mais `pergunta`, `session_id` e `criado_em`. `404` se o id não existe e `422` se
+    não cabe na coluna. Não depende do agente: o histórico continua consultável sem a chave.
+  - **Sem auditoria, sem resposta:** se a gravação falhar, a rota devolve `500` e não entrega o que o agente respondeu. No log vai só o
+    `request_id` e o tipo do erro, porque a mensagem do SQLAlchemy traz a pergunta e as linhas.
+  - **Agente montado uma vez, no `lifespan`**, guardado em `app.state` e entregue por `AgenteDep`. Os testes trocam o agente por um falso
+    com `dependency_overrides` e nunca chamam o Gemini.
+  - **Sem a chave (ou com configuração inválida) a API sobe:** o log diz só os campos com erro, sem o valor digitado, e `/ai/*` responde
+    `503` com a variável que falta. O `/health` e as telas seguem de pé.
+  - **Credenciais separadas:** a gravação usa a sessão do backend. O agente continua com o usuário `venergy_agent`, que não acessa `app`.
+  - **Entrada limitada:** `question` até 2000 caracteres e `session_id` até 100. O teto de 500 da pergunta continua sendo do agente.
+  - **Rotas `async def`:** `await agente.ask(...)` e a gravação em `run_in_threadpool`, porque a sessão do backend é síncrona. A gravação
+    fica em `gravar_auditoria(session, pergunta, session_id, answer)`, para o `POST /ai/ask/stream` (#38) gravar a mesma auditoria.
+  - Versão da API 0.7.0: rotas novas, sem quebrar as existentes.
+- **Motivo:** a trilha só vale se estiver completa. Por isso grava todo status, e por isso a resposta não sai quando a gravação falha.
+  Subir sem a chave evita que um recurso opcional derrube a API inteira para quem trabalha só no portal.
+- **Alternativas descartadas:**
+  - Migração com Alembic: o projeto não tem migrações, e o `create_all` já cria a tabela sem tocar nas ordens de inspeção.
+  - Um `jsonb` só com a resposta inteira: as colunas permitem filtrar por `status`, `session_id` ou data (ver só as recusas) sem abrir o JSON.
+  - `status` e `confidence` como enum com `CHECK` (como nas ordens): um valor novo do agente faria a gravação falhar e a trilha se perderia.
+  - Guardar os `Decimal` da amostra como número: o `float` perde a exatidão (DEC-010). Vão como texto, como o `model_dump(mode="json")`
+    do agente os entrega, e o portal mostra a amostra sem converter.
+  - Montar o agente a cada requisição: recarregaria e validaria a camada semântica a cada pergunta. Montá-lo no import do módulo
+    quebraria a importação sem `.env` e faria os testes dependerem do Gemini.
+  - Derrubar a subida sem a chave: o `/health` e todas as telas cairiam por causa do `/ai`.
+  - Rota `def` síncrona: o agente é `async`, e a chamada ao modelo (segundos) ocuparia uma thread do pool. Uma engine assíncrona só para
+    esta tabela traria um segundo driver e um segundo modo de sessão.
+  - Entregar a resposta mesmo com a gravação falha, só registrando o erro: o analista receberia uma resposta que não consegue conferir.
+  - Dar ao `venergy_agent` permissão no schema `app` para o agente se auditar: tira o isolamento que protege as ordens de inspeção.
+  - Resposta em envelope (`{audit_id, resposta: {...}}`): o campo plano deixa o client do portal usar o `AgentAnswer` como ele é.
+- **Limitações conhecidas:**
+  - Sem expurgo: a tabela só cresce. A pergunta e as linhas ficam guardadas como o agente as devolveu, e podem conter dados de UC.
+  - Sem autenticação: nenhuma rota da API tem hoje, então quem alcança a API lê qualquer auditoria.
+  - Sem migrações, mudar uma coluna da tabela exige apagá-la e recriá-la à mão, como nas ordens de inspeção.
