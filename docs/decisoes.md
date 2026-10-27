@@ -881,6 +881,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
       | **5% (adotado)** | 194 | 0,901 | 0,930 |
 
       **O case confirma a ordem de grandeza:** a gerente de perdas diz que a equipe faz mais de 200 inspeções por mês e que pouco mais da metade encontra alguma irregularidade; a fila de 194 UCs cabe nessa capacidade, e uma lista sem ordem não serve a ela (cada inspeção sem achado é um dia de equipe perdido).
+
       **Por que 5% (o top-200 do backlog):** o critério de aceite da D3-07 pede a "taxa de acerto do top-200" da fila, e só com o
       corte de 5% a fila tem o tamanho desse teste (194 UCs; com 8%, 95). A faixa de 5% a 10% ainda acerta 83% (151 irregularidades
       confirmadas para 30 sem irregularidade), bem acima da taxa base das inspeções (0,64, nas mesmas UCs medidas). Abaixo de 5% a precisão da faixa cai para
