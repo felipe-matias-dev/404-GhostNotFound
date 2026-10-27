@@ -36,7 +36,8 @@ UNKNOWN_REASON = (
     "Não tenho essa informação nas tabelas que consulto, então não vou inventar uma resposta."
 )
 REFUSED_REASON = (
-    "Esse pedido está fora do que o agente faz: ele só consulta dados e não altera nada."
+    "Esse pedido está fora do que o agente faz: ele só responde perguntas sobre consumo, "
+    "faturamento, interrupções e atendimento da distribuidora, consultando os dados."
 )
 MODEL_FAILED = "Não consegui consultar o modelo de linguagem agora. Tente de novo em instantes."
 INTERNAL_FAILED = "Algo deu errado do nosso lado. Tente de novo em instantes."
