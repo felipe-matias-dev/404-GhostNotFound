@@ -43,6 +43,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | 26/10/2026 | DEC-031: a API lista os pares de períodos da decomposição e passa a exigir o par; API 0.5.0 | A Gold grava centenas de pares (DEC-028): sem o par, a resposta somaria períodos que não se comparam, e o seletor precisa saber quais existem | Felipe |
 | 24/10/2026 | DEC-032 (proposta): DEC e FEC de um período de vários meses somam os valores mensais, nunca a média | Indicador de continuidade é acumulado; a média dos meses subestima o período e o agente alternava entre as duas formas | Luis Felipe |
 | 26/10/2026 | DEC-033: DEC e FEC de um período saem da soma dos componentes ÷ média mensal de UCs, no backend, com rotas por alimentador, ranking e recortes; fila de suspeitas paginada com a ordem de inspeção ativa; API 0.6.0 | DEC e FEC não se somam nem se tiram a média entre recortes; a fila mostra quais UCs já têm ordem, para a tela não oferecer o que daria 409 | Felipe |
+| 27/10/2026 | DEC-036: Workflow do Databricks com os notebooks lidos do GitHub (`main`), serverless, Landing → Bronze → Silver → Gold + export; agendamento mensal no dia 6, pausado | Roda o código revisado; os sistemas de origem fecham o faturamento uma vez por mês, e rodar diário gastaria compute sem dado novo | Arthur |
 
 ## DEC-001 · Localização dos arquivos de origem (landing)
 
@@ -1029,3 +1030,26 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   schema, OpenAPI e cliente, e não muda nenhum número da tela. Volta a valer se outro consumidor precisar dos mesmos números
   (por exemplo, o JSON de métricas que o backend monta para o insight da tela, D9): aí a conta passa para o backend, e a tela só
   exibe.
+
+
+## DEC-036 · Workflow do Databricks e agendamento mensal
+
+- **Data:** 27/10/2026 · **Área:** Dados · **Autor:** Arthur
+- **Decisão:** o Job `v_energy_workflow` ([`data-engineering/workflow/v_energy_workflow.yaml`](../data-engineering/workflow/v_energy_workflow.yaml))
+  roda três tasks em sequência, `landing_to_bronze` → `bronze_to_silver` → `silver_to_gold_export`, com os notebooks lidos do
+  GitHub (branch `main`) e compute serverless. Cada task passa `gravar = sim`, e a da Gold também `exportar_csv = sim` e
+  `schema_gold = gold`. Timeout de 2h e fila ligada, para um segundo disparo esperar o primeiro em vez de gravar as mesmas tabelas
+  ao mesmo tempo.
+- **Por que o Git como fonte:** o Job roda o código revisado em PR, não uma cópia do workspace, e a Gold gravada fica rastreável
+  a um commit da `main`.
+- **Agendamento:** mensal, no dia 6 às 03h (horário de Fortaleza, igual ao do Recife), D+5 do fechamento do ciclo de
+  faturamento. Os sistemas de origem só geram dado novo uma vez por mês, então rodar todo dia gastaria compute sem dado novo. O
+  agendamento fica **pausado**, porque o dataset do case é uma extração única. Em produção, basta despausar.
+- **Falhas:** o Resumo de cada notebook dá erro se alguma tabela falhar, e o Job para na primeira task com erro, sem gravar as
+  camadas seguintes.
+- **Limitação conhecida:** a conferência pós-gravação da Bronze (DEC-008) compara as duas últimas gravações de cada tabela por
+  time travel, e o Delta só guarda os arquivos antigos por 7 dias (`deletedFileRetentionDuration`). Se a última gravação tiver
+  mais de 7 dias, a task `landing_to_bronze` grava a Bronze e falha nessa comparação; o run seguinte passa, porque compara duas
+  gravações recentes. Na carga mensal isso aconteceria em todo run, e com dados novos as duas gravações nem deveriam ser iguais.
+  A correção é tornar a comparação opcional no Job (ex.: um widget `exigir_idempotencia = nao`), mantendo a conferência contra a
+  origem. Fica para um PR próprio, combinado com o autor do notebook.
