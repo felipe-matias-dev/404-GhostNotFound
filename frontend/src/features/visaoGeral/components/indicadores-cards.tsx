@@ -70,7 +70,6 @@ export function IndicadoresCards({
 									format={definicao.format}
 									hint={definicao.hint}
 									link={LINKS[indicador]?.(par)}
-									highlight={indicador === "receita_faturada"}
 									loading={carregando}
 									error={erro}
 									onRetry={onRetry}
