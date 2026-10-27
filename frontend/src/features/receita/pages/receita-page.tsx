@@ -4,6 +4,7 @@ import { Pagina } from "#/components/layout/pagina";
 import { DecomposicaoTable } from "../components/decomposicao-table";
 import { MapaRecorte } from "../components/mapa-recorte";
 import { PeriodoPicker } from "../components/periodo-picker";
+import { PonteWaterfall } from "../components/ponte-waterfall";
 import { RecorteTrilha } from "../components/recorte-trilha";
 import { parPadrao } from "../conversions";
 import { usePeriodosDecomposicao } from "../hooks/use-decomposicao";
@@ -48,13 +49,10 @@ export function ReceitaPage() {
 		setDestaque(null);
 	}
 
-	const descricao =
-		"Ponte de receita entre dois períodos, separada em efeito preço, volume e mix, com drill-down por município, bairro e classe.";
-
 	// Sem pares, a consulta da decomposição nunca liga e a tabela ficaria carregando.
 	if (periodos.isError || periodos.data?.length === 0) {
 		return (
-			<Pagina className="max-w-7xl" descricao={descricao}>
+			<Pagina className="max-w-none">
 				<p className="text-text-muted">
 					{periodos.isError
 						? "Não foi possível carregar os períodos da decomposição de receita."
@@ -65,15 +63,15 @@ export function ReceitaPage() {
 	}
 
 	return (
-		<Pagina className="max-w-7xl" descricao={descricao}>
+		<Pagina className="max-w-none">
 			<RecorteTrilha par={par} recorte={recorte} onChange={mudar} />
-			<div className="grid gap-5 lg:grid-cols-[17rem_minmax(0,1fr)] lg:items-start">
+			<div className="grid gap-5 lg:grid-cols-[clamp(20rem,26%,28rem)_minmax(0,1fr)] lg:items-start">
 				<MapaRecorte
 					par={par}
 					recorte={recorte}
 					destaque={destaque}
 					onChange={mudar}
-					className="h-80 lg:sticky lg:top-5 lg:h-[min(75svh,44rem)]"
+					className="h-96 lg:sticky lg:top-5 lg:h-[calc(100svh-8rem)]"
 				/>
 				<section
 					aria-labelledby="ponte-titulo"
@@ -89,6 +87,7 @@ export function ReceitaPage() {
 							onEscolher={(escolhido) => navegar(recorte, escolhido)}
 						/>
 					</div>
+					<PonteWaterfall par={par} recorte={recorte} />
 					<DecomposicaoTable
 						par={par}
 						filtro={recorte}

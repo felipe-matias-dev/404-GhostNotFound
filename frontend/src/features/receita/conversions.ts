@@ -1,4 +1,5 @@
 import type { RegionMapProps } from "#/components/ui/region-map";
+import type { WaterfallStep } from "#/components/ui/waterfall-chart";
 import { formatPct } from "#/lib/format";
 import type { DecomposicaoLinha, ParPeriodos, Recorte } from "./types";
 
@@ -154,4 +155,79 @@ export const LEGENDA_VARIACAO: NonNullable<RegionMapProps["legend"]> = {
 	title: "Variação da receita",
 	ticks: [formatPct(-SATURA), formatPct(0), formatPct(SATURA)],
 	description: `vermelho para queda, verde para alta; a cor fica mais forte e brilha mais até ${formatPct(SATURA)} de variação sobre a receita base`,
+};
+
+/** Campos numéricos da linha (receitas, variação e efeitos). */
+export type CampoValor = {
+	[K in keyof DecomposicaoLinha]: DecomposicaoLinha[K] extends number
+		? K
+		: never;
+}[keyof DecomposicaoLinha];
+
+/**
+ * Ponte do recorte na tela: a soma dos segmentos do nível abaixo (os efeitos são somáveis,
+ * DEC-023). O efeito preço entra aberto em tarifa e bandeira, que somam o `efeito_preco`;
+ * somar os três contaria o preço duas vezes.
+ */
+export function passosDaPonte(linhas: DecomposicaoLinha[]): WaterfallStep[] {
+	if (linhas.length === 0) return [];
+	// Em centavos: somar dezenas de valores em ponto flutuante deixa resíduo na última casa.
+	const soma = (campo: CampoValor) =>
+		Math.round(linhas.reduce((total, l) => total + l[campo], 0) * 100) / 100;
+	return [
+		{
+			id: "base",
+			label: "Receita base",
+			value: soma("receita_base"),
+			kind: "total",
+		},
+		...CAUSAS.map(
+			(efeito): WaterfallStep => ({
+				id: efeito,
+				label: EFEITO_ROTULO[efeito],
+				value: soma(EFEITO_CAMPO[efeito]),
+				kind: "delta",
+			}),
+		),
+		{
+			id: "atual",
+			label: "Receita atual",
+			value: soma("receita_atual"),
+			kind: "total",
+		},
+	];
+}
+
+/**
+ * Recorte da ponte que a tela ranqueia e ordena: a variação total ou uma das causas. Na
+ * ordem da ponte; o efeito preço entra só aberto em tarifa e bandeira.
+ */
+export const EFEITOS = [
+	"variacao",
+	"tarifa",
+	"bandeira",
+	"volume",
+	"mix",
+] as const;
+
+export type Efeito = (typeof EFEITOS)[number];
+
+export type Causa = Exclude<Efeito, "variacao">;
+
+const CAUSAS: Causa[] = ["tarifa", "bandeira", "volume", "mix"];
+
+export const EFEITO_CAMPO: Record<Efeito, CampoValor> = {
+	variacao: "variacao_receita",
+	tarifa: "efeito_tarifa",
+	bandeira: "efeito_bandeira",
+	volume: "efeito_volume",
+	mix: "efeito_mix",
+};
+
+export const EFEITO_ROTULO: Record<Efeito, string> = {
+	variacao: "Variação",
+	tarifa: "Preço · tarifa",
+	bandeira: "Preço · bandeira",
+	volume: "Volume",
+	mix: "Mix",
 };
