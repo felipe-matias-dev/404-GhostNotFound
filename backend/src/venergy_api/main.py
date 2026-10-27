@@ -15,7 +15,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # com as suas próprias, sem depender de um .env na máquina.
     settings = settings or get_settings()
 
-    app = FastAPI(title="V-Energy Grid 360 API", version="0.6.0")
+    app = FastAPI(title="V-Energy Grid 360 API", version="0.8.0")
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,

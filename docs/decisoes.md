@@ -43,6 +43,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | 26/10/2026 | DEC-031: a API lista os pares de períodos da decomposição e passa a exigir o par; API 0.5.0 | A Gold grava centenas de pares (DEC-028): sem o par, a resposta somaria períodos que não se comparam, e o seletor precisa saber quais existem | Felipe |
 | 24/10/2026 | DEC-032 (proposta): DEC e FEC de um período de vários meses somam os valores mensais, nunca a média | Indicador de continuidade é acumulado; a média dos meses subestima o período e o agente alternava entre as duas formas | Luis Felipe |
 | 26/10/2026 | DEC-033: DEC e FEC de um período saem da soma dos componentes ÷ média mensal de UCs, no backend, com rotas por alimentador, ranking e recortes; fila de suspeitas paginada com a ordem de inspeção ativa; API 0.6.0 | DEC e FEC não se somam nem se tiram a média entre recortes; a fila mostra quais UCs já têm ordem, para a tela não oferecer o que daria 409 | Felipe |
+| 27/10/2026 | DEC-036: a visão 360 da unidade consumidora sai de uma rota só, `GET /unidades-consumidoras/{cod_uc}/visao-360`; os 12 meses terminam na última competência da Gold e a "conta alta" é o último mês contra o mesmo mês do ano anterior, com faixa de ±10%; API 0.8.0 | O atendente está com o cliente na linha: uma ida só ao banco e uma resposta pronta para "o consumo subiu?", sem a tela refazer conta de negócio | Felipe |
 
 ## DEC-001 · Localização dos arquivos de origem (landing)
 
@@ -1029,3 +1030,36 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   schema, OpenAPI e cliente, e não muda nenhum número da tela. Volta a valer se outro consumidor precisar dos mesmos números
   (por exemplo, o JSON de métricas que o backend monta para o insight da tela, D9): aí a conta passa para o backend, e a tela só
   exibe.
+
+## DEC-036 · Visão 360 da unidade consumidora: rota única, janela da Gold e regra da conta alta
+
+- **Data:** 27/10/2026 · **Área:** Portal · **Autor:** Felipe
+- **Contexto:** a Camila (Atendimento) pede que o atendente digite o número da unidade consumidora e veja numa tela só o cliente,
+  o consumo dos últimos meses ao lado do mesmo período do ano anterior, as faturas em aberto, o medidor, o painel solar, as
+  interrupções e os chamados, e que consiga responder na hora se a "conta alta" é consumo que subiu. A rota
+  `GET /unidades-consumidoras/{cod_uc}` devolvia só o cadastro.
+- **Decisão:**
+  - **Uma rota agregada:** `GET /unidades-consumidoras/{cod_uc}/visao-360` devolve cadastro (com o painel solar), consumo, faturas
+    não pagas, medidor, interrupções, chamados e inspeções. A rota do cadastro continua igual. `404` se a unidade não existe.
+  - **Os 12 meses terminam na última competência da Gold**, e não no mês de hoje nem na última fatura da própria unidade. O dado
+    é uma extração única: com a data de hoje a janela viria vazia, e uma unidade que parou de faturar passaria por "recente".
+    Cada mês traz o consumo, o mesmo mês do ano anterior, a receita, a bandeira e os `dias_faturados`; o mês sem fatura vem
+    vazio, e não zero.
+  - **Conta alta:** o backend devolve `tendencia`, que compara a última competência com o mesmo mês do ano anterior (o que tira o
+    efeito das estações): acima de +10% é `subiu`, abaixo de −10% é `caiu`, no meio é `estavel`, e sem fatura num dos meses ou
+    com a base em zero é `sem_comparacao`. Os 10% exatos ainda são `estavel`. Junto vêm a variação do último mês, a dos 12 meses
+    e, em cada mês, a bandeira e os dias faturados, que explicam uma conta maior sem consumo maior.
+  - **Faturas não pagas:** todas as `em_aberto` e `em_atraso` da unidade, da mais antiga para a mais nova, com a quantidade e o
+    valor total somado em Decimal (DEC-010). Dívida antiga continua sendo dívida, então não há corte de 12 meses. No dataset
+    todas as não pagas estão em atraso, porque a data de corte da Gold é posterior a todos os vencimentos.
+  - **Interrupções, chamados e inspeções:** todo o histórico, do mais recente para o mais antigo. São poucas linhas por unidade.
+  - A variação percentual passou a ser a mesma função da tela de receita (`variacao.py`): base zero não tem percentual.
+- **Suposição nossa:** o corte de 10% não vem do case. Uma variação pequena de consumo não explica uma conta que o cliente achou
+  alta, e 10% separa o ruído do mês de uma mudança que o atendente deve tratar como real. Fica num único lugar
+  (`LIMITE_DA_TENDENCIA`) se a diretoria pedir outra faixa.
+- **Alternativas descartadas:**
+  - Uma rota por bloco: seis chamadas e seis conjuntos de testes para uma tela que sempre usa tudo.
+  - A tela decidir o rótulo: contraria a regra de que o cálculo de negócio fica no backend.
+  - Comparar com a média dos 12 meses anteriores: mistura estações, e uma conta de janeiro sempre pareceria alta.
+- **Impacto:** API 0.8.0 (rota nova, nada que quebre). Nenhuma mudança na Gold nem nas views do agente. A tela `/uc` do frontend
+  pode usar o tipo gerado do OpenAPI.
