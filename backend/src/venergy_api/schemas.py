@@ -2,7 +2,7 @@
 
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import (
     BaseModel,
@@ -13,6 +13,7 @@ from pydantic import (
     field_validator,
     model_validator,
 )
+from venergy_agent.domain.answer import AnswerStatus, Confidence
 
 from venergy_api.ordens import ResultadoOrdem, StatusOrdem
 
@@ -537,6 +538,57 @@ class OrdemDetalheSchema(OrdemSchema):
     """A OI com o histórico de mudanças de status, do mais antigo ao mais recente."""
 
     eventos: list[EventoSchema]
+
+
+# A entrada é limitada na API, antes de chegar ao agente. O teto de 500 caracteres da pergunta
+# continua sendo do agente; este é folgado, só para não aceitar um corpo gigante.
+MAX_PERGUNTA_IA = 2000
+MAX_SESSAO_IA = 100
+
+
+class PerguntaIaSchema(BaseModel):
+    """Pergunta em português para o agente de IA, dentro de uma conversa."""
+
+    question: Annotated[
+        str, StringConstraints(strip_whitespace=True, min_length=1, max_length=MAX_PERGUNTA_IA)
+    ]
+    session_id: Annotated[
+        str, StringConstraints(strip_whitespace=True, min_length=1, max_length=MAX_SESSAO_IA)
+    ]
+
+
+class RespostaIaSchema(BaseModel):
+    """A resposta do agente (AgentAnswer) mais o id do registro de auditoria dela."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    # O registro é lido pelo atributo id; no JSON o campo se chama audit_id, para o portal
+    # montar o link do painel de auditoria sem confundir com outros ids.
+    audit_id: int = Field(validation_alias="id")
+    answer: str
+    status: AnswerStatus
+    sql: str | None
+    # Amostra: as colunas variam a cada pergunta. Decimal e data chegam como texto.
+    rows: list[dict[str, Any]]
+    row_count: int
+    truncated: bool
+    confidence: Confidence
+    sources: list[str]
+    assumptions: list[str]
+    clarification: str | None
+    refused_reason: str | None
+    request_id: str
+    model: str
+    prompt_version: str
+    latency_ms: int
+
+
+class AuditoriaIaSchema(RespostaIaSchema):
+    """O registro completo da auditoria: a resposta com a pergunta e o momento em que veio."""
+
+    pergunta: str
+    session_id: str
+    criado_em: datetime
 
 
 class ErroSchema(BaseModel):

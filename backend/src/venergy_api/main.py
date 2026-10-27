@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from venergy_api.agente import montar_agente
 from venergy_api.config import Settings, get_settings
-from venergy_api.routers import continuidade, fila, health, ordens, receita, unidades
+from venergy_api.routers import ai, continuidade, fila, health, ordens, receita, unidades
 
 
 @asynccontextmanager
@@ -41,4 +41,5 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(continuidade.router)
     app.include_router(fila.router)
     app.include_router(ordens.router)
+    app.include_router(ai.router)
     return app
