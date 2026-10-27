@@ -1,9 +1,11 @@
 // Mapa de regiões em SVG para escolher um recorte geográfico (ex.: município e bairro da RMR).
 // - Cada região habilitada é um link (`getHref`): Tab percorre o mapa, Enter abre, e o
-//   botão do meio/Ctrl+clique abre em outra aba. Regiões sem dado ficam visíveis, sem link.
+//   botão do meio/Ctrl+clique abre em outra aba. Regiões sem dado ficam visíveis, sem link e
+//   hachuradas (com "Sem dado" na legenda), para não passarem por variação zero.
 // - Ao escolher, o mapa enquadra a região com mola (viewBox animado); os botões aproximam,
-//   afastam e enquadram de novo. Arrastar move o mapa; Ctrl+roda (ou pinça no trackpad) dá
-//   zoom no ponto do cursor. A roda sozinha continua rolando a página.
+//   afastam e enquadram de novo. Arrastar move o mapa; Ctrl+roda (ou a pinça no trackpad) dá
+//   zoom no ponto do cursor, e a roda sozinha também, depois de um clique no mapa. Antes
+//   disso, ou afastando além do limite, a roda rola a página.
 // - Cor contínua (`getIntensity`, de -1 a 1): queda em `danger`, alta em `success`, misturadas
 //   à superfície pela intensidade; quanto mais forte, mais o contorno brilha (glow). Hover e
 //   seleção são contornos por cima de tudo, então valem sobre qualquer cor.
@@ -199,6 +201,8 @@ export function RegionMap({
 }: RegionMapProps) {
 	const reduced = useReducedMotion() ?? false;
 	const titleId = useId();
+	// O id vai num `url(#…)`: só letras e dígitos.
+	const hatchId = `hachura-${useId().replace(/[^\w-]/g, "")}`;
 	const svgRef = useRef<SVGSVGElement>(null);
 	const containerRef = useRef<HTMLDivElement>(null);
 	const full: View = { x: 0, y: 0, w: viewBox.width, h: viewBox.height };
@@ -215,6 +219,33 @@ export function RegionMap({
 		x: number;
 		y: number;
 	} | null>(null);
+	// A roda só dá zoom depois que a pessoa clicou no mapa; antes, rola a página. Assim o mapa
+	// não prende quem só está passando por cima dele, nem quem chegou a ele pelo Tab. Um clique
+	// ou foco fora do mapa desativa de novo; sair com o ponteiro, não.
+	const ativo = useRef(false);
+	const [avisoRoda, setAvisoRoda] = useState(false);
+	const avisoTimer = useRef<number | undefined>(undefined);
+	useEffect(() => () => window.clearTimeout(avisoTimer.current), []);
+	useEffect(() => {
+		const cliqueFora = (event: Event) => {
+			if (!containerRef.current?.contains(event.target as Node))
+				ativo.current = false;
+		};
+		// Clicar numa área do mapa sem link leva o foco a um ancestral focável (ex.: o
+		// conteúdo da página): isso não é sair do mapa.
+		const focoFora = (event: FocusEvent) => {
+			const mapa = containerRef.current;
+			const alvo = event.target as Node;
+			if (mapa && !mapa.contains(alvo) && !alvo.contains(mapa))
+				ativo.current = false;
+		};
+		document.addEventListener("pointerdown", cliqueFora);
+		document.addEventListener("focusin", focoFora);
+		return () => {
+			document.removeEventListener("pointerdown", cliqueFora);
+			document.removeEventListener("focusin", focoFora);
+		};
+	}, []);
 
 	// Nova seleção (clique, menu, URL): enquadra de novo.
 	const [previousSelected, setPreviousSelected] = useState(selectedId);
@@ -240,6 +271,10 @@ export function RegionMap({
 		([w, h, bw, bh]: number[]) =>
 			bw && bh ? Math.max(w / bw, h / bh) : w / 300,
 	);
+	// Hachura de "Sem dado" em pixels da tela, como a da legenda (listra de 2 a cada 5): em
+	// unidades do viewBox, ela engrossaria a cada zoom.
+	const hatch = useTransform(unitsPerPixel, (u) => u * 5);
+	const hatchLine = useTransform(unitsPerPixel, (u) => u * 2);
 
 	useEffect(() => {
 		const pares: [typeof vx, number][] = [
@@ -294,11 +329,23 @@ export function RegionMap({
 		};
 	};
 
-	// Ctrl+roda: listener nativo, porque o React registra `wheel` como passivo e o
-	// preventDefault (que impede o zoom da página) seria ignorado. Registrado uma vez; o
-	// Effect Event lê o `full` atual.
+	// Roda: listener nativo, porque o React registra `wheel` como passivo e o preventDefault
+	// (que impede a página de rolar ou dar zoom junto) seria ignorado. Registrado uma vez; o
+	// Effect Event lê o `full` e a `view` atuais.
+	// - Ctrl/⌘ (e a pinça do trackpad, que chega com ctrlKey) sempre dão zoom.
+	// - A roda sozinha só depois que o mapa está ativo; antes, a página rola e aparece a dica.
+	// - Afastando com o mapa já no limite, a roda volta para a página.
 	const onWheel = useEffectEvent((event: WheelEvent) => {
-		if (!event.ctrlKey && !event.metaKey) return;
+		const comando = event.ctrlKey || event.metaKey;
+		if (!comando && !ativo.current) {
+			setAvisoRoda(true);
+			window.clearTimeout(avisoTimer.current);
+			avisoTimer.current = window.setTimeout(() => setAvisoRoda(false), 1500);
+			return;
+		}
+		// Limite da roda: o mapa inteiro na tela (os botões ainda afastam um pouco além).
+		const noLimite = view.w >= full.w - 1e-6;
+		if (!comando && event.deltaY > 0 && noLimite) return;
 		event.preventDefault();
 		setInstant(true);
 		setView((v) => {
@@ -409,7 +456,21 @@ export function RegionMap({
 				"relative overflow-hidden rounded-lg border border-border bg-surface-1",
 				className,
 			)}
+			onPointerDownCapture={() => {
+				ativo.current = true;
+				setAvisoRoda(false);
+			}}
 		>
+			{avisoRoda && (
+				<div
+					aria-hidden
+					className="pointer-events-none absolute inset-x-0 top-3 z-10 flex justify-center"
+				>
+					<span className="rounded-md border border-border bg-surface-1 px-2.5 py-1 text-small text-text-muted">
+						Clique no mapa para dar zoom com a roda, ou use Ctrl + roda
+					</span>
+				</div>
+			)}
 			<motion.svg
 				ref={svgRef}
 				aria-labelledby={titleId}
@@ -425,6 +486,30 @@ export function RegionMap({
 				onClickCapture={onClickCapture}
 			>
 				<title id={titleId}>{label}</title>
+				{/* Sem dado: hachurado, para não se confundir com uma variação perto de zero. */}
+				<defs>
+					<motion.pattern
+						id={hatchId}
+						patternUnits="userSpaceOnUse"
+						width={hatch}
+						height={hatch}
+						patternTransform="rotate(45)"
+					>
+						<motion.rect
+							width={hatch}
+							height={hatch}
+							className="fill-surface-1"
+						/>
+						<motion.line
+							x1={0}
+							y1={0}
+							x2={0}
+							y2={hatch}
+							className="stroke-border-strong"
+							strokeWidth={hatchLine}
+						/>
+					</motion.pattern>
+				</defs>
 				<g aria-hidden className="fill-none stroke-border" style={stroke(1)}>
 					{context.map((d, i) => (
 						// biome-ignore lint/suspicious/noArrayIndexKey: contorno estático, sem identidade.
@@ -459,6 +544,11 @@ export function RegionMap({
 								data-region-id={shape.id}
 								d={shape.d}
 								className={fill}
+								style={
+									containerIds?.has(shape.id)
+										? undefined
+										: { fill: `url(#${hatchId})` }
+								}
 							/>
 						);
 					const extra = describe?.(shape);
@@ -636,6 +726,15 @@ export function RegionMap({
 							<span key={tick}>{tick}</span>
 						))}
 					</div>
+					{semDado.some((s) => !containerIds?.has(s.id)) && (
+						<div className="mt-1.5 flex items-center gap-1.5 text-small text-text-muted">
+							<span
+								aria-hidden
+								className="size-2.5 rounded-sm border border-border-strong bg-[repeating-linear-gradient(45deg,var(--color-border-strong)_0_2px,transparent_2px_5px)]"
+							/>
+							Sem dado
+						</div>
+					)}
 				</figure>
 			)}
 		</div>

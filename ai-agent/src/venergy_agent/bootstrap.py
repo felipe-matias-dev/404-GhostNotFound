@@ -32,10 +32,11 @@ async def build_agent(settings: AgentSettings) -> AskUseCase:
             prompts_dir=settings.prompts_dir / "answer",
             prompt_version=settings.answer_prompt_version,
             temperature=settings.temperature,
+            units=layer.column_units,
         ),
         max_question_chars=settings.max_question_chars,
         max_correction_attempts=settings.max_correction_attempts,
         answer_sample_rows=settings.answer_sample_rows,
         prompt_version=settings.prompt_version,
-        configured_model=settings.llm_model,
+        configured_model=settings.llm_model.partition(":")[2],
     )

@@ -298,3 +298,18 @@ def test_answer_user_prompt_delimits_question_and_data_and_redacts_the_label():
     assert f"<pergunta-{NONCE}>\nquantas?\n</pergunta-{NONCE}>" in prompt
     assert "[redigido]" in prompt
     assert "- suposição" in prompt
+
+
+def test_answer_user_prompt_labels_the_columns_that_have_a_unit():
+    question = Question(text="receita?", session_id="s1")
+    draft = SqlDraft(status=DraftStatus.OK, sql="SELECT 1")
+    result = QueryResult(
+        columns=("competencia", "receita_faturada"),
+        rows=({"competencia": "2024-06", "receita_faturada": 10},),
+        row_count=1,
+        truncated=False,
+    )
+
+    prompt = render_answer_user(question, draft, result, NONCE, {"receita_faturada": "R$"})
+
+    assert "colunas: competencia, receita_faturada (R$)" in prompt

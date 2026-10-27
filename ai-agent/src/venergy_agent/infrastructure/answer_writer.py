@@ -1,4 +1,5 @@
 import secrets
+from collections.abc import Mapping
 from pathlib import Path
 
 from pydantic_ai import Agent
@@ -17,17 +18,19 @@ class PydanticAiAnswerWriter:
         prompt_version: str,
         temperature: float,
         nonce: str | None = None,
+        units: Mapping[str, str] | None = None,
     ) -> None:
         template = (prompts_dir / prompt_version / "answer.md").read_text(encoding="utf-8")
         self._model = model
         self._nonce = nonce or secrets.token_hex(8)
         self._system = render_answer_system(template, self._nonce)
         self._temperature = temperature
+        self._units = dict(units or {})
 
     async def write(self, question: Question, draft: SqlDraft, result: QueryResult) -> str:
         agent = Agent(self._model, output_type=str, system_prompt=self._system)
         run = await agent.run(
-            render_answer_user(question, draft, result, self._nonce),
+            render_answer_user(question, draft, result, self._nonce, self._units),
             model_settings={"temperature": self._temperature},
         )
         return run.output.strip()

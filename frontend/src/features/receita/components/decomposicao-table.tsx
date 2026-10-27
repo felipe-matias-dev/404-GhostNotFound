@@ -1,55 +1,84 @@
-import { DataTable, type DataTableColumn } from "#/components/ui/data-table";
-import { formatBRL } from "#/lib/format";
+import { useState } from "react";
+import {
+	DataTable,
+	type DataTableColumn,
+	type SortState,
+} from "#/components/ui/data-table";
+import { formatBRL, formatPct } from "#/lib/format";
 import { cn } from "#/lib/utils";
-import { filtroAoAbrir, NIVEL_ROTULO, nivelDoFiltro } from "../conversions";
+import {
+	CAUSAS,
+	type CampoValor,
+	EFEITO_CAMPO,
+	EFEITO_ROTULO,
+	type Efeito,
+	filtroAoAbrir,
+	NIVEL_ROTULO,
+	nivelDoFiltro,
+	sobreABase,
+} from "../conversions";
 import { useDecomposicao } from "../hooks/use-decomposicao";
 import type { DecomposicaoLinha, ParPeriodos, Recorte } from "../types";
 
+function tomDoSinal(n: number) {
+	return n < 0 ? "text-danger" : n > 0 ? "text-success" : undefined;
+}
+
 function valor(
-	id: keyof DecomposicaoLinha & string,
+	campo: CampoValor,
 	header: string,
-	pick: (l: DecomposicaoLinha) => number,
-	destaque = false,
+	comSinal: boolean,
 ): DataTableColumn<DecomposicaoLinha> {
 	return {
-		id,
+		id: campo,
 		header,
 		width: "minmax(0, 1fr)",
 		align: "end",
 		numeric: true,
-		value: pick,
+		value: (l) => l[campo],
 		cell: (l) => (
-			<span
-				className={cn(
-					destaque && pick(l) < 0 && "text-danger",
-					destaque && pick(l) > 0 && "text-success",
-				)}
-			>
-				{formatBRL(pick(l))}
+			<span className={cn(comSinal && tomDoSinal(l[campo]))}>
+				{formatBRL(l[campo])}
 			</span>
 		),
 	};
 }
 
-const COLUNAS_VALORES: DataTableColumn<DecomposicaoLinha>[] = [
-	valor("receita_base", "Receita base", (l) => l.receita_base),
-	valor("receita_atual", "Receita atual", (l) => l.receita_atual),
-	valor("variacao_receita", "Variação", (l) => l.variacao_receita, true),
-	valor("efeito_preco", "Efeito preço", (l) => l.efeito_preco),
-	valor("efeito_volume", "Efeito volume", (l) => l.efeito_volume),
-	valor("efeito_mix", "Efeito mix", (l) => l.efeito_mix),
-	valor("efeito_tarifa", "Efeito tarifa", (l) => l.efeito_tarifa),
-	valor("efeito_bandeira", "Efeito bandeira", (l) => l.efeito_bandeira),
-];
+// Variação em % da receita base: sem ela, o maior município sempre domina a ordem em R$.
+const VARIACAO_PCT: DataTableColumn<DecomposicaoLinha> = {
+	id: "variacao_pct",
+	header: "Var. %",
+	width: "minmax(0, 0.8fr)",
+	align: "end",
+	numeric: true,
+	value: (l) => sobreABase(l, "variacao"),
+	cell: (l) => {
+		const pct = sobreABase(l, "variacao");
+		return pct === null ? (
+			<span className="text-text-muted">—</span>
+		) : (
+			<span className={tomDoSinal(pct)}>{formatPct(pct, { sinal: true })}</span>
+		);
+	},
+};
+
+/** Escolher uma causa na ponte ordena pela coluna dela, da maior queda para a maior alta. */
+const ordemDo = (efeito: Efeito): SortState | null =>
+	efeito === "variacao"
+		? null
+		: { columnId: EFEITO_CAMPO[efeito], direction: "asc" };
 
 export function DecomposicaoTable({
 	par,
 	filtro,
+	efeito,
 	onAbrir,
 	onDestaque,
 }: {
 	par: ParPeriodos | undefined;
 	filtro: Recorte;
+	/** Causa escolhida na ponte: ordena a tabela e ganha cor de alta e queda. */
+	efeito: Efeito;
 	onAbrir: (proximo: Recorte) => void;
 	/** Linha sob o ponteiro (`null` ao sair), para o mapa contornar a região. */
 	onDestaque?: (linha: DecomposicaoLinha | null) => void;
@@ -61,6 +90,14 @@ export function DecomposicaoTable({
 	// Linhas do nível anterior não abrem: o filtro já é o novo e o recorte sairia trocado.
 	const navegavel = nivel !== "classe" && !isPlaceholderData;
 
+	// A ponte define a ordem; o cabeçalho continua livre até a próxima troca de causa.
+	const [ordem, setOrdem] = useState(() => ordemDo(efeito));
+	const [efeitoAnterior, setEfeitoAnterior] = useState(efeito);
+	if (efeito !== efeitoAnterior) {
+		setEfeitoAnterior(efeito);
+		setOrdem(ordemDo(efeito));
+	}
+
 	const colunas: DataTableColumn<DecomposicaoLinha>[] = [
 		{
 			id: "segmento",
@@ -68,7 +105,14 @@ export function DecomposicaoTable({
 			width: "minmax(120px, 1.4fr)",
 			value: (l) => l.segmento,
 		},
-		...COLUNAS_VALORES,
+		valor("receita_base", "Receita base", false),
+		valor("receita_atual", "Receita atual", false),
+		valor("variacao_receita", "Variação", true),
+		VARIACAO_PCT,
+		// Efeitos na ordem e com os nomes da ponte. O efeito preço fica de fora: é tarifa + bandeira.
+		...CAUSAS.map((causa) =>
+			valor(EFEITO_CAMPO[causa], EFEITO_ROTULO[causa], causa === efeito),
+		),
 	];
 
 	return (
@@ -76,13 +120,15 @@ export function DecomposicaoTable({
 			label={`Ponte de receita por ${NIVEL_ROTULO[nivel].toLowerCase()}`}
 			columns={colunas}
 			rows={data}
-			resetKey={JSON.stringify({ ...filtro, ...par })}
+			resetKey={JSON.stringify({ ...filtro, ...par, efeito })}
 			getRowId={(l) => `${l.periodo_base}|${l.periodo_atual}|${l.segmento}`}
 			loading={isPending || isPlaceholderData}
 			error={isError ? "Não foi possível carregar a ponte de receita." : null}
 			onRetry={() => refetch()}
 			emptyMessage="Sem decomposição de receita para este recorte."
-			cardsBelow="4xl"
+			cardsBelow="5xl"
+			sort={ordem}
+			onSortChange={setOrdem}
 			onRowClick={
 				navegavel
 					? (linha) => {

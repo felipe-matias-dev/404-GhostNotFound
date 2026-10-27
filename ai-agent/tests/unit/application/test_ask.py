@@ -160,6 +160,8 @@ async def test_refuse_draft_ends_as_refused(layer):
 
     assert answer.status is AnswerStatus.REFUSED
     assert answer.refused_reason == REFUSED_REASON
+    assert "consumo, faturamento, interrupções e atendimento" in REFUSED_REASON
+    assert "altera" not in REFUSED_REASON
 
 
 async def test_clarify_draft_asks_back_without_sql(layer):
