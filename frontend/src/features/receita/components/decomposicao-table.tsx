@@ -55,10 +55,7 @@ const VARIACAO_PCT: DataTableColumn<DecomposicaoLinha> = {
 		return pct === null ? (
 			<span className="text-text-muted">—</span>
 		) : (
-			<span className={tomDoSinal(pct)}>
-				{pct > 0 ? "+" : ""}
-				{formatPct(pct)}
-			</span>
+			<span className={tomDoSinal(pct)}>{formatPct(pct, { sinal: true })}</span>
 		);
 	},
 };

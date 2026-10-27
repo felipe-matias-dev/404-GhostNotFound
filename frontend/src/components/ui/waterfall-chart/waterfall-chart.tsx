@@ -437,8 +437,8 @@ export function WaterfallChart({
 																)}
 															>
 																{net > 0 ? "+" : ""}
-																{formatValue(net)} · {net > 0 ? "+" : ""}
-																{formatPct(net / base)}
+																{formatValue(net)} ·{" "}
+																{formatPct(net / base, { sinal: true })}
 															</span>
 															<span className="text-text-muted">
 																{formatValue(base)} → {formatValue(bar.end)}
@@ -469,7 +469,7 @@ export function WaterfallChart({
 											<span className="sr-only">não se aplica</span>
 										</>
 									) : (
-										`${pct > 0 ? "+" : ""}${formatPct(pct)}`
+										formatPct(pct, { sinal: true })
 									)}
 								</td>
 							</tr>

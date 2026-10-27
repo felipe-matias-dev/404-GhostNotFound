@@ -4,10 +4,21 @@ const brl = new Intl.NumberFormat("pt-BR", {
 	style: "currency",
 	currency: "BRL",
 });
+// "exceptZero": "+" na alta, "-" na queda e nada no zero, decidido sobre o valor já arredondado.
+const brlComSinal = new Intl.NumberFormat("pt-BR", {
+	style: "currency",
+	currency: "BRL",
+	signDisplay: "exceptZero",
+});
 const inteiro = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 });
 const percentual = new Intl.NumberFormat("pt-BR", {
 	style: "percent",
 	maximumFractionDigits: 1,
+});
+const percentualComSinal = new Intl.NumberFormat("pt-BR", {
+	style: "percent",
+	maximumFractionDigits: 1,
+	signDisplay: "exceptZero",
 });
 const decimal1 = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1 });
 // Datas sem hora ("2025-03-10") são interpretadas em UTC; formatar em UTC evita mostrar o dia anterior.
@@ -35,9 +46,10 @@ const MESES = [
 
 type Valor = number | null | undefined;
 
-/** 1234.5 → "R$ 1.234,50" */
-export function formatBRL(valor: Valor): string {
-	return valor == null ? VAZIO : brl.format(valor);
+/** 1234.5 → "R$ 1.234,50"; com sinal: "+R$ 1.234,50" */
+export function formatBRL(valor: Valor, { sinal = false } = {}): string {
+	if (valor == null) return VAZIO;
+	return (sinal ? brlComSinal : brl).format(valor);
 }
 
 /** 1234.5 → "1.235 kWh" */
@@ -45,9 +57,10 @@ export function formatKWh(valor: Valor): string {
 	return valor == null ? VAZIO : `${inteiro.format(valor)} kWh`;
 }
 
-/** Fração → percentual: -0.039 → "-3,9%" */
-export function formatPct(fracao: Valor): string {
-	return fracao == null ? VAZIO : percentual.format(fracao);
+/** Fração → percentual: -0.039 → "-3,9%"; com sinal, 0.039 → "+3,9%" */
+export function formatPct(fracao: Valor, { sinal = false } = {}): string {
+	if (fracao == null) return VAZIO;
+	return (sinal ? percentualComSinal : percentual).format(fracao);
 }
 
 /** Competência "2025-03" → "mar/2025" */

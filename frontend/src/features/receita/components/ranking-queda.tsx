@@ -20,8 +20,6 @@ const MEDIDAS: { id: Medida; rotulo: string; nome: string }[] = [
 	{ id: "pct", rotulo: "%", nome: "Ranquear pelo percentual da receita base" },
 ];
 
-const sinal = (n: number) => (n > 0 ? "+" : "");
-
 const LIMITE = 5;
 
 const PLURAL: Record<Nivel, string> = {
@@ -200,25 +198,21 @@ export function RankingQueda({
 										{medida === "pct" && pct !== null ? (
 											<>
 												<span className="hidden text-small text-text-muted @md:inline">
-													{sinal(valor)}
-													{formatBRL(valor)}
+													{formatBRL(valor, { sinal: true })}
 												</span>
 												<span className="min-w-14 text-body">
-													{sinal(pct)}
-													{formatPct(pct)}
+													{formatPct(pct, { sinal: true })}
 												</span>
 											</>
 										) : (
 											<>
 												{pct !== null && (
 													<span className="hidden text-small text-text-muted @md:inline">
-														{sinal(pct)}
-														{formatPct(pct)}
+														{formatPct(pct, { sinal: true })}
 													</span>
 												)}
 												<span className="text-body">
-													{sinal(valor)}
-													{formatBRL(valor)}
+													{formatBRL(valor, { sinal: true })}
 												</span>
 											</>
 										)}

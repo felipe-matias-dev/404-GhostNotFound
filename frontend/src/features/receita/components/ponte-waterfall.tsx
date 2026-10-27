@@ -47,8 +47,8 @@ export function PonteWaterfall({
 					? "ficou estável"
 					: `${variacao < 0 ? "caiu" : "subiu"} ${formatBRL(Math.abs(variacao))}`}
 			</span>
-			{base > 0 && ` (${variacao > 0 ? "+" : ""}${formatPct(variacao / base)})`}{" "}
-			de {formatPeriodoCurto(linha.periodo_base)} para{" "}
+			{base > 0 && ` (${formatPct(variacao / base, { sinal: true })})`} de{" "}
+			{formatPeriodoCurto(linha.periodo_base)} para{" "}
 			{formatPeriodoCurto(linha.periodo_atual)}.{" "}
 			{quedas.length === 0 ? (
 				"Nenhum efeito puxou a receita para baixo."

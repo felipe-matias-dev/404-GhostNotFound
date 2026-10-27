@@ -152,7 +152,7 @@ export function MapaRecorte({
 				if (!linha) return null;
 				const pct = sobreABase(linha, efeito);
 				return `${EFEITO_ROTULO[efeito]}: ${formatBRL(linha[EFEITO_CAMPO[efeito]])}${
-					pct === null ? "" : ` (${pct > 0 ? "+" : ""}${formatPct(pct)})`
+					pct === null ? "" : ` (${formatPct(pct, { sinal: true })})`
 				}`;
 			}}
 			className={className}
