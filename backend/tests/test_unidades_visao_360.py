@@ -229,3 +229,76 @@ def test_unrated_ticket_and_unknown_cause_stay_empty(client: TestClient, seed) -
 
     assert body["interrupcoes"][0]["causa"] is None
     assert body["atendimentos"][0]["nota_satisfacao"] is None
+
+
+def test_open_invoices_list_only_unpaid_ones_oldest_first(client: TestClient, seed) -> None:
+    seed(
+        make_uc("0001"),
+        make_invoice("0001", "2025-01"),
+        make_invoice("0001", "2025-02", status_pagamento="paga_com_atraso", dias_em_atraso=4),
+        make_invoice(
+            "0001",
+            "2025-04",
+            receita_faturada=Decimal("120.50"),
+            data_pagamento=None,
+            status_pagamento="em_atraso",
+            dias_em_atraso=40,
+        ),
+        make_invoice(
+            "0001",
+            "2025-03",
+            receita_faturada=Decimal("99.90"),
+            data_pagamento=None,
+            status_pagamento="em_aberto",
+            dias_em_atraso=None,
+        ),
+    )
+
+    body = client.get(URL.format(cod_uc="0001")).json()["faturas_nao_pagas"]
+
+    assert [item["competencia"] for item in body["itens"]] == ["2025-03", "2025-04"]
+    assert [item["status_pagamento"] for item in body["itens"]] == ["em_aberto", "em_atraso"]
+    assert body["itens"][1]["dias_em_atraso"] == 40
+    assert body["itens"][0]["dias_em_atraso"] is None
+    assert body["quantidade"] == 2
+
+
+def test_open_invoices_total_is_exact(client: TestClient, seed) -> None:
+    # 0,10 + 0,20 em float dá 0,30000000000000004: o total sai da soma em Decimal (DEC-010).
+    seed(
+        make_uc("0001"),
+        make_invoice(
+            "0001",
+            "2025-01",
+            receita_faturada=Decimal("0.10"),
+            data_pagamento=None,
+            status_pagamento="em_atraso",
+            dias_em_atraso=10,
+        ),
+        make_invoice(
+            "0001",
+            "2025-02",
+            receita_faturada=Decimal("0.20"),
+            data_pagamento=None,
+            status_pagamento="em_atraso",
+            dias_em_atraso=5,
+        ),
+    )
+
+    body = client.get(URL.format(cod_uc="0001")).json()["faturas_nao_pagas"]
+
+    assert body["valor_total"] == 0.3
+
+
+def test_other_units_invoices_are_not_counted(client: TestClient, seed) -> None:
+    seed(
+        make_uc("0001"),
+        make_uc("0002"),
+        make_invoice(
+            "0002", "2025-01", data_pagamento=None, status_pagamento="em_atraso", dias_em_atraso=9
+        ),
+    )
+
+    body = client.get(URL.format(cod_uc="0001")).json()["faturas_nao_pagas"]
+
+    assert body == {"quantidade": 0, "valor_total": 0, "itens": []}

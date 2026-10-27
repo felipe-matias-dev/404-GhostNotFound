@@ -360,10 +360,32 @@ class InspecaoUcSchema(BaseModel):
     kwh_recuperado: Annotated[ExactNumber, Field(ge=0)]
 
 
+class FaturaNaoPagaSchema(BaseModel):
+    """Uma fatura da UC que ainda não foi paga."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    competencia: Competencia
+    receita_faturada: ExactNumber
+    data_vencimento: date
+    status_pagamento: Literal["em_aberto", "em_atraso"]
+    # Vazio na fatura em aberto: ainda está no prazo.
+    dias_em_atraso: int | None
+
+
+class FaturasNaoPagasSchema(BaseModel):
+    """As faturas não pagas da UC, a mais antiga primeiro, e quanto a UC deve no total."""
+
+    quantidade: int
+    valor_total: ExactNumber
+    itens: list[FaturaNaoPagaSchema]
+
+
 class Uc360Schema(BaseModel):
     """Tudo o que o atendente precisa de uma UC numa tela só."""
 
     cadastro: DimUcSchema
+    faturas_nao_pagas: FaturasNaoPagasSchema
     # Vazio na UC sem medidor instalado: não há linha em gold_medidor_uc.
     medidor: MedidorUcSchema | None
     # Do mais recente para o mais antigo: o atendente olha primeiro o que aconteceu há pouco.

@@ -1586,6 +1586,80 @@
         ],
         "title": "EventoSchema"
       },
+      "FaturaNaoPagaSchema": {
+        "properties": {
+          "competencia": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+            "title": "Competencia"
+          },
+          "receita_faturada": {
+            "type": "number",
+            "title": "Receita Faturada"
+          },
+          "data_vencimento": {
+            "type": "string",
+            "format": "date",
+            "title": "Data Vencimento"
+          },
+          "status_pagamento": {
+            "type": "string",
+            "enum": [
+              "em_aberto",
+              "em_atraso"
+            ],
+            "title": "Status Pagamento"
+          },
+          "dias_em_atraso": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dias Em Atraso"
+          }
+        },
+        "type": "object",
+        "required": [
+          "competencia",
+          "receita_faturada",
+          "data_vencimento",
+          "status_pagamento",
+          "dias_em_atraso"
+        ],
+        "title": "FaturaNaoPagaSchema",
+        "description": "Uma fatura da UC que ainda não foi paga."
+      },
+      "FaturasNaoPagasSchema": {
+        "properties": {
+          "quantidade": {
+            "type": "integer",
+            "title": "Quantidade"
+          },
+          "valor_total": {
+            "type": "number",
+            "title": "Valor Total"
+          },
+          "itens": {
+            "items": {
+              "$ref": "#/components/schemas/FaturaNaoPagaSchema"
+            },
+            "type": "array",
+            "title": "Itens"
+          }
+        },
+        "type": "object",
+        "required": [
+          "quantidade",
+          "valor_total",
+          "itens"
+        ],
+        "title": "FaturasNaoPagasSchema",
+        "description": "As faturas não pagas da UC, a mais antiga primeiro, e quanto a UC deve no total."
+      },
       "FilaItemSchema": {
         "properties": {
           "cod_uc": {
@@ -2400,6 +2474,9 @@
           "cadastro": {
             "$ref": "#/components/schemas/DimUcSchema"
           },
+          "faturas_nao_pagas": {
+            "$ref": "#/components/schemas/FaturasNaoPagasSchema"
+          },
           "medidor": {
             "anyOf": [
               {
@@ -2435,6 +2512,7 @@
         "type": "object",
         "required": [
           "cadastro",
+          "faturas_nao_pagas",
           "medidor",
           "interrupcoes",
           "atendimentos",

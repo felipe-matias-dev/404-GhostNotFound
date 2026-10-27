@@ -449,6 +449,40 @@ export interface components {
             ocorrido_em: string;
         };
         /**
+         * FaturaNaoPagaSchema
+         * @description Uma fatura da UC que ainda não foi paga.
+         */
+        FaturaNaoPagaSchema: {
+            /** Competencia */
+            competencia: string;
+            /** Receita Faturada */
+            receita_faturada: number;
+            /**
+             * Data Vencimento
+             * Format: date
+             */
+            data_vencimento: string;
+            /**
+             * Status Pagamento
+             * @enum {string}
+             */
+            status_pagamento: "em_aberto" | "em_atraso";
+            /** Dias Em Atraso */
+            dias_em_atraso: number | null;
+        };
+        /**
+         * FaturasNaoPagasSchema
+         * @description As faturas não pagas da UC, a mais antiga primeiro, e quanto a UC deve no total.
+         */
+        FaturasNaoPagasSchema: {
+            /** Quantidade */
+            quantidade: number;
+            /** Valor Total */
+            valor_total: number;
+            /** Itens */
+            itens: components["schemas"]["FaturaNaoPagaSchema"][];
+        };
+        /**
          * FilaItemSchema
          * @description Uma UC da fila e a ordem ativa dela, para a tela não oferecer o que daria 409.
          */
@@ -757,6 +791,7 @@ export interface components {
          */
         Uc360Schema: {
             cadastro: components["schemas"]["DimUcSchema"];
+            faturas_nao_pagas: components["schemas"]["FaturasNaoPagasSchema"];
             medidor: components["schemas"]["MedidorUcSchema"] | null;
             /** Interrupcoes */
             interrupcoes: components["schemas"]["InterrupcaoUcSchema"][];
