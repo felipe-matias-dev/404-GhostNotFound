@@ -19,6 +19,7 @@ from venergy_api.schemas import (
     PeriodoSchema,
     TotaisPeriodoSchema,
 )
+from venergy_api.variacao import variacao_pct
 
 router = APIRouter(prefix="/receita", tags=["receita"])
 
@@ -44,12 +45,6 @@ def _soma_no_periodo(
     # CASE dentro do SUM: os dois períodos saem da mesma leitura, numa ida só ao banco.
     # Sem nenhuma linha no período, a soma é zero, e não nula.
     return func.coalesce(func.sum(case((no_periodo, coluna))), 0)
-
-
-def _variacao_pct(base: Decimal, atual: Decimal) -> float | None:
-    if base == 0:
-        return None
-    return float((atual - base) / base * 100)
 
 
 @router.get("/comparacao")
@@ -94,8 +89,8 @@ def get_comparacao(
         ),
         variacao_kwh=kwh_atual - kwh_base,
         variacao_receita=receita_atual - receita_base,
-        variacao_kwh_pct=_variacao_pct(kwh_base, kwh_atual),
-        variacao_receita_pct=_variacao_pct(receita_base, receita_atual),
+        variacao_kwh_pct=variacao_pct(kwh_base, kwh_atual),
+        variacao_receita_pct=variacao_pct(receita_base, receita_atual),
     )
 
 
