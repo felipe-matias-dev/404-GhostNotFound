@@ -298,7 +298,7 @@ def test_segment_invoice_and_reading_components_add_up_to_the_billing(
     assert recortes == faturas
     # A amostra exercita a situação das faturas e as leituras estimadas.
     assert sum(valores[1] for valores in recortes.values()) > 0
-    assert sum(valores[5] for valores in recortes.values()) > 0
+    assert sum(valores[6] for valores in recortes.values()) > 0
 
 
 def test_occurrences_add_up_to_the_feeder_continuity(tmp_path: Path, engine: Engine) -> None:
