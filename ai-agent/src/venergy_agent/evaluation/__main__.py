@@ -12,6 +12,7 @@ from pydantic import ValidationError
 
 from venergy_agent.bootstrap import build_agent
 from venergy_agent.config import AGENT_ROOT, AgentSettings
+from venergy_agent.evaluation.database_guard import PostgresDatabaseGuard
 from venergy_agent.evaluation.report import EvaluationReport
 from venergy_agent.evaluation.runner import EvaluationRunner
 from venergy_agent.infrastructure.postgres_executor import PostgresQueryExecutor
@@ -78,6 +79,9 @@ async def _evaluate(only: str | None, pause_seconds: float) -> tuple[Path, list[
         ),
         executor=PostgresQueryExecutor(settings.database_url, settings.query_timeout_seconds),
         allowed_views=layer.allowed_views,
+        guard=PostgresDatabaseGuard(
+            settings.database_url, settings.allowed_schema, layer.allowed_views
+        ),
         pause_seconds=pause_seconds,
     )
     golden_version, golden = load_set(EVAL_DIR / "golden_set.yaml")

@@ -91,8 +91,9 @@ O banco local só tem a amostra sintética do backend (`venergy_api.amostra`). A
 
 ## 6b. Avaliação (item 7)
 
-- `evaluation/metrics.py`: execution accuracy por conjunto de linhas, violação pelo validador, vazamento de prompt, fidelidade numérica, taxas e percentis.
+- `evaluation/metrics.py`: execution accuracy por conjunto de linhas, tentativa barrada pelo validador, vazamento de prompt, fidelidade numérica, taxas e percentis.
 - `evaluation/runner.py`: `EvaluationRunner` sobre as portas.
+- `evaluation/database_guard.py`: `PostgresDatabaseGuard` mede a violação no banco: impressão digital das views antes e depois da rodada e escritas reais com o usuário do agente, sempre com rollback (spec §9.2).
 - `evaluation/__main__.py`: CLI que grava `eval/runs/<data>.json`.
 - Linha de base e achados: spec §9.6.
 

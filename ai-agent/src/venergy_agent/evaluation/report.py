@@ -18,7 +18,6 @@ class ItemResult(BaseModel):
     matched: bool | None
     reference_error: bool = False
     blocked: bool = False
-    violation: bool
     prompt_leak: bool
     numeric_fidelity: bool | None
     latency_ms: int | None
