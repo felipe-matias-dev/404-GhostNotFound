@@ -858,16 +858,16 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
     fatura e nada foi pago; `soma_notas` fica vazia quando nenhum chamado foi avaliado. Não arrecadar e não ter fatura são coisas
     diferentes para o agente. Na fatura (fato), a não paga continua com zero.
   - **Fila de suspeitas:**
-    - **Quem entra:** UCs sem GD, com medidor, com pelo menos 6 meses em cada janela e queda de 8% ou mais no consumo médio
-      (`kwh_faturado`) das 12 últimas competências contra as 12 anteriores. O corte era de 15% e passou a 8% (ver Volume).
-    - **Quem sai:** UCs com irregularidade confirmada (já regularizadas) e UCs inspecionadas sem irregularidade nos 12 meses antes
+    - **Quem entra:** UCs sem GD, com medidor, com pelo menos 6 meses em cada janela e queda de 5% ou mais no consumo médio
+      (`kwh_faturado`) das 12 últimas competências contra as 12 anteriores. O corte era de 15%, foi a 8% e ficou em 5% (ver Volume).
+    - **Quem sai:** UCs com irregularidade confirmada (o próximo passo delas é a regularização, e não a inspeção; ver Volume) e UCs inspecionadas sem irregularidade nos 12 meses antes
       do fim dos dados. Uma UC inspecionada sem irregularidade há mais tempo pode voltar à fila.
-    - **Ordem:** pontos (queda de 30% ou mais: 3; de 8% a 30%: 1; medidor eletromecânico: 1; 25% ou mais de leituras estimadas: 1)
+    - **Ordem:** pontos (queda de 30% ou mais: 3; de 5% a 30%: 1; medidor eletromecânico: 1; 25% ou mais de leituras estimadas: 1)
       e depois o kWh a recuperar (`kwh_recuperavel_est` = média anterior − média recente).
     - **Validação:** nas UCs inspecionadas, a regra é medida com a janela na **data de cada inspeção** (as 12 competências antes dela
       contra as 12 anteriores), que é o que a equipe via ao decidir; a janela atual inclui meses depois da regularização. Precisão e
       cobertura saem a cada carga.
-    - **Volume (calibração de 27/10/2026):** com o corte de 15%, a regra era precisa (0,906) mas pegava menos da metade das
+    - **Volume (calibração de 27/10/2026, corte final de 5%):** com o corte de 15%, a regra era precisa (0,906) mas pegava menos da metade das
       irregularidades (cobertura 0,477) e a fila tinha 50 UCs, abaixo da capacidade de inspeção de um mês (as inspeções do dado
       são cerca de 280 por mês). Nas UCs inspecionadas, a faixa de queda entre 5% e 15% é quase toda de irregularidades
       confirmadas, então o corte foi medido de 15% a 5%, com a janela na data de cada inspeção:
@@ -876,11 +876,31 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
       |---|---:|---:|---:|
       | 15% | 50 | 0,906 | 0,477 |
       | 10% | 77 | 0,919 | 0,755 |
-      | **8% (adotado)** | 95 | 0,922 | 0,857 |
+      | 8% | 95 | 0,922 | 0,857 |
       | 7% | 112 | 0,919 | 0,889 |
-      | 5% | 194 | 0,901 | 0,930 |
+      | **5% (adotado)** | 194 | 0,901 | 0,930 |
 
-      O 8% fica no ponto de maior precisão da tabela, e passar para 7% dá só 3 pontos de cobertura por 17 UCs a mais.
+      **Por que 5% (o top-200 do backlog):** o critério de aceite da D3-07 pede a "taxa de acerto do top-200" da fila, e só com o
+      corte de 5% a fila tem o tamanho desse teste (194 UCs; com 8%, 95). A faixa de 5% a 10% ainda acerta 83% (151 irregularidades
+      confirmadas para 30 sem irregularidade), bem acima da taxa base das inspeções (0,64, nas mesmas UCs medidas). Abaixo de 5% a precisão da faixa cai para
+      22% (45 para 163), então 5% é o ponto onde a UC marginal deixa de valer a inspeção. Nas UCs inspecionadas, ordenadas pela queda
+      que a equipe via na data da inspeção, a precisão do top-200 é 0,92, contra a taxa base de 0,64 (o backlog supunha cerca de 50%). Essa medida ordena só pela queda; a fila de fato ordena
+      por pontos (queda forte, medidor eletromecânico, leituras estimadas) e depois por kWh a recuperar, e essa ordem não foi medida na data da
+      inspeção. O 0,92 vale para o sinal principal, e não para a ordem final da fila.
+      Faixas, na data da inspeção:
+
+      | Queda | Com irregularidade | Sem irregularidade | Precisão |
+      |---|---:|---:|---:|
+      | 15% ou mais | 413 | 43 | 91% |
+      | 10% a 15% | 241 | 15 | 94% |
+      | 5% a 10% | 151 | 30 | 83% |
+      | 0% a 5% | 45 | 163 | 22% |
+    - **Confirmadas fora da fila:** as UCs com irregularidade confirmada saem porque o próximo passo delas é a regularização
+      (recomendação 1 do diagnóstico), e não porque já foram regularizadas: a Gold não sabe se houve regularização, e o consumo
+      delas continua baixo depois da inspeção (cerca de 57% do histórico antes e 62% depois, com até 6 meses de dados). A energia a
+      recuperar nesse grupo (cerca de 2,65 GWh por ano) é muito maior que a das UCs novas da fila, e é o que sustenta a recomendação.
+    - **Em aberto:** o portal precisa de uma lista de "regularização pendente" para as confirmadas, já que elas saem da fila (sugestão da
+      revisão do #54).
     - **Limites desta calibração:** as UCs inspecionadas não são uma amostra aleatória (a distribuidora já escolhia quem
       inspecionar), então a precisão tende a ser menor na população toda; o corte foi escolhido no mesmo grupo em que foi medido;
       e só cerca de 7% das irregularidades confirmadas aparecem com consumo estável ou em alta, fora do alcance de qualquer regra
@@ -989,3 +1009,24 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
     sendo uma tarefa própria.
 - **Consequências:** a DEC-021 deixa de valer na frase "DEC, FEC… não têm recorte por segmento": desde esta decisão eles têm, calculados
   sobre os componentes. O agente continua somando os mesmos componentes, então portal e agente dão o mesmo número.
+
+
+## DEC-035 · Soma dos efeitos e percentual sobre a base na tela de receita
+
+- **Data:** 27/10/2026 · **Área:** Portal · **Autor:** João Euclides
+- **Contexto:** a regra do projeto é que os cálculos de negócio ficam na Gold e no backend e que o frontend só exibe. Na revisão
+  do PR #51, Felipe apontou que a tela de receita faz duas contas sobre as linhas de `GET /receita/decomposicao`.
+- **Decisão:** a tela continua fazendo essas duas contas, e só elas:
+  - **Ponte do recorte:** soma a `receita_base` e os `efeito_tarifa`, `efeito_bandeira`, `efeito_volume` e `efeito_mix` dos
+    segmentos do nível abaixo (os efeitos são somáveis, DEC-023), como o backend já faz em SQL para cada segmento. A receita atual
+    da ponte é a base mais os efeitos, e não a soma de `receita_atual`. Cada linha fecha só dentro da tolerância do contrato
+    (R$ 0,025, DEC-029); somada sobre uns 90 bairros, a sobra passaria de R$ 1 e desalinharia o último degrau.
+  - **Percentual sobre a base:** efeito ÷ `receita_base` do próprio segmento, para a coluna "Var. %", o ranking em % e a cor do
+    mapa. Sem receita base (segmento novo), não há percentual.
+- **Por que não é cálculo de negócio:** nenhuma fórmula do PVM é refeita. A tela soma e divide valores que a Gold já calculou, do
+  mesmo jeito que formata R$ e %.
+- **Limite:** a receita atual da ponte pode ficar alguns centavos acima ou abaixo da soma da coluna "Receita atual" da tabela.
+- **Alternativa descartada por enquanto:** a API devolver a linha agregada do recorte e os percentuais. Isso pede campos novos no
+  schema, OpenAPI e cliente, e não muda nenhum número da tela. Volta a valer se outro consumidor precisar dos mesmos números
+  (por exemplo, o JSON de métricas que o backend monta para o insight da tela, D9): aí a conta passa para o backend, e a tela só
+  exibe.

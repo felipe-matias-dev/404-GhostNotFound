@@ -49,7 +49,8 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-// Clique num município: o mapa enquadra; arraste, Ctrl+roda e os botões dão zoom.
+// Clique num município: o mapa enquadra; arraste para mover. Ctrl+roda e os botões dão zoom,
+// e a roda sozinha também, depois de um clique no mapa.
 export const Padrao: Story = {};
 
 // Só os municípios com dado são links; os outros da RMR ficam apagados.

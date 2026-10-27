@@ -25,7 +25,7 @@ Hexagonal: `domain` ← `application` ← `infrastructure`.
 | infrastructure | `postgres_executor.py` | `PostgresQueryExecutor`: `BEGIN READ ONLY`, `statement_timeout`, SQLSTATE → `ErrorKind` | pronto |
 | infrastructure | `sql_generator.py`, `prompt_renderer.py`, `llm.py` | PydanticAI com `output_type=SqlDraft`; prompt em `prompts/v1/`; delimitadores com nonce; Gemini direto (padrão) ou OpenRouter | pronto |
 | infrastructure | `semantic_source.py`, `views_sql.py` | `YamlSemanticLayerSource` valida `semantic/semantic_layer.yaml` contra `contracts/gold_schema.yaml` (inclusive `consumers` e `sensitive`); `views_sql` gera `semantic/views.sql` | pronto |
-| infrastructure | `answer_writer.py` | `PydanticAiAnswerWriter`: narra as linhas, com o conteúdo do banco delimitado como dado; prompt em `prompts/answer/v1/` | item 8 |
+| infrastructure | `answer_writer.py` | `PydanticAiAnswerWriter`: narra as linhas, com o conteúdo do banco delimitado como dado e a unidade de cada coluna vinda da camada semântica; prompt em `prompts/answer/v2/` | item 8 |
 | raiz | `config.py`, `bootstrap.py`, `__main__.py` | `AgentSettings` (`VENERGY_AGENT_*`); `build_agent(settings)` monta o agente; `python -m venergy_agent "pergunta"` | pronto |
 
 ## 3. Fluxo do `ask()`

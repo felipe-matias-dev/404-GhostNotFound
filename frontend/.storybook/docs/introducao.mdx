@@ -64,7 +64,7 @@ export const Carregando: Story = { args: { ...Padrao.args, carregando: true } };
 
 ## Previstos (V2-02)
 
-`KpiCard` (valor + variação vs período), `SeriesChart`, `WaterfallChart` e `FilterBar`.
+`KpiCard` (valor + variação vs período), `SeriesChart` e `FilterBar`.
 
 Prontos: `DataTable` (**Componentes/DataTable**): ordenação com as linhas viajando até a
 nova posição (Sortable Table do interior.dev), paginação, seleção múltipla, lista de cards
@@ -75,3 +75,10 @@ enquadramento animados. `Breadcrumb` e `DropdownMenu` (shadcn/ui) para a trilha 
 foco preso, Esc e fundo para fechar e entrada em mola; consulta longa continua no `Sheet`.
 `FloatingLabelInput` e `FloatingLabelTextarea` (**Componentes/FloatingLabel**, Floating Label
 do interior.dev): o rótulo sobe para um espaço reservado acima do texto em vez de sumir.
+`WaterfallChart` (**Componentes/WaterfallChart**): ponte horizontal do total inicial ao final,
+com alta em `success` e queda em `danger` (o sinal do valor diz o mesmo sem a cor), o acumulado
+de cada etapa como trilho em `pressed` e degraus contínuos entre as etapas; no total final, a
+variação líquida aparece na barra (alta preenchida, queda só contornada), com a conta no tooltip
+(`compareLabel`); eixo ampliado com corte nas barras de total quando o zero fica longe, barras
+que deslizam ao trocar de dados e uma tabela por baixo para o leitor de tela; abaixo de 28rem de
+container, o valor sobe e a barra ocupa a largura toda.
