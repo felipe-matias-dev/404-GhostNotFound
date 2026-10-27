@@ -26,7 +26,7 @@ export function PonteWaterfall({
 	const passos = data ? passosDaPonte(data) : undefined;
 	const nome = recorte.bairro ?? recorte.municipio;
 	const daClasse = recorte.classe
-		? ` da classe ${recorte.classe} (${CLASSE_ROTULO[recorte.classe].toLowerCase()})`
+		? ` da classe ${recorte.classe} · ${CLASSE_ROTULO[recorte.classe]}`
 		: "";
 
 	// Períodos das linhas, e não da URL: no drill-down as linhas ainda podem ser do par anterior.
