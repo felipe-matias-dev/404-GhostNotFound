@@ -5,7 +5,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Query
 from sqlalchemy import ColumnElement, case, func, or_, select
-from sqlalchemy.orm import InstrumentedAttribute
+from sqlalchemy.orm import InstrumentedAttribute, Session
 
 from venergy_api.database import SessionDep
 from venergy_api.models import DimUc, FatoFaturamentoMensal, KpisMensais, ReceitaDecomposicao
@@ -116,13 +116,12 @@ def get_pares_de_periodos(session: SessionDep) -> list[ParPeriodosSchema]:
     ]
 
 
-@router.get("/decomposicao")
-def get_decomposicao(
-    filtro: Annotated[DecomposicaoFiltroSchema, Query()], session: SessionDep
+def consultar_decomposicao(
+    filtro: DecomposicaoFiltroSchema, session: Session
 ) -> list[DecomposicaoLinhaSchema]:
-    """Ponte de receita de um par de períodos, por município, por bairro ou por classe.
+    """A ponte do nível abaixo do filtro, da maior queda para a maior alta.
 
-    Ordenada da maior queda para a maior alta: o topo é onde a receita mais caiu.
+    Fica fora da rota para a tela e o insight de IA lerem exatamente os mesmos números.
     """
     decomposicao = ReceitaDecomposicao
     # O breadcrumb da tela só acrescenta filtros: o nível da resposta é o próximo abaixo.
@@ -176,3 +175,14 @@ def get_decomposicao(
         DecomposicaoLinhaSchema(nivel=nivel, **linha._mapping)
         for linha in session.execute(consulta)
     ]
+
+
+@router.get("/decomposicao")
+def get_decomposicao(
+    filtro: Annotated[DecomposicaoFiltroSchema, Query()], session: SessionDep
+) -> list[DecomposicaoLinhaSchema]:
+    """Ponte de receita de um par de períodos, por município, por bairro ou por classe.
+
+    Ordenada da maior queda para a maior alta: o topo é onde a receita mais caiu.
+    """
+    return consultar_decomposicao(filtro, session)
