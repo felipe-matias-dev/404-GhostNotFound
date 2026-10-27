@@ -41,6 +41,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | 24/10/2026 | DEC-029: método do efeito bandeira: acréscimo fixo por kWh por bandeira, conferido no dado | Fecha a pendência da DEC-023 com uma regra verificável e exata | Alisson |
 | 24/10/2026 | DEC-030: regras aplicadas na Gold: `n_uc` de UCs faturadas (PRODIST), ocorrências antes da ligação fora (OCO-04), potência em Wp convertida, vazio × zero nos recortes, fila de suspeitas calibrada e medida na data das inspeções | Denominador do DEC/FEC como no PRODIST e fila explicável e medida; revisada com a comparação das cópias | Alisson |
 | 26/10/2026 | DEC-031: a API lista os pares de períodos da decomposição e passa a exigir o par; API 0.5.0 | A Gold grava centenas de pares (DEC-028): sem o par, a resposta somaria períodos que não se comparam, e o seletor precisa saber quais existem | Felipe |
+| 24/10/2026 | DEC-032 (proposta): DEC e FEC de um período de vários meses somam os valores mensais, nunca a média | Indicador de continuidade é acumulado; a média dos meses subestima o período e o agente alternava entre as duas formas | Luis Felipe |
 
 ## DEC-001 · Localização dos arquivos de origem (landing)
 
@@ -885,3 +886,16 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Limite:** a rota só conhece os pares gravados. Pares de trechos diferentes (DEC-028) continuam fora, e entram só se o portal
   precisar deles.
 - **Amostra:** o gerador grava os 78 pares de mesmos meses entre 2024 e 2025, para o seletor ter o que mostrar.
+
+## DEC-032 · DEC e FEC de um período somam os mensais (proposta)
+
+- **Data:** 24/10/2026 · **Área:** GenAI e Dados · **Autor:** Luis Felipe
+- **Status:** proposta. Precisa da aprovação de Dados (o contrato da Gold) e de GenAI (a camada semântica). Pedido de revisão do Lucas no PR #41.
+- **Contexto:** a camada semântica não dizia como agregar DEC e FEC de vários meses. Nas rodadas de avaliação do PR #41, o agente usou ora a soma, ora a média dos valores mensais da mesma view, para a mesma pergunta (G020: DEC do AL-07 no semestre).
+- **Decisão proposta:**
+  - DEC e FEC são indicadores acumulados: o valor de um semestre ou de um ano é a soma dos valores mensais prontos (`sum(dec)`, `sum(fec)`), nunca a média.
+  - Para um recorte de `gold_kpis_segmento_mensal`, continua a fórmula dos componentes do contrato: horas e interrupções somadas ÷ média mensal de UCs.
+  - As duas formas dão o mesmo número quando o `n_uc` não muda no período.
+- **Motivo:** a média dos meses subestima o indicador do período. Uma regra explícita tira a ambiguidade, que hoje o modelo resolve sozinho, de um jeito diferente a cada execução.
+- **Consequência:** a regra está na camada semântica 0.3.3 e na referência do G020 (golden set 0.4.0). Se Dados preferir outra definição, por exemplo a ANEEL com o número de UCs no fim do período, mudam a regra, a referência e esta DEC.
+- **Em aberto:** confirmar a definição com Dados. Para o FEC, a mesma regra vale com `n_interrupcoes`.

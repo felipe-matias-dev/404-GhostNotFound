@@ -21,6 +21,11 @@ def agent_database_url() -> str:
 
 
 @pytest.fixture
+def owner_database_url() -> str:
+    return OWNER_DATABASE_URL
+
+
+@pytest.fixture
 def owner() -> Iterator[psycopg.Connection]:
     try:
         connection = psycopg.connect(OWNER_DATABASE_URL, autocommit=True)
