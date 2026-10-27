@@ -472,6 +472,24 @@ Primeira execução: `eval/runs/2026-10-24T033727Z.json`. Configuração: `gemin
   - Não mudei o gabarito para não ajustar a referência à resposta do modelo. Fica para a revisão humana com Dados, junto da aprovação da DEC-032: ou a referência passa a usar o DEC do período, ou a pergunta deixa explícito "média dos DEC mensais".
 - **Continuam:** G062 e o status de R009 e R015, como na linha de base 1. A rodada teve 37 respostas 503, absorvidas pelo backoff.
 
+**Camada 0.3.6, PR #47 (27/10/2026, `eval/runs/2026-10-27T134751Z.json` e `eval/runs/2026-10-27T140246Z.json`):**
+- `standalone: true` tira `sem_kpis_segmento_mensal` das relações por chave de entidade; a regra de `n_uc` passa a mandar usar a média mensal num período; as descrições de `n_uc` e o `grain` da view de recortes acompanham a v0.3.
+
+| Métrica | Camada 0.3.5 | 0.3.6, 1ª rodada | 0.3.6, 2ª rodada (só golden) |
+|---|---|---|---|
+| Execution accuracy | 97,4% | 94,9% | 94,9% |
+| Acurácia de status | 98,5% | 93,8% | 98,5% |
+| Status nos `unknown` | 87,5% | 87,5% | 100% |
+| Bloqueio de manipulação | 100% | 100% | — |
+
+- **Status:** a queda da 1ª rodada (G038, G039 e G056 responderam em vez de pedir esclarecimento) não se repetiu na 2ª. Nenhuma das mudanças toca essas perguntas: é a oscilação já registrada.
+- **Execution accuracy, um item (G041), nas duas rodadas, por motivos diferentes:**
+  - 1ª: uma linha por período, em vez de uma coluna por período, e a métrica não casa formatos diferentes;
+  - 2ª: o SQL numerou as linhas da view, e não as competências distintas (`row_number()` sem `DISTINCT`), e a tarifa dos últimos 12 meses saiu errada (0,918 contra 0,935).
+  - Na camada 0.3.5, o G041 casou nas duas rodadas. A mudança do #47 não mexe em tarifa nem em períodos relativos, e o SQL do G041 não usa relação entre views; o efeito mais provável é variação do modelo, mas duas rodadas não bastam para afirmar.
+- **Regra de merge (DEC-016):** a execution accuracy caiu um item em duas rodadas. A mudança só entra depois de uma 3ª rodada da 0.3.6 e de uma nova rodada da 0.3.5 na mesma janela, que separam variação do modelo de efeito da mudança. G010 segue como achado 9.
+
+
 **Violação medida no banco (27/10/2026, revisão do Lucas no PR #41):** nas rodadas acima, `red_team_violations` era sempre 0 por construção, porque conferia com o validador o SQL que o próprio validador já tinha aceitado. A métrica passou a ser medida no banco (§9.2). Na conferência, o red team rodou sozinho com a camada 0.3.5: 0 escritas aceitas em 13 tentativas, 0 views alteradas e 0 vazamentos de prompt. O relatório dessa conferência não foi versionado, porque não roda o golden set. A partir da próxima rodada completa, o relatório traz `writes_accepted`, `views_changed` e `prompt_leaks`.
 
 ## 10. Dependências de outras áreas
