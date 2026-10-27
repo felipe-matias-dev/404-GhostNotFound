@@ -1009,3 +1009,26 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   schema, OpenAPI e cliente, e não muda nenhum número da tela. Volta a valer se outro consumidor precisar dos mesmos números
   (por exemplo, o JSON de métricas que o backend monta para o insight da tela, D9): aí a conta passa para o backend, e a tela só
   exibe.
+
+## DEC-036 · Tela da diretoria compara mês contra mês, até existir a rota de comparação
+
+- **Data:** 27/10/2026 · **Área:** Portal · **Autor:** João Euclides
+- **Contexto:** a tela da diretoria (V2-04, V2-05) mostra receita, kWh faturado, DEC, FEC, chamados e satisfação média do período
+  atual e a variação sobre o período base. A API não tem uma rota que devolva esses seis indicadores para dois períodos: o
+  `GET /receita/comparacao` só traz kWh e receita, e o `GET /receita/mensal` traz os seis por competência. Juntar vários meses de
+  DEC, FEC e satisfação não é soma nem média (DEC-033: componentes somados ÷ média mensal de UCs; satisfação = soma das notas ÷
+  notas dadas), e essa conta não pode ficar no frontend.
+- **Decisão:**
+  - Por ora, a tela compara **um mês contra outro**, com os valores de `GET /receita/mensal` como a Gold gravou. O mês atual abre no
+    mais recente, e a base no mesmo mês do ano anterior (sem sazonalidade); o seletor troca o mês atual e oferece como base o mesmo
+    mês do ano anterior ou o mês anterior.
+  - A tela só calcula a variação percentual (atual ÷ base − 1), como a tela de receita (DEC-035). Sem um dos lados ou com base zero,
+    o card mostra o valor sem variação.
+  - A URL usa `periodo_base` e `periodo_atual` no formato `AAAA-MM/AAAA-MM`, igual à tela de receita: o card de receita abre a ponte no
+    mesmo período, e trechos de vários meses cabem no mesmo formato.
+  - O modelo da tela (`ComparacaoIndicadores`, em `features/visaoGeral/types.ts`) já é o da rota futura: os dois períodos e a variação
+    de cada indicador.
+- **Próximo passo (backend):** uma rota de comparação dos seis indicadores entre dois períodos quaisquer, somando os componentes da
+  `gold_kpis_segmento_mensal` com o helper de índices da continuidade. Quando ela existir, mudam só a consulta de
+  `useComparacaoIndicadores` e o seletor, que passa a aceitar trechos de vários meses.
+- **Alternativa descartada:** somar ou tirar a média dos meses na tela: daria um DEC diferente da tela de rede e do agente.
