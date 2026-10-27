@@ -42,6 +42,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | 24/10/2026 | DEC-030: regras aplicadas na Gold: `n_uc` de UCs faturadas (PRODIST), ocorrências antes da ligação fora (OCO-04), potência em Wp convertida, vazio × zero nos recortes, fila de suspeitas calibrada e medida na data das inspeções | Denominador do DEC/FEC como no PRODIST e fila explicável e medida; revisada com a comparação das cópias | Alisson |
 | 26/10/2026 | DEC-031: a API lista os pares de períodos da decomposição e passa a exigir o par; API 0.5.0 | A Gold grava centenas de pares (DEC-028): sem o par, a resposta somaria períodos que não se comparam, e o seletor precisa saber quais existem | Felipe |
 | 24/10/2026 | DEC-032 (proposta): DEC e FEC de um período de vários meses somam os valores mensais, nunca a média | Indicador de continuidade é acumulado; a média dos meses subestima o período e o agente alternava entre as duas formas | Luis Felipe |
+| 26/10/2026 | DEC-033: DEC e FEC de um período saem da soma dos componentes ÷ média mensal de UCs, no backend, com rotas por alimentador, ranking e recortes; fila de suspeitas paginada com a ordem de inspeção ativa; API 0.6.0 | DEC e FEC não se somam nem se tiram a média entre recortes; a fila mostra quais UCs já têm ordem, para a tela não oferecer o que daria 409 | Felipe |
 
 ## DEC-001 · Localização dos arquivos de origem (landing)
 
@@ -562,6 +563,9 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
     DEC/FEC por recorte é uma tarefa própria, que revisa esta decisão.
   - O agente de IA, se responder sobre receita de um segmento, precisa somar a mesma fato com
     a mesma dimensão para bater com a tela.
+  - **Atualização (26/10/2026):** DEC e FEC passam a ter recorte por município, bairro, alimentador e
+    classe, calculados sobre os componentes da `gold_kpis_segmento_mensal` (DEC-033). A troca do
+    `/receita/comparacao` para essa tabela continua pendente.
 
 ## DEC-022 · Regras do agente sobre a Gold e decisões da daily de 21/10
 
@@ -899,3 +903,68 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Motivo:** a média dos meses subestima o indicador do período. Uma regra explícita tira a ambiguidade, que hoje o modelo resolve sozinho, de um jeito diferente a cada execução.
 - **Consequência:** a regra está na camada semântica 0.3.3 e na referência do G020 (golden set 0.4.0). Se Dados preferir outra definição, por exemplo a ANEEL com o número de UCs no fim do período, mudam a regra, a referência e esta DEC.
 - **Em aberto:** confirmar a definição com Dados. Para o FEC, a mesma regra vale com `n_interrupcoes`.
+
+## DEC-033 · DEC e FEC por período e recorte, e a fila de suspeitas paginada
+
+- **Data:** 26/10/2026 · **Área:** Portal · **Autor:** Felipe · **Revisa:** DEC-021 (DEC e FEC só no total)
+- **Contexto:** o V1-07 pede as rotas das telas de DEC/FEC (a Beatriz quer os piores alimentadores e regiões para a manutenção
+  preventiva) e da fila de perdas (o Rafael quer a fila da mais para a menos promissora, com o motivo e a energia a recuperar, e gera as
+  ordens de inspeção a partir dela). Com a `gold_kpis_segmento_mensal` da v0.3 (alimentador na chave), DEC e FEC passam a poder ser
+  calculados por recorte.
+- **Decisão:**
+  - `GET /continuidade/alimentadores/mensal`: a série de DEC e FEC por alimentador, como a Gold calculou (sem recalcular), com
+    `inicio`, `fim` e `cod_alimentador` (repetível) opcionais.
+  - `GET /continuidade/alimentadores/ranking`: os alimentadores do pior para o melhor num período obrigatório, pelo `criterio`
+    `dec` (padrão) ou `fec`.
+  - `GET /continuidade/recortes`: DEC e FEC do nível abaixo do filtro, como na decomposição: por município, por bairro de um
+    município ou por alimentador de um bairro. `classe` filtra em qualquer nível, e `bairro` sem `municipio` dá `422`.
+  - `GET /fila-suspeitas`: a fila por posição no ranking (`score_suspeita`, 1 = mais suspeita), paginada (`pagina`, `tamanho` até 200),
+    com `motivos`, `kwh_recuperavel_est` e `ordem_ativa` (a ordem de inspeção gerada ou em campo da UC, se houver).
+    `sem_ordem_ativa=true` esconde as UCs que já têm ordem, e o `total` acompanha o filtro.
+  - Versão da API 0.6.0.
+- **Regra do período** (a do contrato e a da camada semântica do agente): `DEC = Σ horas_interrompidas ÷ média mensal de n_uc`
+  e `FEC = Σ n_interrupcoes ÷ média mensal de n_uc`, com a média igual a `Σ n_uc ÷ n_meses`. A conta fica no SQL do backend, num
+  único helper usado pelo ranking e pelos recortes; o frontend só exibe. Num mês, o resultado é o `dec` e o `fec` da Gold.
+  - **Divisor:** `n_meses` é o número de competências com dado dentro do período, contado na tabela inteira (e não no recorte),
+    e a resposta o devolve. Um recorte sem linha num mês conta zero UC nesse mês. Enquanto a Gold cobre o período, o número é o do
+    agente; num período que passa do fim dos dados, o DEC não sai subestimado.
+  - **Sem divisor:** sem UC atendida no período, `dec` e `fec` são nulos, e o recorte vai para o fim da lista.
+- **Motivo:**
+  - O DEC é uma média ponderada pelas UCs atendidas: a média dos DEC mensais, ou dos DEC dos alimentadores de um bairro, dá peso
+    igual a bases de tamanhos diferentes. Somar os componentes e dividir no fim fecha com o total da empresa (teste com a amostra).
+  - O último nível do drill-down é o alimentador, e não a classe: a manutenção preventiva age no circuito, e a Beatriz vê o bairro
+    pior e, dentro dele, qual alimentador atacar. O breadcrumb é o da decomposição, e a tela reaproveita a trilha.
+  - `ordem_ativa` na fila evita o `409` do `POST /ordens-inspecao`: o Rafael vê "já em campo" antes de clicar, e o filtro traz na
+    primeira página o que ainda dá para mandar a campo. O índice único parcial (uma OI ativa por UC) garante que a junção não duplica
+    linhas.
+- **Alternativas descartadas:**
+  - Dividir pelos meses do período pedido, ao pé da letra da camada semântica: um período além dos dados mostraria o DEC menor do
+    que é, sem aviso. O GenAI foi avisado para alinhar a regra do agente.
+  - Parâmetro livre `agrupar_por`: um bairro sem município é ambíguo (o nome repete entre municípios), e o schema divergiria da
+    decomposição.
+  - Paginação por cursor: a tela precisa do total e de pular de página, e o OFFSET sobre 45 mil linhas custa pouco. Total em
+    cabeçalho: o client gerado não tipa cabeçalho.
+  - A tela cruzar a fila com `GET /ordens-inspecao`: a regra ficaria no frontend e a paginação quebraria.
+  - Retirar da fila as UCs com ordem: o Rafael perderia a visão completa do ranking.
+- **Desempenho (aceite "< 1 s"):** medido com dados sintéticos no pior caso (500 alimentadores × 24 meses, 288 mil linhas de segmentos,
+  45.200 suspeitas e 200 ordens ativas), 30 chamadas por rota, pelo `TestClient`:
+
+  | Rota | Mediana | Máximo |
+  |---|---|---|
+  | Série de um alimentador, 24 meses | 8,5 ms | 51 ms |
+  | Série de todos (12.000 linhas) | 206 ms | 265 ms |
+  | Ranking dos 500 alimentadores, 24 meses | 21 ms | 28 ms |
+  | Recortes por município, 24 meses | 78 ms | 90 ms |
+  | Recortes por bairro / por alimentador | 68 ms / 66 ms | 75 ms / 75 ms |
+  | Fila, página 1 / última página de 200 | 27 ms / 46 ms | 33 ms / 82 ms |
+  | Fila sem ordem ativa | 31 ms | 90 ms |
+
+  Nenhum índice novo. O mais lento é a série completa, e o tempo é da serialização das 12.000 linhas; a tela pede um alimentador
+  ou um período.
+- **Limitações conhecidas:**
+  - O `n_uc` vem como a Gold grava. A discussão do PR #42 sobre excluir do `n_uc` as UCs que nunca são faturadas (UC-12, PRODIST)
+    muda o valor gravado, e não a conta da API.
+  - `/receita/comparacao` ainda soma a fato com o cadastro atual da UC (DEC-021). Trocá-lo pela `gold_kpis_segmento_mensal` continua
+    sendo uma tarefa própria.
+- **Consequências:** a DEC-021 deixa de valer na frase "DEC, FEC… não têm recorte por segmento": desde esta decisão eles têm, calculados
+  sobre os componentes. O agente continua somando os mesmos componentes, então portal e agente dão o mesmo número.

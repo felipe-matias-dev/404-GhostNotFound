@@ -352,6 +352,85 @@ class InspecaoUcSchema(BaseModel):
     kwh_recuperado: Annotated[ExactNumber, Field(ge=0)]
 
 
+class ContinuidadeSerieFiltroSchema(PeriodoSchema):
+    """Período da série e, se quiser, só alguns alimentadores (o parâmetro se repete na URL)."""
+
+    cod_alimentador: list[RequiredText] = Field(default_factory=list)
+
+
+class IndicesContinuidadeSchema(BaseModel):
+    """DEC e FEC de um período, calculados sobre os componentes somados."""
+
+    # Nulos quando não há UC atendida no período: sem divisor, não existe índice.
+    dec: float | None
+    fec: float | None
+    horas_interrompidas: float
+    n_interrupcoes: int
+    # Média mensal das UCs atendidas, o divisor do DEC e do FEC de um período.
+    n_uc_medio: float | None
+
+
+class RankingFiltroSchema(BaseModel):
+    """Período do ranking, obrigatório: a média mensal só existe sobre um período."""
+
+    inicio: Competencia
+    fim: Competencia
+    criterio: Literal["dec", "fec"] = "dec"
+
+    @model_validator(mode="after")
+    def inicio_ate_o_fim(self) -> "RankingFiltroSchema":
+        _inicio_ate_o_fim(self.inicio, self.fim)
+        return self
+
+
+class RankingAlimentadorSchema(IndicesContinuidadeSchema):
+    cod_alimentador: RequiredText
+
+
+class RankingContinuidadeSchema(BaseModel):
+    """Os alimentadores do pior para o melhor, e quantos meses entraram na média."""
+
+    inicio: Competencia
+    fim: Competencia
+    criterio: Literal["dec", "fec"]
+    # Meses com dado dentro do período: o divisor da média mensal de UCs. Zero, sem dados.
+    n_meses: int
+    alimentadores: list[RankingAlimentadorSchema]
+
+
+class RecortesFiltroSchema(BaseModel):
+    """Período e onde o gerente está no drill-down: o nível da resposta é o próximo abaixo."""
+
+    inicio: Competencia
+    fim: Competencia
+    criterio: Literal["dec", "fec"] = "dec"
+    municipio: RequiredText | None = None
+    bairro: RequiredText | None = None
+    classe: Classe | None = None
+
+    @model_validator(mode="after")
+    def periodo_e_bairro_validos(self) -> "RecortesFiltroSchema":
+        _inicio_ate_o_fim(self.inicio, self.fim)
+        if self.bairro and not self.municipio:
+            raise ValueError("Informe o município junto com o bairro")
+        return self
+
+
+class RecorteContinuidadeSchema(IndicesContinuidadeSchema):
+    segmento: RequiredText
+
+
+class RecortesContinuidadeSchema(BaseModel):
+    """DEC e FEC do nível abaixo do filtro, do pior para o melhor."""
+
+    inicio: Competencia
+    fim: Competencia
+    criterio: Literal["dec", "fec"]
+    nivel: Literal["municipio", "bairro", "alimentador"]
+    n_meses: int
+    recortes: list[RecorteContinuidadeSchema]
+
+
 class FilaSuspeitaSchema(BaseModel):
     """Uma UC suspeita de perda não técnica, com o porquê e o quanto vale inspecionar."""
 
@@ -361,6 +440,39 @@ class FilaSuspeitaSchema(BaseModel):
     # Motivos legíveis para o gerente de perdas decidir; no CSV, separados por ";".
     motivos: list[RequiredText]
     kwh_recuperavel_est: ExactNumber | None
+
+
+class FilaFiltroSchema(BaseModel):
+    """Página da fila e, se quiser, só as UCs que ainda não têm ordem de inspeção ativa."""
+
+    pagina: Annotated[int, Field(ge=1)] = 1
+    # Mesmo teto do pedido de ordens: uma página inteira cabe num único pedido.
+    tamanho: Annotated[int, Field(ge=1, le=MAX_ORDENS_POR_PEDIDO)] = 50
+    sem_ordem_ativa: bool = False
+
+
+class OrdemAtivaSchema(BaseModel):
+    """A ordem de inspeção que já ocupa a UC (gerada ou em campo)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    status: StatusOrdem
+
+
+class FilaItemSchema(FilaSuspeitaSchema):
+    """Uma UC da fila e a ordem ativa dela, para a tela não oferecer o que daria 409."""
+
+    ordem_ativa: OrdemAtivaSchema | None
+
+
+class FilaPaginaSchema(BaseModel):
+    """Uma página da fila pela posição no ranking, e quantas UCs a fila tem no filtro."""
+
+    itens: list[FilaItemSchema]
+    total: int
+    pagina: int
+    tamanho: int
 
 
 class CriarOrdensSchema(BaseModel):
