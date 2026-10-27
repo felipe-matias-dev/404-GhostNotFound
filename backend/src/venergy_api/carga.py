@@ -8,6 +8,7 @@ Uso: uv run python -m venergy_api.carga
 """
 
 import csv
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 from typing import get_args, get_origin
@@ -108,8 +109,10 @@ def _parse_cell(value: str, is_list: bool) -> object:
     return value
 
 
-def read_rows(csv_path: Path, schema: type[BaseModel]) -> list[dict[str, object]]:
-    """Lê o CSV e valida cada linha, parando na primeira que fugir do contrato."""
+def iter_rows(csv_path: Path, schema: type[BaseModel]) -> Iterator[dict[str, object]]:
+    """Lê o CSV uma linha por vez, validando cada uma, e para na primeira que fugir do contrato."""
+    # Um gerador, e não uma lista: a Gold real tem milhões de linhas, e guardar todas na
+    # memória derrubou a carga numa máquina de 8 GB. Quem consome decide quanto guardar.
     # utf-8-sig aceita o BOM que Excel e algumas exportações colocam no início do arquivo.
     with csv_path.open(encoding="utf-8-sig", newline="") as file:
         reader = csv.DictReader(file)
@@ -120,7 +123,6 @@ def read_rows(csv_path: Path, schema: type[BaseModel]) -> list[dict[str, object]
         list_columns = {
             name for name, field in schema.model_fields.items() if _is_list(field.annotation)
         }
-        rows = []
         # A linha 1 é o cabeçalho, então a primeira linha de dados é a 2.
         for line_number, raw_row in enumerate(reader, start=2):
             row = {
@@ -128,11 +130,15 @@ def read_rows(csv_path: Path, schema: type[BaseModel]) -> list[dict[str, object]
                 for column, value in raw_row.items()
             }
             try:
-                rows.append(schema.model_validate(row).model_dump())
+                yield schema.model_validate(row).model_dump()
             except ValidationError as error:
                 message = f"{csv_path.name}, linha {line_number}: {_describe(error)}"
                 raise GoldLoadError(message) from error
-    return rows
+
+
+def read_rows(csv_path: Path, schema: type[BaseModel]) -> list[dict[str, object]]:
+    """Todas as linhas do CSV numa lista: só para arquivos pequenos. A carga usa iter_rows."""
+    return list(iter_rows(csv_path, schema))
 
 
 def drop_agent_views(connection: Connection) -> None:

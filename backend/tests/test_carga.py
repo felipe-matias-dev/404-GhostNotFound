@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from venergy_api import carga
 from venergy_api.amostra import write_sample
-from venergy_api.carga import AGENT_VIEWS_SQL, GoldLoadError, load_gold, read_rows
+from venergy_api.carga import AGENT_VIEWS_SQL, GoldLoadError, iter_rows, load_gold, read_rows
 from venergy_api.models import DimUc
 from venergy_api.schemas import RequiredText
 
@@ -195,6 +195,19 @@ def test_empty_cell_becomes_none(tmp_path: Path) -> None:
     csv_path.write_text("cod_uc,receita\n0001,\n", encoding="utf-8")
 
     assert read_rows(csv_path, OptionalColumnSchema) == [{"cod_uc": "0001", "receita": None}]
+
+
+def test_rows_are_read_one_at_a_time_and_not_all_at_once(tmp_path: Path) -> None:
+    # A linha 3 é inválida. Se a leitura juntasse o arquivo inteiro antes de entregar a primeira
+    # linha, o erro apareceria já na primeira: é isso que enche a memória com milhões de linhas.
+    csv_path = tmp_path / "opcional.csv"
+    csv_path.write_text("cod_uc,receita\n0001,10\n0002,abc\n", encoding="utf-8")
+
+    rows = iter_rows(csv_path, OptionalColumnSchema)
+
+    assert next(rows) == {"cod_uc": "0001", "receita": 10.0}
+    with pytest.raises(GoldLoadError, match="linha 3: receita"):
+        next(rows)
 
 
 class ListColumnSchema(BaseModel):
