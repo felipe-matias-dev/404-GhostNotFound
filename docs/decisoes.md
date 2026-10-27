@@ -837,8 +837,8 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 
 ## DEC-030 · Regras aplicadas na Gold: UCs, ocorrências, GD e fila de suspeitas
 
-- **Data:** 24/10/2026, revisada em 26/10/2026 com a comparação das cópias do Alisson e do Arthur · **Área:** Dados · **Autor:** Alisson
-- **Status:** as duas cópias batem tabela por tabela; falta a cópia do Gabriel para fechar a versão oficial (DEC-011).
+- **Data:** 24/10/2026, revisada em 26/10/2026 com a comparação das cópias do Alisson e do Arthur, e em 27/10/2026 com a cópia do Gabriel e a calibração da fila · **Área:** Dados · **Autor:** Alisson
+- **Status:** as três cópias batem tabela por tabela (DEC-011); a cópia do Alisson, com as escolhas abaixo, é a base do notebook oficial.
 - **Decisão:**
   - **`n_uc`:** UCs **faturadas** na competência, como no PRODIST (denominador do DEC/FEC = UCs faturadas do conjunto). Ficam fora
     as UCs da UC-12, que nunca são faturadas, e os meses de ligação antes da primeira fatura. A base dos recortes e da continuidade
@@ -855,18 +855,38 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
     diferentes para o agente. Na fatura (fato), a não paga continua com zero.
   - **Fila de suspeitas:**
     - **Quem entra:** UCs sem GD, com medidor, com pelo menos 6 meses em cada janela e queda de 15% ou mais no consumo médio
-      (`kwh_faturado`) das 12 últimas competências contra as 12 anteriores.
+      (`kwh_faturado`) das 12 últimas competências contra as 12 anteriores. O corte é de **8%** (antes: 15%); ver Volume.
     - **Quem sai:** UCs com irregularidade confirmada (já regularizadas) e UCs inspecionadas sem irregularidade nos 12 meses antes
       do fim dos dados. Uma UC inspecionada sem irregularidade há mais tempo pode voltar à fila.
-    - **Ordem:** pontos (queda de 30% ou mais: 3; de 15% a 30%: 1; medidor eletromecânico: 1; 25% ou mais de leituras estimadas: 1)
+    - **Ordem:** pontos (queda de 30% ou mais: 3; de 8% a 30%: 1; medidor eletromecânico: 1; 25% ou mais de leituras estimadas: 1)
       e depois o kWh a recuperar (`kwh_recuperavel_est` = média anterior − média recente).
     - **Validação:** nas UCs inspecionadas, a regra é medida com a janela na **data de cada inspeção** (as 12 competências antes dela
       contra as 12 anteriores), que é o que a equipe via ao decidir; a janela atual inclui meses depois da regularização. Precisão e
       cobertura saem a cada carga.
-    - **Volume:** a regra é precisa, mas conservadora: a fila fica menor que a capacidade de inspeção de um mês. Ganhar volume
-      (entrada mais solta ou outro sinal) fica para uma próxima calibração, medida do mesmo jeito.
+    - **Volume (calibração de 27/10/2026):** com o corte de 15%, a regra era precisa (0,906) mas pegava menos da metade das
+      irregularidades (cobertura 0,477) e a fila tinha 50 UCs, abaixo da capacidade de inspeção de um mês (as inspeções do dado
+      são cerca de 280 por mês). Nas UCs inspecionadas, a faixa de queda entre 5% e 15% é quase toda de irregularidades
+      confirmadas, então o corte foi medido de 15% a 5%, com a janela na data de cada inspeção:
+
+      | Corte | UCs na fila | Precisão | Cobertura |
+      |---|---:|---:|---:|
+      | 15% | 50 | 0,906 | 0,477 |
+      | 10% | 77 | 0,919 | 0,755 |
+      | **8% (adotado)** | 95 | 0,922 | 0,857 |
+      | 7% | 112 | 0,919 | 0,889 |
+      | 5% | 194 | 0,901 | 0,930 |
+
+      O 8% fica no ponto de maior precisão da tabela, e passar para 7% dá só 3 pontos de cobertura por 17 UCs a mais.
+    - **Limites desta calibração:** as UCs inspecionadas não são uma amostra aleatória (a distribuidora já escolhia quem
+      inspecionar), então a precisão tende a ser menor na população toda; o corte foi escolhido no mesmo grupo em que foi medido;
+      e só cerca de 7% das irregularidades confirmadas aparecem com consumo estável ou em alta, fora do alcance de qualquer regra
+      de queda. Sem contato com a equipe de campo, a escolha foi pela fila mais completa; se a equipe preferir uma fila curta, é
+      só subir o corte (a constante `QUEDA_ENTRADA` do notebook).
+  - **Documento na UC-12 (comparação com a cópia do Gabriel):** `documento_mascarado` fica **vazio** nas UCs da UC-12
+    (`flag_documento_repetido`). O documento é um preenchimento repetido, e mostrar os 3 últimos dígitos levaria o atendente a
+    confirmar a identidade com um documento fictício. O contrato já aceita vazio nessa coluna.
   - **Outras escolhas da cópia:** `receita_arrecadada` é zero na fatura não paga (como na amostra do backend); consumo médio na
-    janela das 12 últimas competências; titular por iniciais e documento com os 3 últimos dígitos.
+    janela das 12 últimas competências; titular por iniciais e documento com os 3 últimos dígitos (exceto UC-12).
 
 ## DEC-031 · Rota de pares da decomposição e par de períodos obrigatório
 
