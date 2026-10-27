@@ -50,6 +50,7 @@ const percentualComSinal = new Intl.NumberFormat("pt-BR", {
 	signDisplay: "exceptZero",
 });
 const decimal1 = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1 });
+const decimal2 = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 2 });
 // Datas sem hora ("2025-03-10") são interpretadas em UTC; formatar em UTC evita mostrar o dia anterior.
 const data = new Intl.DateTimeFormat("pt-BR", { timeZone: "UTC" });
 // Instantes com fuso ("2026-10-23T13:30:26Z") ficam no fuso de quem vê a tela.
@@ -105,6 +106,16 @@ export function formatKWh(
 /** Número sem unidade, até uma casa: 12.43 → "12,4"; 1234 → "1.234" */
 export function formatNumero(valor: Valor): string {
 	return valor == null ? VAZIO : decimal1.format(valor);
+}
+
+/** Índice por unidade consumidora, até duas casas (FEC): 0.347 → "0,35" */
+export function formatIndice(valor: Valor): string {
+	return valor == null ? VAZIO : decimal2.format(valor);
+}
+
+/** Horas, até duas casas (DEC): 1.254 → "1,25 h" */
+export function formatHoras(valor: Valor): string {
+	return valor == null ? VAZIO : `${decimal2.format(valor)} h`;
 }
 
 /** Fração → percentual: -0.039 → "-3,9%"; com sinal, 0.039 → "+3,9%" */
