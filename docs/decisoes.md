@@ -1032,3 +1032,21 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   `gold_kpis_segmento_mensal` com o helper de índices da continuidade. Quando ela existir, mudam só a consulta de
   `useComparacaoIndicadores` e o seletor, que passa a aceitar trechos de vários meses.
 - **Alternativa descartada:** somar ou tirar a média dos meses na tela: daria um DEC diferente da tela de rede e do agente.
+
+## DEC-037 · Gráficos do portal em SVG próprio, com d3 só para as contas
+
+- **Data:** 27/10/2026 · **Área:** Portal · **Autor:** João Euclides
+- **Contexto:** a tela da diretoria ganhou o gráfico de tendência dos seis indicadores, mês a mês ou ano a ano, e ele precisa
+  servir a outras telas. O design system não usa biblioteca de componentes, e o `WaterfallChart` da receita já é desenhado à mão
+  com `motion`.
+- **Decisão:**
+  - O `TrendChart` (`components/ui/trend-chart`) é SVG próprio. `d3-scale` (escala e ticks do eixo y) e `d3-shape` (curva
+    `monotoneX`, que não passa do valor real entre dois meses) fazem só as contas; o desenho, as cores (tokens `chart-*`) e o
+    movimento (`motion`) são do projeto.
+  - Mês a mês: a série corrida da `gold_kpis_mensais`. Ano a ano: um ano por linha sobre jan–dez, o mais recente em destaque e o
+    anterior como comparação. O tooltip mostra a variação sobre o mês anterior ou sobre o mesmo mês do ano anterior; é a mesma
+    conta de variação da DEC-036, sem nova regra de negócio.
+  - Indicador e visão ficam na URL (`indicador`, `tendencia`), como os outros filtros.
+- **Alternativa descartada:** Recharts (o gráfico do shadcn) ou outra biblioteca completa. A troca entre mês a mês e ano a ano
+  redesenharia o gráfico do zero em vez de mudar a forma das linhas, o tema e a acessibilidade seguiriam o modelo dela e o
+  bundle cresceria para fazer o que duas bibliotecas pequenas do d3 já fazem.
