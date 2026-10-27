@@ -77,6 +77,10 @@ docker compose run --rm api python -m venergy_api.carga
 | API e documentação interativa | http://127.0.0.1:8000/docs |
 | Banco | `127.0.0.1:5433`, usuário `venergy` |
 
+O agente de IA precisa de `GOOGLE_API_KEY` no `.env` (chave do Gemini, uma por pessoa). Sem ela
+tudo sobe, mas `POST /ai/ask` responde `503`. Cada resposta fica em `app.ai_auditoria` e se lê em
+`GET /ai/audit/{id}` ([DEC-034](docs/decisoes.md)).
+
 O código de `backend/src` e `frontend/src` é montado nos containers: API e portal
 recarregam a cada mudança. Mudou dependência (`pyproject.toml`, `package.json`) ou
 `vite.config.ts`? `docker compose up -d --build`.
