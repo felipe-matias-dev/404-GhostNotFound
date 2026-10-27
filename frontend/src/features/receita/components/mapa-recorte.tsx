@@ -130,9 +130,15 @@ export function MapaRecorte({
 			focusIds={foco}
 			highlightId={destacada?.id ?? null}
 			selectedId={bairro?.id ?? municipio?.id ?? null}
-			getHref={(f) =>
-				router.buildLocation({ to: "/receita", search: recorteDe(f) }).href
-			}
+			// Parte da busca atual, como o clique comum: Ctrl+clique, botão do meio e "copiar
+			// link" levam à mesma tela, com classe, causa e período.
+			getHref={(f) => {
+				const { municipio, bairro } = recorteDe(f);
+				return router.buildLocation({
+					to: "/receita",
+					search: (atual) => ({ ...atual, municipio, bairro }),
+				}).href;
+			}}
 			onSelect={(f) => onChange(recorteDe(f))}
 			onClear={() =>
 				onChange(recorte.bairro ? { municipio: recorte.municipio } : {})
