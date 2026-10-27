@@ -854,8 +854,8 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
     fatura e nada foi pago; `soma_notas` fica vazia quando nenhum chamado foi avaliado. Não arrecadar e não ter fatura são coisas
     diferentes para o agente. Na fatura (fato), a não paga continua com zero.
   - **Fila de suspeitas:**
-    - **Quem entra:** UCs sem GD, com medidor, com pelo menos 6 meses em cada janela e queda de 15% ou mais no consumo médio
-      (`kwh_faturado`) das 12 últimas competências contra as 12 anteriores. O corte é de **8%** (antes: 15%); ver Volume.
+    - **Quem entra:** UCs sem GD, com medidor, com pelo menos 6 meses em cada janela e queda de 8% ou mais no consumo médio
+      (`kwh_faturado`) das 12 últimas competências contra as 12 anteriores. O corte era de 15% e passou a 8% (ver Volume).
     - **Quem sai:** UCs com irregularidade confirmada (já regularizadas) e UCs inspecionadas sem irregularidade nos 12 meses antes
       do fim dos dados. Uma UC inspecionada sem irregularidade há mais tempo pode voltar à fila.
     - **Ordem:** pontos (queda de 30% ou mais: 3; de 8% a 30%: 1; medidor eletromecânico: 1; 25% ou mais de leituras estimadas: 1)
