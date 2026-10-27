@@ -36,11 +36,11 @@ def test_lists_the_queue_by_ranking_position(client: TestClient) -> None:
     ]
 
 
-def test_reports_the_recoverable_energy_or_leaves_it_empty(client: TestClient) -> None:
+def test_reports_the_recoverable_energy(client: TestClient) -> None:
     energy = {i["cod_uc"]: i["kwh_recuperavel_est"] for i in queue(client)["itens"]}
 
-    assert energy["0007"] == 4200.0
-    assert energy["0004"] is None
+    assert energy["0007"] == 1425.0
+    assert energy["0004"] == 310.0
 
 
 def test_pages_follow_the_ranking(client: TestClient) -> None:
