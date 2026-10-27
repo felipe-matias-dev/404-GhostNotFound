@@ -126,13 +126,23 @@ def render_answer_system(template: str, nonce: str) -> str:
     return _fill(template, nonce=nonce)
 
 
-def render_answer_user(question: Question, draft: SqlDraft, result: QueryResult, nonce: str) -> str:
+def render_answer_user(
+    question: Question,
+    draft: SqlDraft,
+    result: QueryResult,
+    nonce: str,
+    units: Mapping[str, str] | None = None,
+) -> str:
     _require(nonce)
+    units = units or {}
+    columns = ", ".join(
+        f"{column} ({units[column]})" if column in units else column for column in result.columns
+    )
     rows = "\n".join(json.dumps(row, ensure_ascii=False, default=str) for row in result.rows)
     assumptions = "\n".join(f"- {item}" for item in draft.assumptions) or "(nenhuma)"
     data = "\n".join(
         [
-            f"colunas: {', '.join(result.columns)}",
+            f"colunas: {columns}",
             f"total de linhas: {result.row_count}",
             "suposições declaradas:",
             assumptions,

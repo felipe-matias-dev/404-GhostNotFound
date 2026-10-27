@@ -70,6 +70,18 @@ class SemanticLayer(BaseModel):
     def allowed_views(self) -> frozenset[str]:
         return frozenset(view.name for view in self.views)
 
+    @property
+    def column_units(self) -> dict[str, str]:
+        units: dict[str, set[str | None]] = {}
+        for view in self.views:
+            for column in view.columns:
+                units.setdefault(column.name, set()).add(column.unit)
+        return {
+            name: unit
+            for name, found in units.items()
+            if len(found) == 1 and (unit := next(iter(found))) is not None
+        }
+
     @model_validator(mode="after")
     def check_references(self) -> Self:
         names = [view.name for view in self.views]

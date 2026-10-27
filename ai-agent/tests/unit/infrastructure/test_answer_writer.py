@@ -23,13 +23,14 @@ def narrating_model(text):
     return FunctionModel(respond), calls
 
 
-def writer(model):
+def writer(model, units=None):
     return PydanticAiAnswerWriter(
         model=model,
         prompts_dir=SHIPPED_PROMPTS,
-        prompt_version="v1",
+        prompt_version="v2",
         temperature=0.0,
         nonce=NONCE,
+        units=units or {},
     )
 
 
@@ -70,3 +71,21 @@ async def test_forged_label_in_a_row_is_redacted_before_reaching_the_model():
     user = next(p.content for p in calls[0][0].parts if isinstance(p, UserPromptPart))
     assert forged not in user
     assert "[redigido]" in user
+
+
+async def test_request_tells_the_model_the_unit_of_each_column():
+    model, calls = narrating_model("A receita foi R$ 10,00.")
+    result = QueryResult(
+        columns=("receita_faturada",),
+        rows=({"receita_faturada": 10},),
+        row_count=1,
+        truncated=False,
+    )
+
+    await writer(model, {"receita_faturada": "R$"}).write(QUESTION, DRAFT, result)
+
+    parts = calls[0][0].parts
+    system = next(p.content for p in parts if isinstance(p, SystemPromptPart))
+    user = next(p.content for p in parts if isinstance(p, UserPromptPart))
+    assert "receita_faturada (R$)" in user
+    assert "unidade" in system

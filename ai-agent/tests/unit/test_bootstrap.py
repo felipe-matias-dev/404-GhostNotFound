@@ -37,3 +37,11 @@ async def test_unknown_prompt_version_fails_at_startup(settings):
 
     with pytest.raises(FileNotFoundError):
         await build_agent(settings)
+
+
+async def test_answers_name_the_model_as_the_provider_does_without_the_prefix(settings):
+    agent = await build_agent(settings)
+
+    answer = await agent.ask("x" * (settings.max_question_chars + 1), "s1")
+
+    assert answer.model == settings.llm_model.partition(":")[2]
