@@ -221,6 +221,9 @@ _TARIFA = {
 }
 _REAJUSTE = {2024: Decimal("1.00"), 2025: Decimal("1.08")}
 _VOLUME = {2024: Decimal("1.03"), 2025: Decimal("1.00")}
+# As UCs da fila de suspeitas consumiam mais em 2024: a queda de 2025 as põe na fila (DEC-030).
+# Queda de ~33% na 0005 e na 0007 (forte, 3 pontos) e de 20% na 0004 (entrada, 1 ponto).
+_VOLUME_2024_DA_FILA = {"0005": Decimal("1.50"), "0007": Decimal("1.50"), "0004": Decimal("1.25")}
 # Bandeiras de 2025, de janeiro a dezembro: vermelha na seca, quando as térmicas entram.
 # 2024 fica todo em verde, como o período base do diagnóstico, para a decomposição ter
 # efeito bandeira.
@@ -259,8 +262,8 @@ _ALIQUOTA_TRIBUTOS = Decimal("0.25")
 _TROCA_MEDIDOR = ("0003", "2025-03")
 _SINAL_INVERTIDO = ("0006", "2024-08")
 _PAGOU_COM_ATRASO = ("0001", "2025-03")
-# Leituras estimadas (o leiturista não chegou ao medidor), nos últimos seis meses das UCs da
-# fila de suspeitas: 3 de 6 na UC 0005 e 2 de 6 na UC 0004.
+# Leituras estimadas (o leiturista não chegou ao medidor) nas 12 últimas competências das UCs da
+# fila de suspeitas: 3 de 12 (25%, o limite do ponto da DEC-030) na UC 0005 e 2 de 12 na UC 0004.
 _LEITURAS_ESTIMADAS = {
     "0005": ("2025-08", "2025-10", "2025-12"),
     "0004": ("2025-09", "2025-11"),
@@ -326,7 +329,10 @@ def _faturamento() -> tuple[FaturamentoMensalSchema, ...]:
     for uc in SAMPLE_UCS:
         for competencia in COMPETENCIAS:
             ano, mes = int(competencia[:4]), int(competencia[5:])
-            kwh = uc.consumo_medio_kwh_12m * _SAZONALIDADE_PCT[mes - 1] / 100 * _VOLUME[ano]
+            volume = (
+                _VOLUME_2024_DA_FILA.get(uc.cod_uc, _VOLUME[2024]) if ano == 2024 else _VOLUME[ano]
+            )
+            kwh = uc.consumo_medio_kwh_12m * _SAZONALIDADE_PCT[mes - 1] / 100 * volume
             # O painel solar da UC 0002 compensa todo o consumo de janeiro: kWh faturado
             # zero e tarifa média vazia, caso que o contrato prevê.
             if uc.cod_uc == "0002" and mes == 1:
@@ -459,7 +465,7 @@ def _interrupcoes_uc() -> tuple[InterrupcaoUcSchema, ...]:
 
 
 # Instalação do medidor vigente de cada UC. A UC 0003 tem o medidor da troca de 2025-03, a UC
-# 0005 tem o mais antigo (mais de 15 anos, um dos motivos da fila) e a UC 0004 não traz o modelo.
+# 0005 tem o mais antigo (e é eletromecânico, um dos motivos da fila) e a UC 0004 não traz o modelo.
 _INSTALACAO_MEDIDOR = {
     "0001": date(2018, 6, 12),
     "0002": date(2021, 9, 3),
@@ -800,26 +806,36 @@ SAMPLE_INSPECOES = (
     ),
 )
 
-# Fila de suspeitas, pela posição no ranking (1 = mais suspeita). A UC 0004 ainda não tem estimativa
-# de energia recuperável: o gerente de perdas vê a suspeita mesmo sem o valor.
+# Fila de suspeitas, pela posição no ranking (1 = mais suspeita), com a regra da DEC-030 aplicada
+# à própria amostra: pontos (queda de 30% ou mais: 3, de 15% a 30%: 1, medidor eletromecânico: 1,
+# 25% ou mais de leituras estimadas: 1) e depois a energia a recuperar (média anterior - recente).
+# O teste test_queue_follows_the_dec_030_rule confere este bloco contra o faturamento.
 SAMPLE_FILA = (
     FilaSuspeitaSchema(
         cod_uc="0005",
         score_suspeita=1,
-        motivos=["leituras estimadas em 3 dos últimos 6 meses", "medidor com mais de 15 anos"],
-        kwh_recuperavel_est=Decimal("1850.000"),
+        motivos=[
+            "Queda de 33% no consumo médio das 12 últimas competências contra as 12 anteriores",
+            "Medidor eletromecânico",
+            "25% das leituras das 12 últimas competências foram estimadas",
+        ],
+        kwh_recuperavel_est=Decimal("105.350"),
     ),
     FilaSuspeitaSchema(
         cod_uc="0007",
         score_suspeita=2,
-        motivos=["queda de 30% ou mais no consumo médio das últimas 12 competências"],
-        kwh_recuperavel_est=Decimal("4200.000"),
+        motivos=[
+            "Queda de 33% no consumo médio das 12 últimas competências contra as 12 anteriores"
+        ],
+        kwh_recuperavel_est=Decimal("1425.000"),
     ),
     FilaSuspeitaSchema(
         cod_uc="0004",
         score_suspeita=3,
-        motivos=["leituras estimadas em 2 dos últimos 6 meses"],
-        kwh_recuperavel_est=None,
+        motivos=[
+            "Queda de 20% no consumo médio das 12 últimas competências contra as 12 anteriores"
+        ],
+        kwh_recuperavel_est=Decimal("310.000"),
     ),
 )
 
