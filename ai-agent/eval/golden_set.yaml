@@ -27,8 +27,9 @@
 #          até a revisão independente por Dados.
 #   0.5.0  Revisão de Dados (27/10/2026), conferida na Gold v0.3: G019 passou de julho de 2022, que existe na
 #          Gold, para julho de 2021, que não existe; G010 passou a usar o DEC do grupo de alimentadores (DEC-032).
-#          Os outros itens que mudaram na 0.4.0 foram conferidos e ficam como estão. revisado_por continua nulo:
-#          quem confere o item escreve o próprio nome.
+#          Os outros itens que mudaram na 0.4.0 foram conferidos e ficam como estão. revisado_por foi preenchido (Alisson
+#          Ramos, Dados) em G041, G042, G043, G057 e G066, conferidos contra o texto do case e na Gold real; nos demais
+#          continua nulo até a conferência de quem escreve o próprio nome.
 versao: 0.5.0
 status: rascunho
 
@@ -415,7 +416,7 @@ itens:
     expected_status: answered
     follow_up_of: null
     notes: "Pergunta do case (planejamento §3, '10,5%'). A referência devolve as duas tarifas, que respondem 'subiu?'. A variação percentual é opcional, porque colunas extras do agente são ignoradas. Primeiro ano e últimos 12 meses saem das competências que existem (row_number). Tarifa é receita de energia (sem tributos) ÷ energia faturada (DEC-023). A resposta declara a suposição. Mudança de 0.2.0 para 0.4.0 (24/10/2026, feita depois de ver rodadas do modelo): (1) a referência usava 2024 e 2025 fixos, que não valem para a Gold real; agora usa os meses existentes (row_number), com o mesmo resultado na amostra. (2) Passou a devolver as duas tarifas, em vez de só a variação percentual. A mudança (2) é discutível, porque aproxima o gabarito da forma que o agente responde. Pendente de revisão por Dados."
-    revisado_por: null
+    revisado_por: "Alisson Ramos"
 
   - id: G042
     question: "A energia faturada caiu nos últimos 12 meses em relação ao primeiro ano da base?"
@@ -424,7 +425,7 @@ itens:
     expected_status: answered
     follow_up_of: null
     notes: "Pergunta do case: a energia faturada caiu cerca de 4%. A referência devolve os dois totais, que respondem 'caiu?'; a variação é opcional. Mesma janela de G041. A resposta declara os períodos usados. Mudança de 0.2.0 para 0.4.0 (24/10/2026, feita depois de ver rodadas do modelo): mesmos dois motivos de G041, com a energia faturada. Pendente de revisão por Dados."
-    revisado_por: null
+    revisado_por: "Alisson Ramos"
 
   - id: G043
     question: "A receita faturada subiu nos últimos 12 meses em relação ao primeiro ano da base?"
@@ -433,7 +434,7 @@ itens:
     expected_status: answered
     follow_up_of: null
     notes: "Pergunta do case: a receita subiu cerca de 8%. A referência devolve os dois totais, que respondem 'subiu?'; a variação é opcional. Usa a receita faturada, a suposição do glossário. Mesma janela de G041 e G042. Mudança de 0.2.0 para 0.4.0 (24/10/2026, feita depois de ver rodadas do modelo): mesmos dois motivos de G041, com a receita faturada. Pendente de revisão por Dados."
-    revisado_por: null
+    revisado_por: "Alisson Ramos"
 
   - id: G044
     question: "Qual bairro mais perdeu volume residencial no último ano?"
@@ -568,7 +569,7 @@ itens:
     expected_status: answered
     follow_up_of: null
     notes: "Versão da pergunta da Patrícia com os períodos. Suposição a declarar: queda = média mensal de 2025 contra a média de 2024, por UC. Queda acima de 30% = média atual abaixo de 70% da anterior. Mudança de 0.2.0 para 0.4.0 (24/10/2026, feita depois de ver rodadas do modelo): só a nota; a referência não mudou. Pendente de revisão por Dados."
-    revisado_por: null
+    revisado_por: "Alisson Ramos"
 
   - id: G058
     question: "Quanto a receita comercial cresceu em Jaboatão?"
@@ -651,4 +652,4 @@ itens:
     expected_status: answered
     follow_up_of: null
     notes: "Versão com períodos explícitos da pergunta do Henrique (G060). A pergunta pede só o efeito bandeira; o efeito preço e a variação total são contexto opcional para a resposta. Os efeitos são lidos e somados, nunca recalculados. A receita da decomposição é de energia, sem tributos (DEC-023). Mudança de 0.2.0 para 0.4.0 (24/10/2026, feita depois de ver rodadas do modelo): a referência pedia efeito preço e variação total, que a pergunta não pede. Agora devolve só o efeito bandeira. Pendente de revisão por Dados."
-    revisado_por: null
+    revisado_por: "Alisson Ramos"
