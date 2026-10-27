@@ -39,7 +39,10 @@ ModalidadeGd = Literal["geracao_propria_uc", "autoconsumo_remoto", "geracao_comp
 # Um período da decomposição, no formato do contrato: AAAA-MM/AAAA-MM, da primeira à última
 # competência.
 PeriodoDecomposicao = Annotated[
-    str, StringConstraints(pattern=r"^\d{4}-(0[1-9]|1[0-2])/\d{4}-(0[1-9]|1[0-2])$")
+    str,
+    StringConstraints(
+        strip_whitespace=True, pattern=r"^\d{4}-(0[1-9]|1[0-2])/\d{4}-(0[1-9]|1[0-2])$"
+    ),
 ]
 
 # Teto por pedido na ordem da capacidade mensal da equipe de campo (~200 inspeções):

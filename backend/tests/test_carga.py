@@ -228,17 +228,23 @@ def test_rejects_empty_required_cell(tmp_path: Path, engine: Engine) -> None:
         load_gold(tmp_path / "gold", engine)
 
 
+@pytest.mark.parametrize(
+    ("column", "valid", "invalid"),
+    [
+        ("periodo_base", "2024-01/2024-01", "2024-13/2024-13"),
+        ("periodo_atual", "2025-01/2025-01", "2025-13/2025-13"),
+    ],
+)
 def test_rejects_decomposition_period_outside_the_contract_format(
-    tmp_path: Path, engine: Engine
+    tmp_path: Path, engine: Engine, column: str, valid: str, invalid: str
 ) -> None:
     # Um par mal escrito passaria pela carga e derrubaria a rota de pares com 500: a carga
     # é o lugar de recusá-lo.
     write_sample(tmp_path / "gold", force=True)
     csv_path = tmp_path / "gold" / "gold_receita_decomposicao.csv"
     csv_path.write_text(
-        csv_path.read_text(encoding="utf-8").replace("2024-01/2024-01", "2024-13/2024-13", 1),
-        encoding="utf-8",
+        csv_path.read_text(encoding="utf-8").replace(valid, invalid, 1), encoding="utf-8"
     )
 
-    with pytest.raises(GoldLoadError, match="periodo_base"):
+    with pytest.raises(GoldLoadError, match=column):
         load_gold(tmp_path / "gold", engine)

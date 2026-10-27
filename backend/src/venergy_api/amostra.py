@@ -211,8 +211,9 @@ _KWH = Decimal("0.001")
 _CENTAVO = Decimal("0.01")
 # Consumo de cada mês, de janeiro a dezembro, em % da média (média 100): mais no verão.
 _SAZONALIDADE_PCT = (110, 112, 108, 100, 95, 90, 88, 90, 95, 100, 105, 107)
-# R$/kWh por classe. De 2024 para 2025 a tarifa sobe 8% e o consumo cai 3%, para a
-# decomposição ter efeito preço e efeito volume. 2025 fica com o consumo médio da dimensão.
+# R$/kWh por classe. De 2024 para 2025 a tarifa sobe 8% e o consumo cai 3% (mais nas UCs da
+# fila, ver _VOLUME_2024_DA_FILA), para a decomposição ter efeito preço e efeito volume.
+# 2025 fica com o consumo médio da dimensão.
 _TARIFA = {
     "B1": Decimal("0.85"),
     "B2": Decimal("0.62"),

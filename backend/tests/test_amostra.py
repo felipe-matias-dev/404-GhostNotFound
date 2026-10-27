@@ -10,6 +10,7 @@ from venergy_api.amostra import (
     SAMPLE,
     SAMPLE_FATURAMENTO,
     SAMPLE_FILA,
+    SAMPLE_INSPECOES,
     SAMPLE_MEDIDORES,
     SAMPLE_UCS,
     write_sample,
@@ -250,13 +251,21 @@ def test_queue_positions_start_at_one_without_gaps() -> None:
 def test_queue_follows_the_dec_030_rule() -> None:
     # A fila da amostra é a que a regra da DEC-030 produz sobre a própria amostra: entram as UCs
     # sem GD com queda de 15% ou mais (12 últimas competências contra as 12 anteriores), ordenadas
-    # por pontos e depois por energia a recuperar. Os motivos seguem o texto da Gold.
+    # por pontos e depois por energia a recuperar. Saem as UCs com irregularidade confirmada e as
+    # inspecionadas sem irregularidade nas 12 últimas competências. Os motivos seguem o texto do
+    # notebook da Gold do Alisson.
     recentes, anteriores = COMPETENCIAS[-12:], COMPETENCIAS[-24:-12]
     eletromecanicos = {m.cod_uc for m in SAMPLE_MEDIDORES if m.tipo_medidor == "eletromecanico"}
+    com_medidor = {m.cod_uc for m in SAMPLE_MEDIDORES}
+    fora_da_fila = {
+        i.cod_uc
+        for i in SAMPLE_INSPECOES
+        if i.resultado == "irregularidade_confirmada" or i.competencia >= recentes[0]
+    }
 
     esperado = []
     for uc in SAMPLE_UCS:
-        if uc.possui_gd:
+        if uc.possui_gd or uc.cod_uc not in com_medidor or uc.cod_uc in fora_da_fila:
             continue
         faturas = {f.competencia: f for f in SAMPLE_FATURAMENTO if f.cod_uc == uc.cod_uc}
         media_recente = sum(faturas[c].kwh_faturado for c in recentes) / 12
