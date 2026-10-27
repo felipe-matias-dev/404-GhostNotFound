@@ -286,15 +286,18 @@ export type Contribuinte = {
 export type Ranking = {
 	/** `false`: nenhum segmento caiu, e a lista traz as menores altas. */
 	houveQueda: boolean;
+	/** Quedas e total contam todos os segmentos, inclusive os que ficam fora do ranking em %. */
 	quedas: number;
 	total: number;
+	/** Vazio só em %, quando nenhum segmento da lista tem receita base. */
 	itens: Contribuinte[];
 };
 
 /**
  * Maiores contribuintes da queda no efeito escolhido, da maior queda para a menor. Só entram
  * segmentos que caíram; se nenhum caiu, a lista mostra quem subiu menos, sem chamar de queda.
- * Em %, segmento sem receita base fica de fora: não há base para comparar.
+ * Em %, segmento sem receita base fica fora da lista (não há base para comparar), mas continua
+ * contando como queda.
  */
 export function rankingDaQueda(
 	linhas: DecomposicaoLinha[],
@@ -303,6 +306,7 @@ export function rankingDaQueda(
 	limite = 5,
 ): Ranking {
 	const campo = EFEITO_CAMPO[efeito];
+	const quedas = linhas.filter((linha) => linha[campo] < 0).length;
 	const ordenados = linhas
 		.map((linha) => {
 			const pct = sobreABase(linha, efeito);
@@ -310,17 +314,17 @@ export function rankingDaQueda(
 			return { linha, valor: linha[campo], pct, chave };
 		})
 		.filter((c): c is typeof c & { chave: number } => c.chave !== null)
+		.filter((c) => !quedas || c.valor < 0)
 		.sort(
 			(a, b) =>
 				a.chave - b.chave || a.linha.segmento.localeCompare(b.linha.segmento),
 		);
-	const quedas = ordenados.filter((c) => c.chave < 0);
-	const escolhidos = (quedas.length ? quedas : ordenados).slice(0, limite);
+	const escolhidos = ordenados.slice(0, limite);
 	const maior = Math.max(0, ...escolhidos.map((c) => Math.abs(c.chave)));
 	return {
-		houveQueda: quedas.length > 0,
-		quedas: quedas.length,
-		total: ordenados.length,
+		houveQueda: quedas > 0,
+		quedas,
+		total: linhas.length,
 		itens: escolhidos.map(({ chave, ...c }) => ({
 			...c,
 			fracao: maior ? Math.abs(chave) / maior : 0,

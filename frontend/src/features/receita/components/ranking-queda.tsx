@@ -73,17 +73,24 @@ export function RankingQueda({
 	// A tabela logo abaixo já mostra erro (com nova tentativa) e o recorte vazio.
 	if (isError || data?.length === 0) return null;
 
-	// Em %, segmento sem receita base fica de fora; se só há desses (ex.: classe nova no
-	// bairro), a seção continua, com o botão para voltar ao R$.
-	const semBase = ranking?.total === 0;
-	const leitura = semBase
-		? "Sem receita base para comparar em %: veja em R$."
-		: ranking?.houveQueda
+	// Em %, segmento sem receita base fica fora da lista, mas não da contagem; se a lista fica
+	// vazia (ex.: a única queda é de uma classe nova no bairro), a seção continua, com o botão
+	// para voltar ao R$.
+	const semBase = ranking?.itens.length === 0;
+	const contagem =
+		ranking &&
+		(ranking.houveQueda
 			? `${ranking.quedas} de ${ranking.total} ${PLURAL[nivel]} ${
 					ranking.quedas === 1 ? "perdeu" : "perderam"
-				} receita${POR[efeito]}.`
-			: ranking &&
-				`${NENHUM[nivel]} perdeu receita${POR[efeito]}: abaixo, quem subiu menos.`;
+				} receita${POR[efeito]}`
+			: `${NENHUM[nivel]} perdeu receita${POR[efeito]}`);
+	const leitura =
+		contagem &&
+		(semBase
+			? `${contagem}. Sem receita base para comparar em %: veja em R$.`
+			: ranking?.houveQueda
+				? `${contagem}.`
+				: `${contagem}: abaixo, quem subiu menos.`);
 
 	return (
 		<section

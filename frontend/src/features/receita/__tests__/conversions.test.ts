@@ -172,10 +172,22 @@ describe("rankingDaQueda", () => {
 			"Recife",
 		);
 		const r = rankingDaQueda(linhas, "volume", "pct");
-		expect(r.total).toBe(2);
+		expect([r.quedas, r.total]).toEqual([3, 3]);
 		expect(r.itens.map((c) => [c.linha.segmento, c.pct, c.fracao])).toEqual([
 			["Olinda", -0.2, 1],
 			["Recife", -0.05, 0.25],
 		]);
+	});
+
+	it("em %, conta como queda o segmento sem receita base mesmo fora da lista", () => {
+		const linhas = [
+			linha("Recife", 1000, 0, 0, 0, 10),
+			linha("Olinda", 100, 0, 0, 0, 0),
+			linha("Nova", 0, 0, 0, 0, -800),
+		];
+		const r = rankingDaQueda(linhas, "mix", "pct");
+		expect(r.houveQueda).toBe(true);
+		expect([r.quedas, r.total]).toEqual([1, 3]);
+		expect(r.itens).toEqual([]);
 	});
 });
