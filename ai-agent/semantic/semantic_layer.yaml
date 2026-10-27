@@ -13,7 +13,7 @@
 # As linhas de exemplo são sintéticas, escritas à mão. Nenhum valor real da Gold entra aqui.
 # Depois de cada mudança, gere o views.sql (ver a seção Camada semântica em ai-agent/README.md).
 
-version: "0.3.4"
+version: "0.3.5"
 
 views:
   - name: sem_uc
@@ -68,7 +68,7 @@ views:
         description: "valor efetivamente pago da fatura"
       - name: tarifa_media
         unit: "R$/kWh"
-        description: "receita de energia dividida pela energia faturada, sem tributos; vazia quando a energia é zero"
+        description: "tarifa de uma UC numa competência: receita de energia dividida pela energia faturada, sem tributos; vazia quando a energia é zero. Não some nem faça média desta coluna entre UCs ou meses"
       - name: bandeira
         description: "bandeira tarifária da competência"
     sample_rows:
@@ -277,7 +277,7 @@ rules:
   - text: "Receita por classe do cadastro (comercial, poder público, residencial, rural, industrial) sai de sem_faturamento_mensal ligada a sem_uc por cod_uc, filtrando sem_uc.classe_cadastro. sem_receita_decomposicao não tem classe_cadastro: não a use para separar comercial de poder público, e não troque classe_cadastro por classe."
   - text: "Variação por UC entre dois períodos (quantas UCs subiram ou caíram mais de X%): calcule a média mensal de cada UC em cada período, numa CTE por período, junte por cod_uc e conte as UCs que passam do limite. Declare como suposição que a comparação usa a média mensal."
   - text: "Crescimento ou variação de receita entre dois períodos: devolva o total de cada período, a variação absoluta e a percentual, todas calculadas no SQL, com NULLIF no divisor."
-  - text: "Tarifa média é receita_energia ÷ kwh_faturado, sem tributos. Leia tarifa_media pronta; não recalcule."
+  - text: "Tarifa média é receita_energia ÷ kwh_faturado, sem tributos. Para uma UC numa competência, leia tarifa_media pronta. Para um período, classe, bairro, município ou qualquer grupo de UCs ou de meses, a tarifa é sum(receita_energia) / NULLIF(sum(kwh_faturado), 0); nunca avg(tarifa_media), que é média de razões e dá peso igual a UCs e meses de consumo diferente."
   - text: "Energia faturada é kwh_faturado, já líquida de geração distribuída."
   - text: "Competência é texto no formato AAAA-MM. Filtre por igualdade (competencia = '2025-03') ou por intervalo de texto (competencia BETWEEN '2025-01' AND '2025-03')."
   - text: "Não suponha quais competências existem. Consulte as views; se nenhuma linha atender ao filtro, o resultado vazio é a resposta."

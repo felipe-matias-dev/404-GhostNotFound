@@ -445,6 +445,29 @@ Primeira execução: `eval/runs/2026-10-24T033727Z.json`. Configuração: `gemin
 - **Provedor:** a rodada teve 37 respostas 503 do Gemini, absorvidas pelo backoff, sem `failed`. Elas inflam o p95.
 - **Fidelidade numérica:** segue no achado 5.
 
+**Rodada sobre a linha de base 1 (27/10/2026, `eval/runs/2026-10-27T012513Z.json`), achado 8:**
+- Camada semântica 0.3.5: `tarifa_media` vale para uma UC numa competência. A tarifa de um período ou de um grupo é `sum(receita_energia) / NULLIF(sum(kwh_faturado), 0)`, nunca `avg(tarifa_media)`.
+
+| Métrica | Linha de base 1 | Camada 0.3.5 |
+|---|---|---|
+| Execution accuracy | 97,4% | 97,4% |
+| Acurácia de status | 96,9% | **98,5%** |
+| Status nos `unknown` | 87,5% | 87,5% |
+| Taxa de `failed` | 0% | 0% |
+| Bloqueio de manipulação | 100% | 100% |
+| Fidelidade numérica | 63,4% | 65,0% |
+| Latência p50 / p95 | 2,5 / 18,9 s | 3,5 / 14,8 s |
+
+- **Regra de merge (DEC-016):** a execution accuracy se manteve e a acurácia de status subiu, então a mudança entra.
+- **Achado 8 resolvido:** G041 soma receita e energia antes de dividir e casa.
+- **G044** voltou a pedir esclarecimento para "no último ano", e a acurácia de status subiu. Nada nesta mudança toca a pergunta: é a oscilação já registrada.
+- **Achado 9 (aberto, G010), que mantém a execution accuracy igual:** a pergunta é "DEC médio em 2025 dos alimentadores com painel solar".
+  - O agente agora calcula o DEC do grupo no ano: horas somadas ÷ média mensal de UCs, como na regra de recortes e na DEC-032.
+  - A referência faz `avg(dec)` dos valores mensais por alimentador, justamente a média que a DEC-032 proíbe.
+  - O agente mudou de forma porque a regra nova ("nunca média de razões") se estende ao DEC. Pela DEC-032, a forma nova é a certa e a referência é que destoa.
+  - Não mudei o gabarito para não ajustar a referência à resposta do modelo. Fica para a revisão humana com Dados, junto da aprovação da DEC-032: ou a referência passa a usar o DEC do período, ou a pergunta deixa explícito "média dos DEC mensais".
+- **Continuam:** G062 e o status de R009 e R015, como na linha de base 1. A rodada teve 37 respostas 503, absorvidas pelo backoff.
+
 ## 10. Dependências de outras áreas
 
 Pedidos a abrir como issue para a área dona. O GenAI não altera esses arquivos.
