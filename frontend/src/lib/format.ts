@@ -11,6 +11,10 @@ const brlComSinal = new Intl.NumberFormat("pt-BR", {
 	signDisplay: "exceptZero",
 });
 const inteiro = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 });
+const inteiroComSinal = new Intl.NumberFormat("pt-BR", {
+	maximumFractionDigits: 0,
+	signDisplay: "exceptZero",
+});
 const percentual = new Intl.NumberFormat("pt-BR", {
 	style: "percent",
 	maximumFractionDigits: 1,
@@ -52,9 +56,11 @@ export function formatBRL(valor: Valor, { sinal = false } = {}): string {
 	return (sinal ? brlComSinal : brl).format(valor);
 }
 
-/** 1234.5 → "1.235 kWh" */
-export function formatKWh(valor: Valor): string {
-	return valor == null ? VAZIO : `${inteiro.format(valor)} kWh`;
+/** 1234.5 → "1.235 kWh"; com sinal: "+1.235 kWh" */
+export function formatKWh(valor: Valor, { sinal = false } = {}): string {
+	return valor == null
+		? VAZIO
+		: `${(sinal ? inteiroComSinal : inteiro).format(valor)} kWh`;
 }
 
 /** Fração → percentual: -0.039 → "-3,9%"; com sinal, 0.039 → "+3,9%" */

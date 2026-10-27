@@ -61,7 +61,8 @@ export type WaterfallChartProps = {
 	steps?: WaterfallStep[];
 	/** Frase de leitura rápida, acima das barras. */
 	summary?: ReactNode;
-	formatValue?: (value: number) => string;
+	/** Com `sinal`, "+" na alta e "-" na queda, decidido sobre o valor já arredondado. */
+	formatValue?: (value: number, options?: { sinal?: boolean }) => string;
 	/** Complemento do título do tooltip da variação líquida ("Diferença vs. início"). */
 	compareLabel?: string;
 	/** Cabeçalho (lido pelo leitor de tela) da coluna de percentual sobre o primeiro total. */
@@ -313,10 +314,9 @@ export function WaterfallChart({
 						const net = isLastTotal && base !== null ? bar.end - base : null;
 						const netTone =
 							net === null || net === 0 ? "flat" : net > 0 ? "up" : "down";
-						const signed =
-							bar.step.kind === "delta" && bar.step.value > 0
-								? `+${formatValue(bar.step.value)}`
-								: formatValue(bar.step.value);
+						const signed = formatValue(bar.step.value, {
+							sinal: bar.step.kind === "delta",
+						});
 						const value = (
 							<span className={cn("text-body", VALUE_TONE[t])}>{signed}</span>
 						);
@@ -436,8 +436,7 @@ export function WaterfallChart({
 																	VALUE_TONE[netTone],
 																)}
 															>
-																{net > 0 ? "+" : ""}
-																{formatValue(net)} ·{" "}
+																{formatValue(net, { sinal: true })} ·{" "}
 																{formatPct(net / base, { sinal: true })}
 															</span>
 															<span className="text-text-muted">
