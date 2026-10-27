@@ -247,7 +247,7 @@ export type Efeito = (typeof EFEITOS)[number];
 
 export type Causa = Exclude<Efeito, "variacao">;
 
-const CAUSAS: Causa[] = ["tarifa", "bandeira", "volume", "mix"];
+export const CAUSAS: Causa[] = ["tarifa", "bandeira", "volume", "mix"];
 
 export const EFEITO_CAMPO: Record<Efeito, CampoValor> = {
 	variacao: "variacao_receita",

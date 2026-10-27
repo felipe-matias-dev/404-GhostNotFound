@@ -7,8 +7,10 @@ import {
 import { formatBRL, formatPct } from "#/lib/format";
 import { cn } from "#/lib/utils";
 import {
+	CAUSAS,
 	type CampoValor,
 	EFEITO_CAMPO,
+	EFEITO_ROTULO,
 	type Efeito,
 	filtroAoAbrir,
 	NIVEL_ROTULO,
@@ -60,14 +62,6 @@ const VARIACAO_PCT: DataTableColumn<DecomposicaoLinha> = {
 	},
 };
 
-// Efeitos na ordem da ponte. O efeito preço fica de fora: é tarifa + bandeira.
-const EFEITOS_DA_PONTE: [CampoValor, string][] = [
-	["efeito_tarifa", "Tarifa"],
-	["efeito_bandeira", "Bandeira"],
-	["efeito_volume", "Volume"],
-	["efeito_mix", "Mix"],
-];
-
 /** Escolher uma causa na ponte ordena pela coluna dela, da maior queda para a maior alta. */
 const ordemDo = (efeito: Efeito): SortState | null =>
 	efeito === "variacao"
@@ -104,7 +98,6 @@ export function DecomposicaoTable({
 		setOrdem(ordemDo(efeito));
 	}
 
-	const campoDestacado = EFEITO_CAMPO[efeito];
 	const colunas: DataTableColumn<DecomposicaoLinha>[] = [
 		{
 			id: "segmento",
@@ -116,8 +109,9 @@ export function DecomposicaoTable({
 		valor("receita_atual", "Receita atual", false),
 		valor("variacao_receita", "Variação", true),
 		VARIACAO_PCT,
-		...EFEITOS_DA_PONTE.map(([campo, header]) =>
-			valor(campo, header, campo === campoDestacado),
+		// Efeitos na ordem e com os nomes da ponte. O efeito preço fica de fora: é tarifa + bandeira.
+		...CAUSAS.map((causa) =>
+			valor(EFEITO_CAMPO[causa], EFEITO_ROTULO[causa], causa === efeito),
 		),
 	];
 
