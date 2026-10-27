@@ -120,6 +120,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/continuidade/alimentadores/mensal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Serie Alimentadores
+         * @description DEC e FEC de cada alimentador por competência, como a Gold calculou.
+         */
+        get: operations["get_serie_alimentadores_continuidade_alimentadores_mensal_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/continuidade/alimentadores/ranking": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Ranking Alimentadores
+         * @description Os piores alimentadores do período, pelo DEC ou pelo FEC.
+         */
+        get: operations["get_ranking_alimentadores_continuidade_alimentadores_ranking_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/continuidade/recortes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Recortes
+         * @description DEC e FEC por município, por bairro de um município ou por alimentador de um bairro.
+         */
+        get: operations["get_recortes_continuidade_recortes_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/fila-suspeitas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Fila
+         * @description A fila da mais para a menos suspeita, com a ordem ativa de cada UC.
+         */
+        get: operations["get_fila_fila_suspeitas_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/ordens-inspecao": {
         parameters: {
             query?: never;
@@ -194,6 +274,26 @@ export interface components {
             variacao_kwh_pct: number | null;
             /** Variacao Receita Pct */
             variacao_receita_pct: number | null;
+        };
+        /**
+         * ContinuidadeAlimentadorMensalSchema
+         * @description DEC e FEC de um alimentador numa competência.
+         */
+        ContinuidadeAlimentadorMensalSchema: {
+            /** Cod Alimentador */
+            cod_alimentador: string;
+            /** Competencia */
+            competencia: string;
+            /** Dec */
+            dec: number;
+            /** Fec */
+            fec: number;
+            /** N Uc */
+            n_uc: number;
+            /** N Interrupcoes */
+            n_interrupcoes: number;
+            /** Horas Interrompidas */
+            horas_interrompidas: number;
         };
         /**
          * CriarOrdensSchema
@@ -298,6 +398,35 @@ export interface components {
              */
             ocorrido_em: string;
         };
+        /**
+         * FilaItemSchema
+         * @description Uma UC da fila e a ordem ativa dela, para a tela não oferecer o que daria 409.
+         */
+        FilaItemSchema: {
+            /** Cod Uc */
+            cod_uc: string;
+            /** Score Suspeita */
+            score_suspeita: number;
+            /** Motivos */
+            motivos: string[];
+            /** Kwh Recuperavel Est */
+            kwh_recuperavel_est: number | null;
+            ordem_ativa: components["schemas"]["OrdemAtivaSchema"] | null;
+        };
+        /**
+         * FilaPaginaSchema
+         * @description Uma página da fila pela posição no ranking, e quantas UCs a fila tem no filtro.
+         */
+        FilaPaginaSchema: {
+            /** Itens */
+            itens: components["schemas"]["FilaItemSchema"][];
+            /** Total */
+            total: number;
+            /** Pagina */
+            pagina: number;
+            /** Tamanho */
+            tamanho: number;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -324,6 +453,15 @@ export interface components {
             n_chamados: number | null;
             /** Satisfacao Media */
             satisfacao_media: number | null;
+        };
+        /**
+         * OrdemAtivaSchema
+         * @description A ordem de inspeção que já ocupa a UC (gerada ou em campo).
+         */
+        OrdemAtivaSchema: {
+            /** Id */
+            id: number;
+            status: components["schemas"]["StatusOrdem"];
         };
         /**
          * OrdemDetalheSchema
@@ -381,6 +519,79 @@ export interface components {
             periodo_base: string;
             /** Periodo Atual */
             periodo_atual: string;
+        };
+        /** RankingAlimentadorSchema */
+        RankingAlimentadorSchema: {
+            /** Dec */
+            dec: number | null;
+            /** Fec */
+            fec: number | null;
+            /** Horas Interrompidas */
+            horas_interrompidas: number;
+            /** N Interrupcoes */
+            n_interrupcoes: number;
+            /** N Uc Medio */
+            n_uc_medio: number | null;
+            /** Cod Alimentador */
+            cod_alimentador: string;
+        };
+        /**
+         * RankingContinuidadeSchema
+         * @description Os alimentadores do pior para o melhor, e quantos meses entraram na média.
+         */
+        RankingContinuidadeSchema: {
+            /** Inicio */
+            inicio: string;
+            /** Fim */
+            fim: string;
+            /**
+             * Criterio
+             * @enum {string}
+             */
+            criterio: "dec" | "fec";
+            /** N Meses */
+            n_meses: number;
+            /** Alimentadores */
+            alimentadores: components["schemas"]["RankingAlimentadorSchema"][];
+        };
+        /** RecorteContinuidadeSchema */
+        RecorteContinuidadeSchema: {
+            /** Dec */
+            dec: number | null;
+            /** Fec */
+            fec: number | null;
+            /** Horas Interrompidas */
+            horas_interrompidas: number;
+            /** N Interrupcoes */
+            n_interrupcoes: number;
+            /** N Uc Medio */
+            n_uc_medio: number | null;
+            /** Segmento */
+            segmento: string;
+        };
+        /**
+         * RecortesContinuidadeSchema
+         * @description DEC e FEC do nível abaixo do filtro, do pior para o melhor.
+         */
+        RecortesContinuidadeSchema: {
+            /** Inicio */
+            inicio: string;
+            /** Fim */
+            fim: string;
+            /**
+             * Criterio
+             * @enum {string}
+             */
+            criterio: "dec" | "fec";
+            /**
+             * Nivel
+             * @enum {string}
+             */
+            nivel: "municipio" | "bairro" | "alimentador";
+            /** N Meses */
+            n_meses: number;
+            /** Recortes */
+            recortes: components["schemas"]["RecorteContinuidadeSchema"][];
         };
         /**
          * ResultadoOrdem
@@ -601,6 +812,141 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DecomposicaoLinhaSchema"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_serie_alimentadores_continuidade_alimentadores_mensal_get: {
+        parameters: {
+            query?: {
+                inicio?: string | null;
+                fim?: string | null;
+                cod_alimentador?: string[];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContinuidadeAlimentadorMensalSchema"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_ranking_alimentadores_continuidade_alimentadores_ranking_get: {
+        parameters: {
+            query: {
+                inicio: string;
+                fim: string;
+                criterio?: "dec" | "fec";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RankingContinuidadeSchema"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_recortes_continuidade_recortes_get: {
+        parameters: {
+            query: {
+                inicio: string;
+                fim: string;
+                criterio?: "dec" | "fec";
+                municipio?: string | null;
+                bairro?: string | null;
+                classe?: ("B1" | "B2" | "B3" | "A4") | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecortesContinuidadeSchema"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_fila_fila_suspeitas_get: {
+        parameters: {
+            query?: {
+                pagina?: number;
+                tamanho?: number;
+                sem_ordem_ativa?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FilaPaginaSchema"];
                 };
             };
             /** @description Validation Error */

@@ -5,7 +5,16 @@ import pytest
 from sqlalchemy import Engine, func, select
 from sqlalchemy.orm import Session
 
-from venergy_api.amostra import COMPETENCIAS, SAMPLE, SAMPLE_FILA, write_sample
+from venergy_api.amostra import (
+    COMPETENCIAS,
+    SAMPLE,
+    SAMPLE_FATURAMENTO,
+    SAMPLE_FILA,
+    SAMPLE_INSPECOES,
+    SAMPLE_MEDIDORES,
+    SAMPLE_UCS,
+    write_sample,
+)
 from venergy_api.carga import load_gold
 from venergy_api.models import (
     AtendimentoUc,
@@ -239,6 +248,54 @@ def test_queue_positions_start_at_one_without_gaps() -> None:
     assert positions == list(range(1, len(SAMPLE_FILA) + 1))
 
 
+def test_queue_follows_the_dec_030_rule() -> None:
+    # A fila da amostra é a que a regra da DEC-030 produz sobre a própria amostra: entram as UCs
+    # sem GD com queda de 15% ou mais (12 últimas competências contra as 12 anteriores), ordenadas
+    # por pontos e depois por energia a recuperar. Saem as UCs com irregularidade confirmada e as
+    # inspecionadas sem irregularidade nas 12 últimas competências. Os motivos seguem o texto do
+    # notebook da Gold do Alisson.
+    recentes, anteriores = COMPETENCIAS[-12:], COMPETENCIAS[-24:-12]
+    eletromecanicos = {m.cod_uc for m in SAMPLE_MEDIDORES if m.tipo_medidor == "eletromecanico"}
+    com_medidor = {m.cod_uc for m in SAMPLE_MEDIDORES}
+    fora_da_fila = {
+        i.cod_uc
+        for i in SAMPLE_INSPECOES
+        if i.resultado == "irregularidade_confirmada" or i.competencia >= recentes[0]
+    }
+
+    esperado = []
+    for uc in SAMPLE_UCS:
+        if uc.possui_gd or uc.cod_uc not in com_medidor or uc.cod_uc in fora_da_fila:
+            continue
+        faturas = {f.competencia: f for f in SAMPLE_FATURAMENTO if f.cod_uc == uc.cod_uc}
+        media_recente = sum(faturas[c].kwh_faturado for c in recentes) / 12
+        media_anterior = sum(faturas[c].kwh_faturado for c in anteriores) / 12
+        queda = float(1 - media_recente / media_anterior)
+        if queda < 0.15:
+            continue
+        estimadas = sum(faturas[c].tipo_leitura == "estimada" for c in recentes) / 12
+        motivos = [f"Queda de {queda * 100:.0f}% no consumo médio das 12 últimas competências"]
+        motivos[0] += " contra as 12 anteriores"
+        pontos = 3 if queda >= 0.30 else 1
+        if uc.cod_uc in eletromecanicos:
+            motivos.append("Medidor eletromecânico")
+            pontos += 1
+        if estimadas >= 0.25:
+            motivos.append(
+                f"{estimadas * 100:.0f}% das leituras das 12 últimas competências foram estimadas"
+            )
+            pontos += 1
+        esperado.append((pontos, media_anterior - media_recente, uc.cod_uc, motivos))
+    esperado.sort(key=lambda item: (-item[0], -item[1]))
+
+    na_fila = sorted(SAMPLE_FILA, key=lambda suspeita: suspeita.score_suspeita)
+    assert [s.cod_uc for s in na_fila] == [cod_uc for _, _, cod_uc, _ in esperado]
+    assert [s.motivos for s in na_fila] == [motivos for _, _, _, motivos in esperado]
+    for suspeita, (_, recuperavel, _, _) in zip(na_fila, esperado, strict=True):
+        assert suspeita.kwh_recuperavel_est is not None
+        assert abs(suspeita.kwh_recuperavel_est - recuperavel) <= Decimal("0.001")
+
+
 def test_does_not_overwrite_existing_csv_without_force(tmp_path: Path) -> None:
     existing = tmp_path / "gold" / "gold_dim_uc.csv"
     existing.parent.mkdir()
@@ -298,7 +355,7 @@ def test_segment_invoice_and_reading_components_add_up_to_the_billing(
     assert recortes == faturas
     # A amostra exercita a situação das faturas e as leituras estimadas.
     assert sum(valores[1] for valores in recortes.values()) > 0
-    assert sum(valores[5] for valores in recortes.values()) > 0
+    assert sum(valores[6] for valores in recortes.values()) > 0
 
 
 def test_occurrences_add_up_to_the_feeder_continuity(tmp_path: Path, engine: Engine) -> None:
