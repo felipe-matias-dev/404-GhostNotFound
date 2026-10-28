@@ -44,6 +44,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | 24/10/2026 | DEC-032 (proposta): DEC e FEC de um período de vários meses somam os valores mensais, nunca a média | Indicador de continuidade é acumulado; a média dos meses subestima o período e o agente alternava entre as duas formas | Luis Felipe |
 | 26/10/2026 | DEC-033: DEC e FEC de um período saem da soma dos componentes ÷ média mensal de UCs, no backend, com rotas por alimentador, ranking e recortes; fila de suspeitas paginada com a ordem de inspeção ativa; API 0.6.0 | DEC e FEC não se somam nem se tiram a média entre recortes; a fila mostra quais UCs já têm ordem, para a tela não oferecer o que daria 409 | Felipe |
 | 27/10/2026 | DEC-034: cada resposta do agente de IA é gravada em `app.ai_auditoria` (qualquer status) por `POST /ai/ask`, e lida por `GET /ai/audit/{id}`; sem a chave do Gemini a API sobe e o `/ai` responde 503; API 0.7.0 | A auditoria só serve se ninguém recebe uma resposta que não dá para conferir depois; e a chave ausente não pode derrubar o `/health` nem as telas | Felipe |
+| 27/10/2026 | DEC-039: Workflow do Databricks com os notebooks lidos do GitHub (`main`), serverless, Landing → Bronze → Silver → Gold + export, reprocessando tudo (diverge da ADR-07); agendamento mensal no dia 6, pausado | Roda o código revisado e mantém o tudo ou nada de cada camada numa extração única; a origem fecha o faturamento uma vez por mês | Arthur |
 
 ## DEC-001 · Localização dos arquivos de origem (landing)
 
@@ -1119,3 +1120,33 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Alternativa descartada:** Recharts (o gráfico do shadcn) ou outra biblioteca completa. A troca entre mês a mês e ano a ano
   redesenharia o gráfico do zero em vez de mudar a forma das linhas, o tema e a acessibilidade seguiriam o modelo dela e o
   bundle cresceria para fazer o que duas bibliotecas pequenas do d3 já fazem.
+
+## DEC-039 · Workflow do Databricks e agendamento mensal
+
+- **Data:** 27/10/2026 · **Área:** Dados · **Autor:** Arthur · **Atende:** D1-08 e D1-11
+- **Decisão:** o Job `v_energy_workflow` ([`data-engineering/workflow/v_energy_workflow.yaml`](../data-engineering/workflow/v_energy_workflow.yaml))
+  roda três tasks em sequência, `landing_to_bronze` → `bronze_to_silver` → `silver_to_gold_export`, com os notebooks lidos do
+  GitHub (branch `main`) e compute serverless. Cada task passa `gravar = sim`, e a da Gold também `exportar_csv = sim` e
+  `schema_gold = gold`. Timeout de 2h e fila ligada, para um segundo disparo esperar o primeiro em vez de gravar as mesmas tabelas
+  ao mesmo tempo.
+- **Por que o Git como fonte:** o Job roda o código revisado em PR, não uma cópia do workspace, e a Gold gravada fica rastreável
+  a um commit da `main`.
+- **Reprocessamento completo, e não incremental:** cada run relê todos os arquivos da landing e regrava as três camadas (full
+  refresh, como na DEC-008). Isso **diverge da ADR-07**, que previa ingestão incremental por competência. O motivo: o dataset do
+  case é uma extração única, o run completo leva cerca de 15 minutos, e o full refresh mantém o tudo ou nada de cada camada (as
+  travas e o Resumo de cada notebook validam a tabela inteira). A carga incremental por competência fica como evolução para
+  produção, quando o volume mensal justificar.
+- **Agendamento:** mensal, no dia 6 às 03h (`America/Fortaleza`, mesmo fuso do Recife, UTC-03 sem horário de verão; a interface do Job não oferece `America/Recife`). Os sistemas de origem só geram dado novo uma vez por mês, então
+  rodar todo dia gastaria compute sem dado novo. **Suposição:** o fechamento do ciclo de faturamento termina até D+5; o case não
+  informa esse prazo, o número vem do exemplo da ADR-07. O agendamento fica **pausado**, porque o dataset do case é uma extração
+  única.
+- **Falhas:** o Resumo de cada notebook dá erro se alguma tabela falhar, e o Job para na primeira task com erro, sem gravar as
+  camadas seguintes.
+- **Limitação conhecida:** a conferência pós-gravação da Bronze (DEC-008) compara as duas últimas gravações de cada tabela por
+  time travel. O VACUUM automático do Databricks (predictive optimization) apaga os arquivos antigos depois de 7 dias
+  (`deletedFileRetentionDuration`). Se a última gravação tiver mais de 7 dias, a task `landing_to_bronze` grava a Bronze e falha
+  nessa comparação; o run seguinte passa, porque compara duas gravações recentes. Com dado novo, as duas gravações nem deveriam
+  ser iguais, então essa checagem falharia em todo run mensal.
+- **Para produção:** despausar o agendamento depende de tornar essa comparação opcional no Job (por exemplo, um widget
+  `exigir_idempotencia = nao`), mantendo a conferência contra a origem. Fica para um PR próprio, combinado com o autor do
+  `Landing_to_Bronze`.
