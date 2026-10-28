@@ -202,6 +202,48 @@ def test_cancelled_order_cannot_be_reopened(client: TestClient) -> None:
     assert client.get(f"/ordens-inspecao/{ordem['id']}").json()["status"] == "CANCELADA"
 
 
+def test_order_sent_to_the_field_by_mistake_goes_back_to_generated_keeping_the_history(
+    client: TestClient,
+) -> None:
+    [ordem] = create_orders(client, "0001")
+    change(client, ordem["id"], status="EM_CAMPO")
+
+    response = change(client, ordem["id"], status="GERADA", observacao="Enviada por engano")
+
+    assert response.status_code == 200
+    devolvida = response.json()
+    assert devolvida["status"] == "GERADA"
+    assert [(e["status_anterior"], e["status_novo"]) for e in devolvida["eventos"]] == [
+        (None, "GERADA"),
+        ("GERADA", "EM_CAMPO"),
+        ("EM_CAMPO", "GERADA"),
+    ]
+    assert devolvida["eventos"][-1]["observacao"] == "Enviada por engano"
+
+
+def test_order_that_went_back_to_generated_can_be_sent_to_the_field_again(
+    client: TestClient,
+) -> None:
+    [ordem] = create_orders(client, "0001")
+    change(client, ordem["id"], status="EM_CAMPO")
+    change(client, ordem["id"], status="GERADA")
+
+    response = change(client, ordem["id"], status="EM_CAMPO")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "EM_CAMPO"
+
+
+def test_order_that_went_back_to_generated_still_holds_the_uc(client: TestClient) -> None:
+    [ordem] = create_orders(client, "0001")
+    change(client, ordem["id"], status="EM_CAMPO")
+    assert change(client, ordem["id"], status="GERADA").status_code == 200
+
+    response = client.post("/ordens-inspecao", json={"cod_ucs": ["0001"]})
+
+    assert response.status_code == 409
+
+
 def test_cancelling_keeps_the_reason_and_frees_the_uc_for_a_new_order(
     client: TestClient,
 ) -> None:
