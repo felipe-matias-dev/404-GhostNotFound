@@ -10,9 +10,34 @@ const brlComSinal = new Intl.NumberFormat("pt-BR", {
 	currency: "BRL",
 	signDisplay: "exceptZero",
 });
+// Compacto para números de destaque: 45712401.17 → "R$ 45,7 mi".
+const brlCompacto = new Intl.NumberFormat("pt-BR", {
+	style: "currency",
+	currency: "BRL",
+	notation: "compact",
+	minimumFractionDigits: 0,
+	maximumFractionDigits: 1,
+});
+const brlCompactoComSinal = new Intl.NumberFormat("pt-BR", {
+	style: "currency",
+	currency: "BRL",
+	notation: "compact",
+	minimumFractionDigits: 0,
+	maximumFractionDigits: 1,
+	signDisplay: "exceptZero",
+});
 const inteiro = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 });
 const inteiroComSinal = new Intl.NumberFormat("pt-BR", {
 	maximumFractionDigits: 0,
+	signDisplay: "exceptZero",
+});
+const numeroCompacto = new Intl.NumberFormat("pt-BR", {
+	notation: "compact",
+	maximumFractionDigits: 1,
+});
+const numeroCompactoComSinal = new Intl.NumberFormat("pt-BR", {
+	notation: "compact",
+	maximumFractionDigits: 1,
 	signDisplay: "exceptZero",
 });
 const percentual = new Intl.NumberFormat("pt-BR", {
@@ -25,6 +50,7 @@ const percentualComSinal = new Intl.NumberFormat("pt-BR", {
 	signDisplay: "exceptZero",
 });
 const decimal1 = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1 });
+const decimal2 = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 2 });
 // Datas sem hora ("2025-03-10") são interpretadas em UTC; formatar em UTC evita mostrar o dia anterior.
 const data = new Intl.DateTimeFormat("pt-BR", { timeZone: "UTC" });
 // Instantes com fuso ("2026-10-23T13:30:26Z") ficam no fuso de quem vê a tela.
@@ -33,7 +59,8 @@ const dataHora = new Intl.DateTimeFormat("pt-BR", {
 	timeStyle: "short",
 });
 
-const MESES = [
+/** Abreviações de mês de `#/lib/format`: rótulos de eixo e de calendário. */
+export const MESES = [
 	"jan",
 	"fev",
 	"mar",
@@ -50,17 +77,46 @@ const MESES = [
 
 type Valor = number | null | undefined;
 
-/** 1234.5 → "R$ 1.234,50"; com sinal: "+R$ 1.234,50" */
-export function formatBRL(valor: Valor, { sinal = false } = {}): string {
+/** 1234.5 → "R$ 1.234,50"; com sinal: "+R$ 1.234,50"; compacto: 45712401 → "R$ 45,7 mi" */
+export function formatBRL(
+	valor: Valor,
+	{ sinal = false, compacto = false } = {},
+): string {
 	if (valor == null) return VAZIO;
+	if (compacto)
+		return (sinal ? brlCompactoComSinal : brlCompacto).format(valor);
 	return (sinal ? brlComSinal : brl).format(valor);
 }
 
-/** 1234.5 → "1.235 kWh"; com sinal: "+1.235 kWh" */
-export function formatKWh(valor: Valor, { sinal = false } = {}): string {
-	return valor == null
-		? VAZIO
-		: `${(sinal ? inteiroComSinal : inteiro).format(valor)} kWh`;
+/** 1234.5 → "1.235 kWh"; com sinal: "+1.235 kWh"; compacto: 12345678 → "12,3 mi kWh" */
+export function formatKWh(
+	valor: Valor,
+	{ sinal = false, compacto = false } = {},
+): string {
+	if (valor == null) return VAZIO;
+	const numero = compacto
+		? sinal
+			? numeroCompactoComSinal
+			: numeroCompacto
+		: sinal
+			? inteiroComSinal
+			: inteiro;
+	return `${numero.format(valor)} kWh`;
+}
+
+/** Número sem unidade, até uma casa: 12.43 → "12,4"; 1234 → "1.234" */
+export function formatNumero(valor: Valor): string {
+	return valor == null ? VAZIO : decimal1.format(valor);
+}
+
+/** Índice por unidade consumidora, até duas casas (FEC): 0.347 → "0,35" */
+export function formatIndice(valor: Valor): string {
+	return valor == null ? VAZIO : decimal2.format(valor);
+}
+
+/** Horas, até duas casas (DEC): 1.254 → "1,25 h" */
+export function formatHoras(valor: Valor): string {
+	return valor == null ? VAZIO : `${decimal2.format(valor)} h`;
 }
 
 /** Fração → percentual: -0.039 → "-3,9%"; com sinal, 0.039 → "+3,9%" */
@@ -77,6 +133,21 @@ export function formatCompetencia(
 	const match = /^(\d{4})-(\d{2})$/.exec(competencia);
 	const mes = match ? MESES[Number(match[2]) - 1] : undefined;
 	return match && mes ? `${mes}/${match[1]}` : competencia;
+}
+
+/** Competência "2025-03" → "mar 25": rótulo de eixo, onde cabe pouco */
+export function formatCompetenciaCurta(
+	competencia: string | null | undefined,
+): string {
+	if (!competencia) return VAZIO;
+	const match = /^\d{2}(\d{2})-(\d{2})$/.exec(competencia);
+	const mes = match ? MESES[Number(match[2]) - 1] : undefined;
+	return match && mes ? `${mes} ${match[1]}` : competencia;
+}
+
+/** Número do mês (1 a 12) → "mar" */
+export function formatMes(mes: number): string {
+	return MESES[mes - 1] ?? VAZIO;
 }
 
 /** Período "2024-01/2024-12" → "jan/2024 a dez/2024" */

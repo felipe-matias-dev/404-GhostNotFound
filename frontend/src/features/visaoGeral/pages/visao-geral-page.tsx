@@ -1,7 +1,80 @@
+import { getRouteApi } from "@tanstack/react-router";
 import { Pagina } from "#/components/layout/pagina";
+import { ComparacaoPicker } from "../components/comparacao-picker";
+import { IndicadoresCards } from "../components/indicadores-cards";
+import { TendenciaPainel } from "../components/tendencia-painel";
+import { parEscolhido } from "../conversions";
+import {
+	useComparacaoIndicadores,
+	useCompetencias,
+} from "../hooks/use-indicadores";
+import type { ParPeriodos } from "../types";
+
+const route = getRouteApi("/");
 
 export function VisaoGeralPage() {
+	const { periodo_base, periodo_atual, indicador, tendencia } =
+		route.useSearch();
+	const navigate = route.useNavigate();
+
+	// O par da URL só vale se os dois meses existem na série; senão, o padrão.
+	const competencias = useCompetencias();
+	const par = competencias.data
+		? parEscolhido(competencias.data, periodo_base, periodo_atual)
+		: undefined;
+	const comparacao = useComparacaoIndicadores(par);
+
+	const escolher = (proximo: ParPeriodos) =>
+		navigate({
+			search: (atual) => ({
+				...atual,
+				periodo_base: proximo.periodo_base,
+				periodo_atual: proximo.periodo_atual,
+			}),
+			resetScroll: false,
+		});
+
+	// Série carregada sem nenhum par possível (menos de dois meses): não há o que comparar.
+	const semDados = Boolean(competencias.data) && !par;
 	return (
-		<Pagina descricao="Indicadores do mês de receita, consumo, rede e atendimento, com a variação contra o período anterior." />
+		<Pagina className="min-h-full max-w-none">
+			<div className="flex justify-end">
+				<ComparacaoPicker
+					competencias={competencias.data ?? []}
+					par={par}
+					onEscolher={escolher}
+					semPeriodos={competencias.isError || semDados}
+				/>
+			</div>
+			<IndicadoresCards
+				comparacao={comparacao.data}
+				par={par}
+				carregando={competencias.isPending}
+				erro={
+					competencias.isError
+						? "Não foi possível carregar os indicadores."
+						: null
+				}
+				semDados={semDados}
+				onRetry={() => competencias.refetch()}
+			/>
+			<TendenciaPainel
+				indicador={indicador ?? "receita_faturada"}
+				visao={tendencia ?? "mes"}
+				par={par}
+				onIndicador={(proximo) =>
+					navigate({
+						search: (atual) => ({ ...atual, indicador: proximo }),
+						resetScroll: false,
+					})
+				}
+				onVisao={(proxima) =>
+					navigate({
+						search: (atual) => ({ ...atual, tendencia: proxima }),
+						resetScroll: false,
+					})
+				}
+			/>
+		</Pagina>
 	);
 }

@@ -47,6 +47,7 @@ compõem os de `ui/` com dados da API.
 ```tsx
 // src/components/ui/kpi-card/kpi-card.stories.tsx
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { formatBRL } from "#/lib/format";
 import { KpiCard } from "./kpi-card";
 
 const meta = {
@@ -58,13 +59,17 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Padrao: Story = { args: { titulo: "Receita", valor: 1250000 } };
-export const Carregando: Story = { args: { ...Padrao.args, carregando: true } };
+export const Padrao: Story = {
+	args: { label: "Receita faturada", value: 45_712_401.17, format: formatBRL },
+};
+export const Carregando: Story = {
+	args: { ...Padrao.args, value: undefined, loading: true },
+};
 ```
 
 ## Previstos (V2-02)
 
-`KpiCard` (valor + variação vs período), `SeriesChart` e `FilterBar`.
+`SeriesChart` e `FilterBar`.
 
 Prontos: `DataTable` (**Componentes/DataTable**): ordenação com as linhas viajando até a
 nova posição (Sortable Table do interior.dev), paginação, seleção múltipla, lista de cards
@@ -82,3 +87,10 @@ variação líquida aparece na barra (alta preenchida, queda só contornada), co
 (`compareLabel`); eixo ampliado com corte nas barras de total quando o zero fica longe, barras
 que deslizam ao trocar de dados e uma tabela por baixo para o leitor de tela; abaixo de 28rem de
 container, o valor sobe e a barra ocupa a largura toda.
+`KpiCard` (**Componentes/KpiCard**): rótulo, número e variação, nesta ordem. A unidade sai em
+`font-sans` menor ao lado do número em `font-display`; a variação leva seta e sinal, com
+`favorable` dizendo se alta é boa (`"up"`, padrão), ruim (`"down"`: DEC, FEC, perdas) ou só
+informativa (`"none"`). `hint` abre a definição da métrica; `link` torna o card inteiro
+clicável; `highlight` põe o número em `accent-text` (um por região). Abaixo de 16rem o valor
+desce para `text-title`. `KpiValue` e `KpiDelta` são exportados para compor fora do card. Para
+números grandes, `formatBRL(v, { compacto: true })` → "R$ 45,7 mi".
