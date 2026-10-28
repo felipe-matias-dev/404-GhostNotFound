@@ -44,6 +44,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | 24/10/2026 | DEC-032 (proposta): DEC e FEC de um período de vários meses somam os valores mensais, nunca a média | Indicador de continuidade é acumulado; a média dos meses subestima o período e o agente alternava entre as duas formas | Luis Felipe |
 | 26/10/2026 | DEC-033: DEC e FEC de um período saem da soma dos componentes ÷ média mensal de UCs, no backend, com rotas por alimentador, ranking e recortes; fila de suspeitas paginada com a ordem de inspeção ativa; API 0.6.0 | DEC e FEC não se somam nem se tiram a média entre recortes; a fila mostra quais UCs já têm ordem, para a tela não oferecer o que daria 409 | Felipe |
 | 27/10/2026 | DEC-034: cada resposta do agente de IA é gravada em `app.ai_auditoria` (qualquer status) por `POST /ai/ask`, e lida por `GET /ai/audit/{id}`; sem a chave do Gemini a API sobe e o `/ai` responde 503; API 0.7.0 | A auditoria só serve se ninguém recebe uma resposta que não dá para conferir depois; e a chave ausente não pode derrubar o `/health` nem as telas | Felipe |
+| 27/10/2026 | DEC-038: a carga da Gold lê cada CSV aos poucos e grava em lotes de 10 mil linhas, depois de uma primeira rodada que só confere os arquivos; a memória deixa de crescer com o tamanho da Gold | A carga antiga guardava os 12 CSVs inteiros na memória e derrubou o WSL de 8 GB com os ~4 milhões de linhas da Gold real; a conferência antes de gravar continua garantindo que um arquivo fora do contrato não altera o banco | Felipe |
 | 27/10/2026 | DEC-039: Workflow do Databricks com os notebooks lidos do GitHub (`main`), serverless, Landing → Bronze → Silver → Gold + export, reprocessando tudo (diverge da ADR-07); agendamento mensal no dia 6, pausado | Roda o código revisado e mantém o tudo ou nada de cada camada numa extração única; a origem fecha o faturamento uma vez por mês | Arthur |
 
 ## DEC-001 · Localização dos arquivos de origem (landing)
@@ -1125,6 +1126,45 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Alternativa descartada:** Recharts (o gráfico do shadcn) ou outra biblioteca completa. A troca entre mês a mês e ano a ano
   redesenharia o gráfico do zero em vez de mudar a forma das linhas, o tema e a acessibilidade seguiriam o modelo dela e o
   bundle cresceria para fazer o que duas bibliotecas pequenas do d3 já fazem.
+
+## DEC-038 · Carga da Gold em lotes, com uma rodada de conferência antes de gravar
+
+- **Data:** 27/10/2026 · **Área:** Portal e Dados · **Autor:** Felipe
+- **Contexto:** o Arthur rodou a carga com os CSVs oficiais da Gold (~4 milhões de linhas, ~2,1 milhões só no faturamento), e ela
+  derrubou o WSL do notebook dele, de 8 GB. A carga lia e validava os 12 arquivos inteiros, guardava tudo numa lista (`validated`) e só
+  então abria a transação e fazia um único `INSERT` por tabela. A memória crescia com o tamanho da Gold. O banco não foi alterado,
+  porque a transação nunca chegou a gravar.
+- **Decisão:**
+  - **Leitura aos poucos:** `iter_rows` lê o CSV uma linha por vez (gerador), valida cada uma contra o contrato e guarda só o lote em
+    andamento. `read_rows`, que devolve a lista, continua para arquivos pequenos e para os testes.
+  - **Gravação em lotes de 10 mil linhas** (`TAMANHO_LOTE`), na mesma transação de antes: `DROP` das views e das tabelas, `CREATE`,
+    `INSERT` por lote, views de volta. Uma falha em qualquer ponto desfaz tudo, inclusive o `DROP`.
+  - **Duas rodadas, como o Alisson sugeriu:** a primeira confere todas as linhas de todos os arquivos sem guardar nada, antes de a
+    transação abrir. Um arquivo fora do contrato falha em segundos, a Gold anterior não é apagada e as tabelas não ficam travadas
+    para leitura enquanto o erro não aparece. A segunda rodada lê de novo e grava. Se o arquivo mudar entre as duas (o número de
+    linhas gravadas difere do conferido), a carga é cancelada e desfeita.
+- **Alternativas descartadas:**
+  - **Conferir só dentro da transação, numa rodada:** a memória ficaria igual, mas um erro na última tabela só apareceria depois de
+    minutos de carga, com as tabelas já apagadas e travadas.
+  - **`COPY` do Postgres:** é mais rápido na gravação, mas exige converter listas (`text[]`), `Decimal` e datas para o formato do
+    `COPY`, e a validação linha a linha continuaria necessária. Fica como próximo passo se o tempo atrapalhar.
+- **Medição** (volume sintético, replicando as linhas da amostra com chaves novas; Ryzen 5 5600GT, Postgres no Docker; pico de memória
+  do processo Python):
+
+  | Linhas | Carga antiga | Carga nova |
+  |---|---|---|
+  | 151 mil | 370 MB, 14 s | 107 MB, 17 s |
+  | 451 mil | 946 MB, 43 s | 109 MB, 41 s |
+  | 4,0 milhões | não medida (extrapolação: ~7,8 GB) | 109 MB, 423 s |
+
+  A antiga cresce ~1,9 KB por linha, o que dá uns 8 GB com 4 milhões de linhas, a máquina que caiu. A nova fica em ~110 MB, no
+  volume que for. Uma passada de validação sobre os 2,1 milhões de linhas do faturamento leva ~35 s; o restante dos ~7 minutos é a
+  gravação (~14 mil linhas por segundo).
+- **Limites:** a medição é com dados sintéticos e nesta máquina (16 GB). A prova com os CSVs reais, na máquina de 8 GB, é do Arthur. A
+  carga leva uns 7 minutos com a Gold real, e a primeira rodada acrescenta cerca de 1 a 2 minutos de validação (o dobro do custo
+  de validar), que o `COPY` não reduziria.
+- **Impacto:** nenhuma mudança de rota, de schema ou de contrato; `load_gold` ganha o parâmetro opcional `tamanho_lote`. A carga da
+  amostra e os testes continuam iguais.
 
 ## DEC-039 · Workflow do Databricks e agendamento mensal
 
