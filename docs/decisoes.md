@@ -46,6 +46,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | 27/10/2026 | DEC-034: cada resposta do agente de IA é gravada em `app.ai_auditoria` (qualquer status) por `POST /ai/ask`, e lida por `GET /ai/audit/{id}`; sem a chave do Gemini a API sobe e o `/ai` responde 503; API 0.7.0 | A auditoria só serve se ninguém recebe uma resposta que não dá para conferir depois; e a chave ausente não pode derrubar o `/health` nem as telas | Felipe |
 | 27/10/2026 | DEC-038: a carga da Gold lê cada CSV aos poucos e grava em lotes de 10 mil linhas, depois de uma primeira rodada que só confere os arquivos; a memória deixa de crescer com o tamanho da Gold | A carga antiga guardava os 12 CSVs inteiros na memória e derrubou o WSL de 8 GB com os ~4 milhões de linhas da Gold real; a conferência antes de gravar continua garantindo que um arquivo fora do contrato não altera o banco | Felipe |
 | 27/10/2026 | DEC-039: Workflow do Databricks com os notebooks lidos do GitHub (`main`), serverless, Landing → Bronze → Silver → Gold + export, reprocessando tudo (diverge da ADR-07); agendamento mensal no dia 6, pausado | Roda o código revisado e mantém o tudo ou nada de cada camada numa extração única; a origem fecha o faturamento uma vez por mês | Arthur |
+| 27/10/2026 | DEC-041: redesign da tela da diretoria: frase de leitura, receita e energia de 12 meses contra os 12 primeiros da base, tesoura em índice de 12 meses corridos e faixa mês contra mês com sparklines; área do `TrendChart` só com eixo a partir do zero; rotas `GET /indicadores/comparacao` e `GET /indicadores/janelas`; API 0.10.0 | A tela responde à pergunta da diretoria (receita sobe, volume cai) em vez de listar seis números de mesmo peso; a área sobre eixo truncado exagerava a variação; DEC, FEC, satisfação, base de UCs e tarifa de um período são contas de backend | João Euclides |
 
 ## DEC-001 · Localização dos arquivos de origem (landing)
 
@@ -1195,3 +1196,41 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Para produção:** despausar o agendamento depende de tornar essa comparação opcional no Job (por exemplo, um widget
   `exigir_idempotencia = nao`), mantendo a conferência contra a origem. Fica para um PR próprio, combinado com o autor do
   `Landing_to_Bronze`.
+
+## DEC-041 · Redesign da tela da diretoria: a tesoura primeiro, e indicadores por período no backend
+
+- **Data:** 27/10/2026 · **Área:** Portal · **Autor:** João Euclides · **Revisa:** DEC-036 (comparação só mês contra mês) e
+  DEC-037 (gráfico de um indicador por vez)
+- **Contexto:** a tela da DEC-036 mostrava seis cards de mesmo peso e um gráfico de um indicador por vez. A pergunta da diretoria
+  ("a receita subiu 8% e o volume caiu 4%: por quê?", `docs/diagnostico-receita.md`) liga receita e energia, que a tela separava.
+- **Decisão (tela):**
+  - **Frase de leitura no topo:** montada no frontend só pela direção e pelo tamanho relativo das duas variações de 12 meses
+    ("A receita cresceu com menos energia faturada."), sem número. Os números ficam logo abaixo. Quando a tela tiver insight de IA
+    (D9, como o `GET /receita/insight` da DEC-040), ele ocupa o lugar da frase; com `texto` vazio (narração descartada ou falha do
+    provedor), a frase determinística continua, e a tela nunca fica sem leitura.
+  - **Receita e energia de 12 meses:** os 12 meses mais recentes contra os 12 primeiros da série, somados pelo backend em
+    `GET /receita/comparacao`. Sem 24 meses seguidos na Gold, a tela diz que não há comparação. O botão "Abrir a ponte de receita"
+    leva o mesmo par de janelas para a tela de receita.
+  - **Tesoura:** receita e energia faturadas em 12 meses corridos, como índice sobre a primeira janela (= 100), na mesma escala.
+    A tela soma os meses da `gold_kpis_mensais` e divide pela primeira janela, como a DEC-035 permite: nenhuma regra de negócio
+    é refeita, e a soma de 12 meses tira a sazonalidade. Janela com buraco na série fica de fora. O tooltip mostra as somas em R$
+    e kWh por trás do índice.
+  - **Indicadores do mês:** os seis indicadores numa faixa só, mês contra mês como na DEC-036, cada um com uma `Sparkline`
+    (`components/ui/sparkline`) da série inteira: linha em `chart-muted`, mês atual em `chart-1` e mês base em anel neutro.
+  - **`TrendChart`:** a área em degradê só aparece com `zeroBaseline`. Num eixo que não começa no zero, a área sugeria uma queda
+    maior do que a real. A visão ano a ano e os parâmetros `indicador` e `tendencia` da URL saem da tela.
+- **Decisão (backend):** a rota de comparação que a DEC-036 pedia, mais a série de janelas para a tesoura, ambas sobre a
+  `gold_kpis_segmento_mensal` e numa ida ao banco cada.
+  - `GET /indicadores/comparacao`: dois períodos quaisquer e o recorte (`municipio`, `bairro`, `classe`). Por período: receita
+    faturada, de energia e tributos, kWh, `n_uc_medio` (Σ `n_uc` ÷ meses com dado) e `n_uc_fim` (último mês), `tarifa_media`
+    (Σ receita de energia ÷ Σ kWh) e `tarifa_base_media` (sem o acréscimo da bandeira, DEC-029), DEC e FEC pelo helper da DEC-033
+    (agora em `venergy_api/indices.py`), chamados e satisfação (Σ notas ÷ notas dadas). `variacao_pct` de cada indicador.
+  - `GET /indicadores/janelas`: janelas corridas de 1 a 24 meses (padrão 12), só as completas, com receita, kWh, base de UCs e
+    tarifas.
+  - Versão da API 0.10.0 (0.8.0 e 0.9.0 estão em branches abertas).
+- **Limites:**
+  - A tarifa das rotas é a **realizada** (com mix de classes). O reajuste homologado da B1 (+10,52%, medido na Silver pelo
+    diagnóstico) não tem tabela na Gold.
+  - A "Receita faturada" da tela inclui tributos, e a ponte de receita usa a receita de energia (DEC-023). Os valores absolutos
+    das duas telas diferem até a ponte ganhar o degrau de tributos.
+  - A tela ainda não consome as rotas novas: a troca de `useComparacaoIndicadores` e da tesoura é o próximo passo.
