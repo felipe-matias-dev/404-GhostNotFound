@@ -1218,7 +1218,8 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
     lugar da legenda, e a faixa entre as duas é preenchida em `chart-muted`: a distância entre elas é o dado do gráfico. O
     resumo não tem moldura própria, e o gráfico tem altura limitada (entre 18rem e 26rem, conforme a tela): esticado numa tela
     alta, ele fazia 8% parecer um penhasco. Sobra espaço embaixo em telas altas, e isso é melhor que distorcer a inclinação.
-  - **Por que a receita mudou:** entre o resumo e a faixa, os quatro efeitos da ponte (tarifa, bandeira, volume e mix) do
+  - **Por que a receita mudou:** abaixo do resumo, ao lado da faixa de rede e atendimento (5 para 7 colunas a partir de
+    1280px, empilhados abaixo disso), os quatro efeitos da ponte (tarifa, bandeira, volume e mix) do
     mesmo par de 12 meses, de `GET /receita/decomposicao`, somados como a tela de Receita soma (`passosDaPonte`, DEC-035).
     Em % da receita base, e não em R$: a ponte é sobre a receita de energia, e o resumo, sobre a faturada; o peso de cada
     efeito é o mesmo nas duas medidas, o valor em reais não. Barras divergentes a partir de um eixo central, em `success` e

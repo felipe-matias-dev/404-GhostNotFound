@@ -197,7 +197,7 @@ export function ResumoReceita({
 					emptyMessage="A tesoura precisa de 13 meses seguidos na Gold."
 					height="fill"
 					// Altura limitada: esticado numa tela alta, o gráfico faz 8% parecer um penhasco.
-					className="h-[clamp(18rem,36svh,26rem)] rounded-none border-0 bg-transparent p-0 shadow-none lg:border-border lg:border-l lg:pl-5"
+					className="h-[clamp(20rem,40svh,26rem)] rounded-none border-0 bg-transparent p-0 shadow-none lg:border-border lg:border-l lg:pl-5"
 				/>
 			</div>
 		</section>

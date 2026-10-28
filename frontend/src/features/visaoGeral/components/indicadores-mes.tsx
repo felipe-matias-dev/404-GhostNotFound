@@ -61,7 +61,10 @@ export function IndicadoresMes({
 	const base = indiceDe(par?.periodo_base);
 
 	return (
-		<section aria-labelledby="mes-titulo" className="flex flex-col gap-3">
+		<section
+			aria-labelledby="mes-titulo"
+			className="@container flex min-w-0 flex-col gap-3"
+		>
 			<div className="flex flex-wrap items-center justify-between gap-2">
 				<h2 id="mes-titulo" className="text-heading">
 					Rede e atendimento no mês
@@ -73,7 +76,7 @@ export function IndicadoresMes({
 					semPeriodos={Boolean(erro) || semDados}
 				/>
 			</div>
-			<div className="grid grid-cols-2 gap-px overflow-hidden rounded-md border border-border bg-border lg:grid-cols-4">
+			<div className="grid grid-cols-2 gap-px overflow-hidden rounded-md border border-border bg-border @3xl:grid-cols-4">
 				{DA_FAIXA.map((indicador) => {
 					const definicao = DEFINICOES[indicador];
 					const variacao = comparacao.data?.variacao[indicador];

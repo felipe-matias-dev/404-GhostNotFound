@@ -42,20 +42,23 @@ export function VisaoGeralPage() {
 				erroSerie={competencias.isError}
 				onRetrySerie={() => competencias.refetch()}
 			/>
-			<EfeitosReceita janelas={janelas} />
-			<IndicadoresMes
-				competencias={competencias.data ?? []}
-				par={par}
-				onEscolher={escolher}
-				carregando={competencias.isPending}
-				erro={
-					competencias.isError
-						? "Não foi possível carregar os indicadores."
-						: null
-				}
-				semDados={semDados}
-				onRetry={() => competencias.refetch()}
-			/>
+			{/* O porquê ao lado do contexto: dois blocos de mesmo peso, cada um com o seu título. */}
+			<div className="mt-3 grid gap-8 xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] xl:gap-10">
+				<EfeitosReceita janelas={janelas} />
+				<IndicadoresMes
+					competencias={competencias.data ?? []}
+					par={par}
+					onEscolher={escolher}
+					carregando={competencias.isPending}
+					erro={
+						competencias.isError
+							? "Não foi possível carregar os indicadores."
+							: null
+					}
+					semDados={semDados}
+					onRetry={() => competencias.refetch()}
+				/>
+			</div>
 		</Pagina>
 	);
 }

@@ -21,7 +21,7 @@ function Molde() {
 				<li
 					// biome-ignore lint/suspicious/noArrayIndexKey: linhas fixas do molde.
 					key={i}
-					className="grid h-9 grid-cols-[minmax(0,7rem)_minmax(0,1fr)_3.5rem] items-center gap-3 sm:grid-cols-[10rem_minmax(0,1fr)_4rem]"
+					className="grid h-10 grid-cols-[7.5rem_minmax(0,1fr)_3.5rem] items-center gap-4 sm:grid-cols-[9rem_minmax(0,1fr)_4rem]"
 				>
 					<div className="h-3 w-20 rounded-sm bg-pressed" />
 					<div className={cn("h-2.5 rounded-sm bg-pressed", largura)} />
@@ -98,7 +98,7 @@ export function EfeitosReceita({ janelas }: { janelas: Janelas | undefined }) {
 									efeito: EFEITOS.find((e) => e === efeito.id),
 								}}
 								aria-label={`${efeito.rotulo}: ${texto} sobre a receita base. Abrir na ponte de receita`}
-								className="group grid h-9 grid-cols-[minmax(0,7rem)_minmax(0,1fr)_3.5rem_auto] items-center gap-3 rounded-sm px-2 outline-none transition-colors hover:bg-hover focus-visible:ring-3 focus-visible:ring-focus-ring/50 sm:grid-cols-[10rem_minmax(0,1fr)_4rem_auto]"
+								className="group -mx-2 grid h-10 grid-cols-[7.5rem_minmax(0,1fr)_3.5rem_auto] items-center gap-4 rounded-sm px-2 outline-none transition-colors hover:bg-hover focus-visible:ring-3 focus-visible:ring-focus-ring/50 sm:grid-cols-[9rem_minmax(0,1fr)_4rem_auto]"
 							>
 								<span className="truncate text-body text-text">
 									{efeito.rotulo}
@@ -147,7 +147,7 @@ export function EfeitosReceita({ janelas }: { janelas: Janelas | undefined }) {
 		<section
 			aria-labelledby="efeitos-titulo"
 			aria-busy={decomposicao.isFetching || undefined}
-			className="grid gap-3 lg:grid-cols-[minmax(14rem,18rem)_minmax(0,1fr)] lg:gap-5"
+			className="flex max-w-3xl flex-col gap-3"
 		>
 			<header className="flex flex-col gap-1">
 				<h2 id="efeitos-titulo" className="text-heading">
@@ -158,7 +158,7 @@ export function EfeitosReceita({ janelas }: { janelas: Janelas | undefined }) {
 					{formatPeriodoCurto(janelas.base)}.
 				</p>
 			</header>
-			<div className="max-w-3xl">{corpo}</div>
+			{corpo}
 		</section>
 	);
 }
