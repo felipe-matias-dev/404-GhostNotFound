@@ -35,7 +35,7 @@ export function VisaoGeralPage() {
 	// Série carregada sem nenhum par possível (menos de dois meses): não há o que comparar.
 	const semDados = Boolean(competencias.data) && !par;
 	return (
-		<Pagina className="max-w-none">
+		<Pagina className="min-h-full max-w-none">
 			<ResumoReceita
 				janelas={janelas}
 				semJanelas={Boolean(competencias.data) && !janelas}

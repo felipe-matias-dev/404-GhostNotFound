@@ -1216,8 +1216,8 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
     é refeita, e a soma de 12 meses tira a sazonalidade. Janela com buraco na série fica de fora. O tooltip mostra as somas em R$
     e kWh por trás do índice. A linha 100 é mais forte que a grade, cada linha tem o rótulo no fim ("107,8 receita") no
     lugar da legenda, e a faixa entre as duas é preenchida em `chart-muted`: a distância entre elas é o dado do gráfico. O
-    resumo não tem moldura própria, e o gráfico tem altura limitada (entre 18rem e 26rem, conforme a tela): esticado numa tela
-    alta, ele fazia 8% parecer um penhasco. Sobra espaço embaixo em telas altas, e isso é melhor que distorcer a inclinação.
+    resumo não tem moldura própria e ocupa a altura que sobra na tela. O gráfico tem piso de 20rem e teto de 40% da largura
+    (até 44rem): é a proporção, e não a altura da tela, que decide se uma alta de 8% parece um penhasco.
   - **Por que a receita mudou:** abaixo do resumo, ao lado da faixa de rede e atendimento (5 para 7 colunas a partir de
     1280px, empilhados abaixo disso), os quatro efeitos da ponte (tarifa, bandeira, volume e mix) do
     mesmo par de 12 meses, de `GET /receita/decomposicao`, somados como a tela de Receita soma (`passosDaPonte`, DEC-035).

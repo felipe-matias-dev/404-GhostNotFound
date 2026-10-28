@@ -140,7 +140,7 @@ export function ResumoReceita({
 		<section
 			aria-labelledby="resumo-titulo"
 			aria-busy={comparacao.isFetching || undefined}
-			className="flex flex-col gap-5"
+			className="@container flex flex-1 flex-col gap-5"
 		>
 			<header className="flex flex-col gap-1.5">
 				<h2 id="resumo-titulo" className="text-balance font-display text-title">
@@ -153,7 +153,7 @@ export function ResumoReceita({
 					</p>
 				) : null}
 			</header>
-			<div className="grid gap-5 lg:grid-cols-[minmax(14rem,18rem)_minmax(0,1fr)]">
+			<div className="grid flex-1 gap-5 lg:grid-cols-[minmax(14rem,18rem)_minmax(0,1fr)]">
 				<div className="@container flex flex-col justify-between gap-5">
 					{numeros}
 					<Link
@@ -196,8 +196,9 @@ export function ResumoReceita({
 					onRetry={onRetrySerie}
 					emptyMessage="A tesoura precisa de 13 meses seguidos na Gold."
 					height="fill"
-					// Altura limitada: esticado numa tela alta, o gráfico faz 8% parecer um penhasco.
-					className="h-[clamp(20rem,40svh,26rem)] rounded-none border-0 bg-transparent p-0 shadow-none lg:border-border lg:border-l lg:pl-5"
+					// Ocupa a altura que sobra na tela, com piso e teto. O teto acompanha a largura (40% dela,
+					// até 44rem): a proporção do gráfico, e não a altura da tela, decide se 8% vira penhasco.
+					className="h-80 max-h-[min(44rem,40cqw)] rounded-none border-0 bg-transparent p-0 shadow-none lg:h-auto lg:min-h-80 lg:border-border lg:border-l lg:pl-5"
 				/>
 			</div>
 		</section>
