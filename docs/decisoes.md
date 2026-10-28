@@ -47,6 +47,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | 27/10/2026 | DEC-038: a carga da Gold lê cada CSV aos poucos e grava em lotes de 10 mil linhas, depois de uma primeira rodada que só confere os arquivos; a memória deixa de crescer com o tamanho da Gold | A carga antiga guardava os 12 CSVs inteiros na memória e derrubou o WSL de 8 GB com os ~4 milhões de linhas da Gold real; a conferência antes de gravar continua garantindo que um arquivo fora do contrato não altera o banco | Felipe |
 | 27/10/2026 | DEC-039: Workflow do Databricks com os notebooks lidos do GitHub (`main`), serverless, Landing → Bronze → Silver → Gold + export, reprocessando tudo (diverge da ADR-07); agendamento mensal no dia 6, pausado | Roda o código revisado e mantém o tudo ou nada de cada camada numa extração única; a origem fecha o faturamento uma vez por mês | Arthur |
 | 27/10/2026 | DEC-040: `GET /receita/insight` devolve o insight de IA da tela de receita; o backend monta o JSON de métricas a partir da ponte da Gold, com valores arredondados como a tela os mostra, e guarda o texto num cache em memória pelo conteúdo das métricas; sem a chave do Gemini a rota responde 503; API 0.9.0 | O agente só aceita texto cujos números sejam exatamente valores do JSON (DEC-019), e uma Gold recarregada precisa gerar um insight novo, nunca um velho | Felipe |
+| 27/10/2026 | DEC-044: a visão 360 da unidade consumidora sai de uma rota só, `GET /unidades-consumidoras/{cod_uc}/visao-360`; os 12 meses terminam na última competência da Gold e a "conta alta" é o último mês contra o mesmo mês do ano anterior, com faixa de ±10%; integrada à API 0.9.0 da main | O atendente está com o cliente na linha: uma chamada só à API e uma resposta pronta para "o consumo subiu?", sem a tela refazer conta de negócio | Felipe |
 
 ## DEC-001 · Localização dos arquivos de origem (landing)
 
@@ -1238,3 +1239,48 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   tentativa do modelo passasse. Revisitar com a taxa de aprovação medida pelo GenAI.
 - **Impacto:** API 0.9.0 (rota nova). A tela de Receita pode exibir o insight com o tipo gerado do OpenAPI. Agente: configuração
   nova `insight_prompt_version` (padrão `v1`) e `build_insight_writer`; o prompt e o redator não mudam.
+
+## DEC-044 · Visão 360 da unidade consumidora: rota única, janela da Gold e regra da conta alta
+
+- **Data:** 27/10/2026 · **Área:** Portal · **Autor:** Felipe
+- **Contexto:** a Camila (Atendimento) pede que o atendente digite o número da unidade consumidora e veja numa tela só o cliente,
+  o consumo dos últimos meses ao lado do mesmo período do ano anterior, as faturas em aberto, o medidor, o painel solar, as
+  interrupções e os chamados, e que consiga responder na hora se a "conta alta" é consumo que subiu. A rota
+  `GET /unidades-consumidoras/{cod_uc}` devolvia só o cadastro.
+- **Decisão:**
+  - **Uma rota agregada:** `GET /unidades-consumidoras/{cod_uc}/visao-360` devolve cadastro (com o painel solar), consumo, faturas
+    não pagas, medidor, interrupções, chamados e inspeções. A rota do cadastro continua igual. `404` se a unidade não existe.
+  - **Os 12 meses terminam na última competência da Gold**, e não no mês de hoje nem na última fatura da própria unidade. O dado
+    é uma extração única: com a data de hoje a janela viria vazia, e uma unidade que parou de faturar passaria por "recente".
+    Cada mês traz o consumo, o mesmo mês do ano anterior, a receita, a bandeira e os `dias_faturados`; o mês sem fatura vem
+    vazio, e não zero.
+  - **Variação dos 12 meses:** compara só os meses com fatura nos dois anos e informa quantos são (`meses_comparados`); sem
+    nenhum par, ou com a base em zero, fica vazia. Os totais (`kwh_12m` e `kwh_12m_ano_anterior`) continuam somando tudo o que
+    foi faturado. Sem essa regra, uma unidade ligada em 2024-12 apareceria com +1100% (12 meses contra 1), e uma que parou de
+    faturar no meio da janela com uma queda que é falta de fatura, não de consumo.
+  - **Conta alta:** o backend devolve `tendencia`, que compara a última competência com o mesmo mês do ano anterior (o que tira o
+    efeito das estações): acima de +10% é `subiu`, abaixo de −10% é `caiu`, no meio é `estavel`, e sem fatura num dos meses ou
+    com a base em zero é `sem_comparacao`. Os 10% exatos ainda são `estavel`. Junto vêm a variação do último mês, a dos 12 meses
+    e, em cada mês, a bandeira e os dias faturados, que explicam uma conta maior sem consumo maior.
+  - **Faturas não pagas:** todas as `em_aberto` e `em_atraso` da unidade, da mais antiga para a mais nova, com a quantidade e o
+    valor total somado em Decimal (DEC-010). Dívida antiga continua sendo dívida, então não há corte de 12 meses. No dataset
+    todas as não pagas estão em atraso, porque a data de corte da Gold é posterior a todos os vencimentos.
+  - **Interrupções, chamados e inspeções:** todo o histórico, do mais recente para o mais antigo. São poucas linhas por unidade.
+  - A variação percentual passou a ser a mesma função da tela de receita (`variacao.py`): base zero não tem percentual.
+- **Suposição nossa:** o corte de 10% não vem do case. Uma variação pequena de consumo não explica uma conta que o cliente achou
+  alta, e 10% separa o ruído do mês de uma mudança que o atendente deve tratar como real. Fica num único lugar
+  (`LIMITE_DA_TENDENCIA`) se a diretoria pedir outra faixa.
+- **Alternativas descartadas:**
+  - Uma rota por bloco: seis chamadas e seis conjuntos de testes para uma tela que sempre usa tudo.
+  - A tela decidir o rótulo: contraria a regra de que o cálculo de negócio fica no backend.
+  - Comparar com a média dos 12 meses anteriores: mistura estações, e uma conta de janeiro sempre pareceria alta.
+  - Somar os 12 meses de cada lado na variação: compara períodos diferentes quando falta fatura. Anular a variação se faltar
+    qualquer mês também foi descartado: uma única fatura faltando apagaria a comparação do ano inteiro.
+- **Limitação conhecida:** a rota busca a última competência da Gold com `max(competencia)`, e a chave primária da fato é
+  `(cod_uc, competencia)`, então a consulta lê a tabela inteira a cada chamada. Com o volume do case isso não pesa. Se pesar, a
+  saída é um índice em `competencia`, que fica para depois da carga em lotes (PR #60), porque mexe no modelo e na carga.
+- **Impacto:** rota nova, sem quebra de contrato; na atualização com a `main`, a API mantém a versão 0.9.0,
+  o `lifespan` do agente e o cache de insights. Nenhuma mudança na Gold nem nas views do agente.
+  A tela `/uc` do frontend pode usar o tipo gerado do OpenAPI.
+  A decisão foi renumerada de DEC-036 para DEC-044 na resolução do PR #55: DEC-036 já identifica a tela
+  da diretoria na `main`, e DEC-041 a DEC-043 estão reservadas nas branches do portal.
