@@ -65,7 +65,7 @@ class AskUseCase:
         generator: SqlGenerator,
         validator: SqlValidator,
         executor: QueryExecutor,
-        answer_writer: AnswerWriter,
+        answer_writer: AnswerWriter | None,
         max_question_chars: int,
         max_correction_attempts: int,
         answer_sample_rows: int,
@@ -329,6 +329,8 @@ class AskUseCase:
         visible: QueryResult,
         fallback: str,
     ) -> str:
+        if self._answer_writer is None:
+            return fallback
         try:
             narrative = await self._answer_writer.write(question, draft, visible)
         except Exception as error:

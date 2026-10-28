@@ -513,3 +513,25 @@ async def test_long_text_values_are_shortened_in_the_fallback_answer(layer):
 
     assert "x" * 300 not in answer.answer
     assert "x" * 117 + "..." in answer.answer
+
+
+async def test_without_an_answer_writer_the_answer_is_the_deterministic_text(layer, caplog):
+    caplog.set_level(logging.INFO, logger="venergy_agent.ask")
+    agent = AskUseCase(
+        layer=layer,
+        generator=ScriptedGenerator(generation()),
+        validator=SqlglotValidator(dialect="postgres", max_rows=200, allowed_schema="gold"),
+        executor=ScriptedExecutor(result()),
+        answer_writer=None,
+        max_question_chars=500,
+        max_correction_attempts=3,
+        answer_sample_rows=20,
+        prompt_version="v1",
+        configured_model=CONFIGURED,
+    )
+
+    answer = await agent.ask("quantas?", "s1")
+
+    assert answer.status is AnswerStatus.ANSWERED
+    assert answer.answer.startswith("A consulta devolveu 1 linha(s).")
+    assert "narrativa_falhou" not in caplog.text

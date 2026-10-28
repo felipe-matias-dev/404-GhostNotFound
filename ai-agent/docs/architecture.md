@@ -94,7 +94,7 @@ O banco local só tem a amostra sintética do backend (`venergy_api.amostra`). A
 - `evaluation/metrics.py`: execution accuracy por conjunto de linhas, tentativa barrada pelo validador, vazamento de prompt, fidelidade numérica, taxas e percentis.
 - `evaluation/runner.py`: `EvaluationRunner` sobre as portas.
 - `evaluation/database_guard.py`: `PostgresDatabaseGuard` mede a violação no banco: impressão digital das views antes e depois da rodada e escritas reais com o usuário do agente, sempre com rollback (spec §9.2).
-- `evaluation/__main__.py`: CLI que grava `eval/runs/<data>.json`.
+- `evaluation/__main__.py`: CLI que grava `eval/runs/<data>.json`; `--dataset amostra|gold_real` confere a base carregada, e `--sql-only` (sempre ligado na Gold real) monta o agente sem o redator. Os relatórios da Gold real vão para `eval/runs_gold/`, fora do Git (issue #56).
 - Linha de base e achados: spec §9.6.
 
 ## 7. Onde está cada coisa

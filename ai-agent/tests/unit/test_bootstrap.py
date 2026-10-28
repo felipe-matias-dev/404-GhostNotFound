@@ -45,3 +45,14 @@ async def test_answers_name_the_model_as_the_provider_does_without_the_prefix(se
     answer = await agent.ask("x" * (settings.max_question_chars + 1), "s1")
 
     assert answer.model == settings.llm_model.partition(":")[2]
+
+
+async def test_sql_only_agent_never_builds_the_answer_writer(settings, monkeypatch):
+    def forbidden(**kwargs):
+        raise AssertionError("answer writer built in sql-only mode")
+
+    monkeypatch.setattr("venergy_agent.bootstrap.PydanticAiAnswerWriter", forbidden)
+
+    agent = await build_agent(settings, narrate=False)
+
+    assert isinstance(agent, AskUseCase)
