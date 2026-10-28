@@ -60,7 +60,7 @@ a UC `0003` em `GET /unidades-consumidoras/{cod_uc}`.
 |---|---|
 | `GET /health` | `200` se a API alcança o banco, `503` se não alcança |
 | `GET /unidades-consumidoras/{cod_uc}` | Resumo de uma unidade consumidora, ou `404` se ela não existir |
-| `GET /unidades-consumidoras/{cod_uc}/visao-360` | A unidade consumidora numa tela só: cadastro e painel solar, consumo dos 12 meses até a última competência da Gold contra o ano anterior (com `tendencia`: `subiu`, `estavel`, `caiu` ou `sem_comparacao`, faixa de ±10%), faturas não pagas, medidor, interrupções, chamados e inspeções ([DEC-036](../docs/decisoes.md)). `404` se a unidade não existir |
+| `GET /unidades-consumidoras/{cod_uc}/visao-360` | A unidade consumidora numa tela só: cadastro e painel solar, consumo dos 12 meses até a última competência da Gold contra o ano anterior (com `tendencia`: `subiu`, `estavel`, `caiu` ou `sem_comparacao`, faixa de ±10%), faturas não pagas, medidor, interrupções, chamados e inspeções ([DEC-044](../docs/decisoes.md)). `404` se a unidade não existir |
 | `GET /receita/mensal?inicio=&fim=` | KPIs de cada competência (`gold_kpis_mensais`), do mês mais antigo ao mais recente, com recorte opcional (`AAAA-MM`, inclusivo) |
 | `GET /receita/comparacao` | kWh e receita de dois períodos (`base_inicio`, `base_fim`, `atual_inicio`, `atual_fim`) e a variação, com filtros opcionais de `municipio`, `bairro` e `classe` |
 | `GET /receita/decomposicao/periodos` | Os pares de períodos (`periodo_base`, `periodo_atual`, no formato `AAAA-MM/AAAA-MM`) que a Gold gravou na decomposição: o que o seletor da tela pode oferecer ([DEC-028](../docs/decisoes.md)) |
@@ -73,6 +73,9 @@ a UC `0003` em `GET /unidades-consumidoras/{cod_uc}`.
 | `GET /ordens-inspecao?status=` | Lista as ordens, das mais recentes para as mais antigas, opcionalmente por status |
 | `GET /ordens-inspecao/{id}` | Uma ordem com o histórico de mudanças de status |
 | `PATCH /ordens-inspecao/{id}` | Muda o status (`EM_CAMPO`, `CONCLUIDA` com `resultado`, `CANCELADA`), com `observacao` opcional: `409` se a mudança não for permitida |
+| `POST /ai/ask` | Pergunta ao agente de IA (`{"question": "...", "session_id": "..."}`) e devolve a resposta com o `audit_id` do registro gravado em `app.ai_auditoria`. Todo status é gravado, e se a gravação falhar a resposta não sai (`500`). Sem a chave do Gemini, `503` ([DEC-034](../docs/decisoes.md)) |
+| `GET /ai/audit/{id}` | A auditoria de uma resposta: pergunta, SQL executado, views, linhas, modelo, versão do prompt, latência e horário. `404` se não existir |
+| `GET /receita/insight?periodo_base=&periodo_atual=&municipio=&bairro=&classe=` | Um insight de IA sobre a ponte de receita do recorte da tela (2 a 4 frases), com as `metricas` que sustentam cada número do texto. Os filtros são os de `/receita/decomposicao`. `texto` vem vazio quando o agente descarta a narração (número fora das métricas) ou o provedor falha: a tela aparece sem insight. O mesmo recorte não paga o modelo duas vezes (cache em memória pelo conteúdo das métricas). `503` sem a chave do Gemini ([DEC-040](../docs/decisoes.md)) |
 
 Com filtro de segmento, a receita e o kWh são somados da fatura de cada UC. DEC e FEC só
 existem no total da empresa e por alimentador, porque não dá para somá-los por bairro
@@ -129,7 +132,12 @@ O backend acompanha o contrato no mesmo PR em que ele muda
 
 A carga valida cada linha contra o contrato (`src/venergy_api/schemas.py`). Se um
 arquivo estiver fora do formato, ela é cancelada, informa a linha e a coluna com
-problema e mantém os dados anteriores. A cada execução, ela recria as tabelas da Gold:
+problema e mantém os dados anteriores. Ela lê cada CSV aos poucos e grava de 10 mil em
+10 mil linhas, então a memória não depende do tamanho da Gold: com ~4 milhões de linhas o
+pico foi de ~110 MB e a carga levou uns 7 minutos
+([DEC-038](../docs/decisoes.md#dec-038--carga-da-gold-em-lotes-com-uma-rodada-de-conferência-antes-de-gravar)).
+Antes de gravar, uma primeira rodada confere todos os arquivos sem guardar nada: o arquivo
+ruim falha cedo, sem apagar a Gold anterior. A cada execução, ela recria as tabelas da Gold:
 coluna nova no contrato entra sem apagar nada à mão. Na mesma transação, ela também
 recria as views `sem_*` do agente de IA a partir de `ai-agent/semantic/views.sql`; se esse
 arquivo não bater com a Gold, a carga é cancelada e o banco fica como estava. O gerador da
@@ -209,6 +217,8 @@ tests/            # pytest
 | A busca de UC responde `500` | A carga ainda não rodou (passos 5 e 6) |
 | A carga é cancelada com "arquivo não encontrado" ou "colunas faltando" | A amostra em `data/gold/` é de uma versão anterior do contrato: `uv run python -m venergy_api.amostra --force` |
 | A carga é cancelada com "as views do agente não batem com a Gold" | O `ai-agent/semantic/views.sql` cita coluna que o contrato não tem mais: avise o time de GenAI para regerar o arquivo |
+| A carga com a Gold real leva alguns minutos e não imprime nada até acabar | É o esperado: ~4 milhões de linhas levam uns 7 minutos ([DEC-038](../docs/decisoes.md)). Não interrompa: se parar no meio, a transação desfaz tudo e o banco fica como estava |
+| A carga é cancelada com "o arquivo mudou durante a carga" | O CSV foi trocado entre a conferência e a gravação. Rode a carga de novo |
 | Testes param com "Banco de testes indisponível" | O banco não está no ar: `docker compose up -d --wait db` |
 | A API não sobe: porta 8000 em uso | A API do `docker compose` está no ar: `docker compose stop api web` |
 | Testes param com "Usuário do agente não conecta" | O banco foi criado antes do script de inicialização atual: `docker compose down -v` |

@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "V-Energy Grid 360 API",
-    "version": "0.8.0"
+    "version": "0.9.0"
   },
   "paths": {
     "/health": {
@@ -463,6 +463,126 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/receita/insight": {
+      "get": {
+        "tags": [
+          "receita"
+        ],
+        "summary": "Get Insight",
+        "description": "Um insight de IA sobre a ponte de receita do recorte que a tela está mostrando.",
+        "operationId": "get_insight_receita_insight_get",
+        "parameters": [
+          {
+            "name": "periodo_base",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])/\\d{4}-(0[1-9]|1[0-2])$",
+              "title": "Periodo Base"
+            }
+          },
+          {
+            "name": "periodo_atual",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])/\\d{4}-(0[1-9]|1[0-2])$",
+              "title": "Periodo Atual"
+            }
+          },
+          {
+            "name": "municipio",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Municipio"
+            }
+          },
+          {
+            "name": "bairro",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Bairro"
+            }
+          },
+          {
+            "name": "classe",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "B1",
+                    "B2",
+                    "B3",
+                    "A4"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Classe"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InsightReceitaSchema"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErroSchema"
+                }
+              }
+            },
+            "description": "Service Unavailable"
           },
           "422": {
             "description": "Validation Error",
@@ -1061,10 +1181,128 @@
           }
         }
       }
+    },
+    "/ai/ask": {
+      "post": {
+        "tags": [
+          "agente de IA"
+        ],
+        "summary": "Perguntar",
+        "description": "Pergunta ao agente e grava a resposta, qualquer que seja o status, na auditoria.",
+        "operationId": "perguntar_ai_ask_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PerguntaIaSchema"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RespostaIaSchema"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErroSchema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ai/audit/{audit_id}": {
+      "get": {
+        "tags": [
+          "agente de IA"
+        ],
+        "summary": "Obter Auditoria",
+        "description": "O registro completo de uma resposta: pergunta, SQL, views, linhas, modelo e horário.",
+        "operationId": "obter_auditoria_ai_audit__audit_id__get",
+        "parameters": [
+          {
+            "name": "audit_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "maximum": 2147483647,
+              "minimum": 1,
+              "title": "Audit Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditoriaIaSchema"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErroSchema"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "AnswerStatus": {
+        "type": "string",
+        "enum": [
+          "answered",
+          "unknown",
+          "clarify",
+          "refused",
+          "failed"
+        ],
+        "title": "AnswerStatus"
+      },
       "AtendimentoUcSchema": {
         "properties": {
           "protocolo": {
@@ -1179,6 +1417,140 @@
         "title": "AtualizarOrdemSchema",
         "description": "Mudança de status de uma OI. Cancelar é mudar para CANCELADA."
       },
+      "AuditoriaIaSchema": {
+        "properties": {
+          "audit_id": {
+            "type": "integer",
+            "title": "Audit Id"
+          },
+          "answer": {
+            "type": "string",
+            "title": "Answer"
+          },
+          "status": {
+            "$ref": "#/components/schemas/AnswerStatus"
+          },
+          "sql": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sql"
+          },
+          "rows": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Rows"
+          },
+          "row_count": {
+            "type": "integer",
+            "title": "Row Count"
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated"
+          },
+          "confidence": {
+            "$ref": "#/components/schemas/Confidence"
+          },
+          "sources": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Sources"
+          },
+          "assumptions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Assumptions"
+          },
+          "clarification": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clarification"
+          },
+          "refused_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refused Reason"
+          },
+          "request_id": {
+            "type": "string",
+            "title": "Request Id"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "prompt_version": {
+            "type": "string",
+            "title": "Prompt Version"
+          },
+          "latency_ms": {
+            "type": "integer",
+            "title": "Latency Ms"
+          },
+          "pergunta": {
+            "type": "string",
+            "title": "Pergunta"
+          },
+          "session_id": {
+            "type": "string",
+            "title": "Session Id"
+          },
+          "criado_em": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Criado Em"
+          }
+        },
+        "type": "object",
+        "required": [
+          "audit_id",
+          "answer",
+          "status",
+          "sql",
+          "rows",
+          "row_count",
+          "truncated",
+          "confidence",
+          "sources",
+          "assumptions",
+          "clarification",
+          "refused_reason",
+          "request_id",
+          "model",
+          "prompt_version",
+          "latency_ms",
+          "pergunta",
+          "session_id",
+          "criado_em"
+        ],
+        "title": "AuditoriaIaSchema",
+        "description": "O registro completo da auditoria: a resposta com a pergunta e o momento em que veio."
+      },
       "ComparacaoReceitaSchema": {
         "properties": {
           "base": {
@@ -1229,6 +1601,16 @@
         ],
         "title": "ComparacaoReceitaSchema",
         "description": "Totais de dois períodos e quanto o atual variou sobre a base."
+      },
+      "Confidence": {
+        "type": "string",
+        "enum": [
+          "high",
+          "medium",
+          "low",
+          "unknown"
+        ],
+        "title": "Confidence"
       },
       "ConsumoMesSchema": {
         "properties": {
@@ -1919,6 +2301,40 @@
         "type": "object",
         "title": "HTTPValidationError"
       },
+      "InsightReceitaSchema": {
+        "properties": {
+          "texto": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Texto"
+          },
+          "metricas": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metricas"
+          }
+        },
+        "type": "object",
+        "required": [
+          "texto",
+          "metricas"
+        ],
+        "title": "InsightReceitaSchema",
+        "description": "O insight de IA da tela de Receita e as métricas que sustentam cada número do texto."
+      },
       "InspecaoUcSchema": {
         "properties": {
           "cod_inspecao": {
@@ -2364,6 +2780,29 @@
         "title": "ParPeriodosSchema",
         "description": "Um par de períodos que a Gold gravou na decomposição (DEC-028)."
       },
+      "PerguntaIaSchema": {
+        "properties": {
+          "question": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Question"
+          },
+          "session_id": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Session Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "question",
+          "session_id"
+        ],
+        "title": "PerguntaIaSchema",
+        "description": "Pergunta em português para o agente de IA, dentro de uma conversa."
+      },
       "RankingAlimentadorSchema": {
         "properties": {
           "dec": {
@@ -2579,6 +3018,124 @@
         ],
         "title": "RecortesContinuidadeSchema",
         "description": "DEC e FEC do nível abaixo do filtro, do pior para o melhor."
+      },
+      "RespostaIaSchema": {
+        "properties": {
+          "audit_id": {
+            "type": "integer",
+            "title": "Audit Id"
+          },
+          "answer": {
+            "type": "string",
+            "title": "Answer"
+          },
+          "status": {
+            "$ref": "#/components/schemas/AnswerStatus"
+          },
+          "sql": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sql"
+          },
+          "rows": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Rows"
+          },
+          "row_count": {
+            "type": "integer",
+            "title": "Row Count"
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated"
+          },
+          "confidence": {
+            "$ref": "#/components/schemas/Confidence"
+          },
+          "sources": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Sources"
+          },
+          "assumptions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Assumptions"
+          },
+          "clarification": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clarification"
+          },
+          "refused_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refused Reason"
+          },
+          "request_id": {
+            "type": "string",
+            "title": "Request Id"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "prompt_version": {
+            "type": "string",
+            "title": "Prompt Version"
+          },
+          "latency_ms": {
+            "type": "integer",
+            "title": "Latency Ms"
+          }
+        },
+        "type": "object",
+        "required": [
+          "audit_id",
+          "answer",
+          "status",
+          "sql",
+          "rows",
+          "row_count",
+          "truncated",
+          "confidence",
+          "sources",
+          "assumptions",
+          "clarification",
+          "refused_reason",
+          "request_id",
+          "model",
+          "prompt_version",
+          "latency_ms"
+        ],
+        "title": "RespostaIaSchema",
+        "description": "A resposta do agente (AgentAnswer) mais o id do registro de auditoria dela."
       },
       "ResultadoOrdem": {
         "type": "string",

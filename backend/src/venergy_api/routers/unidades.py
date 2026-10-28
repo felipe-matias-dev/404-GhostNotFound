@@ -61,7 +61,7 @@ def get_visao_360(cod_uc: str, session: SessionDep) -> Uc360Schema:
     uc = _buscar_uc(session, cod_uc)
     medidor = session.get(MedidorUc, cod_uc)
     # A janela termina na última competência da Gold, e não na da própria UC nem no mês de
-    # hoje (DEC-036): o dado é uma extração única, e uma UC que parou de faturar não pode
+    # hoje (DEC-044): o dado é uma extração única, e uma UC que parou de faturar não pode
     # passar por "recente" só porque a última fatura dela é a última que ela tem.
     fato = FatoFaturamentoMensal
     referencia = session.scalar(select(func.max(fato.competencia)))

@@ -4,10 +4,16 @@ from pathlib import Path
 import pytest
 
 from venergy_agent.evaluation.__main__ import (
+    RUNS_DIR,
+    RUNS_GOLD_DIR,
+    DatasetMismatch,
+    check_dataset,
     format_metrics,
     load_set,
     main,
+    narrates,
     report_path,
+    runs_dir,
     write_report,
 )
 from venergy_agent.evaluation.report import EvaluationReport
@@ -72,3 +78,27 @@ def test_load_set_returns_the_version_and_the_items(tmp_path):
     path.write_text("versao: 0.1.0\nitens:\n  - id: R001\n", encoding="utf-8")
 
     assert load_set(path) == ("0.1.0", [{"id": "R001"}])
+
+
+def test_real_gold_reports_go_to_a_folder_outside_git():
+    assert runs_dir("amostra") == RUNS_DIR
+    assert runs_dir("gold_real") == RUNS_GOLD_DIR
+    ignored = (RUNS_GOLD_DIR.parents[2] / ".gitignore").read_text(encoding="utf-8")
+    assert "ai-agent/eval/runs_gold/" in ignored
+
+
+def test_real_gold_always_runs_without_the_answer_writer():
+    assert narrates("amostra", sql_only=False) is True
+    assert narrates("amostra", sql_only=True) is False
+    assert narrates("gold_real", sql_only=False) is False
+
+
+@pytest.mark.parametrize(("dataset", "uc_count"), [("amostra", 50_000), ("gold_real", 8)])
+def test_loaded_database_must_be_the_declared_dataset(dataset, uc_count):
+    with pytest.raises(DatasetMismatch, match=dataset):
+        check_dataset(dataset, uc_count)
+
+
+@pytest.mark.parametrize(("dataset", "uc_count"), [("amostra", 8), ("gold_real", 50_000)])
+def test_matching_database_passes_the_check(dataset, uc_count):
+    check_dataset(dataset, uc_count)

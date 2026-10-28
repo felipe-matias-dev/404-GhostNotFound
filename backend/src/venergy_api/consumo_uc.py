@@ -9,7 +9,7 @@ from venergy_api.variacao import variacao_pct
 
 MESES_DA_JANELA = 12
 
-# Faixa do "estável" (DEC-036): o consumo varia mês a mês, e uma variação pequena não
+# Faixa do "estável" (DEC-044): o consumo varia mês a mês, e uma variação pequena não
 # explica uma conta que o cliente achou alta. Suposição nossa: o case não define o corte.
 LIMITE_DA_TENDENCIA = Decimal("0.10")
 

@@ -140,6 +140,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/receita/insight": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Insight
+         * @description Um insight de IA sobre a ponte de receita do recorte que a tela está mostrando.
+         */
+        get: operations["get_insight_receita_insight_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/continuidade/alimentadores/mensal": {
         parameters: {
             query?: never;
@@ -265,10 +285,55 @@ export interface paths {
         patch: operations["atualizar_ordem_ordens_inspecao__ordem_id__patch"];
         trace?: never;
     };
+    "/ai/ask": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Perguntar
+         * @description Pergunta ao agente e grava a resposta, qualquer que seja o status, na auditoria.
+         */
+        post: operations["perguntar_ai_ask_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ai/audit/{audit_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Obter Auditoria
+         * @description O registro completo de uma resposta: pergunta, SQL, views, linhas, modelo e horário.
+         */
+        get: operations["obter_auditoria_ai_audit__audit_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * AnswerStatus
+         * @enum {string}
+         */
+        AnswerStatus: "answered" | "unknown" | "clarify" | "refused" | "failed";
         /**
          * AtendimentoUcSchema
          * @description Um chamado de atendimento de uma UC.
@@ -310,6 +375,53 @@ export interface components {
             observacao?: string | null;
         };
         /**
+         * AuditoriaIaSchema
+         * @description O registro completo da auditoria: a resposta com a pergunta e o momento em que veio.
+         */
+        AuditoriaIaSchema: {
+            /** Audit Id */
+            audit_id: number;
+            /** Answer */
+            answer: string;
+            status: components["schemas"]["AnswerStatus"];
+            /** Sql */
+            sql: string | null;
+            /** Rows */
+            rows: {
+                [key: string]: unknown;
+            }[];
+            /** Row Count */
+            row_count: number;
+            /** Truncated */
+            truncated: boolean;
+            confidence: components["schemas"]["Confidence"];
+            /** Sources */
+            sources: string[];
+            /** Assumptions */
+            assumptions: string[];
+            /** Clarification */
+            clarification: string | null;
+            /** Refused Reason */
+            refused_reason: string | null;
+            /** Request Id */
+            request_id: string;
+            /** Model */
+            model: string;
+            /** Prompt Version */
+            prompt_version: string;
+            /** Latency Ms */
+            latency_ms: number;
+            /** Pergunta */
+            pergunta: string;
+            /** Session Id */
+            session_id: string;
+            /**
+             * Criado Em
+             * Format: date-time
+             */
+            criado_em: string;
+        };
+        /**
          * ComparacaoReceitaSchema
          * @description Totais de dois períodos e quanto o atual variou sobre a base.
          */
@@ -325,6 +437,11 @@ export interface components {
             /** Variacao Receita Pct */
             variacao_receita_pct: number | null;
         };
+        /**
+         * Confidence
+         * @enum {string}
+         */
+        Confidence: "high" | "medium" | "low" | "unknown";
         /**
          * ConsumoMesSchema
          * @description Um mês do consumo da UC ao lado do mesmo mês do ano anterior.
@@ -560,6 +677,18 @@ export interface components {
             detail?: components["schemas"]["ValidationError"][];
         };
         /**
+         * InsightReceitaSchema
+         * @description O insight de IA da tela de Receita e as métricas que sustentam cada número do texto.
+         */
+        InsightReceitaSchema: {
+            /** Texto */
+            texto: string | null;
+            /** Metricas */
+            metricas: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /**
          * InspecaoUcSchema
          * @description Uma inspeção de campo numa UC e o que ela encontrou.
          */
@@ -731,6 +860,16 @@ export interface components {
             /** Periodo Atual */
             periodo_atual: string;
         };
+        /**
+         * PerguntaIaSchema
+         * @description Pergunta em português para o agente de IA, dentro de uma conversa.
+         */
+        PerguntaIaSchema: {
+            /** Question */
+            question: string;
+            /** Session Id */
+            session_id: string;
+        };
         /** RankingAlimentadorSchema */
         RankingAlimentadorSchema: {
             /** Dec */
@@ -803,6 +942,44 @@ export interface components {
             n_meses: number;
             /** Recortes */
             recortes: components["schemas"]["RecorteContinuidadeSchema"][];
+        };
+        /**
+         * RespostaIaSchema
+         * @description A resposta do agente (AgentAnswer) mais o id do registro de auditoria dela.
+         */
+        RespostaIaSchema: {
+            /** Audit Id */
+            audit_id: number;
+            /** Answer */
+            answer: string;
+            status: components["schemas"]["AnswerStatus"];
+            /** Sql */
+            sql: string | null;
+            /** Rows */
+            rows: {
+                [key: string]: unknown;
+            }[];
+            /** Row Count */
+            row_count: number;
+            /** Truncated */
+            truncated: boolean;
+            confidence: components["schemas"]["Confidence"];
+            /** Sources */
+            sources: string[];
+            /** Assumptions */
+            assumptions: string[];
+            /** Clarification */
+            clarification: string | null;
+            /** Refused Reason */
+            refused_reason: string | null;
+            /** Request Id */
+            request_id: string;
+            /** Model */
+            model: string;
+            /** Prompt Version */
+            prompt_version: string;
+            /** Latency Ms */
+            latency_ms: number;
         };
         /**
          * ResultadoOrdem
@@ -1088,6 +1265,50 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_insight_receita_insight_get: {
+        parameters: {
+            query: {
+                periodo_base: string;
+                periodo_atual: string;
+                municipio?: string | null;
+                bairro?: string | null;
+                classe?: ("B1" | "B2" | "B3" | "A4") | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InsightReceitaSchema"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErroSchema"];
                 };
             };
         };
@@ -1384,6 +1605,88 @@ export interface operations {
             };
             /** @description Conflict */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErroSchema"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    perguntar_ai_ask_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PerguntaIaSchema"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RespostaIaSchema"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErroSchema"];
+                };
+            };
+        };
+    };
+    obter_auditoria_ai_audit__audit_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                audit_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditoriaIaSchema"];
+                };
+            };
+            /** @description Not Found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

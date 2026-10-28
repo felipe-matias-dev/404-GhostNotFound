@@ -15,6 +15,8 @@ SQLSTATE_KINDS = {
     "22P02": ErrorKind.TYPE_MISMATCH,
     "57014": ErrorKind.TIMEOUT,
 }
+DATA_EXCEPTION_CLASS = "22"
+REDACTED = "<valor>"
 
 
 class PostgresQueryExecutor:
@@ -45,10 +47,18 @@ class PostgresQueryExecutor:
                 kind = SQLSTATE_KINDS.get(error.sqlstate or "")
                 if kind is None:
                     raise
-                raise QueryExecutionError(kind, str(error)) from error
+                raise QueryExecutionError(kind, _safe_message(error)) from error
         return QueryResult(
             columns=columns,
             rows=rows,
             row_count=len(rows),
             truncated=query.limit_imposed and len(rows) >= query.applied_limit,
         )
+
+
+def _safe_message(error: psycopg.Error) -> str:
+    message = str(error)
+    if not (error.sqlstate or "").startswith(DATA_EXCEPTION_CLASS):
+        return message
+    kind, separator, _ = (message.splitlines() or [""])[0].partition(":")
+    return f"{kind}: {REDACTED}" if separator else kind

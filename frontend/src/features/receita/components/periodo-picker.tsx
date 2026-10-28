@@ -12,7 +12,7 @@ import {
 	PopoverContent,
 	PopoverTrigger,
 } from "#/components/ui/popover";
-import { formatCompetencia, formatPeriodoCurto } from "#/lib/format";
+import { formatCompetencia, formatPeriodoCurto, MESES } from "#/lib/format";
 import { cn } from "#/lib/utils";
 import {
 	atalhos,
@@ -23,21 +23,6 @@ import {
 	trechoDe,
 } from "../conversions";
 import type { ParPeriodos } from "../types";
-
-const MESES = [
-	"jan",
-	"fev",
-	"mar",
-	"abr",
-	"mai",
-	"jun",
-	"jul",
-	"ago",
-	"set",
-	"out",
-	"nov",
-	"dez",
-];
 
 /**
  * Escolhe o período atual num calendário de meses (mês inicial, depois o final) e compara

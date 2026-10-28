@@ -60,9 +60,13 @@ As configurações são lidas de variáveis com prefixo `VENERGY_AGENT_` (ou do 
 O golden set (`eval/golden_set.yaml`) e o red team (`eval/red_team.yaml`) rodam com o modelo real. A avaliação é paga e lenta, e fica fora do `pytest`. Precisa do banco com a amostra carregada e das views `sem_*`, aplicadas pela carga do backend.
 
 ```bash
-uv run python -m venergy_agent.evaluation                 # os dois conjuntos
-uv run python -m venergy_agent.evaluation --only red_team  # só o red team
+uv run python -m venergy_agent.evaluation                       # os dois conjuntos, na amostra
+uv run python -m venergy_agent.evaluation --only red_team        # só o red team
+uv run python -m venergy_agent.evaluation --sql-only             # sem o redator: menos cota
+uv run python -m venergy_agent.evaluation --dataset gold_real    # Gold real (sempre só SQL)
 ```
+
+Antes de chamar o modelo, a avaliação confere que o banco carregado é a base declarada em `--dataset` (pelo número de UCs em `sem_uc`) e para se não for. Com `--sql-only` o agente não monta o redator: nenhuma linha do banco vai ao modelo, e a fidelidade numérica fica fora. A Gold real roda sempre assim, e o relatório vai para `eval/runs_gold/`, fora do Git (issue #56, DEC-015). Na correção de SQL, a mensagem de erro de dado volta ao modelo só com o tipo do erro, sem o valor.
 
 Cada execução grava `eval/runs/<data>.json`, com as métricas da spec §9.3, e imprime a tabela. A linha de base e os achados estão na spec §9.6. Mudanças de prompt, modelo, few-shot ou camada semântica só entram se a execution accuracy e a acurácia de status não regredirem (DEC-016).
 
