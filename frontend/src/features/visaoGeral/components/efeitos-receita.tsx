@@ -19,13 +19,13 @@ import { efeitosDaReceita, type Janelas } from "../conversions";
 
 const SEM_RECORTE = {};
 
-// Rótulo, barra e valor juntos: a barra não atravessa a tela até o número.
+// Rótulo, barra e valor juntos: a barra não atravessa a coluna até o número.
 const LINHA =
-	"grid h-9 grid-cols-[7.5rem_minmax(0,1fr)_3.5rem] items-center gap-4 sm:grid-cols-[9rem_minmax(0,14rem)_4rem]";
+	"grid h-9 grid-cols-[8rem_minmax(0,20rem)_3.5rem] items-center gap-4";
 
 function Molde() {
 	return (
-		<ul aria-hidden className="flex flex-col gap-1">
+		<ul aria-hidden className="grid gap-x-12 gap-y-1 md:grid-cols-2">
 			{["w-1/3", "w-1/5", "w-1/5", "w-1/12"].map((largura, i) => (
 				<li
 					// biome-ignore lint/suspicious/noArrayIndexKey: linhas fixas do molde.
@@ -87,7 +87,7 @@ export function EfeitosReceita({ janelas }: { janelas: Janelas | undefined }) {
 		corpo = <Molde />;
 	} else {
 		corpo = (
-			<ul className="flex flex-col gap-1">
+			<ul className="grid gap-x-12 gap-y-1 md:grid-cols-2">
 				{efeitos.map((efeito) => {
 					const pct = efeito.pct ?? 0;
 					const largura = maior > 0 ? (Math.abs(pct) / maior) * 50 : 0;
@@ -155,9 +155,9 @@ export function EfeitosReceita({ janelas }: { janelas: Janelas | undefined }) {
 		<section
 			aria-labelledby="efeitos-titulo"
 			aria-busy={decomposicao.isFetching || undefined}
-			className="flex flex-col gap-3"
+			className="flex flex-col gap-3 rounded-md border border-border bg-surface-1 p-5 shadow-edge"
 		>
-			<header className="flex h-8 items-center gap-1.5">
+			<header className="flex items-center gap-1.5">
 				<h2 id="efeitos-titulo" className="text-heading">
 					Por que a receita mudou
 				</h2>

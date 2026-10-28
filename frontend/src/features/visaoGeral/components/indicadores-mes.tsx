@@ -63,9 +63,9 @@ export function IndicadoresMes({
 	return (
 		<section
 			aria-labelledby="mes-titulo"
-			className="@container flex min-w-0 flex-col gap-3"
+			className="@container flex min-w-0 flex-col overflow-hidden rounded-md border border-border bg-surface-1 shadow-edge"
 		>
-			<div className="flex flex-wrap items-center justify-between gap-2">
+			<div className="flex flex-wrap items-center justify-between gap-2 px-5 pt-4 pb-3">
 				<h2 id="mes-titulo" className="text-heading">
 					Rede e atendimento no mês
 				</h2>
@@ -76,7 +76,7 @@ export function IndicadoresMes({
 					semPeriodos={Boolean(erro) || semDados}
 				/>
 			</div>
-			<div className="grid grid-cols-2 gap-px overflow-hidden rounded-md border border-border bg-border @3xl:grid-cols-4">
+			<div className="grid grid-cols-2 gap-px border-border border-t bg-border @2xl:grid-cols-4">
 				{DA_FAIXA.map((indicador) => {
 					const definicao = DEFINICOES[indicador];
 					const variacao = comparacao.data?.variacao[indicador];
@@ -104,7 +104,7 @@ export function IndicadoresMes({
 							}
 							// Card inteiro é o link: o fundo responde ao hover, e o chevron diz para onde.
 							className={cn(
-								"rounded-none border-0 p-4 shadow-none",
+								"rounded-none border-0 px-5 py-4 shadow-none",
 								LINKS[indicador] && "hover:bg-surface-2",
 							)}
 						>

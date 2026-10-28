@@ -35,30 +35,27 @@ export function VisaoGeralPage() {
 	// Série carregada sem nenhum par possível (menos de dois meses): não há o que comparar.
 	const semDados = Boolean(competencias.data) && !par;
 	return (
-		<Pagina className="min-h-full max-w-none">
+		<Pagina className="max-w-none gap-4">
 			<ResumoReceita
 				janelas={janelas}
 				semJanelas={Boolean(competencias.data) && !janelas}
 				erroSerie={competencias.isError}
 				onRetrySerie={() => competencias.refetch()}
 			/>
-			{/* O porquê ao lado do contexto: dois blocos de mesmo peso, cada um com o seu título. */}
-			<div className="mt-3 grid gap-8 xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] xl:gap-10">
-				<EfeitosReceita janelas={janelas} />
-				<IndicadoresMes
-					competencias={competencias.data ?? []}
-					par={par}
-					onEscolher={escolher}
-					carregando={competencias.isPending}
-					erro={
-						competencias.isError
-							? "Não foi possível carregar os indicadores."
-							: null
-					}
-					semDados={semDados}
-					onRetry={() => competencias.refetch()}
-				/>
-			</div>
+			<EfeitosReceita janelas={janelas} />
+			<IndicadoresMes
+				competencias={competencias.data ?? []}
+				par={par}
+				onEscolher={escolher}
+				carregando={competencias.isPending}
+				erro={
+					competencias.isError
+						? "Não foi possível carregar os indicadores."
+						: null
+				}
+				semDados={semDados}
+				onRetry={() => competencias.refetch()}
+			/>
 		</Pagina>
 	);
 }

@@ -117,7 +117,7 @@ export function ResumoReceita({
 		numeros = <Molde />;
 	} else {
 		numeros = (
-			<dl className="flex flex-col gap-5">
+			<dl className="flex flex-col gap-4">
 				<Numero
 					label="Receita faturada"
 					value={dados.atual.receita_faturada}
@@ -140,7 +140,7 @@ export function ResumoReceita({
 		<section
 			aria-labelledby="resumo-titulo"
 			aria-busy={comparacao.isFetching || undefined}
-			className="@container flex flex-1 flex-col gap-5"
+			className="@container flex flex-col gap-5 rounded-md border border-border bg-surface-1 p-5 shadow-edge"
 		>
 			<header className="flex flex-col gap-1.5">
 				<h2 id="resumo-titulo" className="text-balance font-display text-title">
@@ -153,8 +153,8 @@ export function ResumoReceita({
 					</p>
 				) : null}
 			</header>
-			<div className="grid flex-1 gap-5 lg:grid-cols-[minmax(14rem,18rem)_minmax(0,1fr)]">
-				<div className="@container flex flex-col justify-between gap-5">
+			<div className="grid gap-6 lg:grid-cols-[minmax(13rem,16rem)_minmax(0,1fr)]">
+				<div className="flex flex-col gap-4">
 					{numeros}
 					<Link
 						to="/receita"
@@ -195,10 +195,8 @@ export function ResumoReceita({
 					error={erroSerie ? "Não foi possível carregar a série." : null}
 					onRetry={onRetrySerie}
 					emptyMessage="A tesoura precisa de 13 meses seguidos na Gold."
-					height="fill"
-					// Ocupa a altura que sobra na tela, com piso e teto. O teto acompanha a largura (40% dela,
-					// até 44rem): a proporção do gráfico, e não a altura da tela, decide se 8% vira penhasco.
-					className="h-80 max-h-[min(44rem,40cqw)] rounded-none border-0 bg-transparent p-0 shadow-none lg:h-auto lg:min-h-80 lg:border-border lg:border-l lg:pl-5"
+					height={240}
+					className="rounded-none border-0 bg-transparent p-0 shadow-none lg:border-border lg:border-l lg:pl-6"
 				/>
 			</div>
 		</section>
