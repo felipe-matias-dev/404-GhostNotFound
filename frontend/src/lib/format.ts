@@ -59,7 +59,8 @@ const dataHora = new Intl.DateTimeFormat("pt-BR", {
 	timeStyle: "short",
 });
 
-const MESES = [
+/** Abreviações de mês de `#/lib/format`: rótulos de eixo e de calendário. */
+export const MESES = [
 	"jan",
 	"fev",
 	"mar",

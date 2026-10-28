@@ -11,7 +11,7 @@ import {
 	PopoverContent,
 	PopoverTrigger,
 } from "#/components/ui/popover";
-import { formatCompetencia, formatPeriodoCurto } from "#/lib/format";
+import { formatCompetencia, formatPeriodoCurto, MESES } from "#/lib/format";
 import { cn } from "#/lib/utils";
 import {
 	basesDoMes,
@@ -21,21 +21,6 @@ import {
 	relacaoDoPar,
 } from "../conversions";
 import type { ParPeriodos } from "../types";
-
-const MESES = [
-	"jan",
-	"fev",
-	"mar",
-	"abr",
-	"mai",
-	"jun",
-	"jul",
-	"ago",
-	"set",
-	"out",
-	"nov",
-	"dez",
-];
 
 const competenciaDe = (ano: number, indice: number) =>
 	`${ano}-${String(indice + 1).padStart(2, "0")}`;
