@@ -27,10 +27,13 @@ import {
 } from "motion/react";
 import {
 	type KeyboardEvent,
+	memo,
 	type PointerEvent,
 	type ReactNode,
+	useCallback,
 	useEffect,
 	useId,
+	useMemo,
 	useRef,
 	useState,
 } from "react";
@@ -140,6 +143,8 @@ export type TrendMarker = {
 	/** O que a marca significa, no tooltip: "Mês atual". */
 	label: string;
 };
+
+const NO_MARKERS: TrendMarker[] = [];
 
 export type TrendChartProps = {
 	/** Nome acessível do gráfico e legenda da tabela lida pelo leitor de tela. */
@@ -276,6 +281,72 @@ const lastDefined = (values: (number | null)[]) => {
 	return -1;
 };
 
+type DrawnSeries = {
+	s: TrendSeries;
+	color: TrendColor;
+	emphasis: boolean;
+	values: (number | null)[];
+	path: string;
+	areaPath: string;
+};
+
+type ChartGeometry = {
+	drawn: DrawnSeries[];
+	emphasized: DrawnSeries[];
+	rows: DrawnSeries[];
+	markerAt: Map<string, string>;
+	end: { d: DrawnSeries; last: number; value: number }[];
+};
+
+function geometryOf(
+	geo: Layout,
+	series: TrendSeries[],
+	markers: TrendMarker[],
+	count: number,
+): ChartGeometry {
+	const { px, py, plotHeight } = geo;
+	const toLine = line<number | null>()
+		.defined((v) => v !== null)
+		.x((_, i) => px(i))
+		.y((v) => py(v ?? 0))
+		.curve(curveMonotoneX)
+		.digits(1);
+	const toArea = area<number | null>()
+		.defined((v) => v !== null)
+		.x((_, i) => px(i))
+		.y0(plotHeight)
+		.y1((v) => py(v ?? 0))
+		.curve(curveMonotoneX)
+		.digits(1);
+
+	const drawn = series
+		.map((s, i) => ({
+			s,
+			color: colorOf(s, i),
+			emphasis: isEmphasized(s, series),
+			values: s.values.slice(0, count),
+		}))
+		.sort((a, b) => Number(a.emphasis) - Number(b.emphasis))
+		.map((d) => ({
+			...d,
+			path: toLine(d.values) ?? "",
+			areaPath: d.emphasis ? (toArea(d.values) ?? "") : "",
+		}));
+	const emphasized = drawn.filter((d) => d.emphasis);
+	const end = emphasized.flatMap((d) => {
+		const last = lastDefined(d.values);
+		const value = d.values[last];
+		return last >= 0 && value != null ? [{ d, last, value }] : [];
+	});
+	return {
+		drawn,
+		emphasized,
+		rows: [...drawn].reverse(),
+		markerAt: new Map(markers.map((m) => [m.at, m.label])),
+		end,
+	};
+}
+
 function StateBlock({
 	tone,
 	children,
@@ -348,7 +419,7 @@ export function TrendChart({
 	formatValue = formatNumero,
 	formatTick,
 	categoryLabel = "Período",
-	markers = [],
+	markers = NO_MARKERS,
 	zeroBaseline = false,
 	height = 240,
 	tooltipFooter,
@@ -374,10 +445,13 @@ export function TrendChart({
 	const hasData =
 		count > 0 && (series ?? []).some((s) => s.values.some((v) => v !== null));
 	const tick = formatTick ?? formatValue;
-	const geo =
-		hasData && categories && series && size.width > 0 && plotHeight > 0
-			? layout(categories, series, size.width, plotHeight, zeroBaseline, tick)
-			: null;
+	const geo = useMemo(
+		() =>
+			hasData && categories && series && size.width > 0 && plotHeight > 0
+				? layout(categories, series, size.width, plotHeight, zeroBaseline, tick)
+				: null,
+		[hasData, categories, series, size.width, plotHeight, zeroBaseline, tick],
+	);
 	const current = active !== null && active < count ? active : null;
 	const cursorPx = geo && current !== null ? geo.px(current) : null;
 
@@ -393,17 +467,25 @@ export function TrendChart({
 
 	const motionFor = reduced || resizing ? INSTANT : SPRING;
 
-	const valueText = (value: number | null | undefined) =>
-		value === null || value === undefined ? NOT_APPLICABLE : formatValue(value);
+	const valueText = useCallback(
+		(value: number | null | undefined) =>
+			value === null || value === undefined
+				? NOT_APPLICABLE
+				: formatValue(value),
+		[formatValue],
+	);
 
-	const describe = (index: number) => {
-		const category = categories?.[index];
-		if (!category || !series) return "";
-		const values = series
-			.map((s) => `${s.label}: ${valueText(s.values[index])}`)
-			.join("; ");
-		return `${category.title ?? category.label}. ${values}`;
-	};
+	const describe = useCallback(
+		(index: number) => {
+			const category = categories?.[index];
+			if (!category || !series) return "";
+			const values = series
+				.map((s) => `${s.label}: ${valueText(s.values[index])}`)
+				.join("; ");
+			return `${category.title ?? category.label}. ${values}`;
+		},
+		[categories, series, valueText],
+	);
 
 	const onPointer = (event: PointerEvent<HTMLDivElement>) => {
 		if (!geo || count === 0) return;
@@ -517,26 +599,9 @@ export function TrendChart({
 			</ul>
 		) : null;
 
-	return (
-		<div
-			aria-busy={loading || undefined}
-			className={cn(
-				"flex flex-col gap-4 rounded-md border border-border bg-surface-1 p-5 shadow-edge",
-				className,
-			)}
-		>
-			{header}
-			{legend}
-			<div
-				ref={ref}
-				className={cn("relative", height === "fill" && "min-h-60 flex-1")}
-				style={height === "fill" ? undefined : { height }}
-			>
-				{/* Fora do fluxo: a altura do SVG não pode definir a altura medida do
-				    contêiner, senão `fill` trava no tamanho que já tinha. */}
-				<div className="absolute inset-0">{body}</div>
-			</div>
-			{hasData && categories && series ? (
+	const dataTable = useMemo(
+		() =>
+			hasData && categories && series ? (
 				// Embrulhada: a `caption` escapa do `sr-only` aplicado direto na tabela.
 				<div className="sr-only">
 					<table>
@@ -563,7 +628,30 @@ export function TrendChart({
 						</tbody>
 					</table>
 				</div>
-			) : null}
+			) : null,
+		[hasData, categories, series, label, categoryLabel, valueText],
+	);
+
+	return (
+		<div
+			aria-busy={loading || undefined}
+			className={cn(
+				"flex flex-col gap-4 rounded-md border border-border bg-surface-1 p-5 shadow-edge",
+				className,
+			)}
+		>
+			{header}
+			{legend}
+			<div
+				ref={ref}
+				className={cn("relative", height === "fill" && "min-h-60 flex-1")}
+				style={height === "fill" ? undefined : { height }}
+			>
+				{/* Fora do fluxo: a altura do SVG não pode definir a altura medida do
+				    contêiner, senão `fill` trava no tamanho que já tinha. */}
+				<div className="absolute inset-0">{body}</div>
+			</div>
+			{dataTable}
 		</div>
 	);
 }
@@ -614,37 +702,14 @@ function Plot({
 	formatTick,
 }: PlotProps) {
 	const count = categories.length;
+	const chart = useMemo(
+		() => (geo ? geometryOf(geo, series, markers, count) : null),
+		[geo, series, markers, count],
+	);
 
-	if (!geo) return <div className="h-full" />;
+	if (!geo || !chart) return <div className="h-full" />;
 
-	const { left, plotWidth, plotHeight, px, py, ticks, labelEvery } = geo;
-	const toLine = line<number | null>()
-		.defined((v) => v !== null)
-		.x((_, i) => px(i))
-		.y((v) => py(v ?? 0))
-		.curve(curveMonotoneX)
-		.digits(1);
-	const toArea = area<number | null>()
-		.defined((v) => v !== null)
-		.x((_, i) => px(i))
-		.y0(plotHeight)
-		.y1((v) => py(v ?? 0))
-		.curve(curveMonotoneX)
-		.digits(1);
-
-	const drawn = series
-		.map((s, i) => ({
-			s,
-			color: colorOf(s, i),
-			emphasis: isEmphasized(s, series),
-			values: s.values.slice(0, count),
-		}))
-		.sort((a, b) => Number(a.emphasis) - Number(b.emphasis));
-	const rows = [...drawn].reverse();
-	const markerAt = new Map(markers.map((m) => [m.at, m.label]));
-	const activeCategory = current === null ? undefined : categories[current];
-	const flip = current !== null && px(current) > plotWidth / 2;
-	const enter = reduced ? INSTANT : DRAW;
+	const { left } = geo;
 
 	return (
 		<div
@@ -671,266 +736,383 @@ function Plot({
 				className="block overflow-visible"
 			>
 				<defs>
-					{drawn
-						.filter((d) => d.emphasis)
-						.map((d) => (
-							<linearGradient
-								key={d.s.id}
-								id={`${gradientId}-${d.s.id}`}
-								x1="0"
-								x2="0"
-								y1="0"
-								y2="1"
-							>
-								<stop
-									offset="0%"
-									stopOpacity={0.16}
-									style={{ stopColor: COLORS[d.color].stop }}
-								/>
-								<stop
-									offset="100%"
-									stopOpacity={0}
-									style={{ stopColor: COLORS[d.color].stop }}
-								/>
-							</linearGradient>
-						))}
+					{chart.emphasized.map((d) => (
+						<linearGradient
+							key={d.s.id}
+							id={`${gradientId}-${d.s.id}`}
+							x1="0"
+							x2="0"
+							y1="0"
+							y2="1"
+						>
+							<stop
+								offset="0%"
+								stopOpacity={0.16}
+								style={{ stopColor: COLORS[d.color].stop }}
+							/>
+							<stop
+								offset="100%"
+								stopOpacity={0}
+								style={{ stopColor: COLORS[d.color].stop }}
+							/>
+						</linearGradient>
+					))}
 				</defs>
 				<g transform={`translate(${left} ${MARGIN.top})`}>
-					<AnimatePresence initial={false}>
-						{ticks.map((t) => (
-							<motion.g
-								key={t}
-								initial={{ opacity: 0, y: py(t) }}
-								animate={{ opacity: 1, y: py(t) }}
-								exit={{ opacity: 0, transition: FADE }}
-								transition={motionFor}
-							>
-								<line x1={0} x2={plotWidth} className="stroke-border" />
-								<text
-									x={-12}
-									dy="0.32em"
-									textAnchor="end"
-									className="fill-text-muted text-small tabular-nums"
-								>
-									{formatTick(t)}
-								</text>
-							</motion.g>
-						))}
-					</AnimatePresence>
+					<StaticLayers
+						geo={geo}
+						chart={chart}
+						categories={categories}
+						formatTick={formatTick}
+						motionFor={motionFor}
+						reduced={reduced}
+						gradientId={gradientId}
+					/>
 
-					<AnimatePresence initial={false}>
-						{categories.map((c, i) =>
-							(count - 1 - i) % labelEvery === 0 ? (
-								<motion.text
-									key={c.key}
-									x={px(i)}
-									y={plotHeight + 20}
-									textAnchor="middle"
-									initial={{ opacity: 0 }}
-									animate={{ opacity: 1 }}
-									exit={{ opacity: 0 }}
-									transition={FADE}
-									className={cn(
-										"text-small tabular-nums",
-										i === current ? "fill-text" : "fill-text-muted",
-									)}
-								>
-									{c.label}
-								</motion.text>
-							) : null,
-						)}
-					</AnimatePresence>
+					<XLabels geo={geo} categories={categories} current={current} />
 
-					<AnimatePresence initial={false}>
-						{categories.map((c, i) =>
-							markerAt.has(c.key) ? (
-								<motion.line
-									key={`marker-${c.key}`}
-									x1={px(i)}
-									x2={px(i)}
-									y1={0}
-									y2={plotHeight}
-									strokeDasharray="2 4"
-									initial={{ opacity: 0 }}
-									animate={{ opacity: 1 }}
-									exit={{ opacity: 0 }}
-									transition={FADE}
-									className="stroke-border-strong"
-								/>
-							) : null,
-						)}
-					</AnimatePresence>
+					<EndDots
+						geo={geo}
+						chart={chart}
+						current={current}
+						motionFor={motionFor}
+						reduced={reduced}
+					/>
 
-					<AnimatePresence>
-						{drawn
-							.filter((d) => d.emphasis)
-							.map((d) => {
-								const path = toArea(d.values) ?? "";
-								return (
-									<motion.path
-										key={`area-${d.s.id}`}
-										fill={`url(#${gradientId}-${d.s.id})`}
-										initial={reduced ? false : { d: path, opacity: 0 }}
-										animate={{ d: path, opacity: 1 }}
-										exit={{ opacity: 0, transition: FADE }}
-										transition={{ ...motionFor, opacity: enter }}
-									/>
-								);
-							})}
-					</AnimatePresence>
-
-					<AnimatePresence>
-						{drawn.map((d) => {
-							const path = toLine(d.values) ?? "";
-							return (
-								<motion.path
-									key={d.s.id}
-									fill="none"
-									strokeWidth={d.emphasis ? 2 : 1.5}
-									strokeLinecap="round"
-									strokeLinejoin="round"
-									className={COLORS[d.color].stroke}
-									initial={
-										reduced ? false : { d: path, pathLength: 0, opacity: 0 }
-									}
-									animate={{ d: path, pathLength: 1, opacity: 1 }}
-									exit={{ opacity: 0, transition: FADE }}
-									transition={{
-										...motionFor,
-										pathLength: enter,
-										opacity: FADE,
-									}}
-								/>
-							);
-						})}
-					</AnimatePresence>
-
-					<AnimatePresence>
-						{drawn
-							.filter((d) => d.emphasis && current === null)
-							.map((d) => {
-								const last = lastDefined(d.values);
-								const value = d.values[last];
-								if (last < 0 || value === null || value === undefined)
-									return null;
-								return (
-									<motion.g
-										key={`end-${d.s.id}`}
-										initial={
-											reduced
-												? false
-												: { opacity: 0, x: px(last), y: py(value) }
-										}
-										animate={{ opacity: 1, x: px(last), y: py(value) }}
-										exit={{ opacity: 0, transition: FADE }}
-										transition={{
-											...motionFor,
-											opacity: reduced ? INSTANT : { ...FADE, delay: 0.5 },
-										}}
-									>
-										<circle r={7} className={COLORS[d.color].halo} />
-										<circle r={3.5} className={COLORS[d.color].fill} />
-									</motion.g>
-								);
-							})}
-					</AnimatePresence>
-
-					<motion.g
-						style={{ x: cursorX }}
-						initial={false}
-						animate={{ opacity: current === null ? 0 : 1 }}
-						transition={FADE}
-					>
-						<line y1={0} y2={plotHeight} className="stroke-border-strong" />
-						{current !== null
-							? drawn.map((d) => {
-									const value = d.values[current];
-									if (value === null || value === undefined) return null;
-									return (
-										<motion.circle
-											key={d.s.id}
-											cx={0}
-											r={d.emphasis ? 4 : 3}
-											strokeWidth={2}
-											initial={false}
-											animate={{ cy: py(value) }}
-											transition={motionFor}
-											className={cn("fill-surface-1", COLORS[d.color].stroke)}
-										/>
-									);
-								})
-							: null}
-					</motion.g>
+					<CursorLine
+						geo={geo}
+						chart={chart}
+						current={current}
+						motionFor={motionFor}
+						cursorX={cursorX}
+					/>
 				</g>
 			</svg>
 
-			<motion.div
-				aria-hidden
-				className="pointer-events-none absolute top-0"
-				style={{ left, x: cursorX }}
-			>
-				<AnimatePresence>
-					{activeCategory && current !== null ? (
-						<motion.div
-							key="tooltip"
-							initial={{ opacity: 0, scale: reduced ? 1 : 0.96 }}
-							animate={{ opacity: 1, scale: 1 }}
-							exit={{ opacity: 0, transition: FADE }}
-							transition={FADE}
-							className={cn(
-								"flex w-max min-w-40 max-w-64 flex-col gap-1.5 rounded-md border border-border-strong bg-surface-2 px-2.5 py-2 text-small text-text shadow-overlay",
-								flip
-									? "-translate-x-full -ml-3 origin-top-right"
-									: "ml-3 origin-top-left",
-							)}
-						>
-							<p className="flex items-baseline justify-between gap-3">
-								<span className="font-medium">
-									{activeCategory.title ?? activeCategory.label}
-								</span>
-								{markerAt.has(activeCategory.key) ? (
-									<span className="text-text-muted">
-										{markerAt.get(activeCategory.key)}
-									</span>
-								) : null}
-							</p>
-							<dl className="grid grid-cols-[auto_1fr_auto] items-center gap-x-2 gap-y-1">
-								{rows.map((d) => (
-									<div key={d.s.id} className="contents">
-										<span
-											className={cn(
-												"h-0.5 w-2.5 rounded-full",
-												COLORS[d.color].swatch,
-											)}
-										/>
-										<dt
-											className={cn(
-												"truncate",
-												d.emphasis ? "text-text" : "text-text-muted",
-											)}
-										>
-											{d.s.label}
-										</dt>
-										<dd
-											className={cn(
-												"text-right tabular-nums",
-												d.emphasis ? "font-medium" : "text-text-muted",
-											)}
-										>
-											{valueText(d.values[current])}
-										</dd>
-									</div>
-								))}
-							</dl>
-							{tooltipFooter ? (
-								<div className="border-t border-border pt-1.5">
-									{tooltipFooter(current)}
-								</div>
-							) : null}
-						</motion.div>
-					) : null}
-				</AnimatePresence>
-			</motion.div>
+			<Tooltip
+				geo={geo}
+				chart={chart}
+				categories={categories}
+				current={current}
+				reduced={reduced}
+				cursorX={cursorX}
+				valueText={valueText}
+				tooltipFooter={tooltipFooter}
+			/>
 		</div>
+	);
+}
+
+type StaticLayersProps = {
+	geo: Layout;
+	chart: ChartGeometry;
+	categories: TrendCategory[];
+	formatTick: (value: number) => string;
+	motionFor: typeof SPRING | typeof INSTANT;
+	reduced: boolean;
+	gradientId: string;
+};
+
+const StaticLayers = memo(function StaticLayers({
+	geo,
+	chart,
+	categories,
+	formatTick,
+	motionFor,
+	reduced,
+	gradientId,
+}: StaticLayersProps) {
+	const { plotWidth, plotHeight, px, py, ticks } = geo;
+	const enter = reduced ? INSTANT : DRAW;
+	return (
+		<>
+			<AnimatePresence initial={false}>
+				{ticks.map((t) => (
+					<motion.g
+						key={t}
+						initial={{ opacity: 0, y: py(t) }}
+						animate={{ opacity: 1, y: py(t) }}
+						exit={{ opacity: 0, transition: FADE }}
+						transition={motionFor}
+					>
+						<line x1={0} x2={plotWidth} className="stroke-border" />
+						<text
+							x={-12}
+							dy="0.32em"
+							textAnchor="end"
+							className="fill-text-muted text-small tabular-nums"
+						>
+							{formatTick(t)}
+						</text>
+					</motion.g>
+				))}
+			</AnimatePresence>
+
+			<AnimatePresence initial={false}>
+				{categories.map((c, i) =>
+					chart.markerAt.has(c.key) ? (
+						<motion.line
+							key={`marker-${c.key}`}
+							x1={px(i)}
+							x2={px(i)}
+							y1={0}
+							y2={plotHeight}
+							strokeDasharray="2 4"
+							initial={{ opacity: 0 }}
+							animate={{ opacity: 1 }}
+							exit={{ opacity: 0 }}
+							transition={FADE}
+							className="stroke-border-strong"
+						/>
+					) : null,
+				)}
+			</AnimatePresence>
+
+			<AnimatePresence>
+				{chart.emphasized.map((d) => (
+					<motion.path
+						key={`area-${d.s.id}`}
+						fill={`url(#${gradientId}-${d.s.id})`}
+						initial={reduced ? false : { d: d.areaPath, opacity: 0 }}
+						animate={{ d: d.areaPath, opacity: 1 }}
+						exit={{ opacity: 0, transition: FADE }}
+						transition={{ ...motionFor, opacity: enter }}
+					/>
+				))}
+			</AnimatePresence>
+
+			<AnimatePresence>
+				{chart.drawn.map((d) => (
+					<motion.path
+						key={d.s.id}
+						fill="none"
+						strokeWidth={d.emphasis ? 2 : 1.5}
+						strokeLinecap="round"
+						strokeLinejoin="round"
+						className={COLORS[d.color].stroke}
+						initial={reduced ? false : { d: d.path, pathLength: 0, opacity: 0 }}
+						animate={{ d: d.path, pathLength: 1, opacity: 1 }}
+						exit={{ opacity: 0, transition: FADE }}
+						transition={{
+							...motionFor,
+							pathLength: enter,
+							opacity: FADE,
+						}}
+					/>
+				))}
+			</AnimatePresence>
+		</>
+	);
+});
+
+function XLabels({
+	geo,
+	categories,
+	current,
+}: {
+	geo: Layout;
+	categories: TrendCategory[];
+	current: number | null;
+}) {
+	const { px, plotHeight, labelEvery } = geo;
+	return (
+		<AnimatePresence initial={false}>
+			{categories.map((c, i) =>
+				(categories.length - 1 - i) % labelEvery === 0 ? (
+					<motion.text
+						key={c.key}
+						x={px(i)}
+						y={plotHeight + 20}
+						textAnchor="middle"
+						initial={{ opacity: 0 }}
+						animate={{ opacity: 1 }}
+						exit={{ opacity: 0 }}
+						transition={FADE}
+						className={cn(
+							"text-small tabular-nums",
+							i === current ? "fill-text" : "fill-text-muted",
+						)}
+					>
+						{c.label}
+					</motion.text>
+				) : null,
+			)}
+		</AnimatePresence>
+	);
+}
+
+function EndDots({
+	geo,
+	chart,
+	current,
+	motionFor,
+	reduced,
+}: {
+	geo: Layout;
+	chart: ChartGeometry;
+	current: number | null;
+	motionFor: typeof SPRING | typeof INSTANT;
+	reduced: boolean;
+}) {
+	const { px, py } = geo;
+	return (
+		<AnimatePresence>
+			{current === null
+				? chart.end.map(({ d, last, value }) => (
+						<motion.g
+							key={`end-${d.s.id}`}
+							initial={
+								reduced ? false : { opacity: 0, x: px(last), y: py(value) }
+							}
+							animate={{ opacity: 1, x: px(last), y: py(value) }}
+							exit={{ opacity: 0, transition: FADE }}
+							transition={{
+								...motionFor,
+								opacity: reduced ? INSTANT : { ...FADE, delay: 0.5 },
+							}}
+						>
+							<circle r={7} className={COLORS[d.color].halo} />
+							<circle r={3.5} className={COLORS[d.color].fill} />
+						</motion.g>
+					))
+				: null}
+		</AnimatePresence>
+	);
+}
+
+function CursorLine({
+	geo,
+	chart,
+	current,
+	motionFor,
+	cursorX,
+}: {
+	geo: Layout;
+	chart: ChartGeometry;
+	current: number | null;
+	motionFor: typeof SPRING | typeof INSTANT;
+	cursorX: MotionValue<number>;
+}) {
+	const { plotHeight, py } = geo;
+	return (
+		<motion.g
+			style={{ x: cursorX }}
+			initial={false}
+			animate={{ opacity: current === null ? 0 : 1 }}
+			transition={FADE}
+		>
+			<line y1={0} y2={plotHeight} className="stroke-border-strong" />
+			{current !== null
+				? chart.drawn.map((d) => {
+						const value = d.values[current];
+						if (value === null || value === undefined) return null;
+						return (
+							<motion.circle
+								key={d.s.id}
+								cx={0}
+								r={d.emphasis ? 4 : 3}
+								strokeWidth={2}
+								initial={false}
+								animate={{ cy: py(value) }}
+								transition={motionFor}
+								className={cn("fill-surface-1", COLORS[d.color].stroke)}
+							/>
+						);
+					})
+				: null}
+		</motion.g>
+	);
+}
+
+function Tooltip({
+	geo,
+	chart,
+	categories,
+	current,
+	reduced,
+	cursorX,
+	valueText,
+	tooltipFooter,
+}: {
+	geo: Layout;
+	chart: ChartGeometry;
+	categories: TrendCategory[];
+	current: number | null;
+	reduced: boolean;
+	cursorX: MotionValue<number>;
+	valueText: (value: number | null | undefined) => string;
+	tooltipFooter?: (index: number) => ReactNode;
+}) {
+	const { left, plotWidth, px } = geo;
+	const activeCategory = current === null ? undefined : categories[current];
+	const flip = current !== null && px(current) > plotWidth / 2;
+	return (
+		<motion.div
+			aria-hidden
+			className="pointer-events-none absolute top-0"
+			style={{ left, x: cursorX }}
+		>
+			<AnimatePresence>
+				{activeCategory && current !== null ? (
+					<motion.div
+						key="tooltip"
+						initial={{ opacity: 0, scale: reduced ? 1 : 0.96 }}
+						animate={{ opacity: 1, scale: 1 }}
+						exit={{ opacity: 0, transition: FADE }}
+						transition={FADE}
+						className={cn(
+							"flex w-max min-w-40 max-w-64 flex-col gap-1.5 rounded-md border border-border-strong bg-surface-2 px-2.5 py-2 text-small text-text shadow-overlay",
+							flip
+								? "-translate-x-full -ml-3 origin-top-right"
+								: "ml-3 origin-top-left",
+						)}
+					>
+						<p className="flex items-baseline justify-between gap-3">
+							<span className="font-medium">
+								{activeCategory.title ?? activeCategory.label}
+							</span>
+							{chart.markerAt.has(activeCategory.key) ? (
+								<span className="text-text-muted">
+									{chart.markerAt.get(activeCategory.key)}
+								</span>
+							) : null}
+						</p>
+						<dl className="grid grid-cols-[auto_1fr_auto] items-center gap-x-2 gap-y-1">
+							{chart.rows.map((d) => (
+								<div key={d.s.id} className="contents">
+									<span
+										className={cn(
+											"h-0.5 w-2.5 rounded-full",
+											COLORS[d.color].swatch,
+										)}
+									/>
+									<dt
+										className={cn(
+											"truncate",
+											d.emphasis ? "text-text" : "text-text-muted",
+										)}
+									>
+										{d.s.label}
+									</dt>
+									<dd
+										className={cn(
+											"text-right tabular-nums",
+											d.emphasis ? "font-medium" : "text-text-muted",
+										)}
+									>
+										{valueText(d.values[current])}
+									</dd>
+								</div>
+							))}
+						</dl>
+						{tooltipFooter ? (
+							<div className="border-t border-border pt-1.5">
+								{tooltipFooter(current)}
+							</div>
+						) : null}
+					</motion.div>
+				) : null}
+			</AnimatePresence>
+		</motion.div>
 	);
 }
