@@ -28,20 +28,18 @@ function Numero({
 	value,
 	format,
 	pct,
-	className,
 }: {
 	label: string;
 	value: number;
 	format: (valor: number) => string;
 	/** Variação em %, como vem da API. */
 	pct: number | null;
-	className?: string;
 }) {
 	return (
 		<div className="flex flex-col gap-1.5">
 			<dt className="text-small text-text-muted">{label}</dt>
 			<dd className="flex flex-col items-start gap-1.5">
-				<KpiValue value={value} format={format} className={className} />
+				<KpiValue value={value} format={format} />
 				{pct === null ? null : <KpiDelta value={pct / 100} />}
 			</dd>
 		</div>
@@ -123,7 +121,6 @@ export function ResumoReceita({
 					value={dados.atual.receita_faturada}
 					format={receita}
 					pct={dados.variacao_receita_pct}
-					className="@3xs:text-display"
 				/>
 				<Numero
 					label="Energia faturada"
