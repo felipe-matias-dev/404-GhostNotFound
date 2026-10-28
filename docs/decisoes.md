@@ -1307,15 +1307,13 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   - `GERADA` e `EM_CAMPO` seguem ativas, então o índice único parcial continua valendo e a unidade consumidora não ganha outra OI;
   - o resultado só é aceito ao concluir (`422` em qualquer outro caso);
   - o `PATCH` continua travando a linha da OI.
-- **Observação na volta é opcional:** exigir motivo para um clique errado seria atrito, e o evento já registra de onde a OI veio,
-  para onde foi e quando.
+- **Observação na volta é opcional e fica só no histórico:** exigir motivo para um clique errado seria atrito, e o evento já
+  registra de onde a OI veio, para onde foi e quando. O motivo não é copiado para o campo `observacao` da OI, que continua
+  sendo o que a equipe viu em campo ou o motivo do cancelamento; a observação que já estava lá não é sobrescrita.
 - **Alternativas descartadas:**
   - Só aumentar a janela do "Desfazer": continua cego para o erro percebido depois, e uma janela longa atrasa o envio de verdade.
   - Rota de ação (`/devolver`): a DEC-009 já descartou rotas por ação, porque espalham a validação.
   - Status novo (`DEVOLVIDA`): complica o mapa e o filtro por status sem ganho, já que o evento do histórico registra a volta.
-- **Limitação conhecida:** como no cancelamento, a observação enviada no `PATCH` também é copiada para o campo `observacao` da OI.
-  Uma volta com "Enviada por engano" deixa essa frase como observação da OI até a próxima mudança com observação. O histórico
-  fica certo; só o campo da OI pode ficar enganoso.
 - **Impacto:** nenhuma mudança no contrato OpenAPI (o enum `StatusOrdem` é o mesmo). O "Desfazer" de 6 segundos continua, porque
   cobre o clique errado percebido na hora sem tocar no banco. A tela de perdas ainda não oferece a volta: falta uma ação nova em
   `ACOES_POR_STATUS` (`frontend/src/features/perdas/conversions.ts`), que é do João. Com ela, arrastar o cartão do Kanban de volta
