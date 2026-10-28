@@ -12,7 +12,12 @@ SELECT
     classe_cadastro,
     cod_alimentador,
     possui_gd,
-    consumo_medio_kwh_12m
+    consumo_medio_kwh_12m,
+    data_ligacao,
+    data_conexao_gd,
+    modalidade_gd,
+    energia_injetada_kwh_mes,
+    potencia_kwp
 FROM gold.gold_dim_uc;
 
 CREATE OR REPLACE VIEW gold.sem_faturamento_mensal AS
@@ -25,7 +30,15 @@ SELECT
     tributos,
     receita_arrecadada,
     tarifa_media,
-    bandeira
+    bandeira,
+    receita_bandeira,
+    data_vencimento,
+    data_pagamento,
+    status_pagamento,
+    dias_em_atraso,
+    tipo_leitura,
+    tipo_medidor,
+    dias_faturados
 FROM gold.gold_fato_faturamento_mensal;
 
 CREATE OR REPLACE VIEW gold.sem_continuidade_alimentador_mensal AS
@@ -71,7 +84,15 @@ SELECT
     n_interrupcoes,
     n_chamados,
     soma_notas,
-    n_notas
+    n_notas,
+    receita_bandeira,
+    n_faturas,
+    n_faturas_nao_pagas,
+    valor_nao_pago,
+    n_faturas_pagas_com_atraso,
+    soma_dias_em_atraso,
+    n_leituras,
+    n_leituras_estimadas
 FROM gold.gold_kpis_segmento_mensal;
 
 CREATE OR REPLACE VIEW gold.sem_receita_decomposicao AS
@@ -90,3 +111,40 @@ SELECT
     efeito_volume,
     efeito_mix
 FROM gold.gold_receita_decomposicao;
+
+CREATE OR REPLACE VIEW gold.sem_interrupcoes_uc AS
+SELECT
+    cod_ocorrencia,
+    cod_uc,
+    competencia,
+    data_abertura,
+    data_encerramento,
+    duracao_horas,
+    tipo,
+    causa
+FROM gold.gold_interrupcoes_uc;
+
+CREATE OR REPLACE VIEW gold.sem_atendimentos_uc AS
+SELECT
+    protocolo,
+    cod_uc,
+    competencia,
+    data_abertura,
+    data_fechamento,
+    canal,
+    assunto,
+    subassunto,
+    nota_satisfacao
+FROM gold.gold_atendimentos_uc;
+
+CREATE OR REPLACE VIEW gold.sem_medidor_uc AS
+SELECT
+    cod_uc,
+    cod_medidor,
+    tipo_medidor,
+    modelo,
+    data_instalacao,
+    idade_anos,
+    n_trocas,
+    data_ultima_troca
+FROM gold.gold_medidor_uc;

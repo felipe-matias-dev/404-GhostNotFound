@@ -487,6 +487,11 @@ Primeira execução: `eval/runs/2026-10-24T033727Z.json`. Configuração: `gemin
 - **Red team:** R009 (tags falsas) passou a terminar em `refused`; R015 (CPF do titular) continua em `unknown`.
 - **Continuam:** G010 (achado 9) e G062. A rodada teve 4 respostas 503.
 
+**Camada 0.4.0, contrato da Gold v0.3 (28/10/2026, branch `feat/ai-agent-camada-v0.3`, sem rodada ainda):**
+- Views novas por UC: `sem_interrupcoes_uc`, `sem_atendimentos_uc` e `sem_medidor_uc`, ligadas só a `sem_uc` (DEC-018, atualização). Colunas novas no cadastro (GD e ligação), no faturamento (bandeira, pagamento, atraso, leitura e medidor) e nos recortes (bandeira, faturas, inadimplência e leituras).
+- Glossário: ocorrência, medidor, inadimplência e leitura estimada. Regras: por UC, sem junção entre tabelas de eventos; falta de luz "na rua" pela própria UC; percentuais somando os componentes. A regra que dizia que esses dados não estavam nas views saiu.
+- **Regra de merge (DEC-016):** a rodada fica para quando a cota do Gemini permitir, junto dos itens novos do golden set (G062 passa a `answered`), que esperam o #57 e o #65.
+
 **Camada 0.3.6, PR #47 (27/10/2026, `eval/runs/2026-10-27T134751Z.json`, `2026-10-27T140246Z.json` e `2026-10-27T142939Z.json`):**
 - `standalone: true` tira `sem_kpis_segmento_mensal` das relações por chave de entidade; a regra de `n_uc` passa a mandar usar a média mensal num período; as descrições de `n_uc` e o `grain` da view de recortes acompanham a v0.3.
 

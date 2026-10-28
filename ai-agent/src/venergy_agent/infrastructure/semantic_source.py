@@ -189,7 +189,8 @@ def _relations(
                         )
                     )
 
-    for key in sorted(ENTITY_KEYS):
+    linked_by_foreign_key = {relation.left_column for relation in relations}
+    for key in sorted(ENTITY_KEYS - linked_by_foreign_key):
         holders = [
             definition
             for definition in definitions
