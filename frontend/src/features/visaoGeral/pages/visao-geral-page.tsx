@@ -4,7 +4,7 @@ import { EfeitosReceita } from "../components/efeitos-receita";
 import { IndicadoresMes } from "../components/indicadores-mes";
 import { ResumoReceita } from "../components/resumo-receita";
 import { janelasDaBase, parEscolhido } from "../conversions";
-import { useCompetencias } from "../hooks/use-indicadores";
+import { useCompetencias, useJanelas } from "../hooks/use-indicadores";
 import type { ParPeriodos } from "../types";
 
 const route = getRouteApi("/");
@@ -18,8 +18,9 @@ export function VisaoGeralPage() {
 	const par = competencias.data
 		? parEscolhido(competencias.data, periodo_base, periodo_atual)
 		: undefined;
-	const janelas = competencias.data
-		? janelasDaBase(competencias.data)
+	const serieJanelas = useJanelas();
+	const janelas = serieJanelas.data
+		? janelasDaBase(serieJanelas.data)
 		: undefined;
 
 	const escolher = (proximo: ParPeriodos) =>
@@ -38,9 +39,9 @@ export function VisaoGeralPage() {
 		<Pagina className="max-w-none gap-4">
 			<ResumoReceita
 				janelas={janelas}
-				semJanelas={Boolean(competencias.data) && !janelas}
-				erroSerie={competencias.isError}
-				onRetrySerie={() => competencias.refetch()}
+				semJanelas={Boolean(serieJanelas.data) && !janelas}
+				erroSerie={serieJanelas.isError}
+				onRetrySerie={() => serieJanelas.refetch()}
 			/>
 			<EfeitosReceita janelas={janelas} />
 			<IndicadoresMes

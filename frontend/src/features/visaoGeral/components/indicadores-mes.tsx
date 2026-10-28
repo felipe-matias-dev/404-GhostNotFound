@@ -28,8 +28,8 @@ const LINKS: Partial<Record<Indicador, ReactElement>> = {
 
 /**
  * Rede e atendimento no mês escolhido, numa faixa só, cada um com a variação sobre o mês base
- * e a forma da série inteira (o mês atual em destaque, o base em anel). O mês contra mês é o
- * que a tela usa para DEC, FEC e satisfação até passar para a rota de comparação (DEC-041).
+ * e a forma da série inteira (o mês atual em destaque, o base em anel). Valores e variações
+ * vêm da comparação do backend; a série mensal serve só às sparklines.
  */
 export function IndicadoresMes({
 	competencias,
@@ -79,28 +79,35 @@ export function IndicadoresMes({
 			<div className="grid grid-cols-2 gap-px border-border border-t bg-border @2xl:grid-cols-4">
 				{DA_FAIXA.map((indicador) => {
 					const definicao = DEFINICOES[indicador];
-					const variacao = comparacao.data?.variacao[indicador];
+					const variacao = comparacao.data?.variacao_pct[indicador];
 					const valores = linhas.map((linha) => linha[indicador] ?? null);
 					return (
 						<KpiCard
 							key={indicador}
 							label={definicao.label}
 							value={
-								semDados ? null : comparacao.data?.atual.valores[indicador]
+								semDados || comparacao.data?.atual.n_meses === 0
+									? null
+									: comparacao.data?.atual[indicador]
 							}
 							format={definicao.format}
 							hint={definicao.hint}
 							link={LINKS[indicador]}
-							loading={carregando}
-							error={erro}
-							onRetry={onRetry}
+							loading={carregando || (Boolean(par) && comparacao.isPending)}
+							error={
+								erro ??
+								(comparacao.isError
+									? "Não foi possível carregar os indicadores."
+									: null)
+							}
+							onRetry={erro ? onRetry : () => comparacao.refetch()}
 							emptyMessage={
 								semDados ? "Sem indicadores carregados." : "Sem dado no mês."
 							}
 							delta={
 								variacao == null
 									? undefined
-									: { value: variacao, favorable: definicao.favorable }
+									: { value: variacao / 100, favorable: definicao.favorable }
 							}
 							// Card inteiro é o link: o fundo responde ao hover, e o chevron diz para onde.
 							className={cn(

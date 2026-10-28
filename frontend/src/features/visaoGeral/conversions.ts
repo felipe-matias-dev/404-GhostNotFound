@@ -1,22 +1,7 @@
 import type { TrendCategory, TrendSeries } from "#/components/ui/trend-chart";
 import type { WaterfallStep } from "#/components/ui/waterfall-chart";
 import { formatCompetencia, formatCompetenciaCurta } from "#/lib/format";
-import type {
-	ComparacaoIndicadores,
-	Indicador,
-	IndicadoresPeriodo,
-	KpisMensais,
-	ParPeriodos,
-} from "./types";
-
-export const INDICADORES = [
-	"receita_faturada",
-	"kwh_faturado",
-	"dec",
-	"fec",
-	"n_chamados",
-	"satisfacao_media",
-] as const satisfies readonly Indicador[];
+import type { JanelaIndicadores, ParPeriodos } from "./types";
 
 /** "2025-03" → "2025-03/2025-03": um mês no formato de período da URL e da API. */
 export const periodoDoMes = (competencia: string) =>
@@ -93,7 +78,7 @@ export function parPadrao(competencias: string[]): ParPeriodos | undefined {
 
 /**
  * O par da URL, se é mês contra mês, com os dois meses na série e a base antes do atual;
- * senão o padrão. Trechos de vários meses esperam a rota de comparação do backend (DEC-036).
+ * senão o padrão. O seletor da faixa continua mensal.
  */
 export function parEscolhido(
 	competencias: string[],
@@ -118,68 +103,20 @@ export function parEscolhido(
 	return parPadrao(competencias);
 }
 
-/** Variação do atual sobre a base, em fração; nula sem um dos lados ou com base zero. */
-export function variacao(
-	base: number | null,
-	atual: number | null,
-): number | null {
-	if (base == null || atual == null || base === 0) return null;
-	return (atual - base) / base;
-}
-
-function indicadoresDoMes(
-	linhas: KpisMensais[],
-	periodo: string,
-): IndicadoresPeriodo {
-	const linha = linhas.find((l) => l.competencia === mesDoPeriodo(periodo));
-	const valores = Object.fromEntries(
-		INDICADORES.map((indicador) => [indicador, linha?.[indicador] ?? null]),
-	) as Record<Indicador, number | null>;
-	return { periodo, valores };
-}
-
-/**
- * Comparação mês contra mês a partir da série mensal: os valores são os da Gold, sem conta, e
- * a tela só calcula a variação percentual, como na tela de receita (DEC-035).
- */
-export function compararMeses(
-	linhas: KpisMensais[],
-	par: ParPeriodos,
-): ComparacaoIndicadores {
-	const base = indicadoresDoMes(linhas, par.periodo_base);
-	const atual = indicadoresDoMes(linhas, par.periodo_atual);
-	return {
-		base,
-		atual,
-		variacao: Object.fromEntries(
-			INDICADORES.map((indicador) => [
-				indicador,
-				variacao(base.valores[indicador], atual.valores[indicador]),
-			]),
-		) as Record<Indicador, number | null>,
-	};
-}
-
-const JANELA = 12;
-
-const fechaJanela = (inicio: string, fim: string) =>
-	deslocar(inicio, JANELA - 1) === fim;
-
 /** Janelas de 12 meses no formato de período da URL e da API: "2024-01/2024-12". */
 export type Janelas = { base: string; atual: string };
 
-/**
- * A comparação da pergunta da diretoria: os 12 meses mais recentes contra os 12 primeiros da
- * base. Com menos de 24 meses as janelas se sobreporiam, e com buraco na série uma janela não
- * teria 12 meses: nos dois casos, não há comparação.
- */
-export function janelasDaBase(competencias: string[]): Janelas | undefined {
-	if (competencias.length < 2 * JANELA) return undefined;
-	const [bi, bf] = [competencias[0], competencias[JANELA - 1]];
-	const [ai, af] = [competencias.at(-JANELA), competencias.at(-1)];
-	if (!bi || !bf || !ai || !af) return undefined;
-	if (!fechaJanela(bi, bf) || !fechaJanela(ai, af)) return undefined;
-	return { base: `${bi}/${bf}`, atual: `${ai}/${af}` };
+/** Primeira e última janelas completas de 12 meses, sem sobreposição. */
+export function janelasDaBase(
+	janelas: JanelaIndicadores[],
+): Janelas | undefined {
+	const base = janelas[0];
+	const atual = janelas.at(-1);
+	if (!base || !atual || atual.inicio <= base.fim) return undefined;
+	return {
+		base: `${base.inicio}/${base.fim}`,
+		atual: `${atual.inicio}/${atual.fim}`,
+	};
 }
 
 export type Tesoura = {
@@ -189,34 +126,16 @@ export type Tesoura = {
 	somas: { receita: number; kwh: number }[];
 };
 
-/**
- * Receita e energia faturadas em 12 meses corridos, como variação sobre a primeira janela (0 = igual).
- * A soma de 12 meses tira a sazonalidade, e a variação põe R$ e kWh na mesma escala: a distância
- * entre as linhas é a pergunta da diretoria. Só soma e divide o que a Gold gravou (DEC-041).
- * Janela com buraco na série fica de fora; com menos de dois pontos, não há tesoura.
- */
-export function tesoura(linhas: KpisMensais[]): Tesoura {
-	const pontos: { competencia: string; receita: number; kwh: number }[] = [];
-	for (let fim = JANELA - 1; fim < linhas.length; fim++) {
-		const janela = linhas.slice(fim - JANELA + 1, fim + 1);
-		const primeira = janela[0];
-		const ultima = janela[JANELA - 1];
-		if (!primeira || !ultima) continue;
-		if (!fechaJanela(primeira.competencia, ultima.competencia)) continue;
-		pontos.push({
-			competencia: ultima.competencia,
-			receita: janela.reduce((soma, l) => soma + l.receita_faturada, 0),
-			kwh: janela.reduce((soma, l) => soma + l.kwh_faturado, 0),
-		});
-	}
+/** Variação das somas calculadas pelo backend sobre a primeira janela. */
+export function tesoura(pontos: JanelaIndicadores[]): Tesoura {
 	const base = pontos[0];
 	if (!base || pontos.length < 2)
 		return { categories: [], series: [], somas: [] };
 	return {
 		categories: pontos.map((p) => ({
-			key: p.competencia,
-			label: formatCompetenciaCurta(p.competencia),
-			title: `12 meses até ${formatCompetencia(p.competencia)}`,
+			key: p.fim,
+			label: formatCompetenciaCurta(p.fim),
+			title: `12 meses até ${formatCompetencia(p.fim)}`,
 		})),
 		series: [
 			{
@@ -224,7 +143,9 @@ export function tesoura(linhas: KpisMensais[]): Tesoura {
 				label: "Receita faturada",
 				shortLabel: "receita",
 				values: pontos.map((p) =>
-					base.receita === 0 ? null : p.receita / base.receita - 1,
+					base.receita_faturada === 0
+						? null
+						: p.receita_faturada / base.receita_faturada - 1,
 				),
 				color: 1,
 				emphasis: true,
@@ -234,13 +155,18 @@ export function tesoura(linhas: KpisMensais[]): Tesoura {
 				label: "Energia faturada",
 				shortLabel: "energia",
 				values: pontos.map((p) =>
-					base.kwh === 0 ? null : p.kwh / base.kwh - 1,
+					base.kwh_faturado === 0
+						? null
+						: p.kwh_faturado / base.kwh_faturado - 1,
 				),
 				color: 2,
 				emphasis: true,
 			},
 		],
-		somas: pontos.map(({ receita, kwh }) => ({ receita, kwh })),
+		somas: pontos.map((p) => ({
+			receita: p.receita_faturada,
+			kwh: p.kwh_faturado,
+		})),
 	};
 }
 

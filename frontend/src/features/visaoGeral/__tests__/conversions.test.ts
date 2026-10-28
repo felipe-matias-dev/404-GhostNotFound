@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-	compararMeses,
 	efeitosDaReceita,
 	janelasDaBase,
 	leitura,
@@ -9,7 +8,7 @@ import {
 	parPadrao,
 	tesoura,
 } from "../conversions";
-import type { KpisMensais, ParPeriodos } from "../types";
+import type { JanelaIndicadores, ParPeriodos } from "../types";
 
 const par = (base: string, atual: string): ParPeriodos => ({
 	periodo_base: `${base}/${base}`,
@@ -81,105 +80,78 @@ describe("parEscolhido", () => {
 	});
 });
 
-describe("compararMeses", () => {
-	const linha = (
-		competencia: string,
-		valores: Partial<KpisMensais>,
-	): KpisMensais => ({
-		competencia,
-		kwh_faturado: 1000,
-		receita_faturada: 800,
-		receita_energia: 700,
-		dec: 2,
-		fec: 0.5,
-		n_chamados: 10,
-		satisfacao_media: 4,
-		...valores,
-	});
-
-	it("dá a variação em fração e respeita os valores da Gold", () => {
-		const resultado = compararMeses(
-			[
-				linha("2024-03", {}),
-				linha("2025-03", { receita_faturada: 840, dec: 1.5 }),
-			],
-			par("2024-03", "2025-03"),
-		);
-		expect(resultado.atual.valores.receita_faturada).toBe(840);
-		expect(resultado.variacao.receita_faturada).toBeCloseTo(0.05);
-		expect(resultado.variacao.dec).toBeCloseTo(-0.25);
-		expect(resultado.variacao.kwh_faturado).toBe(0);
-	});
-
-	it("deixa a variação vazia sem valor num dos lados ou com base zero", () => {
-		const resultado = compararMeses(
-			[
-				linha("2024-03", { satisfacao_media: null, n_chamados: 0 }),
-				linha("2025-03", { dec: null }),
-			],
-			par("2024-03", "2025-03"),
-		);
-		expect(resultado.atual.valores.dec).toBeNull();
-		expect(resultado.variacao.dec).toBeNull();
-		expect(resultado.variacao.satisfacao_media).toBeNull();
-		expect(resultado.variacao.n_chamados).toBeNull();
-	});
-});
-
-const linha = (
-	competencia: string,
+const janela = (
+	inicio: string,
+	fim: string,
 	receita: number,
 	kwh: number,
-): KpisMensais => ({
-	competencia,
-	kwh_faturado: kwh,
+): JanelaIndicadores => ({
+	inicio,
+	fim,
 	receita_faturada: receita,
 	receita_energia: receita,
-	dec: 1,
-	fec: 0.5,
-	n_chamados: 10,
-	satisfacao_media: 4,
+	kwh_faturado: kwh,
+	n_uc_medio: 10,
+	tarifa_media: receita / kwh,
+	tarifa_base_media: receita / kwh,
 });
 
 describe("janelasDaBase", () => {
-	it("compara os 12 últimos meses com os 12 primeiros", () => {
-		expect(janelasDaBase(meses("2022-01", 48))).toEqual({
+	it("compara a primeira e a última janela completa retornadas pelo backend", () => {
+		expect(
+			janelasDaBase([
+				janela("2022-01", "2022-12", 120, 1200),
+				janela("2022-02", "2023-01", 130, 1250),
+				janela("2025-01", "2025-12", 150, 1400),
+			]),
+		).toEqual({
 			base: "2022-01/2022-12",
 			atual: "2025-01/2025-12",
 		});
 	});
 
-	it("não compara janelas que se sobrepõem nem janela com buraco", () => {
-		expect(janelasDaBase(meses("2024-01", 23))).toBeUndefined();
-		const comBuraco = meses("2024-01", 25).filter((m) => m !== "2024-06");
-		expect(janelasDaBase(comBuraco)).toBeUndefined();
+	it("não compara janelas sobrepostas nem série sem janela completa", () => {
+		expect(janelasDaBase([])).toBeUndefined();
+		expect(
+			janelasDaBase([
+				janela("2024-01", "2024-12", 120, 1200),
+				janela("2024-12", "2025-11", 150, 1400),
+			]),
+		).toBeUndefined();
 	});
 });
 
 describe("tesoura", () => {
-	it("soma 12 meses corridos e mede a variação sobre a primeira janela", () => {
-		// Receita sobe 12 no 13º mês; energia cai 24: o segundo ponto abre a tesoura.
-		const linhas = meses("2024-01", 13).map((m, i) =>
-			linha(m, i === 12 ? 22 : 10, i === 12 ? 76 : 100),
-		);
-		const t = tesoura(linhas);
+	it("mede a variação das somas recebidas sem acumular novamente as janelas", () => {
+		const t = tesoura([
+			janela("2024-01", "2024-12", 120, 1200),
+			janela("2024-02", "2025-01", 132, 1176),
+		]);
 		expect(t.categories.map((c) => c.key)).toEqual(["2024-12", "2025-01"]);
-		const [receita, energia] = t.series.map((s) => s.values.at(-1));
-		expect(receita).toBeCloseTo(0.1);
-		expect(energia).toBeCloseTo(-0.02);
+		expect(t.series[0].values).toEqual([0, expect.closeTo(0.1)]);
+		expect(t.series[1].values).toEqual([0, expect.closeTo(-0.02)]);
 		expect(t.somas[1]).toEqual({ receita: 132, kwh: 1176 });
 	});
 
-	it("pula a janela com buraco e não desenha um ponto só", () => {
-		const comBuraco = meses("2024-01", 15)
-			.filter((m) => m !== "2024-02")
-			.map((m) => linha(m, 10, 100));
-		expect(tesoura(comBuraco).categories.map((c) => c.key)).toEqual([
-			"2025-02",
-			"2025-03",
+	it("mantém os meses retornados mesmo quando há um intervalo sem janelas", () => {
+		expect(
+			tesoura([
+				janela("2024-01", "2024-12", 120, 1200),
+				janela("2024-04", "2025-03", 132, 1176),
+			]).categories.map((c) => c.key),
+		).toEqual(["2024-12", "2025-03"]);
+		expect(tesoura([janela("2024-01", "2024-12", 120, 1200)]).series).toEqual(
+			[],
+		);
+	});
+
+	it("não inventa variação para uma série cuja primeira soma é zero", () => {
+		const t = tesoura([
+			janela("2024-01", "2024-12", 0, 1200),
+			janela("2024-02", "2025-01", 132, 1176),
 		]);
-		const doze = meses("2024-01", 12).map((m) => linha(m, 10, 100));
-		expect(tesoura(doze).series).toEqual([]);
+		expect(t.series[0].values).toEqual([null, null]);
+		expect(t.series[1].values[1]).toBeCloseTo(-0.02);
 	});
 });
 

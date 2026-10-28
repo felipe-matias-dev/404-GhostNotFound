@@ -1208,12 +1208,12 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
     ("A receita cresceu com menos energia faturada."), sem número. Os números ficam logo abaixo. Quando a tela tiver insight de IA
     (D9, como o `GET /receita/insight` da DEC-040), ele ocupa o lugar da frase; com `texto` vazio (narração descartada ou falha do
     provedor), a frase determinística continua, e a tela nunca fica sem leitura.
-  - **Receita e energia de 12 meses:** os 12 meses mais recentes contra os 12 primeiros da série, somados pelo backend em
-    `GET /receita/comparacao`. Sem 24 meses seguidos na Gold, a tela diz que não há comparação. O botão "Abrir a ponte de receita"
-    leva o mesmo par de janelas para a tela de receita.
+  - **Receita e energia de 12 meses:** primeira e última janelas completas de `GET /indicadores/janelas?meses=12`, sem
+    sobreposição, comparadas por `GET /indicadores/comparacao`. Sem duas janelas não sobrepostas, a tela diz que não há
+    comparação. O botão "Abrir a ponte de receita" leva o mesmo par de janelas para a tela de receita.
   - **Tesoura:** receita e energia faturadas em 12 meses corridos, como variação sobre a primeira janela (0%), na mesma escala.
-    A tela soma os meses da `gold_kpis_mensais` e divide pela primeira janela, como a DEC-035 permite: nenhuma regra de negócio
-    é refeita, e a soma de 12 meses tira a sazonalidade. Janela com buraco na série fica de fora. O tooltip mostra as somas em R$
+    As somas vêm prontas de `GET /indicadores/janelas?meses=12`, sobre `gold_kpis_segmento_mensal`; o frontend só normaliza
+    cada série sobre a primeira soma para exibir a variação. O backend exclui janelas incompletas. O tooltip mostra as somas em R$
     e kWh por trás da variação. A linha do 0% é mais forte que a grade, cada linha tem o rótulo no fim ("+7,8% receita") no
     lugar da legenda, e a faixa entre as duas é preenchida em `chart-muted`: a distância entre elas é o dado do gráfico. O eixo
     é em variação, e não em índice (base 100): o número do fim da linha é o mesmo da variação ao lado, sem conta de cabeça.
@@ -1225,9 +1225,10 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
     768px. Em % da receita base, e não em R$: a ponte é sobre a receita de energia, e o resumo, sobre a faturada; o peso de cada
     efeito é o mesmo nas duas medidas, o valor em reais não. Barras divergentes a partir de um eixo central, em `success` e
     `danger` com sinal; cada linha abre a ponte com aquele efeito escolhido. Sem o par gravado na Gold, o bloco não aparece.
-  - **Rede e atendimento no mês:** DEC, FEC, chamados e satisfação numa faixa só, mês contra mês como na DEC-036. Receita e
-    energia ficam só no resumo de 12 meses: repetidas na faixa, com o mesmo nome e a variação de um mês, seriam duas
-    "receitas" diferentes na mesma tela. Cada card tem uma `Sparkline` (`components/ui/sparkline`) da série inteira: linha em
+  - **Rede e atendimento no mês:** DEC, FEC, chamados e satisfação numa faixa só, mês contra mês como na DEC-036, com valores
+    e `variacao_pct` de `GET /indicadores/comparacao`. A tela só converte o percentual em fração para o formatador.
+    Receita e energia ficam só no resumo de 12 meses. Cada card tem uma `Sparkline` (`components/ui/sparkline`) da série
+    mensal de `GET /receita/mensal`, que também alimenta as competências do seletor: linha em
     `chart-muted`, mês atual em `chart-1`, mês base em anel neutro; trecho de um ou dois meses entre buracos vira ponto, e série
     com mais de um quarto dos meses vazios não é desenhada. Os cards de DEC e FEC são links inteiros para a tela de rede, com
     fundo no hover.
@@ -1248,4 +1249,5 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
     diagnóstico) não tem tabela na Gold.
   - A "Receita faturada" da tela inclui tributos, e a ponte de receita usa a receita de energia (DEC-023). Os valores absolutos
     das duas telas diferem até a ponte ganhar o degrau de tributos.
-  - A tela ainda não consome as rotas novas: a troca de `useComparacaoIndicadores` e da tesoura é o próximo passo.
+  - O seletor de rede e atendimento continua mensal; a comparação e a tesoura já consomem `/indicadores/*`.
+    `/receita/mensal` permanece para as competências e sparklines porque a rota de janelas não retorna DEC, FEC nem satisfação.

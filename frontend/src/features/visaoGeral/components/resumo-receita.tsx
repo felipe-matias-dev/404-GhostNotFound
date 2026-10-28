@@ -16,7 +16,7 @@ import {
 } from "#/lib/format";
 import { cn } from "#/lib/utils";
 import { type Janelas, leitura } from "../conversions";
-import { useComparacaoReceita, useTesoura } from "../hooks/use-indicadores";
+import { useComparacaoIndicadores, useTesoura } from "../hooks/use-indicadores";
 import { DEFINICOES, type DefinicaoIndicador } from "../indicadores";
 
 const receita = (valor: number) => formatBRL(valor, { compacto: true });
@@ -77,15 +77,22 @@ export function ResumoReceita({
 	onRetrySerie,
 }: {
 	janelas: Janelas | undefined;
-	/** A série carregou, mas não tem 24 meses seguidos: não há duas janelas de 12. */
+	/** Não há duas janelas completas de 12 meses sem sobreposição. */
 	semJanelas: boolean;
 	erroSerie: boolean;
 	onRetrySerie: () => void;
 }) {
-	const comparacao = useComparacaoReceita(janelas);
+	const comparacao = useComparacaoIndicadores(
+		janelas
+			? { periodo_base: janelas.base, periodo_atual: janelas.atual }
+			: undefined,
+	);
 	const tesoura = useTesoura();
 	const dados = comparacao.data;
-	const frase = leitura(dados?.variacao_receita_pct, dados?.variacao_kwh_pct);
+	const frase = leitura(
+		dados?.variacao_pct.receita_faturada,
+		dados?.variacao_pct.kwh_faturado,
+	);
 
 	let numeros: ReactNode;
 	if (erroSerie || comparacao.isError) {
@@ -111,7 +118,8 @@ export function ResumoReceita({
 	} else if (semJanelas) {
 		numeros = (
 			<p className="text-body text-text-muted text-pretty">
-				A comparação de 12 meses precisa de 24 meses seguidos na Gold.
+				A comparação precisa de duas janelas completas de 12 meses sem
+				sobreposição.
 			</p>
 		);
 	} else if (!dados) {
@@ -123,14 +131,14 @@ export function ResumoReceita({
 					label="Receita faturada"
 					value={dados.atual.receita_faturada}
 					format={receita}
-					pct={dados.variacao_receita_pct}
+					pct={dados.variacao_pct.receita_faturada}
 					favorable={DEFINICOES.receita_faturada.favorable}
 				/>
 				<Numero
 					label="Energia faturada"
 					value={dados.atual.kwh_faturado}
 					format={energia}
-					pct={dados.variacao_kwh_pct}
+					pct={dados.variacao_pct.kwh_faturado}
 					favorable={DEFINICOES.kwh_faturado.favorable}
 				/>
 			</dl>
@@ -194,9 +202,9 @@ export function ResumoReceita({
 						) : null;
 					}}
 					loading={tesoura.isFetching}
-					error={erroSerie ? "Não foi possível carregar a série." : null}
-					onRetry={onRetrySerie}
-					emptyMessage="A tesoura precisa de 13 meses seguidos na Gold."
+					error={tesoura.isError ? "Não foi possível carregar a série." : null}
+					onRetry={() => tesoura.refetch()}
+					emptyMessage="A tesoura precisa de pelo menos duas janelas completas de 12 meses."
 					height={240}
 					className="rounded-none border-0 bg-transparent p-0 shadow-none lg:border-border lg:border-l lg:pl-6"
 				/>

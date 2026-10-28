@@ -27,8 +27,8 @@ const competenciaDe = (ano: number, indice: number) =>
 
 /**
  * Escolhe o mês atual num calendário e a base logo abaixo: o mesmo mês do ano anterior ou o
- * mês anterior. Só habilita os meses que têm base na série. Visual igual ao seletor da tela de
- * receita; trechos de vários meses entram com a rota de comparação do backend (DEC-036).
+ * mês anterior. Só habilita os meses que têm base na série. A faixa é mensal; o resumo de
+ * receita e energia usa as janelas de 12 meses, independentemente deste seletor.
  */
 export function ComparacaoPicker({
 	competencias,

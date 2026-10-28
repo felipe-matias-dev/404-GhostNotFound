@@ -1,11 +1,11 @@
-import { queryOptions, useQuery } from "@tanstack/react-query";
-import { useCallback } from "react";
+import { queryOptions, skipToken, useQuery } from "@tanstack/react-query";
 import {
-	buscarComparacaoReceita,
+	buscarComparacaoIndicadores,
+	buscarJanelas,
 	buscarKpisMensais,
 	visaoGeralKeys,
 } from "../api";
-import { compararMeses, type Janelas, tesoura } from "../conversions";
+import { tesoura } from "../conversions";
 import type { KpisMensais, ParPeriodos } from "../types";
 
 const kpisMensaisQuery = queryOptions({
@@ -26,36 +26,22 @@ export function useCompetencias() {
 	return useQuery({ ...kpisMensaisQuery, select: competencias });
 }
 
-/**
- * Os indicadores dos dois meses e a variação. Mês contra mês até a tela passar para a rota de
- * comparação do backend (DEC-041).
- */
-export function useComparacaoIndicadores(par: ParPeriodos | undefined) {
-	const periodoBase = par?.periodo_base;
-	const periodoAtual = par?.periodo_atual;
-	const select = useCallback(
-		(linhas: KpisMensais[]) =>
-			periodoBase && periodoAtual
-				? compararMeses(linhas, {
-						periodo_base: periodoBase,
-						periodo_atual: periodoAtual,
-					})
-				: undefined,
-		[periodoBase, periodoAtual],
-	);
-	return useQuery({ ...kpisMensaisQuery, enabled: Boolean(par), select });
+const janelasQuery = queryOptions({
+	queryKey: visaoGeralKeys.janelas(),
+	queryFn: buscarJanelas,
+});
+
+export function useJanelas() {
+	return useQuery(janelasQuery);
 }
 
-/** Receita e energia das duas janelas de 12 meses, somadas pelo backend. */
-export function useComparacaoReceita(janelas: Janelas | undefined) {
+export function useComparacaoIndicadores(par: ParPeriodos | undefined) {
 	return useQuery({
-		queryKey: visaoGeralKeys.comparacao(janelas),
-		queryFn: () => (janelas ? buscarComparacaoReceita(janelas) : undefined),
-		enabled: Boolean(janelas),
+		queryKey: visaoGeralKeys.comparacao(par),
+		queryFn: par ? () => buscarComparacaoIndicadores(par) : skipToken,
 	});
 }
 
-/** Receita e energia em 12 meses corridos, como índice: a tesoura. */
 export function useTesoura() {
-	return useQuery({ ...kpisMensaisQuery, select: tesoura });
+	return useQuery({ ...janelasQuery, select: tesoura });
 }
