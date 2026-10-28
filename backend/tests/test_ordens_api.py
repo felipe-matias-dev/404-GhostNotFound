@@ -221,6 +221,24 @@ def test_order_sent_to_the_field_by_mistake_goes_back_to_generated_keeping_the_h
     assert devolvida["eventos"][-1]["observacao"] == "Enviada por engano"
 
 
+def test_reason_for_going_back_stays_only_in_the_history(client: TestClient) -> None:
+    [ordem] = create_orders(client, "0001")
+    change(client, ordem["id"], status="EM_CAMPO")
+
+    response = change(client, ordem["id"], status="GERADA", observacao="Enviada por engano")
+
+    assert response.json()["observacao"] is None
+
+
+def test_going_back_does_not_overwrite_the_existing_observation(client: TestClient) -> None:
+    [ordem] = create_orders(client, "0001")
+    change(client, ordem["id"], status="EM_CAMPO", observacao="Equipe 3 a caminho")
+
+    response = change(client, ordem["id"], status="GERADA", observacao="Enviada por engano")
+
+    assert response.json()["observacao"] == "Equipe 3 a caminho"
+
+
 def test_order_that_went_back_to_generated_can_be_sent_to_the_field_again(
     client: TestClient,
 ) -> None:
