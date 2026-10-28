@@ -2,7 +2,8 @@ import { Link } from "@tanstack/react-router";
 import type { ReactElement } from "react";
 import { KpiCard } from "#/components/ui/kpi-card";
 import { Sparkline } from "#/components/ui/sparkline";
-import { INDICADORES, mesDoPeriodo } from "../conversions";
+import { cn } from "#/lib/utils";
+import { mesDoPeriodo } from "../conversions";
 import {
 	useComparacaoIndicadores,
 	useKpisMensais,
@@ -11,26 +12,24 @@ import { DEFINICOES } from "../indicadores";
 import type { Indicador, ParPeriodos } from "../types";
 import { ComparacaoPicker } from "./comparacao-picker";
 
-const LINKS: Partial<
-	Record<Indicador, (par: ParPeriodos | undefined) => ReactElement>
-> = {
-	receita_faturada: (par) => (
-		<Link
-			to="/receita"
-			search={{
-				periodo_base: par?.periodo_base,
-				periodo_atual: par?.periodo_atual,
-			}}
-		/>
-	),
-	dec: () => <Link to="/rede" />,
-	fec: () => <Link to="/rede" />,
+// Receita e energia ficam no resumo de 12 meses: repetidas aqui, num mês, com o mesmo nome,
+// seriam duas "receitas" com variações diferentes.
+const DA_FAIXA = [
+	"dec",
+	"fec",
+	"n_chamados",
+	"satisfacao_media",
+] as const satisfies readonly Indicador[];
+
+const LINKS: Partial<Record<Indicador, ReactElement>> = {
+	dec: <Link to="/rede" />,
+	fec: <Link to="/rede" />,
 };
 
 /**
- * Os seis indicadores do mês escolhido numa faixa só, cada um com a variação sobre o mês base
+ * Rede e atendimento no mês escolhido, numa faixa só, cada um com a variação sobre o mês base
  * e a forma da série inteira (o mês atual em destaque, o base em anel). O mês contra mês é o
- * que a API permite para DEC, FEC e satisfação até existir a rota de comparação (DEC-036).
+ * que a tela usa para DEC, FEC e satisfação até passar para a rota de comparação (DEC-041).
  */
 export function IndicadoresMes({
 	competencias,
@@ -65,7 +64,7 @@ export function IndicadoresMes({
 		<section aria-labelledby="mes-titulo" className="flex flex-col gap-3">
 			<div className="flex flex-wrap items-center justify-between gap-2">
 				<h2 id="mes-titulo" className="text-heading">
-					Indicadores do mês
+					Rede e atendimento no mês
 				</h2>
 				<ComparacaoPicker
 					competencias={competencias}
@@ -74,8 +73,8 @@ export function IndicadoresMes({
 					semPeriodos={Boolean(erro) || semDados}
 				/>
 			</div>
-			<div className="grid grid-cols-2 gap-px overflow-hidden rounded-md border border-border bg-border lg:grid-cols-3 xl:grid-cols-6">
-				{INDICADORES.map((indicador) => {
+			<div className="grid grid-cols-2 gap-px overflow-hidden rounded-md border border-border bg-border lg:grid-cols-4">
+				{DA_FAIXA.map((indicador) => {
 					const definicao = DEFINICOES[indicador];
 					const variacao = comparacao.data?.variacao[indicador];
 					const valores = linhas.map((linha) => linha[indicador] ?? null);
@@ -88,7 +87,7 @@ export function IndicadoresMes({
 							}
 							format={definicao.format}
 							hint={definicao.hint}
-							link={LINKS[indicador]?.(par)}
+							link={LINKS[indicador]}
 							loading={carregando}
 							error={erro}
 							onRetry={onRetry}
@@ -100,7 +99,11 @@ export function IndicadoresMes({
 									? undefined
 									: { value: variacao, favorable: definicao.favorable }
 							}
-							className="rounded-none border-0 p-4 shadow-none"
+							// Card inteiro é o link: o fundo responde ao hover, e o chevron diz para onde.
+							className={cn(
+								"rounded-none border-0 p-4 shadow-none",
+								LINKS[indicador] && "hover:bg-surface-2",
+							)}
 						>
 							<Sparkline values={valores} highlight={atual} reference={base} />
 						</KpiCard>

@@ -221,6 +221,7 @@ export function tesoura(linhas: KpisMensais[]): Tesoura {
 			{
 				id: "receita",
 				label: "Receita faturada",
+				shortLabel: "receita",
 				values: pontos.map((p) =>
 					base.receita === 0 ? null : (p.receita / base.receita) * 100,
 				),
@@ -230,6 +231,7 @@ export function tesoura(linhas: KpisMensais[]): Tesoura {
 			{
 				id: "kwh",
 				label: "Energia faturada",
+				shortLabel: "energia",
 				values: pontos.map((p) =>
 					base.kwh === 0 ? null : (p.kwh / base.kwh) * 100,
 				),

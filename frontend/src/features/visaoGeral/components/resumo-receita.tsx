@@ -20,6 +20,8 @@ import { useComparacaoReceita, useTesoura } from "../hooks/use-indicadores";
 
 const receita = (valor: number) => formatBRL(valor, { compacto: true });
 const energia = (valor: number) => formatKWh(valor, { compacto: true });
+// As duas séries da tesoura: a faixa entre elas é a distância entre receita e energia.
+const TESOURA = ["receita", "kwh"] as const;
 
 function Numero({
 	label,
@@ -138,7 +140,7 @@ export function ResumoReceita({
 		<section
 			aria-labelledby="resumo-titulo"
 			aria-busy={comparacao.isFetching || undefined}
-			className="flex flex-col gap-5 rounded-md border border-border bg-surface-1 p-5 shadow-edge"
+			className="flex flex-col gap-5"
 		>
 			<header className="flex flex-col gap-1.5">
 				<h2 id="resumo-titulo" className="text-balance font-display text-title">
@@ -177,7 +179,10 @@ export function ResumoReceita({
 					series={tesoura.data?.series}
 					formatValue={formatNumero}
 					categoryLabel="Janela de 12 meses"
-					summary="Soma de 12 meses corridos; a primeira janela vale 100."
+					summary="Soma de 12 meses corridos, em índice: a primeira janela vale 100."
+					reference={100}
+					endLabels
+					band={TESOURA}
 					tooltipFooter={(indice) => {
 						const soma = somas?.[indice];
 						return soma ? (
@@ -190,8 +195,9 @@ export function ResumoReceita({
 					error={erroSerie ? "Não foi possível carregar a série." : null}
 					onRetry={onRetrySerie}
 					emptyMessage="A tesoura precisa de 13 meses seguidos na Gold."
-					height={260}
-					className="rounded-none border-0 bg-transparent p-0 shadow-none lg:border-border lg:border-l lg:pl-5"
+					height="fill"
+					// Altura limitada: esticado numa tela alta, o gráfico faz 8% parecer um penhasco.
+					className="h-[clamp(18rem,36svh,26rem)] rounded-none border-0 bg-transparent p-0 shadow-none lg:border-border lg:border-l lg:pl-5"
 				/>
 			</div>
 		</section>
