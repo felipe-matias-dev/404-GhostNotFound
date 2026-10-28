@@ -1090,5 +1090,10 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Limites:** o texto sai em português do Gemini e pode ser descartado se ele escrever um número de outro jeito (por exemplo
   "R$ 1,2 milhão" para 1.234.567,89): a tela fica sem insight, que é o comportamento seguro. O cache zera a cada reinício, e a
   qualidade do texto só se prova com a chave do Gemini (não há chave nos testes automáticos, que usam um redator falso).
+- **Log do agente:** o uvicorn só configura os loggers dele, então a API sobe com o logger `venergy_agent` em INFO e um handler
+  (`configurar_logs_do_agente`, no `lifespan`). Sem isso, uma tela sem insight não deixa rastro do motivo (erro do modelo, texto
+  vazio ou número sem suporte). O log traz o motivo, nunca o texto do insight nem a chave. Reprovação por número não vai para o
+  cache: o redator devolve `None` tanto para ela quanto para falha do provedor, e guardá-la travaria o recorte mesmo que uma nova
+  tentativa do modelo passasse. Revisitar com a taxa de aprovação medida pelo GenAI.
 - **Impacto:** API 0.9.0 (rota nova). A tela de Receita pode exibir o insight com o tipo gerado do OpenAPI. Agente: configuração
   nova `insight_prompt_version` (padrão `v1`) e `build_insight_writer`; o prompt e o redator não mudam.
