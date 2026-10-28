@@ -394,6 +394,36 @@ async def test_narrative_with_the_word_sem_alone_is_kept(layer):
     assert answer.answer == "Há 3 UCs, sem interrupções registradas."
 
 
+@pytest.mark.parametrize(
+    "text",
+    [
+        "A receita_faturada foi de 3 UCs.",
+        "Há 3 UCs em SEM_UC.",
+    ],
+)
+async def test_narrative_naming_a_column_or_in_uppercase_falls_back(layer, text):
+    writer = FixedWriter(text=text)
+
+    answer = await use_case(layer, ScriptedGenerator(generation()), writer=writer).ask(
+        "quantas?", "s1"
+    )
+
+    assert answer.answer.startswith("A consulta devolveu 1 linha(s).")
+
+
+async def test_assumption_naming_a_technical_name_is_left_out_of_the_text(layer):
+    writer = FixedWriter(text="Há 999 UCs em sem_uc.")
+    assumptions = ("Considerei só o mês atual", "Os dados vêm de sem_kpis_mensais")
+
+    answer = await use_case(
+        layer, ScriptedGenerator(generation(assumptions=assumptions)), writer=writer
+    ).ask("quantas?", "s1")
+
+    assert "Considerei só o mês atual" in answer.answer
+    assert "sem_kpis_mensais" not in answer.answer
+    assert answer.assumptions == assumptions
+
+
 def table(columns, *rows):
     return QueryResult(
         columns=columns,
@@ -513,3 +543,25 @@ async def test_long_text_values_are_shortened_in_the_fallback_answer(layer):
 
     assert "x" * 300 not in answer.answer
     assert "x" * 117 + "..." in answer.answer
+
+
+async def test_without_an_answer_writer_the_answer_is_the_deterministic_text(layer, caplog):
+    caplog.set_level(logging.INFO, logger="venergy_agent.ask")
+    agent = AskUseCase(
+        layer=layer,
+        generator=ScriptedGenerator(generation()),
+        validator=SqlglotValidator(dialect="postgres", max_rows=200, allowed_schema="gold"),
+        executor=ScriptedExecutor(result()),
+        answer_writer=None,
+        max_question_chars=500,
+        max_correction_attempts=3,
+        answer_sample_rows=20,
+        prompt_version="v1",
+        configured_model=CONFIGURED,
+    )
+
+    answer = await agent.ask("quantas?", "s1")
+
+    assert answer.status is AnswerStatus.ANSWERED
+    assert answer.answer.startswith("A consulta devolveu 1 linha(s).")
+    assert "narrativa_falhou" not in caplog.text

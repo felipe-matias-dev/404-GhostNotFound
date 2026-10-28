@@ -130,7 +130,12 @@ O backend acompanha o contrato no mesmo PR em que ele muda
 
 A carga valida cada linha contra o contrato (`src/venergy_api/schemas.py`). Se um
 arquivo estiver fora do formato, ela é cancelada, informa a linha e a coluna com
-problema e mantém os dados anteriores. A cada execução, ela recria as tabelas da Gold:
+problema e mantém os dados anteriores. Ela lê cada CSV aos poucos e grava de 10 mil em
+10 mil linhas, então a memória não depende do tamanho da Gold: com ~4 milhões de linhas o
+pico foi de ~110 MB e a carga levou uns 7 minutos
+([DEC-038](../docs/decisoes.md#dec-038--carga-da-gold-em-lotes-com-uma-rodada-de-conferência-antes-de-gravar)).
+Antes de gravar, uma primeira rodada confere todos os arquivos sem guardar nada: o arquivo
+ruim falha cedo, sem apagar a Gold anterior. A cada execução, ela recria as tabelas da Gold:
 coluna nova no contrato entra sem apagar nada à mão. Na mesma transação, ela também
 recria as views `sem_*` do agente de IA a partir de `ai-agent/semantic/views.sql`; se esse
 arquivo não bater com a Gold, a carga é cancelada e o banco fica como estava. O gerador da
@@ -210,6 +215,8 @@ tests/            # pytest
 | A busca de UC responde `500` | A carga ainda não rodou (passos 5 e 6) |
 | A carga é cancelada com "arquivo não encontrado" ou "colunas faltando" | A amostra em `data/gold/` é de uma versão anterior do contrato: `uv run python -m venergy_api.amostra --force` |
 | A carga é cancelada com "as views do agente não batem com a Gold" | O `ai-agent/semantic/views.sql` cita coluna que o contrato não tem mais: avise o time de GenAI para regerar o arquivo |
+| A carga com a Gold real leva alguns minutos e não imprime nada até acabar | É o esperado: ~4 milhões de linhas levam uns 7 minutos ([DEC-038](../docs/decisoes.md)). Não interrompa: se parar no meio, a transação desfaz tudo e o banco fica como estava |
+| A carga é cancelada com "o arquivo mudou durante a carga" | O CSV foi trocado entre a conferência e a gravação. Rode a carga de novo |
 | Testes param com "Banco de testes indisponível" | O banco não está no ar: `docker compose up -d --wait db` |
 | A API não sobe: porta 8000 em uso | A API do `docker compose` está no ar: `docker compose stop api web` |
 | Testes param com "Usuário do agente não conecta" | O banco foi criado antes do script de inicialização atual: `docker compose down -v` |

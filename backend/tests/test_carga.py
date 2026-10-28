@@ -1,6 +1,8 @@
 import csv
 import re
+from collections import Counter
 from decimal import Decimal
+from itertools import islice
 from pathlib import Path
 
 import pytest
@@ -10,7 +12,14 @@ from sqlalchemy.orm import Session
 
 from venergy_api import carga
 from venergy_api.amostra import write_sample
-from venergy_api.carga import AGENT_VIEWS_SQL, GoldLoadError, load_gold, read_rows
+from venergy_api.carga import (
+    AGENT_VIEWS_SQL,
+    GoldLoadError,
+    _inserir_em_lotes,
+    iter_rows,
+    load_gold,
+    read_rows,
+)
 from venergy_api.models import DimUc
 from venergy_api.schemas import RequiredText
 
@@ -184,6 +193,89 @@ def test_unit_without_reading_loads_with_empty_average(tmp_path: Path, engine: E
     assert stored_ucs(engine)[0].consumo_medio_kwh_12m is None
 
 
+def test_small_batches_load_exactly_what_the_default_batch_loads(
+    tmp_path: Path, engine: Engine
+) -> None:
+    write_sample(tmp_path / "gold", force=True)
+    counts = load_gold(tmp_path / "gold", engine)
+    expected_ucs = [uc.cod_uc for uc in stored_ucs(engine)]
+
+    # Lotes de 2 linhas partem cada tabela da amostra em dezenas de INSERTs.
+    small_batch_counts = load_gold(tmp_path / "gold", engine, tamanho_lote=2)
+
+    assert small_batch_counts == counts
+    assert [uc.cod_uc for uc in stored_ucs(engine)] == expected_ucs
+
+
+def test_invalid_row_in_the_last_table_changes_nothing(tmp_path: Path, engine: Engine) -> None:
+    # A conferência roda em todos os arquivos antes de a transação abrir: um erro na última
+    # tabela não pode deixar a Gold anterior apagada nem as tabelas travadas por minutos.
+    write_gold_dim_uc(tmp_path / "gold", [VALID_ROW])
+    load_gold(tmp_path / "gold", engine)
+    write_gold_dim_uc(tmp_path / "gold", [{**VALID_ROW, "cod_uc": "0002"}])
+    last_csv = tmp_path / "gold" / carga.GOLD_TABLES[-1].file_name
+    lines = last_csv.read_text(encoding="utf-8").splitlines()
+    # Uma linha com uma célula só: as demais colunas ficam vazias e o contrato recusa.
+    last_csv.write_text("\n".join([*lines, "linha-quebrada"]) + "\n", encoding="utf-8")
+
+    with pytest.raises(GoldLoadError, match=last_csv.name):
+        load_gold(tmp_path / "gold", engine, tamanho_lote=1)
+
+    assert [uc.cod_uc for uc in stored_ucs(engine)] == ["0001"]
+    assert gold_views(engine) == AGENT_VIEWS
+
+
+def test_a_failure_while_writing_undoes_the_whole_load(
+    tmp_path: Path, engine: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    write_gold_dim_uc(tmp_path / "gold", [VALID_ROW])
+    load_gold(tmp_path / "gold", engine)
+    write_gold_dim_uc(tmp_path / "gold", [{**VALID_ROW, "cod_uc": "0002"}])
+    real_iter_rows = carga.iter_rows
+    reads: Counter[str] = Counter()
+
+    def file_that_breaks_on_the_second_read(csv_path: Path, schema: type[BaseModel]):
+        reads[csv_path.name] += 1
+        if csv_path.name == "gold_receita_decomposicao.csv" and reads[csv_path.name] == 2:
+            raise GoldLoadError("erro na segunda leitura")
+        return real_iter_rows(csv_path, schema)
+
+    monkeypatch.setattr(carga, "iter_rows", file_that_breaks_on_the_second_read)
+
+    with pytest.raises(GoldLoadError, match="erro na segunda leitura"):
+        load_gold(tmp_path / "gold", engine)
+
+    # A dim_uc nova já tinha sido gravada na transação quando a decomposição falhou.
+    assert [uc.cod_uc for uc in stored_ucs(engine)] == ["0001"]
+    assert gold_views(engine) == AGENT_VIEWS
+
+
+def test_a_file_that_changed_between_the_two_reads_cancels_the_load(
+    tmp_path: Path, engine: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    write_gold_dim_uc(tmp_path / "gold", [VALID_ROW])
+    load_gold(tmp_path / "gold", engine)
+    write_gold_dim_uc(
+        tmp_path / "gold", [{**VALID_ROW, "cod_uc": "0002"}, {**VALID_ROW, "cod_uc": "0003"}]
+    )
+    real_iter_rows = carga.iter_rows
+    reads: Counter[str] = Counter()
+
+    def file_that_lost_a_row(csv_path: Path, schema: type[BaseModel]):
+        reads[csv_path.name] += 1
+        rows = real_iter_rows(csv_path, schema)
+        if csv_path.name == "gold_dim_uc.csv" and reads[csv_path.name] == 2:
+            return islice(rows, 1)
+        return rows
+
+    monkeypatch.setattr(carga, "iter_rows", file_that_lost_a_row)
+
+    with pytest.raises(GoldLoadError, match="gold_dim_uc.csv.*mudou durante a carga"):
+        load_gold(tmp_path / "gold", engine)
+
+    assert [uc.cod_uc for uc in stored_ucs(engine)] == ["0001"]
+
+
 class OptionalColumnSchema(BaseModel):
     # Coluna opcional genérica: a regra da célula vazia vale para qualquer tabela da Gold.
     cod_uc: str
@@ -195,6 +287,48 @@ def test_empty_cell_becomes_none(tmp_path: Path) -> None:
     csv_path.write_text("cod_uc,receita\n0001,\n", encoding="utf-8")
 
     assert read_rows(csv_path, OptionalColumnSchema) == [{"cod_uc": "0001", "receita": None}]
+
+
+def test_rows_are_read_one_at_a_time_and_not_all_at_once(tmp_path: Path) -> None:
+    # A linha 3 é inválida. Se a leitura juntasse o arquivo inteiro antes de entregar a primeira
+    # linha, o erro apareceria já na primeira: é isso que enche a memória com milhões de linhas.
+    csv_path = tmp_path / "opcional.csv"
+    csv_path.write_text("cod_uc,receita\n0001,10\n0002,abc\n", encoding="utf-8")
+
+    rows = iter_rows(csv_path, OptionalColumnSchema)
+
+    assert next(rows) == {"cod_uc": "0001", "receita": 10.0}
+    with pytest.raises(GoldLoadError, match="linha 3: receita"):
+        next(rows)
+
+
+class ConexaoFalsa:
+    """Anota o tamanho de cada lote que chegaria ao banco, sem banco nenhum."""
+
+    def __init__(self) -> None:
+        self.lotes: list[int] = []
+
+    def execute(self, statement: object, rows: list[dict[str, object]]) -> None:
+        self.lotes.append(len(rows))
+
+
+def test_rows_are_inserted_in_batches_of_the_requested_size() -> None:
+    conexao = ConexaoFalsa()
+    linhas = ({"cod_uc": str(numero)} for numero in range(5))
+
+    gravadas = _inserir_em_lotes(conexao, DimUc, linhas, tamanho_lote=2)
+
+    assert conexao.lotes == [2, 2, 1]
+    assert gravadas == 5
+
+
+def test_nothing_reaches_the_database_when_there_are_no_rows() -> None:
+    conexao = ConexaoFalsa()
+
+    gravadas = _inserir_em_lotes(conexao, DimUc, iter([]), tamanho_lote=2)
+
+    assert conexao.lotes == []
+    assert gravadas == 0
 
 
 class ListColumnSchema(BaseModel):

@@ -1,3 +1,5 @@
+import json
+import logging
 import secrets
 from collections.abc import Iterator, Mapping
 from pathlib import Path
@@ -8,6 +10,8 @@ from pydantic_ai.models import Model
 from venergy_agent.domain.answer import Insight
 from venergy_agent.domain.numbers import unsupported_numbers
 from venergy_agent.infrastructure.prompt_renderer import render_insight_system, render_insight_user
+
+logger = logging.getLogger("venergy_agent.insight")
 
 
 class PydanticAiInsightWriter:
@@ -32,11 +36,18 @@ class PydanticAiInsightWriter:
                 render_insight_user(screen, metrics, self._nonce),
                 model_settings={"temperature": self._temperature},
             )
-        except Exception:
+        except Exception as error:
+            _log(screen, "erro_do_modelo", error=type(error).__name__)
             return None
         text = run.output.strip()
-        if not text or unsupported_numbers(text, list(_metric_values(metrics))):
+        if not text:
+            _log(screen, "texto_vazio")
             return None
+        unsupported = unsupported_numbers(text, list(_metric_values(metrics)))
+        if unsupported:
+            _log(screen, "numeros_sem_suporte", numbers=list(unsupported))
+            return None
+        _log(screen, "aceito")
         return Insight(text=text, metrics_used=tuple(metrics.keys()))
 
 
@@ -49,3 +60,8 @@ def _metric_values(value: object) -> Iterator[object]:
             yield from _metric_values(item)
     else:
         yield value
+
+
+def _log(screen: str, status: str, **fields: object) -> None:
+    line = {"step": "insight", "screen": screen, "status": status, **fields}
+    logger.info(json.dumps(line, ensure_ascii=False))

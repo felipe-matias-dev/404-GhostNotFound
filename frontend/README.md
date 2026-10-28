@@ -167,6 +167,9 @@ carrega `src/styles.css`.
   micro-interação.
 - Ícones: [Phosphor](https://phosphoricons.com/) (`@phosphor-icons/react`), regras de
   tamanho, peso, cor e acessibilidade em **Fundamentos/Ícones**.
+- Gráficos: SVG próprio com `motion`; `d3-scale` e `d3-shape` só para escalas e curvas
+  (DEC-037). Cores das séries pelos tokens `chart-1` a `chart-6` e `chart-muted`. Tendência
+  ao longo do tempo: `TrendChart`; ponte de efeitos: `WaterfallChart`.
 
 Regras e modelo de story na página **Introdução** do Storybook
 (`.storybook/docs/introducao.mdx`).

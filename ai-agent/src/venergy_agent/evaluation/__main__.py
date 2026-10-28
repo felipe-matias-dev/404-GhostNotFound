@@ -24,7 +24,31 @@ from venergy_agent.infrastructure.sql_validator import SqlglotValidator
 
 EVAL_DIR = AGENT_ROOT / "eval"
 RUNS_DIR = EVAL_DIR / "runs"
+RUNS_GOLD_DIR = EVAL_DIR / "runs_gold"
 DEFAULT_PAUSE_SECONDS = 4.0
+SAMPLE_MAX_UCS = 1000
+UC_COUNT_SQL = "SELECT count(*) AS total FROM sem_uc"
+
+
+class DatasetMismatch(Exception):
+    pass
+
+
+def runs_dir(dataset: str) -> Path:
+    return RUNS_GOLD_DIR if dataset == "gold_real" else RUNS_DIR
+
+
+def narrates(dataset: str, sql_only: bool) -> bool:
+    return dataset != "gold_real" and not sql_only
+
+
+def check_dataset(dataset: str, uc_count: int) -> None:
+    looks_like_sample = uc_count <= SAMPLE_MAX_UCS
+    if looks_like_sample != (dataset == "amostra"):
+        loaded = "a amostra" if looks_like_sample else "a Gold real"
+        raise DatasetMismatch(
+            f"--dataset {dataset}, mas o banco tem {uc_count} UCs em sem_uc, o que indica {loaded}"
+        )
 
 
 def format_metrics(metrics: Mapping[str, float | int | None]) -> list[str]:
@@ -56,6 +80,8 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     )
     parser.add_argument("--only", choices=("golden", "red_team"), default=None)
     parser.add_argument("--pause", type=float, default=DEFAULT_PAUSE_SECONDS, metavar="SECONDS")
+    parser.add_argument("--dataset", choices=("amostra", "gold_real"), default="amostra")
+    parser.add_argument("--sql-only", action="store_true")
     return parser.parse_args(argv)
 
 
@@ -64,20 +90,27 @@ def load_set(path: Path) -> tuple[str, list[dict[str, Any]]]:
     return str(document["versao"]), list(document["itens"])
 
 
-async def _evaluate(only: str | None, pause_seconds: float) -> tuple[Path, list[str]]:
+async def _evaluate(
+    only: str | None, pause_seconds: float, dataset: str, sql_only: bool
+) -> tuple[Path, list[str]]:
     settings = AgentSettings()
     layer = await YamlSemanticLayerSource(
         settings.semantic_layer_path, settings.gold_contract_path
     ).load()
-    agent = await build_agent(settings)
+    validator = SqlglotValidator(
+        dialect=settings.sql_dialect,
+        max_rows=settings.max_rows,
+        allowed_schema=settings.allowed_schema,
+    )
+    executor = PostgresQueryExecutor(settings.database_url, settings.query_timeout_seconds)
+    counted = await executor.execute(validator.validate(UC_COUNT_SQL, layer.allowed_views))
+    check_dataset(dataset, int(counted.rows[0]["total"]))
+    narrate = narrates(dataset, sql_only)
+    agent = await build_agent(settings, narrate=narrate)
     runner = EvaluationRunner(
         agent=agent,
-        validator=SqlglotValidator(
-            dialect=settings.sql_dialect,
-            max_rows=settings.max_rows,
-            allowed_schema=settings.allowed_schema,
-        ),
-        executor=PostgresQueryExecutor(settings.database_url, settings.query_timeout_seconds),
+        validator=validator,
+        executor=executor,
         allowed_views=layer.allowed_views,
         guard=PostgresDatabaseGuard(
             settings.database_url, settings.allowed_schema, layer.allowed_views
@@ -94,8 +127,10 @@ async def _evaluate(only: str | None, pause_seconds: float) -> tuple[Path, list[
         semantic_layer_version=layer.version,
         golden_version=golden_version,
         red_team_version=red_team_version,
+        dataset=dataset,
+        narrated=narrate,
     )
-    path = report_path(RUNS_DIR, report.started_at)
+    path = report_path(runs_dir(dataset), report.started_at)
     write_report(path, report)
     return path, format_metrics(report.metrics)
 
@@ -104,12 +139,15 @@ def main(argv: list[str]) -> int:
     args = _parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(message)s", stream=sys.stderr)
     try:
-        path, lines = asyncio.run(_evaluate(args.only, args.pause))
+        path, lines = asyncio.run(_evaluate(args.only, args.pause, args.dataset, args.sql_only))
     except ValidationError as error:
         print(f"configuração inválida (ai-agent/.env):\n{error}", file=sys.stderr)
         return 1
     except SemanticLayerError as error:
         print(f"camada semântica inválida:\n{error}", file=sys.stderr)
+        return 1
+    except DatasetMismatch as error:
+        print(f"base errada: {error}", file=sys.stderr)
         return 1
     print("\n".join(lines))
     print(f"relatório: {path}")

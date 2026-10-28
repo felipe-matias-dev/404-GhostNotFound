@@ -29,7 +29,7 @@ from venergy_agent.domain.sql import (
 
 logger = logging.getLogger("venergy_agent.ask")
 
-TECHNICAL_NAME = re.compile(r"\b(?:sem|gold)_\w+")
+TECHNICAL_NAME = re.compile(r"\b[a-zA-Z]+_\w+")
 
 EMPTY_QUESTION = "A pergunta está vazia. Escreva o que você quer saber sobre a distribuidora."
 TOO_LONG_QUESTION = (
@@ -65,7 +65,7 @@ class AskUseCase:
         generator: SqlGenerator,
         validator: SqlValidator,
         executor: QueryExecutor,
-        answer_writer: AnswerWriter,
+        answer_writer: AnswerWriter | None,
         max_question_chars: int,
         max_correction_attempts: int,
         answer_sample_rows: int,
@@ -329,6 +329,8 @@ class AskUseCase:
         visible: QueryResult,
         fallback: str,
     ) -> str:
+        if self._answer_writer is None:
+            return fallback
         try:
             narrative = await self._answer_writer.write(question, draft, visible)
         except Exception as error:
@@ -385,8 +387,9 @@ class AskUseCase:
                 f" O resultado foi limitado a {validated.applied_limit} linhas, "
                 "então o total pode ser maior."
             )
-        if draft.assumptions:
-            text += " Suposições: " + "; ".join(draft.assumptions) + "."
+        assumptions = [item for item in draft.assumptions if not TECHNICAL_NAME.search(item)]
+        if assumptions:
+            text += " Suposições: " + "; ".join(assumptions) + "."
         return text
 
     def _confidence(self, result: QueryResult, draft: SqlDraft, attempt: int) -> Confidence:

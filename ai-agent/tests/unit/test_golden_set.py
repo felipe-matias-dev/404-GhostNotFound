@@ -47,12 +47,13 @@ def test_expected_status_is_a_real_answer_status_and_never_failed(items):
     assert {item["expected_status"] for item in items} <= valid
 
 
-def test_reference_sql_exists_exactly_when_the_answer_is_answered(items):
+def test_answer_key_exists_exactly_when_the_answer_is_answered(items):
     for item in items:
+        key = item["reference_sql"] or item.get("expected_values")
         if item["expected_status"] == "answered":
-            assert item["reference_sql"], item["id"]
+            assert key, item["id"]
         else:
-            assert item["reference_sql"] is None, item["id"]
+            assert not key, item["id"]
 
 
 def test_every_reference_sql_passes_the_agent_validator(items, allowed_views):
@@ -92,3 +93,23 @@ def test_review_field_is_null_or_the_name_of_who_reviewed_the_item(items):
         assert "revisado_por" in item, item["id"]
         reviewer = item["revisado_por"]
         assert reviewer is None or (isinstance(reviewer, str) and reviewer.strip()), item["id"]
+
+
+def test_every_item_declares_the_datasets_it_is_valid_for(items):
+    for item in items:
+        assert item["datasets"], item["id"]
+        assert set(item["datasets"]) <= {"amostra", "gold_real"}, item["id"]
+
+
+def test_sample_only_codes_never_run_on_the_real_gold(items):
+    sample_codes = ("'0003'", "'0002'", "'AL-07'", "'AL-03'", "UC 0003", "UC 0002", "AL-07")
+    for item in items:
+        text = f"{item['question']} {item.get('reference_sql') or ''}"
+        if any(code in text for code in sample_codes) and item["expected_status"] == "answered":
+            assert item["datasets"] == ["amostra"], item["id"]
+
+
+def test_only_out_of_range_periods_may_have_an_empty_reference(items):
+    allowed = {item["id"] for item in items if item.get("allow_empty_reference")}
+
+    assert allowed == {"G019", "G029", "G030"}
