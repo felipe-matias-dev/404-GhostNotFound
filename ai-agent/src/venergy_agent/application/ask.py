@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 import time
 from decimal import Decimal
 from uuid import uuid4
@@ -27,6 +28,8 @@ from venergy_agent.domain.sql import (
 )
 
 logger = logging.getLogger("venergy_agent.ask")
+
+TECHNICAL_NAME = re.compile(r"\b(?:sem|gold)_\w+")
 
 EMPTY_QUESTION = "A pergunta está vazia. Escreva o que você quer saber sobre a distribuidora."
 TOO_LONG_QUESTION = (
@@ -335,6 +338,15 @@ class AskUseCase:
                 step="resposta",
                 status="narrativa_falhou",
                 error=type(error).__name__,
+            )
+            return fallback
+
+        if TECHNICAL_NAME.search(narrative):
+            self._log(
+                question.request_id,
+                question.session_id,
+                step="resposta",
+                status="nome_tecnico_na_resposta",
             )
             return fallback
 

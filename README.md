@@ -77,6 +77,10 @@ docker compose run --rm api python -m venergy_api.carga
 | API e documentação interativa | http://127.0.0.1:8000/docs |
 | Banco | `127.0.0.1:5433`, usuário `venergy` |
 
+O agente de IA precisa de `GOOGLE_API_KEY` no `.env` (chave do Gemini, uma por pessoa). Sem ela
+tudo sobe, mas `POST /ai/ask` responde `503`. Cada resposta fica em `app.ai_auditoria` e se lê em
+`GET /ai/audit/{id}` ([DEC-034](docs/decisoes.md)).
+
 O código de `backend/src` e `frontend/src` é montado nos containers: API e portal
 recarregam a cada mudança. Mudou dependência (`pyproject.toml`, `package.json`) ou
 `vite.config.ts`? `docker compose up -d --build`.
@@ -123,13 +127,13 @@ O Job `v_energy_workflow` ([`data-engineering/workflow/v_energy_workflow.yaml`](
 roda `Landing_to_Bronze` → `Bronze_to_Silver` → `Silver_to_Gold` direto da branch `main` do GitHub, em compute serverless.
 A última task grava a Gold e exporta os 12 CSVs para `/Volumes/v_energy/gold/csv`. O agendamento é mensal, no dia 6
 (D+5 do fechamento do faturamento), e fica pausado porque o dataset do case é uma extração única
-([DEC-036](docs/decisoes.md#dec-036--workflow-do-databricks-e-agendamento-mensal)).
+([DEC-039](docs/decisoes.md#dec-039--workflow-do-databricks-e-agendamento-mensal)).
 
 ![Execução bem-sucedida do Workflow no Databricks](docs/img/workflow-databricks.png)
 
 **Para reexecutar:** em **Jobs & Pipelines → v_energy_workflow**, clique em **Run now** uma vez. A checagem de
 idempotência da Bronze compara as duas últimas gravações por time travel, que expira em 7 dias: se a última gravação da
-Bronze for mais antiga que isso, o primeiro run grava a Bronze e falha nessa checagem, e o segundo passa (ver DEC-036).
+Bronze for mais antiga que isso, o primeiro run grava a Bronze e falha nessa checagem, e o segundo passa (ver DEC-039).
 
 ## Dicionário de dados e diagnóstico da receita
 
