@@ -15,7 +15,7 @@
 import {
 	ArrowsClockwiseIcon,
 	TrayIcon,
-	WarningCircleIcon,
+	XCircleIcon,
 } from "@phosphor-icons/react";
 import { scaleLinear, scalePoint } from "d3-scale";
 import { area, curveMonotoneX, line } from "d3-shape";
@@ -469,7 +469,7 @@ function StateBlock({
 	children: ReactNode;
 	action?: ReactNode;
 }) {
-	const Icon = tone === "error" ? WarningCircleIcon : TrayIcon;
+	const Icon = tone === "error" ? XCircleIcon : TrayIcon;
 	return (
 		<div className="flex h-full flex-col items-center justify-center gap-3 px-4 text-center">
 			<Icon

@@ -1,7 +1,7 @@
 import {
 	ArrowsClockwiseIcon,
 	CaretRightIcon,
-	WarningCircleIcon,
+	XCircleIcon,
 } from "@phosphor-icons/react";
 import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
@@ -91,10 +91,7 @@ export function ResumoReceita({
 		numeros = (
 			<div className="flex flex-col items-start gap-2">
 				<p className="flex items-center gap-1.5 text-body">
-					<WarningCircleIcon
-						aria-hidden
-						className="size-4 shrink-0 text-danger"
-					/>
+					<XCircleIcon aria-hidden className="size-4 shrink-0 text-danger" />
 					Não foi possível carregar a receita e a energia.
 				</p>
 				<Button

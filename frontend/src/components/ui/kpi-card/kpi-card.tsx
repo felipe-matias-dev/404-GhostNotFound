@@ -14,7 +14,7 @@ import {
 	ArrowUpIcon,
 	CaretRightIcon,
 	InfoIcon,
-	WarningCircleIcon,
+	XCircleIcon,
 } from "@phosphor-icons/react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import type { ReactElement, ReactNode } from "react";
@@ -192,10 +192,7 @@ export function KpiCard({
 		body = (
 			<>
 				<p className="flex items-center gap-1.5 text-body">
-					<WarningCircleIcon
-						aria-hidden
-						className="size-4 shrink-0 text-danger"
-					/>
+					<XCircleIcon aria-hidden className="size-4 shrink-0 text-danger" />
 					{error}
 				</p>
 				{onRetry ? (
