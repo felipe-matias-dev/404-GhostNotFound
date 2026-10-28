@@ -17,6 +17,7 @@ import {
 import { cn } from "#/lib/utils";
 import { type Janelas, leitura } from "../conversions";
 import { useComparacaoReceita, useTesoura } from "../hooks/use-indicadores";
+import { DEFINICOES, type DefinicaoIndicador } from "../indicadores";
 
 const receita = (valor: number) => formatBRL(valor, { compacto: true });
 const energia = (valor: number) => formatKWh(valor, { compacto: true });
@@ -28,19 +29,23 @@ function Numero({
 	value,
 	format,
 	pct,
+	favorable,
 }: {
 	label: string;
 	value: number;
 	format: (valor: number) => string;
 	/** Variação em %, como vem da API. */
 	pct: number | null;
+	favorable: DefinicaoIndicador["favorable"];
 }) {
 	return (
 		<div className="flex flex-col gap-1.5">
 			<dt className="text-small text-text-muted">{label}</dt>
 			<dd className="flex flex-col items-start gap-1.5">
 				<KpiValue value={value} format={format} />
-				{pct === null ? null : <KpiDelta value={pct / 100} />}
+				{pct === null ? null : (
+					<KpiDelta value={pct / 100} favorable={favorable} />
+				)}
 			</dd>
 		</div>
 	);
@@ -121,12 +126,14 @@ export function ResumoReceita({
 					value={dados.atual.receita_faturada}
 					format={receita}
 					pct={dados.variacao_receita_pct}
+					favorable={DEFINICOES.receita_faturada.favorable}
 				/>
 				<Numero
 					label="Energia faturada"
 					value={dados.atual.kwh_faturado}
 					format={energia}
 					pct={dados.variacao_kwh_pct}
+					favorable={DEFINICOES.kwh_faturado.favorable}
 				/>
 			</dl>
 		);
