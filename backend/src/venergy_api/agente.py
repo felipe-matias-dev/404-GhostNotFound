@@ -14,6 +14,21 @@ from venergy_agent.infrastructure.semantic_source import SemanticLayerError
 logger = logging.getLogger(__name__)
 
 
+def configurar_logs_do_agente() -> None:
+    """Faz os logs do agente aparecerem: o uvicorn só configura os loggers dele.
+
+    Sem handler no logger raiz, o Python só mostra WARNING ou acima. As etapas do `ask()` e o
+    motivo de cada insight descartado são INFO, e a tela ficaria sem texto sem deixar rastro.
+    """
+    agente = logging.getLogger("venergy_agent")
+    agente.setLevel(logging.INFO)
+    # Só se ainda não houver handler: o --reload e as chamadas repetidas não duplicam linhas.
+    if not agente.handlers:
+        handler = logging.StreamHandler()
+        handler.setFormatter(logging.Formatter("%(levelname)s:     %(name)s: %(message)s"))
+        agente.addHandler(handler)
+
+
 def _carregar_configuracao(
     carregar_config: Callable[[], AgentSettings], desativado: str
 ) -> AgentSettings | None:

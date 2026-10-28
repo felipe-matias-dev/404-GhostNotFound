@@ -9,7 +9,13 @@ from sqlalchemy import Engine
 from venergy_agent.config import AgentSettings
 from venergy_agent.infrastructure.semantic_source import SemanticLayerError
 
-from venergy_api.agente import AgenteDep, RedatorInsightsDep, montar_agente, montar_redator_insights
+from venergy_api.agente import (
+    AgenteDep,
+    RedatorInsightsDep,
+    configurar_logs_do_agente,
+    montar_agente,
+    montar_redator_insights,
+)
 
 DATABASE_URL = "postgresql://agente@127.0.0.1/venergy"
 
@@ -219,3 +225,29 @@ def test_insight_dependency_answers_503_when_there_is_no_writer() -> None:
 
     assert response.status_code == 503
     assert "VENERGY_AGENT_GOOGLE_API_KEY" in response.json()["detail"]
+
+
+@pytest.fixture
+def agent_logger() -> logging.Logger:
+    logger = logging.getLogger("venergy_agent")
+    handlers, level = list(logger.handlers), logger.level
+    logger.handlers.clear()
+    yield logger
+    logger.handlers[:] = handlers
+    logger.setLevel(level)
+
+
+def test_agent_logs_reach_a_handler_at_info_level(agent_logger: logging.Logger) -> None:
+    configurar_logs_do_agente()
+
+    assert agent_logger.level == logging.INFO
+    assert len(agent_logger.handlers) == 1
+
+
+def test_configuring_the_agent_logs_twice_does_not_duplicate_lines(
+    agent_logger: logging.Logger,
+) -> None:
+    configurar_logs_do_agente()
+    configurar_logs_do_agente()
+
+    assert len(agent_logger.handlers) == 1
