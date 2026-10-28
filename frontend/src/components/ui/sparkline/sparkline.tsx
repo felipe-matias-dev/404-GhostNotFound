@@ -2,7 +2,10 @@
 // - decorativa (`aria-hidden`): o valor e a variação já estão em texto no card;
 // - "destaque com uma cor só" (Fundamentos/Cores): a linha em `chart-muted` e só o ponto que
 //   importa em `chart-1`; a referência (ex.: o mês base) é um anel neutro;
-// - linha reta entre os pontos, e `null` interrompe a linha em vez de inventar o valor;
+// - linha reta entre os pontos, e `null` interrompe a linha em vez de inventar o valor. Um
+//   trecho de um ou dois meses entre buracos vira ponto, e não um traço solto;
+// - série com mais de um quarto dos períodos vazios não é desenhada: a forma seria mais buraco
+//   do que linha;
 // - estica na largura do container: o SVG escala sem `preserveAspectRatio` e os pontos são
 //   HTML posicionados em %, para não virarem elipses.
 import { cn } from "#/lib/utils";
@@ -20,6 +23,10 @@ export type SparklineProps = {
 const HEIGHT = 100;
 // Folga em cima e embaixo para o ponto não ser cortado no mínimo e no máximo.
 const PAD = 12;
+// Fração mínima de períodos com valor para a forma ainda dizer alguma coisa.
+const MIN_FILLED = 0.75;
+// Trecho mais curto que isso, entre buracos, é desenhado como pontos.
+const MIN_RUN = 3;
 
 export function Sparkline({
 	values,
@@ -28,7 +35,8 @@ export function Sparkline({
 	className,
 }: SparklineProps) {
 	const defined = values.filter((v): v is number => v !== null);
-	if (defined.length < 2) return null;
+	if (defined.length < 2 || defined.length < values.length * MIN_FILLED)
+		return null;
 	const lo = Math.min(...defined);
 	const span = Math.max(...defined) - lo;
 	const last = Math.max(1, values.length - 1);
@@ -36,17 +44,25 @@ export function Sparkline({
 	const y = (v: number) =>
 		span === 0 ? HEIGHT / 2 : PAD + (1 - (v - lo) / span) * (HEIGHT - 2 * PAD);
 
-	const segments: string[] = [];
-	let current: string[] = [];
+	const runs: number[][] = [];
+	let run: number[] = [];
 	values.forEach((v, i) => {
 		if (v === null) {
-			if (current.length > 1) segments.push(current.join(" "));
-			current = [];
+			if (run.length > 0) runs.push(run);
+			run = [];
 			return;
 		}
-		current.push(`${x(i).toFixed(2)},${y(v).toFixed(2)}`);
+		run.push(i);
 	});
-	if (current.length > 1) segments.push(current.join(" "));
+	if (run.length > 0) runs.push(run);
+	const segments = runs
+		.filter((r) => r.length >= MIN_RUN)
+		.map((r) =>
+			r
+				.map((i) => `${x(i).toFixed(2)},${y(values[i] ?? 0).toFixed(2)}`)
+				.join(" "),
+		);
+	const loose = runs.filter((r) => r.length < MIN_RUN).flat();
 
 	const dot = (i: number | undefined, tone: "highlight" | "reference") => {
 		const v = i === undefined ? null : values[i];
@@ -85,6 +101,13 @@ export function Sparkline({
 					/>
 				))}
 			</svg>
+			{loose.map((i) => (
+				<span
+					key={i}
+					className="-translate-x-1/2 -translate-y-1/2 absolute size-1 rounded-full bg-chart-muted"
+					style={{ left: `${x(i)}%`, top: `${y(values[i] ?? 0)}%` }}
+				/>
+			))}
 			{dot(reference, "reference")}
 			{dot(highlight, "highlight")}
 		</div>

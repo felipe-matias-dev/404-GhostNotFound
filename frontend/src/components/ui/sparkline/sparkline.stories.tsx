@@ -39,6 +39,19 @@ export const ComBuraco: Story = {
 	},
 };
 
+// Mês solto entre dois buracos: um ponto, e não um traço.
+export const PontoIsolado: Story = {
+	args: {
+		values: doisAnos.map((v, i) => (i === 9 || i === 11 ? null : v)),
+		reference: undefined,
+	},
+};
+
+// Um mês vazio a cada três: mais buraco do que linha, e nada é desenhado.
+export const Esparsa: Story = {
+	args: { values: doisAnos.map((v, i) => (i % 3 === 2 ? null : v)) },
+};
+
 // Série constante: linha no meio, sem dividir por zero.
 export const Constante: Story = {
 	args: { values: Array.from({ length: 12 }, () => 2), highlight: 11 },
