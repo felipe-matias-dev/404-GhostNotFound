@@ -46,7 +46,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | 27/10/2026 | DEC-034: cada resposta do agente de IA é gravada em `app.ai_auditoria` (qualquer status) por `POST /ai/ask`, e lida por `GET /ai/audit/{id}`; sem a chave do Gemini a API sobe e o `/ai` responde 503; API 0.7.0 | A auditoria só serve se ninguém recebe uma resposta que não dá para conferir depois; e a chave ausente não pode derrubar o `/health` nem as telas | Felipe |
 | 27/10/2026 | DEC-038: a carga da Gold lê cada CSV aos poucos e grava em lotes de 10 mil linhas, depois de uma primeira rodada que só confere os arquivos; a memória deixa de crescer com o tamanho da Gold | A carga antiga guardava os 12 CSVs inteiros na memória e derrubou o WSL de 8 GB com os ~4 milhões de linhas da Gold real; a conferência antes de gravar continua garantindo que um arquivo fora do contrato não altera o banco | Felipe |
 | 27/10/2026 | DEC-039: Workflow do Databricks com os notebooks lidos do GitHub (`main`), serverless, Landing → Bronze → Silver → Gold + export, reprocessando tudo (diverge da ADR-07); agendamento mensal no dia 6, pausado | Roda o código revisado e mantém o tudo ou nada de cada camada numa extração única; a origem fecha o faturamento uma vez por mês | Arthur |
-| 27/10/2026 | DEC-041: redesign da tela da diretoria: frase de leitura, receita e energia de 12 meses contra os 12 primeiros da base, tesoura em índice de 12 meses corridos e faixa mês contra mês com sparklines; área do `TrendChart` só com eixo a partir do zero; rotas `GET /indicadores/comparacao` e `GET /indicadores/janelas`; API 0.10.0 | A tela responde à pergunta da diretoria (receita sobe, volume cai) em vez de listar seis números de mesmo peso; a área sobre eixo truncado exagerava a variação; DEC, FEC, satisfação, base de UCs e tarifa de um período são contas de backend | João Euclides |
+| 27/10/2026 | DEC-041: redesign da tela da diretoria: frase de leitura, receita e energia de 12 meses contra os 12 primeiros da base, tesoura em variação de 12 meses corridos e faixa mês contra mês com sparklines; área do `TrendChart` só com eixo a partir do zero; rotas `GET /indicadores/comparacao` e `GET /indicadores/janelas`; API 0.10.0 | A tela responde à pergunta da diretoria (receita sobe, volume cai) em vez de listar seis números de mesmo peso; a área sobre eixo truncado exagerava a variação; DEC, FEC, satisfação, base de UCs e tarifa de um período são contas de backend | João Euclides |
 
 ## DEC-001 · Localização dos arquivos de origem (landing)
 
@@ -1211,11 +1211,12 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   - **Receita e energia de 12 meses:** os 12 meses mais recentes contra os 12 primeiros da série, somados pelo backend em
     `GET /receita/comparacao`. Sem 24 meses seguidos na Gold, a tela diz que não há comparação. O botão "Abrir a ponte de receita"
     leva o mesmo par de janelas para a tela de receita.
-  - **Tesoura:** receita e energia faturadas em 12 meses corridos, como índice sobre a primeira janela (= 100), na mesma escala.
+  - **Tesoura:** receita e energia faturadas em 12 meses corridos, como variação sobre a primeira janela (0%), na mesma escala.
     A tela soma os meses da `gold_kpis_mensais` e divide pela primeira janela, como a DEC-035 permite: nenhuma regra de negócio
     é refeita, e a soma de 12 meses tira a sazonalidade. Janela com buraco na série fica de fora. O tooltip mostra as somas em R$
-    e kWh por trás do índice. A linha 100 é mais forte que a grade, cada linha tem o rótulo no fim ("107,8 receita") no
-    lugar da legenda, e a faixa entre as duas é preenchida em `chart-muted`: a distância entre elas é o dado do gráfico.
+    e kWh por trás da variação. A linha do 0% é mais forte que a grade, cada linha tem o rótulo no fim ("+7,8% receita") no
+    lugar da legenda, e a faixa entre as duas é preenchida em `chart-muted`: a distância entre elas é o dado do gráfico. O eixo
+    é em variação, e não em índice (base 100): o número do fim da linha é o mesmo da variação ao lado, sem conta de cabeça.
   - **Layout:** três cards empilhados, na largura toda da área: o resumo (números à esquerda, gráfico com altura fixa de
     240px à direita), o porquê e a faixa de rede e atendimento. Preencher a altura da tela com o gráfico deixava a tesoura
     com metade da tela; a altura fixa vale em qualquer monitor.
