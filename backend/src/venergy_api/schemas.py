@@ -36,6 +36,7 @@ TipoMedidor = Literal["eletromecanico", "eletronico", "smart"]
 TipoMedidorRecorte = Literal["eletromecanico", "eletronico", "smart", "sem_medidor"]
 ResultadoInspecao = Literal["irregularidade_confirmada", "sem_irregularidade"]
 ModalidadeGd = Literal["geracao_propria_uc", "autoconsumo_remoto", "geracao_compartilhada"]
+Tendencia = Literal["subiu", "estavel", "caiu", "sem_comparacao"]
 
 # Um período da decomposição, no formato do contrato: AAAA-MM/AAAA-MM, da primeira à última
 # competência.
@@ -312,6 +313,8 @@ class ContinuidadeAlimentadorMensalSchema(BaseModel):
 class InterrupcaoUcSchema(BaseModel):
     """Uma interrupção que afetou uma UC."""
 
+    model_config = ConfigDict(from_attributes=True)
+
     cod_ocorrencia: RequiredText
     cod_uc: RequiredText
     cod_alimentador: RequiredText
@@ -325,6 +328,8 @@ class InterrupcaoUcSchema(BaseModel):
 
 class AtendimentoUcSchema(BaseModel):
     """Um chamado de atendimento de uma UC."""
+
+    model_config = ConfigDict(from_attributes=True)
 
     protocolo: RequiredText
     cod_uc: RequiredText
@@ -340,6 +345,8 @@ class AtendimentoUcSchema(BaseModel):
 class MedidorUcSchema(BaseModel):
     """O medidor vigente de uma UC e quantas vezes ele já foi trocado."""
 
+    model_config = ConfigDict(from_attributes=True)
+
     cod_uc: RequiredText
     cod_medidor: RequiredText
     tipo_medidor: TipoMedidor
@@ -353,6 +360,8 @@ class MedidorUcSchema(BaseModel):
 class InspecaoUcSchema(BaseModel):
     """Uma inspeção de campo numa UC e o que ela encontrou."""
 
+    model_config = ConfigDict(from_attributes=True)
+
     cod_inspecao: RequiredText
     cod_uc: RequiredText
     data_inspecao: date
@@ -360,6 +369,73 @@ class InspecaoUcSchema(BaseModel):
     resultado: ResultadoInspecao
     tipo_irregularidade: RequiredText | None
     kwh_recuperado: Annotated[ExactNumber, Field(ge=0)]
+
+
+class ConsumoMesSchema(BaseModel):
+    """Um mês do consumo da UC ao lado do mesmo mês do ano anterior."""
+
+    competencia: Competencia
+    # Vazio, e não zero, no mês sem fatura: zero diria que a UC não consumiu.
+    kwh_faturado: ExactNumber | None
+    kwh_ano_anterior: ExactNumber | None
+    # Mostram por que a conta mudou sem o consumo mudar: bandeira mais cara ou mais dias.
+    receita_faturada: ExactNumber | None
+    bandeira: Bandeira | None
+    dias_faturados: int | None
+
+
+class ConsumoUcSchema(BaseModel):
+    """Os 12 meses até a última competência da Gold, contra o mesmo período do ano anterior."""
+
+    # Vazia só se a Gold não tem nenhuma fatura.
+    referencia: Competencia | None
+    meses: list[ConsumoMesSchema]
+    kwh_12m: ExactNumber
+    kwh_12m_ano_anterior: ExactNumber
+    # Em %. A de 12 meses compara só os meses com fatura nos dois anos (`meses_comparados`) e
+    # fica vazia sem nenhum par ou com a base em zero; a do último mês fica vazia se faltar a
+    # fatura de um dos dois meses ou se a base for zero. Os totais acima somam tudo o que foi
+    # faturado.
+    variacao_12m_pct: float | None
+    meses_comparados: int
+    variacao_ultimo_mes_pct: float | None
+    # A resposta para "minha conta veio alta": o último mês contra o mesmo mês do ano anterior.
+    tendencia: Tendencia
+
+
+class FaturaNaoPagaSchema(BaseModel):
+    """Uma fatura da UC que ainda não foi paga."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    competencia: Competencia
+    receita_faturada: ExactNumber
+    data_vencimento: date
+    status_pagamento: Literal["em_aberto", "em_atraso"]
+    # Vazio na fatura em aberto: ainda está no prazo.
+    dias_em_atraso: int | None
+
+
+class FaturasNaoPagasSchema(BaseModel):
+    """As faturas não pagas da UC, a mais antiga primeiro, e quanto a UC deve no total."""
+
+    quantidade: int
+    valor_total: ExactNumber
+    itens: list[FaturaNaoPagaSchema]
+
+
+class Uc360Schema(BaseModel):
+    """Tudo o que o atendente precisa de uma UC numa tela só."""
+
+    cadastro: DimUcSchema
+    consumo: ConsumoUcSchema
+    faturas_nao_pagas: FaturasNaoPagasSchema
+    # Vazio na UC sem medidor instalado: não há linha em gold_medidor_uc.
+    medidor: MedidorUcSchema | None
+    # Do mais recente para o mais antigo: o atendente olha primeiro o que aconteceu há pouco.
+    interrupcoes: list[InterrupcaoUcSchema]
+    atendimentos: list[AtendimentoUcSchema]
+    inspecoes: list[InspecaoUcSchema]
 
 
 class ContinuidadeSerieFiltroSchema(PeriodoSchema):

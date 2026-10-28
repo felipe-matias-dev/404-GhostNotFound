@@ -60,6 +60,7 @@ a UC `0003` em `GET /unidades-consumidoras/{cod_uc}`.
 |---|---|
 | `GET /health` | `200` se a API alcança o banco, `503` se não alcança |
 | `GET /unidades-consumidoras/{cod_uc}` | Resumo de uma unidade consumidora, ou `404` se ela não existir |
+| `GET /unidades-consumidoras/{cod_uc}/visao-360` | A unidade consumidora numa tela só: cadastro e painel solar, consumo dos 12 meses até a última competência da Gold contra o ano anterior (com `tendencia`: `subiu`, `estavel`, `caiu` ou `sem_comparacao`, faixa de ±10%), faturas não pagas, medidor, interrupções, chamados e inspeções ([DEC-044](../docs/decisoes.md)). `404` se a unidade não existir |
 | `GET /receita/mensal?inicio=&fim=` | KPIs de cada competência (`gold_kpis_mensais`), do mês mais antigo ao mais recente, com recorte opcional (`AAAA-MM`, inclusivo) |
 | `GET /receita/comparacao` | kWh e receita de dois períodos (`base_inicio`, `base_fim`, `atual_inicio`, `atual_fim`) e a variação, com filtros opcionais de `municipio`, `bairro` e `classe` |
 | `GET /receita/decomposicao/periodos` | Os pares de períodos (`periodo_base`, `periodo_atual`, no formato `AAAA-MM/AAAA-MM`) que a Gold gravou na decomposição: o que o seletor da tela pode oferecer ([DEC-028](../docs/decisoes.md)) |

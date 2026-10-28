@@ -47,6 +47,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | 27/10/2026 | DEC-038: a carga da Gold lê cada CSV aos poucos e grava em lotes de 10 mil linhas, depois de uma primeira rodada que só confere os arquivos; a memória deixa de crescer com o tamanho da Gold | A carga antiga guardava os 12 CSVs inteiros na memória e derrubou o WSL de 8 GB com os ~4 milhões de linhas da Gold real; a conferência antes de gravar continua garantindo que um arquivo fora do contrato não altera o banco | Felipe |
 | 27/10/2026 | DEC-039: Workflow do Databricks com os notebooks lidos do GitHub (`main`), serverless, Landing → Bronze → Silver → Gold + export, reprocessando tudo (diverge da ADR-07); agendamento mensal no dia 6, pausado | Roda o código revisado e mantém o tudo ou nada de cada camada numa extração única; a origem fecha o faturamento uma vez por mês | Arthur |
 | 27/10/2026 | DEC-040: `GET /receita/insight` devolve o insight de IA da tela de receita; o backend monta o JSON de métricas a partir da ponte da Gold, com valores arredondados como a tela os mostra, e guarda o texto num cache em memória pelo conteúdo das métricas; sem a chave do Gemini a rota responde 503; API 0.9.0 | O agente só aceita texto cujos números sejam exatamente valores do JSON (DEC-019), e uma Gold recarregada precisa gerar um insight novo, nunca um velho | Felipe |
+| 27/10/2026 | DEC-044: a visão 360 da unidade consumidora sai de uma rota só, `GET /unidades-consumidoras/{cod_uc}/visao-360`; os 12 meses terminam na última competência da Gold e a "conta alta" é o último mês contra o mesmo mês do ano anterior, com faixa de ±10%; integrada à API 0.9.0 da main | O atendente está com o cliente na linha: uma chamada só à API e uma resposta pronta para "o consumo subiu?", sem a tela refazer conta de negócio | Felipe |
 
 ## DEC-001 · Localização dos arquivos de origem (landing)
 
@@ -221,7 +222,10 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   o notebook só valida e confere tabelas existentes. Uma fonte com falha é marcada e não
   é gravada, e o resumo final falha se houver fonte com falha, pendente ou sem
   idempotência comprovada. As opções de leitura ficam no código da fonte, versionadas,
-  e são impressas a cada execução.
+  e são impressas a cada execução. O widget `exigir_idempotencia` (padrão `sim`) pode ser
+  `nao` no Workflow: a conferência contra a origem continua, e só a comparação entre as duas
+  últimas gravações é pulada, porque depende de time travel (7 dias de retenção) e não se
+  aplica a cargas mensais com dados novos ([DEC-039](#dec-039--workflow-do-databricks-e-agendamento-mensal)).
 - **Formatos:** CSV com `FAILFAST` e tudo string. Uma pasta com vários CSVs (`leituras/`)
   vira uma tabela só se todos os arquivos tiverem o mesmo conjunto de colunas, unidos por
   nome. JSON preserva structs e arrays, com valores primitivos como string
@@ -479,6 +483,8 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Consequência:** `sem_faturamento_mensal` liga a `sem_uc` por `cod_uc`, e `sem_uc` liga a `sem_continuidade_alimentador_mensal` por `cod_alimentador`.
 - **Decomposição (23/10/2026):** `sem_receita_decomposicao` entra sem relação com outras views. A junção composta com `gold_dim_uc` (município, bairro, classe e GD) continua `a_confirmar` no contrato e repetiria cada efeito uma vez por UC do recorte. As perguntas de recorte se respondem filtrando a própria view.
 - **Atualização (26/10/2026):** views de recorte agregado, marcadas com `standalone: true` no `semantic_layer.yaml` (hoje `sem_kpis_segmento_mensal`), não entram nas relações por chave de entidade. Motivo: elas já trazem `cod_alimentador` como recorte, e o join com `sem_uc` ou com a continuidade repete e multiplica somas (pedido da Dados no #43).
+- **Atualização (28/10/2026, camada 0.4.0):** uma chave coberta por chave estrangeira do contrato para uma view da camada liga só por essa chave estrangeira. A ligação por chave compartilhada (`ENTITY_KEYS`) fica para as chaves sem chave estrangeira, como `cod_alimentador`. Motivo: com as tabelas por UC da v0.3 (interrupções, atendimentos, medidor), toda view com `cod_uc` passaria a ligar com as outras, e uma junção entre duas tabelas de eventos (faturamento × interrupções × atendimentos) multiplica as somas. Agora as três ligam só a `sem_uc`.
+- **Consequência para tabelas futuras (28/10/2026):** a regra é por nome de coluna, não por tabela. Se uma view da camada tiver chave estrangeira em `cod_uc` (ou em `cod_alimentador`), a ligação por essa chave deixa de existir para todas as views que não têm FK nela, inclusive as novas. Uma tabela nova com `cod_uc` só entra na ligação se a chave estrangeira estiver declarada no contrato. Caso contrário, esta decisão precisa ser revista antes da camada ser ampliada.
 
 ## DEC-019 · Verificação numérica da narrativa
 
@@ -1191,14 +1197,14 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   única.
 - **Falhas:** o Resumo de cada notebook dá erro se alguma tabela falhar, e o Job para na primeira task com erro, sem gravar as
   camadas seguintes.
-- **Limitação conhecida:** a conferência pós-gravação da Bronze (DEC-008) compara as duas últimas gravações de cada tabela por
-  time travel. O VACUUM automático do Databricks (predictive optimization) apaga os arquivos antigos depois de 7 dias
-  (`deletedFileRetentionDuration`). Se a última gravação tiver mais de 7 dias, a task `landing_to_bronze` grava a Bronze e falha
-  nessa comparação; o run seguinte passa, porque compara duas gravações recentes. Com dado novo, as duas gravações nem deveriam
-  ser iguais, então essa checagem falharia em todo run mensal.
-- **Para produção:** despausar o agendamento depende de tornar essa comparação opcional no Job (por exemplo, um widget
-  `exigir_idempotencia = nao`), mantendo a conferência contra a origem. Fica para um PR próprio, combinado com o autor do
-  `Landing_to_Bronze`.
+- **Idempotência da Bronze no Job (atualizado em 28/10):** a conferência pós-gravação da Bronze (DEC-008) compara as duas
+  últimas gravações de cada tabela por time travel. O VACUUM automático do Databricks (predictive optimization) apaga os arquivos
+  antigos depois de 7 dias (`deletedFileRetentionDuration`), e com dado novo as duas gravações nem deveriam ser iguais: no Job
+  mensal essa comparação falharia em todo run. Por isso o Job passa `exigir_idempotencia = nao` ao `Landing_to_Bronze`: a
+  conferência contra a origem (schema, contagem e conteúdo) continua, e só a comparação entre gravações é pulada. Na execução
+  manual o padrão continua `sim`.
+- **Para produção:** basta despausar o agendamento. A carga incremental por competência continua como evolução, se o volume
+  mensal justificar.
 
 ## DEC-040 · Insight de IA na tela de Receita: métricas montadas no backend, cache pelo conteúdo
 
@@ -1238,3 +1244,48 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   tentativa do modelo passasse. Revisitar com a taxa de aprovação medida pelo GenAI.
 - **Impacto:** API 0.9.0 (rota nova). A tela de Receita pode exibir o insight com o tipo gerado do OpenAPI. Agente: configuração
   nova `insight_prompt_version` (padrão `v1`) e `build_insight_writer`; o prompt e o redator não mudam.
+
+## DEC-044 · Visão 360 da unidade consumidora: rota única, janela da Gold e regra da conta alta
+
+- **Data:** 27/10/2026 · **Área:** Portal · **Autor:** Felipe
+- **Contexto:** a Camila (Atendimento) pede que o atendente digite o número da unidade consumidora e veja numa tela só o cliente,
+  o consumo dos últimos meses ao lado do mesmo período do ano anterior, as faturas em aberto, o medidor, o painel solar, as
+  interrupções e os chamados, e que consiga responder na hora se a "conta alta" é consumo que subiu. A rota
+  `GET /unidades-consumidoras/{cod_uc}` devolvia só o cadastro.
+- **Decisão:**
+  - **Uma rota agregada:** `GET /unidades-consumidoras/{cod_uc}/visao-360` devolve cadastro (com o painel solar), consumo, faturas
+    não pagas, medidor, interrupções, chamados e inspeções. A rota do cadastro continua igual. `404` se a unidade não existe.
+  - **Os 12 meses terminam na última competência da Gold**, e não no mês de hoje nem na última fatura da própria unidade. O dado
+    é uma extração única: com a data de hoje a janela viria vazia, e uma unidade que parou de faturar passaria por "recente".
+    Cada mês traz o consumo, o mesmo mês do ano anterior, a receita, a bandeira e os `dias_faturados`; o mês sem fatura vem
+    vazio, e não zero.
+  - **Variação dos 12 meses:** compara só os meses com fatura nos dois anos e informa quantos são (`meses_comparados`); sem
+    nenhum par, ou com a base em zero, fica vazia. Os totais (`kwh_12m` e `kwh_12m_ano_anterior`) continuam somando tudo o que
+    foi faturado. Sem essa regra, uma unidade ligada em 2024-12 apareceria com +1100% (12 meses contra 1), e uma que parou de
+    faturar no meio da janela com uma queda que é falta de fatura, não de consumo.
+  - **Conta alta:** o backend devolve `tendencia`, que compara a última competência com o mesmo mês do ano anterior (o que tira o
+    efeito das estações): acima de +10% é `subiu`, abaixo de −10% é `caiu`, no meio é `estavel`, e sem fatura num dos meses ou
+    com a base em zero é `sem_comparacao`. Os 10% exatos ainda são `estavel`. Junto vêm a variação do último mês, a dos 12 meses
+    e, em cada mês, a bandeira e os dias faturados, que explicam uma conta maior sem consumo maior.
+  - **Faturas não pagas:** todas as `em_aberto` e `em_atraso` da unidade, da mais antiga para a mais nova, com a quantidade e o
+    valor total somado em Decimal (DEC-010). Dívida antiga continua sendo dívida, então não há corte de 12 meses. No dataset
+    todas as não pagas estão em atraso, porque a data de corte da Gold é posterior a todos os vencimentos.
+  - **Interrupções, chamados e inspeções:** todo o histórico, do mais recente para o mais antigo. São poucas linhas por unidade.
+  - A variação percentual passou a ser a mesma função da tela de receita (`variacao.py`): base zero não tem percentual.
+- **Suposição nossa:** o corte de 10% não vem do case. Uma variação pequena de consumo não explica uma conta que o cliente achou
+  alta, e 10% separa o ruído do mês de uma mudança que o atendente deve tratar como real. Fica num único lugar
+  (`LIMITE_DA_TENDENCIA`) se a diretoria pedir outra faixa.
+- **Alternativas descartadas:**
+  - Uma rota por bloco: seis chamadas e seis conjuntos de testes para uma tela que sempre usa tudo.
+  - A tela decidir o rótulo: contraria a regra de que o cálculo de negócio fica no backend.
+  - Comparar com a média dos 12 meses anteriores: mistura estações, e uma conta de janeiro sempre pareceria alta.
+  - Somar os 12 meses de cada lado na variação: compara períodos diferentes quando falta fatura. Anular a variação se faltar
+    qualquer mês também foi descartado: uma única fatura faltando apagaria a comparação do ano inteiro.
+- **Limitação conhecida:** a rota busca a última competência da Gold com `max(competencia)`, e a chave primária da fato é
+  `(cod_uc, competencia)`, então a consulta lê a tabela inteira a cada chamada. Com o volume do case isso não pesa. Se pesar, a
+  saída é um índice em `competencia`, que fica para depois da carga em lotes (PR #60), porque mexe no modelo e na carga.
+- **Impacto:** rota nova, sem quebra de contrato; na atualização com a `main`, a API mantém a versão 0.9.0,
+  o `lifespan` do agente e o cache de insights. Nenhuma mudança na Gold nem nas views do agente.
+  A tela `/uc` do frontend pode usar o tipo gerado do OpenAPI.
+  A decisão foi renumerada de DEC-036 para DEC-044 na resolução do PR #55: DEC-036 já identifica a tela
+  da diretoria na `main`, e DEC-041 a DEC-043 estão reservadas nas branches do portal.

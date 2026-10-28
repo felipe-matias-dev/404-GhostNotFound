@@ -38,6 +38,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/unidades-consumidoras/{cod_uc}/visao-360": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Visao 360
+         * @description Cadastro, medidor e histórico da UC: o que o atendente precisa com o cliente na linha.
+         */
+        get: operations["get_visao_360_unidades_consumidoras__cod_uc__visao_360_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/receita/mensal": {
         parameters: {
             query?: never;
@@ -315,6 +335,36 @@ export interface components {
          */
         AnswerStatus: "answered" | "unknown" | "clarify" | "refused" | "failed";
         /**
+         * AtendimentoUcSchema
+         * @description Um chamado de atendimento de uma UC.
+         */
+        AtendimentoUcSchema: {
+            /** Protocolo */
+            protocolo: string;
+            /** Cod Uc */
+            cod_uc: string;
+            /** Competencia */
+            competencia: string;
+            /**
+             * Data Abertura
+             * Format: date-time
+             */
+            data_abertura: string;
+            /**
+             * Data Fechamento
+             * Format: date-time
+             */
+            data_fechamento: string;
+            /** Canal */
+            canal: string;
+            /** Assunto */
+            assunto: string;
+            /** Subassunto */
+            subassunto: string | null;
+            /** Nota Satisfacao */
+            nota_satisfacao: number | null;
+        };
+        /**
          * AtualizarOrdemSchema
          * @description Mudança de status de uma OI. Cancelar é mudar para CANCELADA.
          */
@@ -392,6 +442,49 @@ export interface components {
          * @enum {string}
          */
         Confidence: "high" | "medium" | "low" | "unknown";
+        /**
+         * ConsumoMesSchema
+         * @description Um mês do consumo da UC ao lado do mesmo mês do ano anterior.
+         */
+        ConsumoMesSchema: {
+            /** Competencia */
+            competencia: string;
+            /** Kwh Faturado */
+            kwh_faturado: number | null;
+            /** Kwh Ano Anterior */
+            kwh_ano_anterior: number | null;
+            /** Receita Faturada */
+            receita_faturada: number | null;
+            /** Bandeira */
+            bandeira: ("verde" | "amarela" | "vermelha_p1" | "vermelha_p2") | null;
+            /** Dias Faturados */
+            dias_faturados: number | null;
+        };
+        /**
+         * ConsumoUcSchema
+         * @description Os 12 meses até a última competência da Gold, contra o mesmo período do ano anterior.
+         */
+        ConsumoUcSchema: {
+            /** Referencia */
+            referencia: string | null;
+            /** Meses */
+            meses: components["schemas"]["ConsumoMesSchema"][];
+            /** Kwh 12M */
+            kwh_12m: number;
+            /** Kwh 12M Ano Anterior */
+            kwh_12m_ano_anterior: number;
+            /** Variacao 12M Pct */
+            variacao_12m_pct: number | null;
+            /** Meses Comparados */
+            meses_comparados: number;
+            /** Variacao Ultimo Mes Pct */
+            variacao_ultimo_mes_pct: number | null;
+            /**
+             * Tendencia
+             * @enum {string}
+             */
+            tendencia: "subiu" | "estavel" | "caiu" | "sem_comparacao";
+        };
         /**
          * ContinuidadeAlimentadorMensalSchema
          * @description DEC e FEC de um alimentador numa competência.
@@ -516,6 +609,40 @@ export interface components {
             ocorrido_em: string;
         };
         /**
+         * FaturaNaoPagaSchema
+         * @description Uma fatura da UC que ainda não foi paga.
+         */
+        FaturaNaoPagaSchema: {
+            /** Competencia */
+            competencia: string;
+            /** Receita Faturada */
+            receita_faturada: number;
+            /**
+             * Data Vencimento
+             * Format: date
+             */
+            data_vencimento: string;
+            /**
+             * Status Pagamento
+             * @enum {string}
+             */
+            status_pagamento: "em_aberto" | "em_atraso";
+            /** Dias Em Atraso */
+            dias_em_atraso: number | null;
+        };
+        /**
+         * FaturasNaoPagasSchema
+         * @description As faturas não pagas da UC, a mais antiga primeiro, e quanto a UC deve no total.
+         */
+        FaturasNaoPagasSchema: {
+            /** Quantidade */
+            quantidade: number;
+            /** Valor Total */
+            valor_total: number;
+            /** Itens */
+            itens: components["schemas"]["FaturaNaoPagaSchema"][];
+        };
+        /**
          * FilaItemSchema
          * @description Uma UC da fila e a ordem ativa dela, para a tela não oferecer o que daria 409.
          */
@@ -562,6 +689,62 @@ export interface components {
             } | null;
         };
         /**
+         * InspecaoUcSchema
+         * @description Uma inspeção de campo numa UC e o que ela encontrou.
+         */
+        InspecaoUcSchema: {
+            /** Cod Inspecao */
+            cod_inspecao: string;
+            /** Cod Uc */
+            cod_uc: string;
+            /**
+             * Data Inspecao
+             * Format: date
+             */
+            data_inspecao: string;
+            /** Competencia */
+            competencia: string;
+            /**
+             * Resultado
+             * @enum {string}
+             */
+            resultado: "irregularidade_confirmada" | "sem_irregularidade";
+            /** Tipo Irregularidade */
+            tipo_irregularidade: string | null;
+            /** Kwh Recuperado */
+            kwh_recuperado: number;
+        };
+        /**
+         * InterrupcaoUcSchema
+         * @description Uma interrupção que afetou uma UC.
+         */
+        InterrupcaoUcSchema: {
+            /** Cod Ocorrencia */
+            cod_ocorrencia: string;
+            /** Cod Uc */
+            cod_uc: string;
+            /** Cod Alimentador */
+            cod_alimentador: string;
+            /** Competencia */
+            competencia: string;
+            /**
+             * Data Abertura
+             * Format: date-time
+             */
+            data_abertura: string;
+            /**
+             * Data Encerramento
+             * Format: date-time
+             */
+            data_encerramento: string;
+            /** Duracao Horas */
+            duracao_horas: number;
+            /** Tipo */
+            tipo: string;
+            /** Causa */
+            causa: string | null;
+        };
+        /**
          * KpisMensaisSchema
          * @description Indicadores executivos de uma competência.
          */
@@ -582,6 +765,34 @@ export interface components {
             n_chamados: number | null;
             /** Satisfacao Media */
             satisfacao_media: number | null;
+        };
+        /**
+         * MedidorUcSchema
+         * @description O medidor vigente de uma UC e quantas vezes ele já foi trocado.
+         */
+        MedidorUcSchema: {
+            /** Cod Uc */
+            cod_uc: string;
+            /** Cod Medidor */
+            cod_medidor: string;
+            /**
+             * Tipo Medidor
+             * @enum {string}
+             */
+            tipo_medidor: "eletromecanico" | "eletronico" | "smart";
+            /** Modelo */
+            modelo: string | null;
+            /**
+             * Data Instalacao
+             * Format: date
+             */
+            data_instalacao: string;
+            /** Idade Anos */
+            idade_anos: number;
+            /** N Trocas */
+            n_trocas: number;
+            /** Data Ultima Troca */
+            data_ultima_troca: string | null;
         };
         /**
          * OrdemAtivaSchema
@@ -794,6 +1005,22 @@ export interface components {
             /** Receita Faturada */
             receita_faturada: number;
         };
+        /**
+         * Uc360Schema
+         * @description Tudo o que o atendente precisa de uma UC numa tela só.
+         */
+        Uc360Schema: {
+            cadastro: components["schemas"]["DimUcSchema"];
+            consumo: components["schemas"]["ConsumoUcSchema"];
+            faturas_nao_pagas: components["schemas"]["FaturasNaoPagasSchema"];
+            medidor: components["schemas"]["MedidorUcSchema"] | null;
+            /** Interrupcoes */
+            interrupcoes: components["schemas"]["InterrupcaoUcSchema"][];
+            /** Atendimentos */
+            atendimentos: components["schemas"]["AtendimentoUcSchema"][];
+            /** Inspecoes */
+            inspecoes: components["schemas"]["InspecaoUcSchema"][];
+        };
         /** ValidationError */
         ValidationError: {
             /** Location */
@@ -856,6 +1083,46 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DimUcSchema"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErroSchema"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_visao_360_unidades_consumidoras__cod_uc__visao_360_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cod_uc: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Uc360Schema"];
                 };
             };
             /** @description Not Found */

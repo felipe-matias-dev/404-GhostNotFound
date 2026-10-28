@@ -2,7 +2,7 @@
 
 Resumo para orientar quem chega ao `ai-agent/` (pessoa ou sessão de IA). A fonte da verdade continua sendo a [spec](specs/2026-10-19-architecture-design.md); este arquivo só diz o que existe hoje, onde está e o que falta. Atualize-o no mesmo PR que mudar o estado.
 
-- **Atualizado em:** 24/10/2026: narração (item 8, PR #36) na `main`; o `InsightWriter` (item 9) chega por um PR da branch `feat/ai-agent-narracao-v2`. O que está em revisão está na spec §1.
+- **Atualizado em:** 28/10/2026: camada semântica 0.4.0 com o contrato da Gold v0.3 (tabelas por UC). O que está em revisão está na spec §1.
 
 ## 1. O que o agente faz
 
@@ -38,17 +38,18 @@ pergunta → Question → SemanticLayer (carregada uma vez)
                  erro corrigível → AttemptFeedback → nova tentativa (até 3)
                  erro do banco não classificado → failed
         → AnswerWriter (narrativa) → números conferidos com as linhas (DEC-019)
-            falhou → texto determinístico (com os valores, se o resultado for pequeno)
+            falhou ou citou nome técnico → texto determinístico (com os valores, se o resultado for pequeno,
+              e as colunas em palavras com a unidade da camada: "receita faturada = R$ 35.482,79")
         → AgentAnswer
 ```
 
-Detalhes, confiança e logs: spec §5.1. O backend monta o agente uma vez por processo com `build_agent(AgentSettings())`.
+Pedido de esclarecimento que cita nome técnico vira uma pergunta genérica sobre período e recorte. Detalhes, confiança e logs: spec §5.1. O backend monta o agente uma vez por processo com `build_agent(AgentSettings())`.
 
-`InsightWriter` (item 9, `infrastructure/insight_writer.py`, prompt em `prompts/insight/v2/`, com unidade, efeito tarifa e bandeira como partes do efeito preço e negativo por extenso): narra o JSON de métricas de uma tela e devolve `None` se algum número do texto não estiver no JSON. O backend monta o JSON, guarda o insight em cache e liga o redator (D9): feito para a tela de Receita (`GET /receita/insight`, DEC-040), com `build_insight_writer` em `bootstrap.py`. O golden set está em `eval/golden_set.yaml` (66 itens, alinhado à camada v0.2, rascunho até a revisão humana).
+`InsightWriter` (item 9, `infrastructure/insight_writer.py`, prompt em `prompts/insight/v2/`, com unidade, efeito tarifa e bandeira como partes do efeito preço e negativo por extenso): narra o JSON de métricas de uma tela e devolve `None` se algum número do texto não estiver no JSON. O backend monta o JSON, guarda o insight em cache e liga o redator (D9): feito para a tela de Receita (`GET /receita/insight`, DEC-040), com `build_insight_writer` em `bootstrap.py`. O golden set está em `eval/golden_set.yaml` (versão 0.9.0, 93 itens, alinhado à camada 0.4.0). A revisão humana é parcial: `revisado_por` está preenchido em 12 itens (Dados), e os demais aguardam revisão.
 
 ## 4. Camada semântica hoje
 
-`semantic/semantic_layer.yaml` (versão 0.2.0 do arquivo) tem seis views:
+`semantic/semantic_layer.yaml` (versão 0.4.0 do arquivo, contrato da Gold v0.3) tem nove views:
 
 | View | Tabela da Gold | Responde sobre |
 |---|---|---|
@@ -57,26 +58,32 @@ Detalhes, confiança e logs: spec §5.1. O backend monta o agente uma vez por pr
 | `sem_continuidade_alimentador_mensal` | `gold_continuidade_alimentador_mensal` | DEC, FEC e interrupções por alimentador |
 | `sem_kpis_mensais` | `gold_kpis_mensais` | totais da empresa por mês, inclusive chamados e satisfação |
 | `sem_kpis_segmento_mensal` | `gold_kpis_segmento_mensal` | componentes somáveis por município, bairro, classe e GD; DEC, FEC e satisfação do recorte saem da soma dos componentes |
+| `sem_interrupcoes_uc` | `gold_interrupcoes_uc` | ocorrências de falta de luz de cada UC: duração, tipo e causa |
+| `sem_atendimentos_uc` | `gold_atendimentos_uc` | chamados de cada UC: canal, assunto e nota de satisfação |
+| `sem_medidor_uc` | `gold_medidor_uc` | medidor vigente de cada UC: tipo, modelo, idade e trocas |
 | `sem_receita_decomposicao` | `gold_receita_decomposicao` | efeitos de preço (tarifa e bandeira), volume e mix entre dois períodos `AAAA-MM/AAAA-MM` |
 
-Relações: `sem_faturamento_mensal` ↔ `sem_uc` por `cod_uc`, e `sem_uc` ↔ `sem_continuidade_alimentador_mensal` por `cod_alimentador`. As views de KPIs e a decomposição não têm relação: respondem sozinhas (DEC-018).
+Relações: `sem_faturamento_mensal`, `sem_interrupcoes_uc`, `sem_atendimentos_uc` e `sem_medidor_uc` ligam a `sem_uc` por `cod_uc`, pela chave estrangeira do contrato, e nunca entre si (DEC-018, atualização da camada 0.4.0). `sem_uc` ↔ `sem_continuidade_alimentador_mensal` por `cod_alimentador`. As views de KPIs e a decomposição não têm relação: respondem sozinhas (DEC-018).
 
 Testes que protegem a camada: validação contra o contrato (`test_semantic_source.py`), toda SQL de exemplo passa pelo validador (`test_semantic_examples.py`), deriva do `views.sql` (`test_views_sql.py`) e consultas reais pelo validador e pelo executor (`tests/integration/test_semantic_views.py`).
 
-## 5. Cobertura da Gold (contrato v0.2.0)
+## 5. Cobertura da Gold (contrato v0.3.0)
 
 Regras do contrato para o agente (`conventions.agent`, DEC-022), conferidas no código: só tabelas com `agente` em `consumers`, só colunas `confirmada` ou `proposta` sem `sensitive: true`. "Receita" sem qualificador é `receita_faturada`.
 
 | Tabela | Agente em `consumers` | Na camada semântica | Observação |
 |---|---|---|---|
 | `gold_dim_uc` | sim | `sem_uc` | `titular_mascarado` e `documento_mascarado` são `sensitive`: nunca entram |
-| `gold_fato_faturamento_mensal` | sim | `sem_faturamento_mensal` | colunas de pagamento (`status_pagamento`, `dias_em_atraso`) e de leitura (`kwh_leitura`, `origem_kwh`) ainda não foram escolhidas |
+| `gold_fato_faturamento_mensal` | sim | `sem_faturamento_mensal` | entram bandeira, vencimento, pagamento, atraso, tipo de leitura e de medidor e dias faturados; `kwh_leitura` e `origem_kwh` ficam fora: são colunas de qualidade de dado, e ao lado de `kwh_faturado` induzem o modelo a escolher a energia errada |
 | `gold_continuidade_alimentador_mensal` | sim | `sem_continuidade_alimentador_mensal` | |
 | `gold_kpis_mensais` | sim | `sem_kpis_mensais` | |
 | `gold_kpis_segmento_mensal` | sim | `sem_kpis_segmento_mensal` | |
 | `gold_receita_decomposicao` | sim | `sem_receita_decomposicao` | método do efeito bandeira e `possui_gd` entre períodos ainda em aberto no contrato |
 | `gold_reconciliacao_faturamento` | sim | não | candidata para perguntas sobre faturas fora do cadastro e correções de kWh |
-| `gold_interrupcoes_uc`, `gold_atendimentos_uc`, `gold_medidor_uc` | sim | não | sem colunas nem chave no contrato: bloqueadas |
+| `gold_interrupcoes_uc` | sim | `sem_interrupcoes_uc` | sem `cod_alimentador`: o alimentador vem de `sem_uc` |
+| `gold_atendimentos_uc` | sim | `sem_atendimentos_uc` | |
+| `gold_medidor_uc` | sim | `sem_medidor_uc` | |
+| `gold_inspecoes_uc` | **não** | não | fora do agente por decisão de produto, como a fila de suspeitas |
 | `gold_fila_suspeitas` | **não** | não | fora do agente por decisão de produto (DEC-022) |
 
 O banco local só tem a amostra sintética do backend (`venergy_api.amostra`). A Gold real ainda não foi entregue: os nomes e regras vêm do contrato, os números do golden set só se fixam com ela.
@@ -84,9 +91,9 @@ O banco local só tem a amostra sintética do backend (`venergy_api.amostra`). A
 ## 6. Lacunas conhecidas
 
 - O YAML não registra a versão do contrato (`conventions.agent.contract_version`).
-- D7 continua aberto: a carga apaga as tabelas da Gold sem `CASCADE` e falha se houver view `sem_*`. Procedimento manual no `README.md`.
+- D7 resolvido: a carga apaga as views `sem_*` antes de recriar as tabelas da Gold e as aplica de novo no fim, numa única transação (`backend/src/venergy_api/carga.py`, `drop_agent_views`). Se uma view não bater com a Gold, a carga falha e desfaz tudo.
 - D1 continua aberto: as views ficam no schema `gold`, onde o `venergy_agent` lê todas as tabelas.
-- O golden set (PR #32) ainda não tem revisão humana: `revisado_por` é nulo em todos os itens, e o gabarito só se fixa com a Gold real.
+- O golden set tem revisão humana parcial: `revisado_por` está preenchido em 12 de 93 itens, e os gabaritos dos itens da Gold real só se fixam com a Gold real carregada no Postgres local.
 - Recortes de receita: a tela (`GET /receita/comparacao`, DEC-021) soma a fato com o cadastro atual da UC, e o agente soma `sem_kpis_segmento_mensal`. Os números só divergem se uma UC mudou de recorte; alinhar quando o backend migrar para a tabela de segmentos.
 
 ## 6b. Avaliação (item 7)
