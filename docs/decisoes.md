@@ -1214,11 +1214,19 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   - **Tesoura:** receita e energia faturadas em 12 meses corridos, como índice sobre a primeira janela (= 100), na mesma escala.
     A tela soma os meses da `gold_kpis_mensais` e divide pela primeira janela, como a DEC-035 permite: nenhuma regra de negócio
     é refeita, e a soma de 12 meses tira a sazonalidade. Janela com buraco na série fica de fora. O tooltip mostra as somas em R$
-    e kWh por trás do índice.
-  - **Indicadores do mês:** os seis indicadores numa faixa só, mês contra mês como na DEC-036, cada um com uma `Sparkline`
-    (`components/ui/sparkline`) da série inteira: linha em `chart-muted`, mês atual em `chart-1` e mês base em anel neutro.
+    e kWh por trás do índice. A linha 100 é mais forte que a grade, cada linha tem o rótulo no fim ("107,8 receita") no
+    lugar da legenda, e a faixa entre as duas é preenchida em `chart-muted`: a distância entre elas é o dado do gráfico. O
+    resumo não tem moldura própria, e o gráfico tem altura limitada (entre 18rem e 26rem, conforme a tela): esticado numa tela
+    alta, ele fazia 8% parecer um penhasco. Sobra espaço embaixo em telas altas, e isso é melhor que distorcer a inclinação.
+  - **Rede e atendimento no mês:** DEC, FEC, chamados e satisfação numa faixa só, mês contra mês como na DEC-036. Receita e
+    energia ficam só no resumo de 12 meses: repetidas na faixa, com o mesmo nome e a variação de um mês, seriam duas
+    "receitas" diferentes na mesma tela. Cada card tem uma `Sparkline` (`components/ui/sparkline`) da série inteira: linha em
+    `chart-muted`, mês atual em `chart-1`, mês base em anel neutro; trecho de um ou dois meses entre buracos vira ponto, e série
+    com mais de um quarto dos meses vazios não é desenhada. Os cards de DEC e FEC são links inteiros para a tela de rede, com
+    fundo no hover.
   - **`TrendChart`:** a área em degradê só aparece com `zeroBaseline`. Num eixo que não começa no zero, a área sugeria uma queda
-    maior do que a real. A visão ano a ano e os parâmetros `indicador` e `tendencia` da URL saem da tela.
+    maior do que a real. Ganha `reference`, `endLabels` e `band` para a tesoura. A visão ano a ano e os parâmetros `indicador`
+    e `tendencia` da URL saem da tela.
 - **Decisão (backend):** a rota de comparação que a DEC-036 pedia, mais a série de janelas para a tesoura, ambas sobre a
   `gold_kpis_segmento_mensal` e numa ida ao banco cada.
   - `GET /indicadores/comparacao`: dois períodos quaisquer e o recorte (`municipio`, `bairro`, `classe`). Por período: receita
