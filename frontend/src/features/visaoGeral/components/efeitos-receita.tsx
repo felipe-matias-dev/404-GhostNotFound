@@ -1,4 +1,8 @@
-import { ArrowsClockwiseIcon, InfoIcon } from "@phosphor-icons/react";
+import {
+	ArrowsClockwiseIcon,
+	InfoIcon,
+	XCircleIcon,
+} from "@phosphor-icons/react";
 import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { Button } from "#/components/ui/button";
@@ -67,7 +71,8 @@ export function EfeitosReceita({ janelas }: { janelas: Janelas | undefined }) {
 	if (periodos.isError || decomposicao.isError) {
 		corpo = (
 			<div className="flex flex-col items-start gap-2">
-				<p className="text-body text-text-muted">
+				<p className="flex items-center gap-1.5 text-body">
+					<XCircleIcon aria-hidden className="size-4 shrink-0 text-danger" />
 					Não foi possível carregar os efeitos da receita.
 				</p>
 				<Button
