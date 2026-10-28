@@ -120,6 +120,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/receita/insight": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Insight
+         * @description Um insight de IA sobre a ponte de receita do recorte que a tela está mostrando.
+         */
+        get: operations["get_insight_receita_insight_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/continuidade/alimentadores/mensal": {
         parameters: {
             query?: never;
@@ -528,6 +548,18 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /**
+         * InsightReceitaSchema
+         * @description O insight de IA da tela de Receita e as métricas que sustentam cada número do texto.
+         */
+        InsightReceitaSchema: {
+            /** Texto */
+            texto: string | null;
+            /** Metricas */
+            metricas: {
+                [key: string]: unknown;
+            } | null;
         };
         /**
          * KpisMensaisSchema
@@ -966,6 +998,50 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_insight_receita_insight_get: {
+        parameters: {
+            query: {
+                periodo_base: string;
+                periodo_atual: string;
+                municipio?: string | null;
+                bairro?: string | null;
+                classe?: ("B1" | "B2" | "B3" | "A4") | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InsightReceitaSchema"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErroSchema"];
                 };
             };
         };

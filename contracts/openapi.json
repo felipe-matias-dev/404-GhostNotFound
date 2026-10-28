@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "V-Energy Grid 360 API",
-    "version": "0.7.0"
+    "version": "0.9.0"
   },
   "paths": {
     "/health": {
@@ -410,6 +410,126 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/receita/insight": {
+      "get": {
+        "tags": [
+          "receita"
+        ],
+        "summary": "Get Insight",
+        "description": "Um insight de IA sobre a ponte de receita do recorte que a tela está mostrando.",
+        "operationId": "get_insight_receita_insight_get",
+        "parameters": [
+          {
+            "name": "periodo_base",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])/\\d{4}-(0[1-9]|1[0-2])$",
+              "title": "Periodo Base"
+            }
+          },
+          {
+            "name": "periodo_atual",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])/\\d{4}-(0[1-9]|1[0-2])$",
+              "title": "Periodo Atual"
+            }
+          },
+          {
+            "name": "municipio",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Municipio"
+            }
+          },
+          {
+            "name": "bairro",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Bairro"
+            }
+          },
+          {
+            "name": "classe",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "B1",
+                    "B2",
+                    "B3",
+                    "A4"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Classe"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InsightReceitaSchema"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErroSchema"
+                }
+              }
+            },
+            "description": "Service Unavailable"
           },
           "422": {
             "description": "Validation Error",
@@ -1814,6 +1934,40 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "InsightReceitaSchema": {
+        "properties": {
+          "texto": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Texto"
+          },
+          "metricas": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metricas"
+          }
+        },
+        "type": "object",
+        "required": [
+          "texto",
+          "metricas"
+        ],
+        "title": "InsightReceitaSchema",
+        "description": "O insight de IA da tela de Receita e as métricas que sustentam cada número do texto."
       },
       "KpisMensaisSchema": {
         "properties": {

@@ -1,6 +1,8 @@
 from venergy_agent.application.ask import AskUseCase
+from venergy_agent.application.ports import InsightWriter
 from venergy_agent.config import AgentSettings
 from venergy_agent.infrastructure.answer_writer import PydanticAiAnswerWriter
+from venergy_agent.infrastructure.insight_writer import PydanticAiInsightWriter
 from venergy_agent.infrastructure.llm import build_model
 from venergy_agent.infrastructure.postgres_executor import PostgresQueryExecutor
 from venergy_agent.infrastructure.semantic_source import YamlSemanticLayerSource
@@ -43,4 +45,13 @@ async def build_agent(settings: AgentSettings, narrate: bool = True) -> AskUseCa
         answer_sample_rows=settings.answer_sample_rows,
         prompt_version=settings.prompt_version,
         configured_model=settings.llm_model.partition(":")[2],
+    )
+
+
+def build_insight_writer(settings: AgentSettings) -> InsightWriter:
+    return PydanticAiInsightWriter(
+        model=build_model(settings),
+        prompts_dir=settings.prompts_dir / "insight",
+        prompt_version=settings.insight_prompt_version,
+        temperature=settings.temperature,
     )

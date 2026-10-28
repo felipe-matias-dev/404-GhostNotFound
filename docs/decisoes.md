@@ -46,6 +46,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | 27/10/2026 | DEC-034: cada resposta do agente de IA é gravada em `app.ai_auditoria` (qualquer status) por `POST /ai/ask`, e lida por `GET /ai/audit/{id}`; sem a chave do Gemini a API sobe e o `/ai` responde 503; API 0.7.0 | A auditoria só serve se ninguém recebe uma resposta que não dá para conferir depois; e a chave ausente não pode derrubar o `/health` nem as telas | Felipe |
 | 27/10/2026 | DEC-038: a carga da Gold lê cada CSV aos poucos e grava em lotes de 10 mil linhas, depois de uma primeira rodada que só confere os arquivos; a memória deixa de crescer com o tamanho da Gold | A carga antiga guardava os 12 CSVs inteiros na memória e derrubou o WSL de 8 GB com os ~4 milhões de linhas da Gold real; a conferência antes de gravar continua garantindo que um arquivo fora do contrato não altera o banco | Felipe |
 | 27/10/2026 | DEC-039: Workflow do Databricks com os notebooks lidos do GitHub (`main`), serverless, Landing → Bronze → Silver → Gold + export, reprocessando tudo (diverge da ADR-07); agendamento mensal no dia 6, pausado | Roda o código revisado e mantém o tudo ou nada de cada camada numa extração única; a origem fecha o faturamento uma vez por mês | Arthur |
+| 27/10/2026 | DEC-040: `GET /receita/insight` devolve o insight de IA da tela de receita; o backend monta o JSON de métricas a partir da ponte da Gold, com valores arredondados como a tela os mostra, e guarda o texto num cache em memória pelo conteúdo das métricas; sem a chave do Gemini a rota responde 503; API 0.9.0 | O agente só aceita texto cujos números sejam exatamente valores do JSON (DEC-019), e uma Gold recarregada precisa gerar um insight novo, nunca um velho | Felipe |
 
 ## DEC-001 · Localização dos arquivos de origem (landing)
 
@@ -1198,3 +1199,42 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Para produção:** despausar o agendamento depende de tornar essa comparação opcional no Job (por exemplo, um widget
   `exigir_idempotencia = nao`), mantendo a conferência contra a origem. Fica para um PR próprio, combinado com o autor do
   `Landing_to_Bronze`.
+
+## DEC-040 · Insight de IA na tela de Receita: métricas montadas no backend, cache pelo conteúdo
+
+- **Data:** 27/10/2026 · **Área:** Portal e IA · **Autor:** Felipe
+- **Contexto:** o case (5.3) pede insights gerados por IA em pelo menos uma tela, fiéis aos dados. O agente já tinha o
+  `InsightWriter` (spec §5, item 9), que narra um JSON de métricas e descarta o texto se algum número dele não for exatamente um
+  valor do JSON (DEC-019). Faltava o lado do backend (D9): montar o JSON, ligar o redator, guardar em cache e expor a rota.
+- **Decisão:**
+  - **Rota:** `GET /receita/insight` com os filtros da decomposição (`periodo_base`, `periodo_atual`, `municipio`, `bairro`,
+    `classe`). Devolve `texto` (2 a 4 frases, ou vazio) e as `metricas` que sustentam o texto. Recorte sem segmentos devolve os dois
+    vazios, sem chamar o modelo. Sem a chave do Gemini, `503` (DEC-034).
+  - **O JSON sai da ponte da Gold, somada como a tela soma (DEC-035):** base, efeitos de tarifa, bandeira, volume e mix, receita
+    atual = base + efeitos, variação em R$ e em %, as 3 maiores quedas do nível abaixo, o período e o recorte em palavras. Não há
+    fórmula nova do PVM. A consulta é a mesma da rota de decomposição (`consultar_decomposicao`).
+  - **Valores arredondados como a tela mostra:** R$ com 2 casas e % com 1. A checagem do agente exige igualdade exata, e um
+    `-3.912621…` no JSON recusaria o "−3,9%" do texto.
+  - **O período entra como valor** (`"periodo_base": "2024-01/2024-12"`), porque só os valores validam os números do texto.
+  - **Cache em memória, pelo conteúdo das métricas** (texto canônico, até 256 entradas, o menos usado sai primeiro). Só entra
+    texto que passou na checagem; a falha não é guardada.
+  - **Montagem na subida da API,** como o agente: `build_insight_writer` (agente) e `montar_redator_insights` (API). Configuração
+    inválida ou prompt inexistente desligam só os insights; o `/health` e as telas continuam.
+- **Por que não é cálculo de negócio novo:** a DEC-035 previa que, se outro consumidor precisasse dos mesmos números da ponte, a
+  conta passaria para o backend. O insight é esse consumidor, e soma o que a Gold já calculou.
+- **Alternativas descartadas:**
+  - Cache pelos filtros: uma Gold recarregada devolveria um insight velho.
+  - Cache com prazo de validade: dois números para combinar, sem ganho sobre a chave pelo conteúdo.
+  - Cache numa tabela do schema `app`: mais peso para uma tela; o insight só é refeito depois de reiniciar a API.
+  - Valores crus no JSON: o texto nunca passaria na checagem.
+  - O backend instanciar a classe do redator: a regra do `ai-agent` é depender só da porta.
+- **Limites:** o texto sai em português do Gemini e pode ser descartado se ele escrever um número de outro jeito (por exemplo
+  "R$ 1,2 milhão" para 1.234.567,89): a tela fica sem insight, que é o comportamento seguro. O cache zera a cada reinício, e a
+  qualidade do texto só se prova com a chave do Gemini (não há chave nos testes automáticos, que usam um redator falso).
+- **Log do agente:** o uvicorn só configura os loggers dele, então a API sobe com o logger `venergy_agent` em INFO e um handler
+  (`configurar_logs_do_agente`, no `lifespan`). Sem isso, uma tela sem insight não deixa rastro do motivo (erro do modelo, texto
+  vazio ou número sem suporte). O log traz o motivo, nunca o texto do insight nem a chave. Reprovação por número não vai para o
+  cache: o redator devolve `None` tanto para ela quanto para falha do provedor, e guardá-la travaria o recorte mesmo que uma nova
+  tentativa do modelo passasse. Revisitar com a taxa de aprovação medida pelo GenAI.
+- **Impacto:** API 0.9.0 (rota nova). A tela de Receita pode exibir o insight com o tipo gerado do OpenAPI. Agente: configuração
+  nova `insight_prompt_version` (padrão `v1`) e `build_insight_writer`; o prompt e o redator não mudam.

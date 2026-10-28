@@ -118,3 +118,6 @@ def test_semantic_layer_and_contract_paths_resolve_inside_the_repository(require
     assert settings.gold_contract_path.exists()
     assert (settings.prompts_dir / settings.prompt_version / "system.md").exists()
     assert (settings.prompts_dir / "answer" / settings.answer_prompt_version / "answer.md").exists()
+    assert (
+        settings.prompts_dir / "insight" / settings.insight_prompt_version / "insight.md"
+    ).exists()

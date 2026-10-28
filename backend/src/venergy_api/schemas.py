@@ -240,6 +240,15 @@ class DecomposicaoLinhaSchema(BaseModel):
     efeito_mix: ExactNumber
 
 
+class InsightReceitaSchema(BaseModel):
+    """O insight de IA da tela de Receita e as métricas que sustentam cada número do texto."""
+
+    # Vazio quando o redator recusa o texto (número fora das métricas) ou falha: a tela
+    # aparece sem insight. Também vazio, sem chamar o modelo, se o recorte não tem segmentos.
+    texto: str | None
+    metricas: dict[str, Any] | None
+
+
 class KpisSegmentoMensalSchema(BaseModel):
     """Componentes somáveis de um recorte (município, bairro, classe e GD) numa competência."""
 
