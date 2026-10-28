@@ -121,12 +121,12 @@ itens:
   # --- junção: duas views ligadas por chave ---
 
   - id: G010
-    question: "Qual o DEC médio em 2025 dos alimentadores que atendem UCs com painel solar?"
+    question: "Qual o DEC em 2025 do conjunto de alimentadores que atendem UCs com painel solar?"
     category: juncao
-    reference_sql: "SELECT round(sum(c.horas_interrompidas) * count(DISTINCT c.competencia) / NULLIF(sum(c.n_uc), 0), 2) AS dec_medio FROM sem_continuidade_alimentador_mensal c WHERE c.competencia LIKE '2025-%' AND c.cod_alimentador IN (SELECT u.cod_alimentador FROM sem_uc u WHERE u.possui_gd)"
+    reference_sql: "SELECT round((sum(c.horas_interrompidas) / NULLIF(sum(c.n_uc) / 12.0, 0))::numeric, 2) AS dec_grupo FROM sem_continuidade_alimentador_mensal c WHERE c.competencia LIKE '2025-%' AND c.cod_alimentador IN (SELECT u.cod_alimentador FROM sem_uc u WHERE u.possui_gd)"
     expected_status: answered
     follow_up_of: null
-    notes: "Liga UC a alimentador por sem_uc.cod_alimentador = sem_continuidade_alimentador_mensal.cod_alimentador. Revisão de Dados (27/10/2026): 'DEC médio' dos alimentadores em conjunto é o DEC do grupo, com as horas somadas antes de dividir e as UCs pela média mensal (DEC-032 e a regra de recortes: nunca média de índices). A referência fazia a média dos DEC mensais, que dá cerca de um doze avos do DEC do ano. Na Gold real quase todos os alimentadores atendem alguma UC com painel solar, então o filtro quase não filtra; na amostra, filtra. Pendente de revisão por Dados."
+    notes: "Liga UC a alimentador por sem_uc.cod_alimentador = sem_continuidade_alimentador_mensal.cod_alimentador. Revisão de Dados (27/10/2026): O DEC do conjunto de alimentadores é o DEC do grupo, com as horas somadas antes de dividir e as UCs pela média mensal, dividindo por 12 (os meses do período pedido, e não os que aparecem no resultado; DEC-032 e a regra de recortes: nunca média de índices). O `::numeric` é necessário porque `horas_interrompidas` é `double precision` e o Postgres não tem `round(double precision, integer)`. A referência fazia a média dos DEC mensais, que dá cerca de um doze avos do DEC do ano. Na Gold real quase todos os alimentadores atendem alguma UC com painel solar, então o filtro quase não filtra; na amostra, filtra. Pendente de revisão por Dados."
     revisado_por: null
 
   - id: G011
