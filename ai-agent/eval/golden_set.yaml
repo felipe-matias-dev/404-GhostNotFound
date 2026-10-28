@@ -887,13 +887,13 @@ itens:
     revisado_por: null
 
   - id: G089
-    question: "Qual o FEC de março de 2025 do alimentador que atende o bairro Iputinga?"
+    question: "Qual o FEC de março de 2025 do alimentador que atende o bairro Iputinga, em Recife?"
     category: juncao
-    reference_sql: "SELECT round(1.0 * sum(c.n_interrupcoes) / NULLIF(sum(c.n_uc), 0), 4) AS fec FROM sem_continuidade_alimentador_mensal c WHERE c.competencia = '2025-03' AND c.cod_alimentador IN (SELECT u.cod_alimentador FROM sem_uc u WHERE u.bairro = 'Iputinga')"
+    reference_sql: "SELECT round(1.0 * sum(c.n_interrupcoes) / NULLIF(sum(c.n_uc), 0), 4) AS fec FROM sem_continuidade_alimentador_mensal c WHERE c.competencia = '2025-03' AND c.cod_alimentador IN (SELECT u.cod_alimentador FROM sem_uc u WHERE u.municipio = 'Recife' AND u.bairro = 'Iputinga')"
     expected_status: answered
     datasets: [gold_real]
     follow_up_of: null
-    notes: "Equivalente do G011 na Gold real: encadeia cadastro, alimentador e FEC, com o bairro no lugar do código da UC. Na Gold real um único alimentador atende o bairro; com mais de um, o FEC do conjunto soma as interrupções antes de dividir pelas UCs. Só com nomes já publicados no diagnóstico (DEC-024). A referência foi executada na Gold real e volta com resultado (Dados, 28/10/2026)."
+    notes: "Equivalente do G011 na Gold real: encadeia cadastro, alimentador e FEC, com o bairro no lugar do código da UC. Na Gold real um único alimentador atende o bairro; com mais de um, o FEC do conjunto soma as interrupções antes de dividir pelas UCs. Só com nomes já publicados no diagnóstico (DEC-024). A referência foi executada na Gold real e volta com resultado (Dados, 28/10/2026). Revisão do GenAI (28/10/2026): o município entrou na pergunta e na referência, porque a regra da camada pede bairro sempre junto do município; Iputinga e Macaxeira ficam em Recife, então o resultado não muda."
     revisado_por: null
 
   - id: G090
@@ -927,11 +927,11 @@ itens:
     revisado_por: null
 
   - id: G093
-    question: "Quanta energia as UCs do bairro Macaxeira faturaram em 2024 e em 2025?"
+    question: "Quanta energia as UCs do bairro Macaxeira, em Recife, faturaram em 2024 e em 2025?"
     category: case
-    reference_sql: "SELECT sum(CASE WHEN f.competencia LIKE '2024-%' THEN f.kwh_faturado END) AS kwh_2024, sum(CASE WHEN f.competencia LIKE '2025-%' THEN f.kwh_faturado END) AS kwh_2025 FROM sem_faturamento_mensal f JOIN sem_uc u ON u.cod_uc = f.cod_uc WHERE u.bairro = 'Macaxeira'"
+    reference_sql: "SELECT sum(CASE WHEN f.competencia LIKE '2024-%' THEN f.kwh_faturado END) AS kwh_2024, sum(CASE WHEN f.competencia LIKE '2025-%' THEN f.kwh_faturado END) AS kwh_2025 FROM sem_faturamento_mensal f JOIN sem_uc u ON u.cod_uc = f.cod_uc WHERE u.municipio = 'Recife' AND u.bairro = 'Macaxeira'"
     expected_status: answered
     datasets: [gold_real]
     follow_up_of: null
-    notes: "Equivalente do G061 na Gold real: o consumo contra o ano anterior que a Camila pede (case p. 5), por bairro em vez de UC. Macaxeira é um dos bairros da hipótese H2. A soma de cada ano é feita no SQL. Só com nomes já publicados no diagnóstico (DEC-024). A referência foi executada na Gold real e volta com resultado (Dados, 28/10/2026)."
+    notes: "Equivalente do G061 na Gold real: o consumo contra o ano anterior que a Camila pede (case p. 5), por bairro em vez de UC. Macaxeira é um dos bairros da hipótese H2. A soma de cada ano é feita no SQL. Só com nomes já publicados no diagnóstico (DEC-024). A referência foi executada na Gold real e volta com resultado (Dados, 28/10/2026). Revisão do GenAI (28/10/2026): o município entrou na pergunta e na referência, porque a regra da camada pede bairro sempre junto do município; Iputinga e Macaxeira ficam em Recife, então o resultado não muda."
     revisado_por: null
