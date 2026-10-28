@@ -889,6 +889,8 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
       | 7% | 112 | 0,919 | 0,889 |
       | **5% (adotado)** | 194 | 0,901 | 0,930 |
 
+      **O case confirma a ordem de grandeza:** a gerente de perdas diz que a equipe faz mais de 200 inspeções por mês e que pouco mais da metade encontra alguma irregularidade; a fila de 194 UCs cabe nessa capacidade, e uma lista sem ordem não serve a ela (cada inspeção sem achado é um dia de equipe perdido).
+
       **Por que 5% (o top-200 do backlog):** o critério de aceite da D3-07 pede a "taxa de acerto do top-200" da fila, e só com o
       corte de 5% a fila tem o tamanho desse teste (194 UCs; com 8%, 95). A faixa de 5% a 10% ainda acerta 83% (151 irregularidades
       confirmadas para 30 sem irregularidade), bem acima da taxa base das inspeções (0,64, nas mesmas UCs medidas). Abaixo de 5% a precisão da faixa cai para
@@ -940,10 +942,10 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   precisar deles.
 - **Amostra:** o gerador grava os 78 pares de mesmos meses entre 2024 e 2025, para o seletor ter o que mostrar.
 
-## DEC-032 · DEC e FEC de um período somam os mensais (proposta)
+## DEC-032 · DEC e FEC de um período somam os mensais
 
 - **Data:** 24/10/2026 · **Área:** GenAI e Dados · **Autor:** Luis Felipe
-- **Status:** proposta. Precisa da aprovação de Dados (o contrato da Gold) e de GenAI (a camada semântica). Pedido de revisão do Lucas no PR #41.
+- **Status:** aprovada por Dados em 27/10/2026 (Alisson), com a camada semântica do GenAI. Antes: proposta, que precisava da aprovação de Dados (o contrato da Gold) e de GenAI (a camada semântica). Pedido de revisão do Lucas no PR #41.
 - **Contexto:** a camada semântica não dizia como agregar DEC e FEC de vários meses. Nas rodadas de avaliação do PR #41, o agente usou ora a soma, ora a média dos valores mensais da mesma view, para a mesma pergunta (G020: DEC do AL-07 no semestre).
 - **Decisão proposta:**
   - DEC e FEC são indicadores acumulados: o valor de um semestre ou de um ano é a soma dos valores mensais prontos (`sum(dec)`, `sum(fec)`), nunca a média.
@@ -951,7 +953,8 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   - As duas formas dão o mesmo número quando o `n_uc` não muda no período.
 - **Motivo:** a média dos meses subestima o indicador do período. Uma regra explícita tira a ambiguidade, que hoje o modelo resolve sozinho, de um jeito diferente a cada execução.
 - **Consequência:** a regra está na camada semântica 0.3.3 e na referência do G020 (golden set 0.4.0). Se Dados preferir outra definição, por exemplo a ANEEL com o número de UCs no fim do período, mudam a regra, a referência e esta DEC.
-- **Em aberto:** confirmar a definição com Dados. Para o FEC, a mesma regra vale com `n_interrupcoes`.
+- **Confirmação de Dados (27/10/2026):** conferida na Gold v0.3, nos 122 alimentadores e nos 12 meses de 2025. A soma dos DEC mensais e a fórmula do contrato (horas somadas ÷ média mensal de UCs faturadas) diferem em 0,01% na média e 0,13% no pior alimentador; no FEC, 0,005% e 0,10%. A diferença vem só da variação mensal do `n_uc`. A média dos valores mensais, ao contrário, dá cerca de um doze avos do indicador do ano. As duas formas são equivalentes para a Gold; a do contrato continua sendo a dos recortes de `gold_kpis_segmento_mensal`.
+- **Golden set:** a pergunta G010 ("DEC médio dos alimentadores com painel solar") passou a usar o DEC do grupo, como esta regra pede, na versão 0.5.0.
 
 ## DEC-033 · DEC e FEC por período e recorte, e a fila de suspeitas paginada
 
