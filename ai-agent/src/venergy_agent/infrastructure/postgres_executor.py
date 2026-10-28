@@ -1,5 +1,4 @@
 import math
-import re
 
 import psycopg
 from psycopg.rows import dict_row
@@ -17,7 +16,6 @@ SQLSTATE_KINDS = {
     "57014": ErrorKind.TIMEOUT,
 }
 DATA_EXCEPTION_CLASS = "22"
-QUOTED_VALUE = re.compile(r"\"[^\"]*\"|'[^']*'")
 REDACTED = "<valor>"
 
 
@@ -60,6 +58,7 @@ class PostgresQueryExecutor:
 
 def _safe_message(error: psycopg.Error) -> str:
     message = str(error)
-    if (error.sqlstate or "").startswith(DATA_EXCEPTION_CLASS):
-        return QUOTED_VALUE.sub(REDACTED, message)
-    return message
+    if not (error.sqlstate or "").startswith(DATA_EXCEPTION_CLASS):
+        return message
+    kind, separator, _ = (message.splitlines() or [""])[0].partition(":")
+    return f"{kind}: {REDACTED}" if separator else kind

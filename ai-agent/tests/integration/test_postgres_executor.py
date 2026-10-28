@@ -126,3 +126,14 @@ async def test_unknown_column_message_keeps_the_name_the_model_wrote(executor):
         await executor.execute(query("SELECT receita_inventada FROM gold.sem_executor_probe"))
 
     assert "receita_inventada" in raised.value.message
+
+
+@pytest.mark.usefixtures("probe_view")
+async def test_a_quote_inside_the_value_does_not_leak_part_of_it(executor):
+    with pytest.raises(QueryExecutionError) as raised:
+        await executor.execute(
+            query("SELECT CAST(cod_uc || '\"Neil' AS integer) AS n FROM gold.sem_executor_probe")
+        )
+
+    assert "Neil" not in raised.value.message
+    assert raised.value.message.endswith(": <valor>")
