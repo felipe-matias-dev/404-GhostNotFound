@@ -66,7 +66,7 @@ uv run python -m venergy_agent.evaluation --sql-only             # sem o redator
 uv run python -m venergy_agent.evaluation --dataset gold_real    # Gold real (sempre só SQL)
 ```
 
-Antes de chamar o modelo, a avaliação confere que o banco carregado é a base declarada em `--dataset` (pelo número de UCs em `sem_uc`) e para se não for. Com `--sql-only` o agente não monta o redator: nenhuma linha do banco vai ao modelo, e a fidelidade numérica fica fora. A Gold real roda sempre assim, e o relatório vai para `eval/runs_gold/`, fora do Git (issue #56, DEC-015).
+Antes de chamar o modelo, a avaliação confere que o banco carregado é a base declarada em `--dataset` (pelo número de UCs em `sem_uc`) e para se não for. Com `--sql-only` o agente não monta o redator: nenhuma linha do banco vai ao modelo, e a fidelidade numérica fica fora. A Gold real roda sempre assim, e o relatório vai para `eval/runs_gold/`, fora do Git (issue #56, DEC-015). Na correção de SQL, a mensagem de erro de dado volta ao modelo sem o valor entre aspas.
 
 Cada execução grava `eval/runs/<data>.json`, com as métricas da spec §9.3, e imprime a tabela. A linha de base e os achados estão na spec §9.6. Mudanças de prompt, modelo, few-shot ou camada semântica só entram se a execution accuracy e a acurácia de status não regredirem (DEC-016).
 

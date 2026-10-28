@@ -106,3 +106,23 @@ async def test_duplicate_column_names_are_a_correctable_error_not_silent_data_lo
 
     with pytest.raises(QueryExecutionError, match="mesmo nome"):
         await executor.execute(query)
+
+
+@pytest.mark.usefixtures("probe_view")
+async def test_data_error_message_keeps_the_kind_but_drops_the_database_value(executor):
+    with pytest.raises(QueryExecutionError) as raised:
+        await executor.execute(
+            query("SELECT CAST(cod_uc || 'X' AS integer) AS n FROM gold.sem_executor_probe")
+        )
+
+    assert raised.value.kind is ErrorKind.TYPE_MISMATCH
+    assert "0001X" not in raised.value.message
+    assert "integer" in raised.value.message
+
+
+@pytest.mark.usefixtures("probe_view")
+async def test_unknown_column_message_keeps_the_name_the_model_wrote(executor):
+    with pytest.raises(QueryExecutionError) as raised:
+        await executor.execute(query("SELECT receita_inventada FROM gold.sem_executor_probe"))
+
+    assert "receita_inventada" in raised.value.message
