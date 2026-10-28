@@ -321,7 +321,7 @@
 - **História:** Como gerente de perdas, quero gerar OIs a partir da fila, atualizar o status, registrar o resultado e cancelar, para controlar a operação de campo.
 - **Aceite:**
   - `app.ordem_inspecao` + `app.ordem_evento` (histórico).
-  - Máquina de estados `GERADA → EM_CAMPO → CONCLUIDA | CANCELADA`; transição inválida retorna 409.
+  - Máquina de estados `GERADA → EM_CAMPO → CONCLUIDA | CANCELADA`, com volta de `EM_CAMPO` para `GERADA` (DEC-045); transição inválida retorna 409.
   - Resultado obrigatório ao concluir.
   - Sobrevive a um reload da Gold.
 

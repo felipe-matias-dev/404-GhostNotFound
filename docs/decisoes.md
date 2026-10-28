@@ -263,6 +263,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   `PATCH` (mudança de status, inclusive cancelar).
 - **Regras:**
   - Status `GERADA → EM_CAMPO → CONCLUIDA`, ou `CANCELADA` a partir dos dois primeiros.
+    `EM_CAMPO` também pode voltar para `GERADA` (DEC-045).
     `CONCLUIDA` e `CANCELADA` são finais: para voltar ao imóvel, gera-se uma OI nova e o
     histórico mostra as duas visitas. Transição fora do mapa devolve `409`. A regra fica
     num módulo sem banco (`backend/src/venergy_api/ordens.py`), testado à parte.
@@ -776,7 +777,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Contexto:** o backend já expõe `PATCH`, `GET /{id}` (histórico) e `POST` das ordens de inspeção (DEC-009), mas a tela de perdas só listava as OIs.
 - **Decisão:**
   - a tela mostra só os botões das transições permitidas, a partir de uma cópia das `TRANSICOES` do backend (`ACOES_POR_STATUS` em `features/perdas/conversions.ts`). A cópia serve só para exibir: quem decide é o backend, que responde 409 a uma transição inválida, e a tela mostra a mensagem dele;
-  - enviar a campo é sem formulário (a observação é opcional e a OI ainda pode ser cancelada), mas o PATCH só sai depois de 6 s: um aviso embaixo da tela oferece "Desfazer" e "Enviar agora", e o tempo para enquanto o ponteiro ou o foco estão no aviso. É o único desfazer: o backend continua sem a volta Em campo → Gerada (DEC-009), e Concluída e Cancelada continuam finais. Sair da tela envia na hora o que estava agendado; fechar a aba pede confirmação do navegador;
+  - enviar a campo é sem formulário (a observação é opcional e a OI ainda pode ser cancelada), mas o PATCH só sai depois de 6 s: um aviso embaixo da tela oferece "Desfazer" e "Enviar agora", e o tempo para enquanto o ponteiro ou o foco estão no aviso. Era o único desfazer: o backend não tinha a volta Em campo → Gerada (DEC-009), o que mudou na DEC-045. Concluída e Cancelada continuam finais. Sair da tela envia na hora o que estava agendado; fechar a aba pede confirmação do navegador;
   - concluir e cancelar abrem um modal (Modal do interior.dev): concluir pede o resultado, cancelar pede segurar o botão (HoldToConfirm), porque não tem volta. O histórico, que é consulta, abre no painel lateral (Sheet);
   - Kanban e tabela ocupam a largura toda da tela, sem a descrição da tela no topo (o layout da tela de perdas será ajustado quando a fila de suspeitas entrar); o Kanban também estica até o fim da altura. Cada ação tem a cor do status a que leva (enviar = info, concluir = success, cancelar = danger);
   - Kanban com as ativas (Gerada, Em campo) completas e as finalizadas (Concluída, Cancelada) limitadas às últimas N por `atualizada_em`, com N pela altura da viewport: 3 abaixo de 900 px (notebook), 5 até 1299 px (PC 1080p), 8 a partir de 1300 px (desktop grande). "Ver todas" leva à tabela filtrada pelo status;
@@ -1289,3 +1290,33 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   A tela `/uc` do frontend pode usar o tipo gerado do OpenAPI.
   A decisão foi renumerada de DEC-036 para DEC-044 na resolução do PR #55: DEC-036 já identifica a tela
   da diretoria na `main`, e DEC-041 a DEC-043 estão reservadas nas branches do portal.
+
+## DEC-045 · Ordem em campo pode voltar para gerada
+
+- **Data:** 28/10/2026 · **Área:** Portal · **Autor:** Felipe
+- **Contexto:** o João apontou que, na tela de perdas, uma OI enviada a campo sem querer não tinha como voltar. O "Desfazer" de
+  6 segundos (DEC-026) só vale antes de o `PATCH` sair, então quem percebia o erro depois só podia cancelar e gerar uma OI nova.
+  Isso põe no histórico um cancelamento que não aconteceu e suja a métrica que separa visita desnecessária (cancelada) de visita
+  sem acesso (`NAO_REALIZADA`, DEC-009).
+- **Decisão:** liberar `EM_CAMPO → GERADA` em `TRANSICOES` (`backend/src/venergy_api/ordens.py`). O mapa passa a ser
+  `GERADA → EM_CAMPO | CANCELADA` e `EM_CAMPO → GERADA | CONCLUIDA | CANCELADA`; `CONCLUIDA` e `CANCELADA` continuam finais.
+- **Por que a razão da DEC-009 não vale para `EM_CAMPO`:** ela tornou `CONCLUIDA` e `CANCELADA` finais porque reabrir apagaria o
+  que aconteceu em campo. Uma OI em campo ainda não tem resultado, então não há o que apagar, e a volta fica no histórico
+  (`app.ordem_evento`) como mais um evento.
+- **O que não muda:**
+  - `GERADA` e `EM_CAMPO` seguem ativas, então o índice único parcial continua valendo e a unidade consumidora não ganha outra OI;
+  - o resultado só é aceito ao concluir (`422` em qualquer outro caso);
+  - o `PATCH` continua travando a linha da OI.
+- **Observação na volta é opcional:** exigir motivo para um clique errado seria atrito, e o evento já registra de onde a OI veio,
+  para onde foi e quando.
+- **Alternativas descartadas:**
+  - Só aumentar a janela do "Desfazer": continua cego para o erro percebido depois, e uma janela longa atrasa o envio de verdade.
+  - Rota de ação (`/devolver`): a DEC-009 já descartou rotas por ação, porque espalham a validação.
+  - Status novo (`DEVOLVIDA`): complica o mapa e o filtro por status sem ganho, já que o evento do histórico registra a volta.
+- **Limitação conhecida:** como no cancelamento, a observação enviada no `PATCH` também é copiada para o campo `observacao` da OI.
+  Uma volta com "Enviada por engano" deixa essa frase como observação da OI até a próxima mudança com observação. O histórico
+  fica certo; só o campo da OI pode ficar enganoso.
+- **Impacto:** nenhuma mudança no contrato OpenAPI (o enum `StatusOrdem` é o mesmo). O "Desfazer" de 6 segundos continua, porque
+  cobre o clique errado percebido na hora sem tocar no banco. A tela de perdas ainda não oferece a volta: falta uma ação nova em
+  `ACOES_POR_STATUS` (`frontend/src/features/perdas/conversions.ts`), que é do João. Com ela, arrastar o cartão do Kanban de volta
+  para a coluna "Gerada" também passa a valer, porque o arrastar usa o mesmo mapa.
