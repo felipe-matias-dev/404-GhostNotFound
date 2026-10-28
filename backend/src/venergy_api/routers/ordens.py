@@ -135,7 +135,9 @@ def atualizar_ordem(
     )
     ordem.status = mudanca.status
     ordem.resultado = mudanca.resultado
-    if mudanca.observacao is not None:
+    # A observação da OI é o que a equipe viu em campo ou o motivo do cancelamento. O motivo
+    # de uma volta para GERADA fica só no evento, para não sobrescrevê-la.
+    if mudanca.observacao is not None and mudanca.status != StatusOrdem.GERADA:
         ordem.observacao = mudanca.observacao
     session.commit()
     return OrdemDetalheSchema.model_validate(ordem)
