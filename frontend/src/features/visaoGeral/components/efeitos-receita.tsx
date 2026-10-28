@@ -122,7 +122,7 @@ export function EfeitosReceita({ janelas }: { janelas: Janelas | undefined }) {
 								</span>
 								{/* Eixo no meio: alta cresce para a direita, queda para a esquerda. */}
 								<span aria-hidden className="relative h-2.5">
-									<span className="absolute inset-y-[-3px] left-1/2 w-px bg-border-strong" />
+									<span className="-inset-y-1 absolute left-1/2 w-px bg-border-strong" />
 									{largura > 0 ? (
 										<span
 											className={cn(
