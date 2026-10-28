@@ -14,7 +14,7 @@ resources:
       timeout_seconds: 7200
       schedule:
         quartz_cron_expression: 40 0 3 6 * ?
-        timezone_id: America/Recife
+        timezone_id: America/Fortaleza
         pause_status: PAUSED
       tasks:
         - task_key: landing_to_bronze

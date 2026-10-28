@@ -1096,7 +1096,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   case é uma extração única, o run completo leva cerca de 15 minutos, e o full refresh mantém o tudo ou nada de cada camada (as
   travas e o Resumo de cada notebook validam a tabela inteira). A carga incremental por competência fica como evolução para
   produção, quando o volume mensal justificar.
-- **Agendamento:** mensal, no dia 6 às 03h (`America/Recife`). Os sistemas de origem só geram dado novo uma vez por mês, então
+- **Agendamento:** mensal, no dia 6 às 03h (`America/Fortaleza`, mesmo fuso do Recife, UTC-03 sem horário de verão; a interface do Job não oferece `America/Recife`). Os sistemas de origem só geram dado novo uma vez por mês, então
   rodar todo dia gastaria compute sem dado novo. **Suposição:** o fechamento do ciclo de faturamento termina até D+5; o case não
   informa esse prazo, o número vem do exemplo da ADR-07. O agendamento fica **pausado**, porque o dataset do case é uma extração
   única.
