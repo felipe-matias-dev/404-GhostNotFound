@@ -43,6 +43,9 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | 26/10/2026 | DEC-031: a API lista os pares de períodos da decomposição e passa a exigir o par; API 0.5.0 | A Gold grava centenas de pares (DEC-028): sem o par, a resposta somaria períodos que não se comparam, e o seletor precisa saber quais existem | Felipe |
 | 24/10/2026 | DEC-032 (proposta): DEC e FEC de um período de vários meses somam os valores mensais, nunca a média | Indicador de continuidade é acumulado; a média dos meses subestima o período e o agente alternava entre as duas formas | Luis Felipe |
 | 26/10/2026 | DEC-033: DEC e FEC de um período saem da soma dos componentes ÷ média mensal de UCs, no backend, com rotas por alimentador, ranking e recortes; fila de suspeitas paginada com a ordem de inspeção ativa; API 0.6.0 | DEC e FEC não se somam nem se tiram a média entre recortes; a fila mostra quais UCs já têm ordem, para a tela não oferecer o que daria 409 | Felipe |
+| 27/10/2026 | DEC-034: cada resposta do agente de IA é gravada em `app.ai_auditoria` (qualquer status) por `POST /ai/ask`, e lida por `GET /ai/audit/{id}`; sem a chave do Gemini a API sobe e o `/ai` responde 503; API 0.7.0 | A auditoria só serve se ninguém recebe uma resposta que não dá para conferir depois; e a chave ausente não pode derrubar o `/health` nem as telas | Felipe |
+| 27/10/2026 | DEC-038: a carga da Gold lê cada CSV aos poucos e grava em lotes de 10 mil linhas, depois de uma primeira rodada que só confere os arquivos; a memória deixa de crescer com o tamanho da Gold | A carga antiga guardava os 12 CSVs inteiros na memória e derrubou o WSL de 8 GB com os ~4 milhões de linhas da Gold real; a conferência antes de gravar continua garantindo que um arquivo fora do contrato não altera o banco | Felipe |
+| 27/10/2026 | DEC-039: Workflow do Databricks com os notebooks lidos do GitHub (`main`), serverless, Landing → Bronze → Silver → Gold + export, reprocessando tudo (diverge da ADR-07); agendamento mensal no dia 6, pausado | Roda o código revisado e mantém o tudo ou nada de cada camada numa extração única; a origem fecha o faturamento uma vez por mês | Arthur |
 
 ## DEC-001 · Localização dos arquivos de origem (landing)
 
@@ -419,6 +422,11 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Motivo:** no Free Tier, o Google pode usar o conteúdo enviado para melhorar os produtos dele. O dataset é confidencial e nunca vai para o repositório.
 - **Estado atual:** o README orienta o uso do plano gratuito só para a amostra. O código ainda não verifica o tipo de chave, e o modelo padrão do quickstart é o Gemini direto, então nada impede quem segue o README de enviar a Gold real pelo plano gratuito.
 - **Em aberto:** (1) confirmar se a Gold agregada entra no mesmo critério do dataset; (2) definir quem fornece a chave paga; (3) decidir se o código recusa a chave gratuita quando a configuração aponta para a Gold real.
+- **Atualização (27/10/2026, issue #56, proposta de Dados e GenAI):** o time roda tudo em máquina local e não vai usar plano pago. A chamada ao modelo, porém, sai da máquina. Proposta:
+  - o plano gratuito segue valendo para a amostra sintética;
+  - **avaliação na Gold real só no modo "só SQL"** (`--dataset gold_real` liga `--sql-only`): o agente não monta o redator, então só a pergunta e o esquema (com linhas de exemplo sintéticas) chegam ao modelo, e nenhuma linha da Gold sai da máquina. O relatório vai para `eval/runs_gold/`, fora do Git. Feito no PR da issue #56. Na correção de SQL, a mensagem de erro do banco volta ao modelo; nos erros de dado (SQLSTATE da classe 22, como `invalid input syntax`), tudo o que vem depois do primeiro `:` da mensagem, que pode ser um código de UC, vira `<valor>` antes, e o contexto `LINE` sai (revisão do Lucas no #65). Nos erros de sintaxe e de coluna (classe 42), o que fica entre aspas é o nome que o próprio modelo escreveu, e a mensagem fica inteira;
+  - **demonstração ao vivo com a Gold real:** só perguntas agregadas, que não devolvem `cod_uc` linha a linha;
+  - **o que ainda manda dado da Gold ao modelo e precisa de decisão:** a narrativa do `/ai/ask` (as linhas da amostra da resposta) e o insight da tela de receita (#58, as métricas agregadas do recorte). Opções: aceitar o envio de agregados no plano gratuito, desligar a narrativa e o insight com a Gold real (o texto determinístico continua), ou usar uma chave da organização.
 
 ## DEC-016 · Exceção de versionamento do prompt v1 (proposta)
 
@@ -469,6 +477,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Motivo:** a spec (§5, item 5) manda montar relações a partir de `foreign_keys` e `shared_keys`. Juntar duas views só pelo período gera produto cartesiano, e o modelo tende a fazer essa junção quando a relação existe.
 - **Consequência:** `sem_faturamento_mensal` liga a `sem_uc` por `cod_uc`, e `sem_uc` liga a `sem_continuidade_alimentador_mensal` por `cod_alimentador`.
 - **Decomposição (23/10/2026):** `sem_receita_decomposicao` entra sem relação com outras views. A junção composta com `gold_dim_uc` (município, bairro, classe e GD) continua `a_confirmar` no contrato e repetiria cada efeito uma vez por UC do recorte. As perguntas de recorte se respondem filtrando a própria view.
+- **Atualização (26/10/2026):** views de recorte agregado, marcadas com `standalone: true` no `semantic_layer.yaml` (hoje `sem_kpis_segmento_mensal`), não entram nas relações por chave de entidade. Motivo: elas já trazem `cod_alimentador` como recorte, e o join com `sem_uc` ou com a continuidade repete e multiplica somas (pedido da Dados no #43).
 
 ## DEC-019 · Verificação numérica da narrativa
 
@@ -1012,6 +1021,53 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Consequências:** a DEC-021 deixa de valer na frase "DEC, FEC… não têm recorte por segmento": desde esta decisão eles têm, calculados
   sobre os componentes. O agente continua somando os mesmos componentes, então portal e agente dão o mesmo número.
 
+## DEC-034 · Auditoria do agente de IA: gravação, leitura e subida sem a chave
+
+- **Data:** 27/10/2026 · **Área:** Portal e GenAI · **Autor:** Felipe · **Atende:** issue #48 (G1-06 e G1-09, spec do agente §10 D3)
+- **Contexto:** o analista só confia na resposta da IA se puder ver como ela chegou lá (SQL executado, views, linhas, modelo, versão do
+  prompt). O agente é somente leitura e não grava nada (DEC-020): persistir cada `AgentAnswer` e entregá-lo ao portal é do backend.
+- **Decisão:**
+  - **Tabela `app.ai_auditoria`**, criada pelo `create_all` que a carga já roda e que nunca apaga o schema `app`. Uma coluna por campo do
+    `AgentAnswer`, mais `id`, `criado_em` (com fuso), `session_id` e `pergunta`. `rows`, `sources` e `assumptions` em `jsonb`. `status` e
+    `confidence` em texto, sem `CHECK`.
+  - **`POST /ai/ask`** (`{question, session_id}`): chama o agente, grava e devolve os campos do `AgentAnswer` mais o `audit_id`. Grava
+    todo status (`answered`, `unknown`, `clarify`, `refused`, `failed`): o que o agente recusou também é auditável.
+  - **`GET /ai/audit/{id}`**: o mesmo conteúdo do POST, mais `pergunta`, `session_id` e `criado_em`. `404` se o id não existe e `422` se
+    não cabe na coluna. Não depende do agente: o histórico continua consultável sem a chave.
+  - **Sem auditoria, sem resposta:** se a gravação falhar, a rota devolve `500` e não entrega o que o agente respondeu. No log vai só o
+    `request_id` e o tipo do erro, porque a mensagem do SQLAlchemy traz a pergunta e as linhas.
+  - **Agente montado uma vez, no `lifespan`**, guardado em `app.state` e entregue por `AgenteDep`. Os testes trocam o agente por um falso
+    com `dependency_overrides` e nunca chamam o Gemini.
+  - **Sem a chave, com configuração inválida ou com a camada semântica inválida, a API sobe:** o log diz só os campos com erro (sem o
+    valor digitado) ou a lista de problemas da camada (só nomes de view e coluna), e `/ai/*` responde `503`. Uma mudança no contrato da
+    Gold que deixe `semantic_layer.yaml` inválido derruba o `/ai`, e não o `/health` nem as telas (revisão do #52).
+  - **Credenciais separadas:** a gravação usa a sessão do backend. O agente continua com o usuário `venergy_agent`, que não acessa `app`.
+  - **Entrada limitada:** `question` até 2000 caracteres e `session_id` até 100. O teto de 500 da pergunta continua sendo do agente.
+  - **Rotas `async def`:** `await agente.ask(...)` e a gravação em `run_in_threadpool`, porque a sessão do backend é síncrona. A gravação
+    fica em `gravar_auditoria(session, pergunta, session_id, answer)`, para o `POST /ai/ask/stream` (#38) gravar a mesma auditoria.
+  - Versão da API 0.7.0: rotas novas, sem quebrar as existentes.
+- **Motivo:** a trilha só vale se estiver completa. Por isso grava todo status, e por isso a resposta não sai quando a gravação falha.
+  Subir sem a chave evita que um recurso opcional derrube a API inteira para quem trabalha só no portal.
+- **Alternativas descartadas:**
+  - Migração com Alembic: o projeto não tem migrações, e o `create_all` já cria a tabela sem tocar nas ordens de inspeção.
+  - Um `jsonb` só com a resposta inteira: as colunas permitem filtrar por `status`, `session_id` ou data (ver só as recusas) sem abrir o JSON.
+  - `status` e `confidence` como enum com `CHECK` (como nas ordens): um valor novo do agente faria a gravação falhar e a trilha se perderia.
+  - Guardar os `Decimal` da amostra como número: o `float` perde a exatidão (DEC-010). Vão como texto, como o `model_dump(mode="json")`
+    do agente os entrega, e o portal mostra a amostra sem converter.
+  - Montar o agente a cada requisição: recarregaria e validaria a camada semântica a cada pergunta. Montá-lo no import do módulo
+    quebraria a importação sem `.env` e faria os testes dependerem do Gemini.
+  - Derrubar a subida sem a chave: o `/health` e todas as telas cairiam por causa do `/ai`.
+  - Rota `def` síncrona: o agente é `async`, e a chamada ao modelo (segundos) ocuparia uma thread do pool. Uma engine assíncrona só para
+    esta tabela traria um segundo driver e um segundo modo de sessão.
+  - Entregar a resposta mesmo com a gravação falha, só registrando o erro: o analista receberia uma resposta que não consegue conferir.
+  - Dar ao `venergy_agent` permissão no schema `app` para o agente se auditar: tira o isolamento que protege as ordens de inspeção.
+  - Resposta em envelope (`{audit_id, resposta: {...}}`): o campo plano deixa o client do portal usar o `AgentAnswer` como ele é.
+- **Limitações conhecidas:**
+  - Sem expurgo: a tabela só cresce. A pergunta e as linhas ficam guardadas como o agente as devolveu, e podem conter dados de UC.
+    A `pergunta` é o texto livre que o usuário digitou (até 2000 caracteres): se alguém digitar um CPF ou um nome, ele fica em `app`.
+    Expurgo e mascaramento ficam para quando houver autenticação.
+  - Sem autenticação: nenhuma rota da API tem hoje, então quem alcança a API lê qualquer auditoria.
+  - Sem migrações, mudar uma coluna da tabela exige apagá-la e recriá-la à mão, como nas ordens de inspeção.
 
 ## DEC-035 · Soma dos efeitos e percentual sobre a base na tela de receita
 
@@ -1032,3 +1088,113 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   schema, OpenAPI e cliente, e não muda nenhum número da tela. Volta a valer se outro consumidor precisar dos mesmos números
   (por exemplo, o JSON de métricas que o backend monta para o insight da tela, D9): aí a conta passa para o backend, e a tela só
   exibe.
+
+## DEC-036 · Tela da diretoria compara mês contra mês, até existir a rota de comparação
+
+- **Data:** 27/10/2026 · **Área:** Portal · **Autor:** João Euclides
+- **Contexto:** a tela da diretoria (V2-04, V2-05) mostra receita, kWh faturado, DEC, FEC, chamados e satisfação média do período
+  atual e a variação sobre o período base. A API não tem uma rota que devolva esses seis indicadores para dois períodos: o
+  `GET /receita/comparacao` só traz kWh e receita, e o `GET /receita/mensal` traz os seis por competência. Juntar vários meses de
+  DEC, FEC e satisfação não é soma nem média (DEC-033: componentes somados ÷ média mensal de UCs; satisfação = soma das notas ÷
+  notas dadas), e essa conta não pode ficar no frontend.
+- **Decisão:**
+  - Por ora, a tela compara **um mês contra outro**, com os valores de `GET /receita/mensal` como a Gold gravou. O mês atual abre no
+    mais recente, e a base no mesmo mês do ano anterior (sem sazonalidade); o seletor troca o mês atual e oferece como base o mesmo
+    mês do ano anterior ou o mês anterior.
+  - A tela só calcula a variação percentual (atual ÷ base − 1), como a tela de receita (DEC-035). Sem um dos lados ou com base zero,
+    o card mostra o valor sem variação.
+  - A URL usa `periodo_base` e `periodo_atual` no formato `AAAA-MM/AAAA-MM`, igual à tela de receita: o card de receita abre a ponte no
+    mesmo período, e trechos de vários meses cabem no mesmo formato.
+  - O modelo da tela (`ComparacaoIndicadores`, em `features/visaoGeral/types.ts`) já é o da rota futura: os dois períodos e a variação
+    de cada indicador.
+- **Próximo passo (backend):** uma rota de comparação dos seis indicadores entre dois períodos quaisquer, somando os componentes da
+  `gold_kpis_segmento_mensal` com o helper de índices da continuidade. Quando ela existir, mudam só a consulta de
+  `useComparacaoIndicadores` e o seletor, que passa a aceitar trechos de vários meses.
+- **Alternativa descartada:** somar ou tirar a média dos meses na tela: daria um DEC diferente da tela de rede e do agente.
+
+## DEC-037 · Gráficos do portal em SVG próprio, com d3 só para as contas
+
+- **Data:** 27/10/2026 · **Área:** Portal · **Autor:** João Euclides
+- **Contexto:** a tela da diretoria ganhou o gráfico de tendência dos seis indicadores, mês a mês ou ano a ano, e ele precisa
+  servir a outras telas. O design system não usa biblioteca de componentes, e o `WaterfallChart` da receita já é desenhado à mão
+  com `motion`.
+- **Decisão:**
+  - O `TrendChart` (`components/ui/trend-chart`) é SVG próprio. `d3-scale` (escala e ticks do eixo y) e `d3-shape` (curva
+    `monotoneX`, que não passa do valor real entre dois meses) fazem só as contas; o desenho, as cores (tokens `chart-*`) e o
+    movimento (`motion`) são do projeto.
+  - Mês a mês: a série corrida da `gold_kpis_mensais`. Ano a ano: um ano por linha sobre jan–dez, o mais recente em destaque e o
+    anterior como comparação. O tooltip mostra a variação sobre o mês anterior ou sobre o mesmo mês do ano anterior; é a mesma
+    conta de variação da DEC-036, sem nova regra de negócio.
+  - Indicador e visão ficam na URL (`indicador`, `tendencia`), como os outros filtros.
+- **Alternativa descartada:** Recharts (o gráfico do shadcn) ou outra biblioteca completa. A troca entre mês a mês e ano a ano
+  redesenharia o gráfico do zero em vez de mudar a forma das linhas, o tema e a acessibilidade seguiriam o modelo dela e o
+  bundle cresceria para fazer o que duas bibliotecas pequenas do d3 já fazem.
+
+## DEC-038 · Carga da Gold em lotes, com uma rodada de conferência antes de gravar
+
+- **Data:** 27/10/2026 · **Área:** Portal e Dados · **Autor:** Felipe
+- **Contexto:** o Arthur rodou a carga com os CSVs oficiais da Gold (~4 milhões de linhas, ~2,1 milhões só no faturamento), e ela
+  derrubou o WSL do notebook dele, de 8 GB. A carga lia e validava os 12 arquivos inteiros, guardava tudo numa lista (`validated`) e só
+  então abria a transação e fazia um único `INSERT` por tabela. A memória crescia com o tamanho da Gold. O banco não foi alterado,
+  porque a transação nunca chegou a gravar.
+- **Decisão:**
+  - **Leitura aos poucos:** `iter_rows` lê o CSV uma linha por vez (gerador), valida cada uma contra o contrato e guarda só o lote em
+    andamento. `read_rows`, que devolve a lista, continua para arquivos pequenos e para os testes.
+  - **Gravação em lotes de 10 mil linhas** (`TAMANHO_LOTE`), na mesma transação de antes: `DROP` das views e das tabelas, `CREATE`,
+    `INSERT` por lote, views de volta. Uma falha em qualquer ponto desfaz tudo, inclusive o `DROP`.
+  - **Duas rodadas, como o Alisson sugeriu:** a primeira confere todas as linhas de todos os arquivos sem guardar nada, antes de a
+    transação abrir. Um arquivo fora do contrato falha em segundos, a Gold anterior não é apagada e as tabelas não ficam travadas
+    para leitura enquanto o erro não aparece. A segunda rodada lê de novo e grava. Se o arquivo mudar entre as duas (o número de
+    linhas gravadas difere do conferido), a carga é cancelada e desfeita.
+- **Alternativas descartadas:**
+  - **Conferir só dentro da transação, numa rodada:** a memória ficaria igual, mas um erro na última tabela só apareceria depois de
+    minutos de carga, com as tabelas já apagadas e travadas.
+  - **`COPY` do Postgres:** é mais rápido na gravação, mas exige converter listas (`text[]`), `Decimal` e datas para o formato do
+    `COPY`, e a validação linha a linha continuaria necessária. Fica como próximo passo se o tempo atrapalhar.
+- **Medição** (volume sintético, replicando as linhas da amostra com chaves novas; Ryzen 5 5600GT, Postgres no Docker; pico de memória
+  do processo Python):
+
+  | Linhas | Carga antiga | Carga nova |
+  |---|---|---|
+  | 151 mil | 370 MB, 14 s | 107 MB, 17 s |
+  | 451 mil | 946 MB, 43 s | 109 MB, 41 s |
+  | 4,0 milhões | não medida (extrapolação: ~7,8 GB) | 109 MB, 423 s |
+
+  A antiga cresce ~1,9 KB por linha, o que dá uns 8 GB com 4 milhões de linhas, a máquina que caiu. A nova fica em ~110 MB, no
+  volume que for. Uma passada de validação sobre os 2,1 milhões de linhas do faturamento leva ~35 s; o restante dos ~7 minutos é a
+  gravação (~14 mil linhas por segundo).
+- **Limites:** a medição é com dados sintéticos e nesta máquina (16 GB). A prova com os CSVs reais, na máquina de 8 GB, é do Arthur. A
+  carga leva uns 7 minutos com a Gold real, e a primeira rodada acrescenta cerca de 1 a 2 minutos de validação (o dobro do custo
+  de validar), que o `COPY` não reduziria.
+- **Impacto:** nenhuma mudança de rota, de schema ou de contrato; `load_gold` ganha o parâmetro opcional `tamanho_lote`. A carga da
+  amostra e os testes continuam iguais.
+
+## DEC-039 · Workflow do Databricks e agendamento mensal
+
+- **Data:** 27/10/2026 · **Área:** Dados · **Autor:** Arthur · **Atende:** D1-08 e D1-11
+- **Decisão:** o Job `v_energy_workflow` ([`data-engineering/workflow/v_energy_workflow.yaml`](../data-engineering/workflow/v_energy_workflow.yaml))
+  roda três tasks em sequência, `landing_to_bronze` → `bronze_to_silver` → `silver_to_gold_export`, com os notebooks lidos do
+  GitHub (branch `main`) e compute serverless. Cada task passa `gravar = sim`, e a da Gold também `exportar_csv = sim` e
+  `schema_gold = gold`. Timeout de 2h e fila ligada, para um segundo disparo esperar o primeiro em vez de gravar as mesmas tabelas
+  ao mesmo tempo.
+- **Por que o Git como fonte:** o Job roda o código revisado em PR, não uma cópia do workspace, e a Gold gravada fica rastreável
+  a um commit da `main`.
+- **Reprocessamento completo, e não incremental:** cada run relê todos os arquivos da landing e regrava as três camadas (full
+  refresh, como na DEC-008). Isso **diverge da ADR-07**, que previa ingestão incremental por competência. O motivo: o dataset do
+  case é uma extração única, o run completo leva cerca de 15 minutos, e o full refresh mantém o tudo ou nada de cada camada (as
+  travas e o Resumo de cada notebook validam a tabela inteira). A carga incremental por competência fica como evolução para
+  produção, quando o volume mensal justificar.
+- **Agendamento:** mensal, no dia 6 às 03h (`America/Fortaleza`, mesmo fuso do Recife, UTC-03 sem horário de verão; a interface do Job não oferece `America/Recife`). Os sistemas de origem só geram dado novo uma vez por mês, então
+  rodar todo dia gastaria compute sem dado novo. **Suposição:** o fechamento do ciclo de faturamento termina até D+5; o case não
+  informa esse prazo, o número vem do exemplo da ADR-07. O agendamento fica **pausado**, porque o dataset do case é uma extração
+  única.
+- **Falhas:** o Resumo de cada notebook dá erro se alguma tabela falhar, e o Job para na primeira task com erro, sem gravar as
+  camadas seguintes.
+- **Limitação conhecida:** a conferência pós-gravação da Bronze (DEC-008) compara as duas últimas gravações de cada tabela por
+  time travel. O VACUUM automático do Databricks (predictive optimization) apaga os arquivos antigos depois de 7 dias
+  (`deletedFileRetentionDuration`). Se a última gravação tiver mais de 7 dias, a task `landing_to_bronze` grava a Bronze e falha
+  nessa comparação; o run seguinte passa, porque compara duas gravações recentes. Com dado novo, as duas gravações nem deveriam
+  ser iguais, então essa checagem falharia em todo run mensal.
+- **Para produção:** despausar o agendamento depende de tornar essa comparação opcional no Job (por exemplo, um widget
+  `exigir_idempotencia = nao`), mantendo a conferência contra a origem. Fica para um PR próprio, combinado com o autor do
+  `Landing_to_Bronze`.

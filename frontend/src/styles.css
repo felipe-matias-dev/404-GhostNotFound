@@ -58,6 +58,15 @@
   --color-pressed: rgb(255 255 255 / 0.08);
   --color-cover-slab: var(--color-graphite-800);
   --color-scrim: rgb(8 10 15 / 0.64);
+  /* Séries de gráfico (Fundamentos/Cores › Gráficos e dados): ordem categórica e a série
+     de contexto. No claro, cada uma desce para o passo 600. */
+  --color-chart-1: var(--color-brand-400);
+  --color-chart-2: var(--color-indigo-500);
+  --color-chart-3: var(--color-cyan-500);
+  --color-chart-4: var(--color-violet-500);
+  --color-chart-5: var(--color-green-500);
+  --color-chart-6: var(--color-orange-500);
+  --color-chart-muted: var(--color-graphite-600);
 
   /* Primitivos: constroem os semânticos e colorem gráficos. */
   --color-brand-50: #fffbe7;
@@ -232,6 +241,13 @@
   --color-pressed: rgb(8 10 15 / 0.08);
   --color-cover-slab: var(--color-graphite-900);
   --color-scrim: rgb(8 10 15 / 0.32);
+  --color-chart-1: var(--color-brand-600);
+  --color-chart-2: var(--color-indigo-600);
+  --color-chart-3: var(--color-cyan-600);
+  --color-chart-4: var(--color-violet-600);
+  --color-chart-5: var(--color-green-600);
+  --color-chart-6: var(--color-orange-600);
+  --color-chart-muted: var(--color-graphite-300);
 }
 
 @layer base {

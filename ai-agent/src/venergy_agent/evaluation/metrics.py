@@ -80,7 +80,7 @@ def results_match(
     reference: Sequence[Mapping[str, object]],
     ordered: bool,
 ) -> bool:
-    if _no_data(generated) and _no_data(reference):
+    if no_data(generated) and no_data(reference):
         return True
     if len(generated) != len(reference):
         return False
@@ -114,7 +114,7 @@ def results_match(
     return False
 
 
-def _no_data(rows: Sequence[Mapping[str, object]]) -> bool:
+def no_data(rows: Sequence[Mapping[str, object]]) -> bool:
     return not rows or (len(rows) == 1 and all(value is None for value in rows[0].values()))
 
 
