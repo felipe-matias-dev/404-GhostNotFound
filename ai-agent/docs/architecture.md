@@ -45,7 +45,7 @@ pergunta → Question → SemanticLayer (carregada uma vez)
 
 Pedido de esclarecimento que cita nome técnico vira uma pergunta genérica sobre período e recorte. Detalhes, confiança e logs: spec §5.1. O backend monta o agente uma vez por processo com `build_agent(AgentSettings())`.
 
-`InsightWriter` (item 9, `infrastructure/insight_writer.py`, prompt em `prompts/insight/v1/`): narra o JSON de métricas de uma tela e devolve `None` se algum número do texto não estiver no JSON. O backend monta o JSON, guarda o insight em cache e liga o redator (D9): feito para a tela de Receita (`GET /receita/insight`, DEC-040), com `build_insight_writer` em `bootstrap.py`. O golden set está em `eval/golden_set.yaml` (versão 0.9.0, 93 itens, alinhado à camada 0.4.0). A revisão humana é parcial: `revisado_por` está preenchido em 12 itens (Dados), e os demais aguardam revisão.
+`InsightWriter` (item 9, `infrastructure/insight_writer.py`, prompt em `prompts/insight/v2/`, com unidade, efeito tarifa e bandeira como partes do efeito preço e negativo por extenso): narra o JSON de métricas de uma tela e devolve `None` se algum número do texto não estiver no JSON. O backend monta o JSON, guarda o insight em cache e liga o redator (D9): feito para a tela de Receita (`GET /receita/insight`, DEC-040), com `build_insight_writer` em `bootstrap.py`. O golden set está em `eval/golden_set.yaml` (versão 0.9.0, 93 itens, alinhado à camada 0.4.0). A revisão humana é parcial: `revisado_por` está preenchido em 12 itens (Dados), e os demais aguardam revisão.
 
 ## 4. Camada semântica hoje
 

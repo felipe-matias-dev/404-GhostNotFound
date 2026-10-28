@@ -602,6 +602,7 @@ Pedidos a abrir como issue para a área dona. O GenAI não altera esses arquivos
 
 **9. `InsightWriter`.** Narra o JSON de métricas de uma tela (G2-04, tela de Receita; G2-05, "conta alta" na UC 360, Should) em 2 a 4 frases, sem conclusões causais que o JSON não sustenta (§9 do guia), e devolve `None` se algum número do texto não estiver no JSON. O cache por filtros e a montagem do JSON são do backend (D9).
 - Estado: feito (PRs #37 e #40). Usa a mesma verificação da DEC-019: o texto é lido em pt-BR, e os valores do JSON de métricas são a fonte dos números, inclusive os aninhados, mas não as chaves. A porta devolve `Insight | None`. A montagem do JSON, o cache e a ligação no composition root são do backend (D9): feitos para a tela de Receita na DEC-040, com `build_insight_writer` em `bootstrap.py`.
+- **Prompt `insight/v2` (28/10/2026):** depois da medição do #58 pela rota (10 de 10 aceitos, mas sem "R$", com tarifa e bandeira apresentadas como parcelas a mais ao lado do efeito preço e com sinal duplo em "impactou negativamente em -883,87"), a v2 pede a unidade de cada número pela chave (% vence R$ quando a chave termina em `_pct`), apresenta tarifa e bandeira como partes do efeito preço e escreve o negativo por extenso ("redução de R$ 883,87"), que a checagem aceita pela magnitude (DEC-019). Medição da v2 pela rota, nos mesmos 5 recortes, 2 vezes cada: 10 de 10 aceitos, todos com R$ e % e sem sinal negativo.
 
 **Diferenciais, só depois dos obrigatórios:**
 - follow-up com memória (G1-10; o histórico fica fora do processo, §8 do guia);
