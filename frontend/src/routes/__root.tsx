@@ -8,6 +8,10 @@ import {
 } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { AppShell } from "#/components/layout/app-shell";
+import {
+	ConsultaUcProvider,
+	useConsultaUc,
+} from "#/features/unidadeConsumidora";
 import { scriptTemaInicial } from "#/lib/tema";
 import { NaoEncontrado } from "#/pages/nao-encontrado";
 import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
@@ -66,7 +70,16 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 
 function RootLayout() {
 	return (
-		<AppShell>
+		<ConsultaUcProvider>
+			<Portal />
+		</ConsultaUcProvider>
+	);
+}
+
+function Portal() {
+	const { abrir } = useConsultaUc();
+	return (
+		<AppShell onConsultarUc={abrir}>
 			<Outlet />
 		</AppShell>
 	);
