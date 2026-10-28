@@ -1,6 +1,6 @@
-# Diagnóstico: receita x volume faturado e primeiras hipóteses (Status Report)
+# Diagnóstico: variação da receita, volume faturado e recomendações
 
-Documento de diagnóstico da variação de receita e volume faturado da V-Energy, integrando a resposta direta à pergunta da diretoria comercial (história `D3-03`) com a validação das hipóteses para o **Status Report Intermediário** e a decomposição PVM (histórias `D3-04`, `D3-09` e `D3-10`).
+Documento de diagnóstico da variação de receita e volume faturado da V-Energy, integrando a resposta direta à pergunta da diretoria comercial (história `D3-03`), a validação das hipóteses com dados (`D3-04` e `D3-09`), a decomposição PVM (`D3-06` e `D3-10`) e as recomendações acionáveis com ordem de grandeza do impacto (`D3-11`).
 
 > **Nota sobre confidencialidade e governança de dados (`DEC-024`):** Em conformidade com a regra estabelecida na `DEC-024`, este documento mantém os resultados agregados necessários para sustentar ou refutar hipóteses e embasar recomendações executivas (contagens, percentuais, volumes em GWh/MWh, valores em R$, tarifas médias e grandes agregados geográficos/operacionais). Qualquer identificação de pessoa ou de unidade consumidora individual e qualquer dado protegido pela LGPD (nome e documento do titular, endereço, CEP, coordenadas geográficas, código de UC ou de cliente e protocolo) permanecem mascarados/excluídos, sem exposição de registros linha a linha ou recortes que apontem para um cliente individual.
 
@@ -15,7 +15,7 @@ Documento de diagnóstico da variação de receita e volume faturado da V-Energy
 
 ## 2. Resposta Executiva
 
-1. **Os números da diretoria se confirmam na camada Silver:** A base de clientes ativos faturados cresceu **+0,58%** (+259 UCs), o volume faturado recuou **−3,95%** (~−8,97 GWh) e a receita faturada avançou exatamente **+8,00%** (tanto em valor de energia quanto em valor total com tributos). O reajuste acumulado da tarifa base residencial (`B1` em bandeira verde) foi exatamente de **+10,52%**.
+1. **Os números da diretoria se confirmam nas camadas Silver e Gold:** A base de clientes ativos faturados cresceu **+0,58%** (+259 UCs), o volume faturado recuou **−3,95%** (~−8,97 GWh) e a receita faturada avançou exatamente **+8,00%** (tanto em valor de energia quanto em valor total com tributos). O reajuste acumulado da tarifa base residencial (`B1` em bandeira verde) foi exatamente de **+10,52%**.
 2. **A energia faturada caiu principalmente pela Geração Distribuída (H1):** As 3.510 UCs que conectaram sistemas solares após jul/2022 tiveram queda de **−61,2%** em seu volume faturado (−11,2 GWh abatidos). Sem essas UCs com GD, o consumo das 41.490 UCs restantes da distribuidora **cresceu +1,07% (+2,2 GWh)**. Ou seja: a GD sozinha explica mais de 100% da perda líquida de volume da concessão.
 3. **A receita subiu menos que a tarifa por uma combinação de três fatores:**
    - **Queda de volume (−3,95%):** Efeito direto da GD (−11,2 GWh) somado a perdas não técnicas (−2,6 GWh nas irregularidades confirmadas em campo).
@@ -28,7 +28,7 @@ Documento de diagnóstico da variação de receita e volume faturado da V-Energy
 
 ---
 
-## 3. Quadro Consolidado de Hipóteses (Status Report)
+## 3. Quadro Consolidado de Hipóteses
 
 Validação das 7 hipóteses iniciais do planejamento ([`docs/planejamento.md`](planejamento.md) §3) acrescidas da hipótese tarifária identificada na exploração (H8):
 
@@ -47,7 +47,7 @@ Validação das 7 hipóteses iniciais do planejamento ([`docs/planejamento.md`](
 
 ## 4. Decomposição PVM (Preço x Volume x Mix)
 
-A decomposição da variação da receita faturada entre o Período Base (P1) e o Período Atual (P4) separa matematicamente o reajuste tarifário, a retração de consumo e a composição de classes:
+A decomposição da variação da receita faturada entre o Período Base (P1) e o Período Atual (P4) — materializada na tabela [`gold_receita_decomposicao`](dicionario-de-dados.md#gold_receita_decomposicao) ([`DEC-023`](decisoes.md#dec-023--medidas-de-receita-reconciliação-e-ajustes-de-colunas-da-gold) e [`DEC-029`](decisoes.md#dec-029--método-do-efeito-bandeira)) — separa matematicamente o reajuste tarifário, o acréscimo de bandeiras, a retração de consumo e a composição de classes:
 
 | Componente da Ponte de Receita | Impacto sobre Receita de Energia (`valor_energia`) | Impacto sobre Receita Total (`valor_total`) | % sobre a Receita de P1 | Leitura Gerencial |
 |---|---:|---:|---:|---|
@@ -79,10 +79,10 @@ flowchart LR
 
 | # | Ação Recomendada | Escopo Operacional | Energia Recuperável Estimada | Impacto Financeiro Estimado (Ano) |
 |---|---|---|---:|---:|
-| **1** | **Força-tarefa de fiscalização e regularização nos 4 bairros críticos (H2)** | Regularização das 871 UCs com irregularidade confirmada + vistoria prioritária das 176 UCs sem GD com queda $\ge 30\%$ em Iputinga, Macaxeira, Jardim Jordão e Prazeres (foco no segmento Comercial). | **~2,96 GWh/ano** | **+R$ 1,90 M/ano** (energia)<br>**+R$ 2,53 M/ano** (total) |
+| **1** | **Força-tarefa de fiscalização e regularização nos 4 bairros críticos (H2)** | Regularização imediata das 871 UCs com irregularidade confirmada ([`gold_inspecoes_uc`](dicionario-de-dados.md#gold_inspecoes_uc)) + vistoria prioritária guiada pela [`gold_fila_suspeitas`](dicionario-de-dados.md#gold_fila_suspeitas) (194 UCs sem GD calibradas com corte de queda $\ge 5\%$, atingindo 90,1% de precisão e 93,0% de cobertura no backtest conforme [`DEC-030`](decisoes.md#dec-030--regras-aplicadas-na-gold-ucs-ocorrências-gd-e-fila-de-suspeitas), incluindo as 176 UCs com queda severa $\ge 30\%$ em Iputinga, Macaxeira, Jardim Jordão e Prazeres, com foco no segmento Comercial). | **~2,96 GWh/ano** | **+R$ 1,90 M/ano** (energia)<br>**+R$ 2,53 M/ano** (total) |
 | **2** | **Blindagem do parque de medição eletromecânico nos alimentadores críticos (H5)** | Substituição direcionada de medidores eletromecânicos por Smart Meters: **95,4% (831 de 871)** das irregularidades confirmadas na concessão ocorrem em medidores eletromecânicos (recorte por tecnologia), e **95,2% (828 de 871)** concentram-se nos 4 bairros críticos, atendidos por alimentadores de grande porte como `ALM-REC-024` (1.338 UCs) e `ALM-JAB-007` (1.222 UCs). | Proteção de perda recorrente (~4,3 GWh) | Evita perda de **R$ 1,5M a R$ 2,5M/ano** e reduz custo de leitura |
 | **3** | **Saneamento cadastral das 200 UCs ativas sem faturamento (H6)** | Regularização documental (substituição do documento de preenchimento repetido no cadastro), instalação de medidor e ativação do faturamento nas 200 UCs ativas nunca faturadas (**170 Residenciais, 22 Comerciais e 8 nas demais classes**) + saneamento cadastral das faturas órfãs (`FAT-05`). O ganho foi estimado aplicando a cada classe o consumo médio anual e a tarifa média efetiva das UCs faturadas da respectiva classe em P4. | **~0,93 GWh/ano** (~928 MWh/ano) | **+R$ 542 mil/ano** (energia)<br>**+R$ 723 mil/ano** (total) |
-| **4** | **Ajuste na regra de apuração da Gold e monitoramento de GD (H1 / H5)** | Adotar na camada Gold a regra validada de `kwh_faturado` (`leitura_atual` nas 6.299 trocas de medidor em P4 e `\|consumo_kwh\|` nas 1.717 inversões de sinal em P1–P4) e segregar no portal a receita com/sem bandeiras e GD (`possui_gd`). Na troca de medidor, o campo bruto `consumo_kwh` subtrai o acumulado histórico de vários anos do medidor antigo retirado (`leitura_anterior`) da 1ª leitura mensal do medidor novo (`leitura_atual`), tornando a soma bruta imprópria para agregação direta sem a regra de tratamento. | Preserva na apuração **2,81 GWh em P4** (**2,63 GWh** das trocas de medidor + **0,18 GWh** das inversões de sinal) já faturados | Governança regulatória e precisão dos KPIs do portal e do agente |
+| **4** | **Governança na apuração da Gold e monitoramento de bandeiras e GD (H1 / H4 / H5)** | Regra implementada na camada Gold ([`DEC-023`](decisoes.md#dec-023--medidas-de-receita-reconciliação-e-ajustes-de-colunas-da-gold)) para `kwh_faturado` em [`gold_fato_faturamento_mensal`](dicionario-de-dados.md#gold_fato_faturamento_mensal) (`leitura_atual` nas 6.299 trocas de medidor em P4 e `\|consumo_kwh\|` nas 1.717 inversões de sinal em P1–P4, auditadas em [`gold_reconciliacao_faturamento`](dicionario-de-dados.md#gold_reconciliacao_faturamento)) e segregação no portal e no agente dos efeitos de tarifa base, bandeira (`efeito_bandeira`) e GD (`possui_gd`). Na troca de medidor, o campo bruto `consumo_kwh` subtrai o acumulado histórico de vários anos do medidor antigo retirado (`leitura_anterior`) da 1ª leitura mensal do medidor novo (`leitura_atual`), tornando a soma bruta imprópria para agregação direta sem a regra de tratamento. | Preserva na apuração **2,81 GWh em P4** (**2,63 GWh** das trocas de medidor + **0,18 GWh** das inversões de sinal) já faturados | Governança regulatória e precisão dos KPIs do portal e do agente |
 
 ---
 
@@ -97,6 +97,11 @@ flowchart LR
   - **Pareamento estrito 1:1 por `(id_uc, mes_referencia)`:** Aplicado entre `faturas` (das 45.000 UCs válidas no cadastro) e `leituras` (2.152.336 registros pareados nos 48 meses). As 32.285 faturas de UCs órfãs (`FAT-05`, sem cadastro em `unidades_consumidoras`) são analisadas separadamente em H6.
   - **Junção por `id_uc` no cadastro e equipamentos:** `unidades_consumidoras` (45.200 UCs, sendo 45.000 faturadas e 200 sem medidor/fatura), `geracao_distribuida` (1:0..1, 3.510 UCs com GD) e `medidores` (histórico de medidores `ATIVO` e `RETIRADO` por UC).
   - **Agregação analítica de eventos de campo e rede:** `inspecoes` (amostra de 1.389 UCs vistoriadas, sendo 871 com `resultado = IRREGULARIDADE CONFIRMADA`) e `ocorrencias_rede` (eventos 1:N agregados por período, UC e alimentador para cálculo de DEC/FEC).
+- **Materialização na camada Gold ([`docs/dicionario-de-dados.md`](dicionario-de-dados.md)):**
+  - [`gold_kpis_mensais`](dicionario-de-dados.md#gold_kpis_mensais) e [`gold_kpis_segmento_mensal`](dicionario-de-dados.md#gold_kpis_segmento_mensal): séries mensais e componentes somáveis por município, bairro, classe, alimentador, tipo de medidor e `possui_gd` (H1, H3, H5, H7).
+  - [`gold_receita_decomposicao`](dicionario-de-dados.md#gold_receita_decomposicao): ponte PVM com `efeito_tarifa`, `efeito_bandeira`, `efeito_volume` e `efeito_mix` por município, bairro, classe e `possui_gd` (H1, H3, H4, H8 — [`DEC-028`](decisoes.md#dec-028--pares-de-períodos-da-decomposição-e-o-que-fica-para-o-backend) e [`DEC-029`](decisoes.md#dec-029--método-do-efeito-bandeira)).
+  - [`gold_fato_faturamento_mensal`](dicionario-de-dados.md#gold_fato_faturamento_mensal) e [`gold_reconciliacao_faturamento`](dicionario-de-dados.md#gold_reconciliacao_faturamento): aplicação e auditoria de `kwh_faturado`, `origem_kwh`, `receita_bandeira` e reconciliação com as faturas órfãs (H4, H5, H6 — [`DEC-023`](decisoes.md#dec-023--medidas-de-receita-reconciliação-e-ajustes-de-colunas-da-gold)).
+  - [`gold_fila_suspeitas`](dicionario-de-dados.md#gold_fila_suspeitas) e [`gold_inspecoes_uc`](dicionario-de-dados.md#gold_inspecoes_uc): histórico de inspeções e fila calibrada de vistorias de perdas não técnicas (H2 — [`DEC-030`](decisoes.md#dec-030--regras-aplicadas-na-gold-ucs-ocorrências-gd-e-fila-de-suspeitas)).
 - **Tratamento das 8.016 leituras negativas (`LEI-05`) na variável `kwh_faturado`:**
   - **Grupo 1 — Troca de medidor em P4 (6.299 leituras):** Quando a UC possui medidor substituído (`status = RETIRADO` em `medidores.csv`, sendo 6.215 com leitura regressiva `leitura_atual < leitura_anterior` e 84 com `leitura_anterior` nula), o faturamento real validado na fatura é `kwh_faturado = leitura_atual` (totalizando **2,63 GWh** em P4).
   - **Grupo 2 — Inversão de sinal em P1 a P4 (1.717 leituras):** Quando não há troca de medidor e `leitura_atual > leitura_anterior`, mas `consumo_kwh` foi registrado com sinal negativo (`-(leitura_atual - leitura_anterior)`), o faturamento real validado na fatura é `kwh_faturado = |consumo_kwh|` (totalizando **0,18 GWh** em P1 e **0,18 GWh** em P4).
