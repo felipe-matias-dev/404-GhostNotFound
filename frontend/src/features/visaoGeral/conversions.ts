@@ -190,8 +190,8 @@ export type Tesoura = {
 };
 
 /**
- * Receita e energia faturadas em 12 meses corridos, como índice sobre a primeira janela (= 100).
- * A soma de 12 meses tira a sazonalidade, e o índice põe R$ e kWh na mesma escala: a distância
+ * Receita e energia faturadas em 12 meses corridos, como variação sobre a primeira janela (0 = igual).
+ * A soma de 12 meses tira a sazonalidade, e a variação põe R$ e kWh na mesma escala: a distância
  * entre as linhas é a pergunta da diretoria. Só soma e divide o que a Gold gravou (DEC-041).
  * Janela com buraco na série fica de fora; com menos de dois pontos, não há tesoura.
  */
@@ -224,7 +224,7 @@ export function tesoura(linhas: KpisMensais[]): Tesoura {
 				label: "Receita faturada",
 				shortLabel: "receita",
 				values: pontos.map((p) =>
-					base.receita === 0 ? null : (p.receita / base.receita) * 100,
+					base.receita === 0 ? null : p.receita / base.receita - 1,
 				),
 				color: 1,
 				emphasis: true,
@@ -234,7 +234,7 @@ export function tesoura(linhas: KpisMensais[]): Tesoura {
 				label: "Energia faturada",
 				shortLabel: "energia",
 				values: pontos.map((p) =>
-					base.kwh === 0 ? null : (p.kwh / base.kwh) * 100,
+					base.kwh === 0 ? null : p.kwh / base.kwh - 1,
 				),
 				color: 2,
 				emphasis: true,

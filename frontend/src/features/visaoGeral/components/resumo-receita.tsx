@@ -11,7 +11,7 @@ import { TrendChart } from "#/components/ui/trend-chart";
 import {
 	formatBRL,
 	formatKWh,
-	formatNumero,
+	formatPct,
 	formatPeriodoCurto,
 } from "#/lib/format";
 import { cn } from "#/lib/utils";
@@ -21,6 +21,7 @@ import { DEFINICOES, type DefinicaoIndicador } from "../indicadores";
 
 const receita = (valor: number) => formatBRL(valor, { compacto: true });
 const energia = (valor: number) => formatKWh(valor, { compacto: true });
+const variacao = (valor: number) => formatPct(valor, { sinal: true });
 // As duas séries da tesoura: a faixa entre elas é a distância entre receita e energia.
 const TESOURA = ["receita", "kwh"] as const;
 
@@ -175,13 +176,13 @@ export function ResumoReceita({
 					</Link>
 				</div>
 				<TrendChart
-					label="Receita e energia faturadas em 12 meses corridos, índice sobre a primeira janela"
+					label="Receita e energia faturadas em 12 meses corridos, variação sobre a primeira janela"
 					categories={tesoura.data?.categories}
 					series={tesoura.data?.series}
-					formatValue={formatNumero}
+					formatValue={variacao}
 					categoryLabel="Janela de 12 meses"
-					summary="Soma de 12 meses corridos, em índice: a primeira janela vale 100."
-					reference={100}
+					summary="Soma de 12 meses corridos, em variação sobre a primeira janela da série."
+					reference={0}
 					endLabels
 					band={TESOURA}
 					tooltipFooter={(indice) => {

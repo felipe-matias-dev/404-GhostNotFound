@@ -157,7 +157,7 @@ describe("janelasDaBase", () => {
 });
 
 describe("tesoura", () => {
-	it("soma 12 meses corridos e indexa sobre a primeira janela", () => {
+	it("soma 12 meses corridos e mede a variação sobre a primeira janela", () => {
 		// Receita sobe 12 no 13º mês; energia cai 24: o segundo ponto abre a tesoura.
 		const linhas = meses("2024-01", 13).map((m, i) =>
 			linha(m, i === 12 ? 22 : 10, i === 12 ? 76 : 100),
@@ -165,8 +165,8 @@ describe("tesoura", () => {
 		const t = tesoura(linhas);
 		expect(t.categories.map((c) => c.key)).toEqual(["2024-12", "2025-01"]);
 		const [receita, energia] = t.series.map((s) => s.values.at(-1));
-		expect(receita).toBeCloseTo(110);
-		expect(energia).toBeCloseTo(98);
+		expect(receita).toBeCloseTo(0.1);
+		expect(energia).toBeCloseTo(-0.02);
 		expect(t.somas[1]).toEqual({ receita: 132, kwh: 1176 });
 	});
 
