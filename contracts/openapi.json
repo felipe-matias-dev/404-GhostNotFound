@@ -82,6 +82,59 @@
         }
       }
     },
+    "/unidades-consumidoras/{cod_uc}/visao-360": {
+      "get": {
+        "tags": [
+          "unidades consumidoras"
+        ],
+        "summary": "Get Visao 360",
+        "description": "Cadastro, medidor e histórico da UC: o que o atendente precisa com o cliente na linha.",
+        "operationId": "get_visao_360_unidades_consumidoras__cod_uc__visao_360_get",
+        "parameters": [
+          {
+            "name": "cod_uc",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Cod Uc"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Uc360Schema"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErroSchema"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/receita/mensal": {
       "get": {
         "tags": [
@@ -410,6 +463,126 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/receita/insight": {
+      "get": {
+        "tags": [
+          "receita"
+        ],
+        "summary": "Get Insight",
+        "description": "Um insight de IA sobre a ponte de receita do recorte que a tela está mostrando.",
+        "operationId": "get_insight_receita_insight_get",
+        "parameters": [
+          {
+            "name": "periodo_base",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])/\\d{4}-(0[1-9]|1[0-2])$",
+              "title": "Periodo Base"
+            }
+          },
+          {
+            "name": "periodo_atual",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])/\\d{4}-(0[1-9]|1[0-2])$",
+              "title": "Periodo Atual"
+            }
+          },
+          {
+            "name": "municipio",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Municipio"
+            }
+          },
+          {
+            "name": "bairro",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Bairro"
+            }
+          },
+          {
+            "name": "classe",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "B1",
+                    "B2",
+                    "B3",
+                    "A4"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Classe"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InsightReceitaSchema"
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErroSchema"
+                }
+              }
+            },
+            "description": "Service Unavailable"
           },
           "422": {
             "description": "Validation Error",
@@ -1366,6 +1539,84 @@
         ],
         "title": "AnswerStatus"
       },
+      "AtendimentoUcSchema": {
+        "properties": {
+          "protocolo": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Protocolo"
+          },
+          "cod_uc": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Cod Uc"
+          },
+          "competencia": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+            "title": "Competencia"
+          },
+          "data_abertura": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Data Abertura"
+          },
+          "data_fechamento": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Data Fechamento"
+          },
+          "canal": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Canal"
+          },
+          "assunto": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Assunto"
+          },
+          "subassunto": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subassunto"
+          },
+          "nota_satisfacao": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 5.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nota Satisfacao"
+          }
+        },
+        "type": "object",
+        "required": [
+          "protocolo",
+          "cod_uc",
+          "competencia",
+          "data_abertura",
+          "data_fechamento",
+          "canal",
+          "assunto",
+          "subassunto",
+          "nota_satisfacao"
+        ],
+        "title": "AtendimentoUcSchema",
+        "description": "Um chamado de atendimento de uma UC."
+      },
       "AtualizarOrdemSchema": {
         "properties": {
           "status": {
@@ -1616,6 +1867,167 @@
           "unknown"
         ],
         "title": "Confidence"
+      },
+      "ConsumoMesSchema": {
+        "properties": {
+          "competencia": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+            "title": "Competencia"
+          },
+          "kwh_faturado": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kwh Faturado"
+          },
+          "kwh_ano_anterior": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kwh Ano Anterior"
+          },
+          "receita_faturada": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receita Faturada"
+          },
+          "bandeira": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "verde",
+                  "amarela",
+                  "vermelha_p1",
+                  "vermelha_p2"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bandeira"
+          },
+          "dias_faturados": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dias Faturados"
+          }
+        },
+        "type": "object",
+        "required": [
+          "competencia",
+          "kwh_faturado",
+          "kwh_ano_anterior",
+          "receita_faturada",
+          "bandeira",
+          "dias_faturados"
+        ],
+        "title": "ConsumoMesSchema",
+        "description": "Um mês do consumo da UC ao lado do mesmo mês do ano anterior."
+      },
+      "ConsumoUcSchema": {
+        "properties": {
+          "referencia": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\d{4}-(0[1-9]|1[0-2])$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Referencia"
+          },
+          "meses": {
+            "items": {
+              "$ref": "#/components/schemas/ConsumoMesSchema"
+            },
+            "type": "array",
+            "title": "Meses"
+          },
+          "kwh_12m": {
+            "type": "number",
+            "title": "Kwh 12M"
+          },
+          "kwh_12m_ano_anterior": {
+            "type": "number",
+            "title": "Kwh 12M Ano Anterior"
+          },
+          "variacao_12m_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variacao 12M Pct"
+          },
+          "meses_comparados": {
+            "type": "integer",
+            "title": "Meses Comparados"
+          },
+          "variacao_ultimo_mes_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variacao Ultimo Mes Pct"
+          },
+          "tendencia": {
+            "type": "string",
+            "enum": [
+              "subiu",
+              "estavel",
+              "caiu",
+              "sem_comparacao"
+            ],
+            "title": "Tendencia"
+          }
+        },
+        "type": "object",
+        "required": [
+          "referencia",
+          "meses",
+          "kwh_12m",
+          "kwh_12m_ano_anterior",
+          "variacao_12m_pct",
+          "meses_comparados",
+          "variacao_ultimo_mes_pct",
+          "tendencia"
+        ],
+        "title": "ConsumoUcSchema",
+        "description": "Os 12 meses até a última competência da Gold, contra o mesmo período do ano anterior."
       },
       "ContinuidadeAlimentadorMensalSchema": {
         "properties": {
@@ -1973,6 +2385,80 @@
         ],
         "title": "EventoSchema"
       },
+      "FaturaNaoPagaSchema": {
+        "properties": {
+          "competencia": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+            "title": "Competencia"
+          },
+          "receita_faturada": {
+            "type": "number",
+            "title": "Receita Faturada"
+          },
+          "data_vencimento": {
+            "type": "string",
+            "format": "date",
+            "title": "Data Vencimento"
+          },
+          "status_pagamento": {
+            "type": "string",
+            "enum": [
+              "em_aberto",
+              "em_atraso"
+            ],
+            "title": "Status Pagamento"
+          },
+          "dias_em_atraso": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dias Em Atraso"
+          }
+        },
+        "type": "object",
+        "required": [
+          "competencia",
+          "receita_faturada",
+          "data_vencimento",
+          "status_pagamento",
+          "dias_em_atraso"
+        ],
+        "title": "FaturaNaoPagaSchema",
+        "description": "Uma fatura da UC que ainda não foi paga."
+      },
+      "FaturasNaoPagasSchema": {
+        "properties": {
+          "quantidade": {
+            "type": "integer",
+            "title": "Quantidade"
+          },
+          "valor_total": {
+            "type": "number",
+            "title": "Valor Total"
+          },
+          "itens": {
+            "items": {
+              "$ref": "#/components/schemas/FaturaNaoPagaSchema"
+            },
+            "type": "array",
+            "title": "Itens"
+          }
+        },
+        "type": "object",
+        "required": [
+          "quantidade",
+          "valor_total",
+          "itens"
+        ],
+        "title": "FaturasNaoPagasSchema",
+        "description": "As faturas não pagas da UC, a mais antiga primeiro, e quanto a UC deve no total."
+      },
       "FilaItemSchema": {
         "properties": {
           "cod_uc": {
@@ -2286,6 +2772,170 @@
         "title": "IndicadoresPeriodoSchema",
         "description": "Os indicadores da diretoria somados num período, todos calculados no banco."
       },
+      "InsightReceitaSchema": {
+        "properties": {
+          "texto": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Texto"
+          },
+          "metricas": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metricas"
+          }
+        },
+        "type": "object",
+        "required": [
+          "texto",
+          "metricas"
+        ],
+        "title": "InsightReceitaSchema",
+        "description": "O insight de IA da tela de Receita e as métricas que sustentam cada número do texto."
+      },
+      "InspecaoUcSchema": {
+        "properties": {
+          "cod_inspecao": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Cod Inspecao"
+          },
+          "cod_uc": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Cod Uc"
+          },
+          "data_inspecao": {
+            "type": "string",
+            "format": "date",
+            "title": "Data Inspecao"
+          },
+          "competencia": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+            "title": "Competencia"
+          },
+          "resultado": {
+            "type": "string",
+            "enum": [
+              "irregularidade_confirmada",
+              "sem_irregularidade"
+            ],
+            "title": "Resultado"
+          },
+          "tipo_irregularidade": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tipo Irregularidade"
+          },
+          "kwh_recuperado": {
+            "type": "number",
+            "title": "Kwh Recuperado"
+          }
+        },
+        "type": "object",
+        "required": [
+          "cod_inspecao",
+          "cod_uc",
+          "data_inspecao",
+          "competencia",
+          "resultado",
+          "tipo_irregularidade",
+          "kwh_recuperado"
+        ],
+        "title": "InspecaoUcSchema",
+        "description": "Uma inspeção de campo numa UC e o que ela encontrou."
+      },
+      "InterrupcaoUcSchema": {
+        "properties": {
+          "cod_ocorrencia": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Cod Ocorrencia"
+          },
+          "cod_uc": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Cod Uc"
+          },
+          "cod_alimentador": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Cod Alimentador"
+          },
+          "competencia": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+            "title": "Competencia"
+          },
+          "data_abertura": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Data Abertura"
+          },
+          "data_encerramento": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Data Encerramento"
+          },
+          "duracao_horas": {
+            "type": "number",
+            "exclusiveMinimum": 0.0,
+            "title": "Duracao Horas"
+          },
+          "tipo": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Tipo"
+          },
+          "causa": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Causa"
+          }
+        },
+        "type": "object",
+        "required": [
+          "cod_ocorrencia",
+          "cod_uc",
+          "cod_alimentador",
+          "competencia",
+          "data_abertura",
+          "data_encerramento",
+          "duracao_horas",
+          "tipo",
+          "causa"
+        ],
+        "title": "InterrupcaoUcSchema",
+        "description": "Uma interrupção que afetou uma UC."
+      },
       "KpisMensaisSchema": {
         "properties": {
           "competencia": {
@@ -2363,6 +3013,81 @@
         ],
         "title": "KpisMensaisSchema",
         "description": "Indicadores executivos de uma competência."
+      },
+      "MedidorUcSchema": {
+        "properties": {
+          "cod_uc": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Cod Uc"
+          },
+          "cod_medidor": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Cod Medidor"
+          },
+          "tipo_medidor": {
+            "type": "string",
+            "enum": [
+              "eletromecanico",
+              "eletronico",
+              "smart"
+            ],
+            "title": "Tipo Medidor"
+          },
+          "modelo": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modelo"
+          },
+          "data_instalacao": {
+            "type": "string",
+            "format": "date",
+            "title": "Data Instalacao"
+          },
+          "idade_anos": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Idade Anos"
+          },
+          "n_trocas": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "N Trocas"
+          },
+          "data_ultima_troca": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data Ultima Troca"
+          }
+        },
+        "type": "object",
+        "required": [
+          "cod_uc",
+          "cod_medidor",
+          "tipo_medidor",
+          "modelo",
+          "data_instalacao",
+          "idade_anos",
+          "n_trocas",
+          "data_ultima_troca"
+        ],
+        "title": "MedidorUcSchema",
+        "description": "O medidor vigente de uma UC e quantas vezes ele já foi trocado."
       },
       "OrdemAtivaSchema": {
         "properties": {
@@ -2932,6 +3657,62 @@
         ],
         "title": "TotaisPeriodoSchema",
         "description": "kWh e receita faturados, somados num período."
+      },
+      "Uc360Schema": {
+        "properties": {
+          "cadastro": {
+            "$ref": "#/components/schemas/DimUcSchema"
+          },
+          "consumo": {
+            "$ref": "#/components/schemas/ConsumoUcSchema"
+          },
+          "faturas_nao_pagas": {
+            "$ref": "#/components/schemas/FaturasNaoPagasSchema"
+          },
+          "medidor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MedidorUcSchema"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "interrupcoes": {
+            "items": {
+              "$ref": "#/components/schemas/InterrupcaoUcSchema"
+            },
+            "type": "array",
+            "title": "Interrupcoes"
+          },
+          "atendimentos": {
+            "items": {
+              "$ref": "#/components/schemas/AtendimentoUcSchema"
+            },
+            "type": "array",
+            "title": "Atendimentos"
+          },
+          "inspecoes": {
+            "items": {
+              "$ref": "#/components/schemas/InspecaoUcSchema"
+            },
+            "type": "array",
+            "title": "Inspecoes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "cadastro",
+          "consumo",
+          "faturas_nao_pagas",
+          "medidor",
+          "interrupcoes",
+          "atendimentos",
+          "inspecoes"
+        ],
+        "title": "Uc360Schema",
+        "description": "Tudo o que o atendente precisa de uma UC numa tela só."
       },
       "ValidationError": {
         "properties": {

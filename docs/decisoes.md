@@ -47,6 +47,8 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | 27/10/2026 | DEC-038: a carga da Gold lê cada CSV aos poucos e grava em lotes de 10 mil linhas, depois de uma primeira rodada que só confere os arquivos; a memória deixa de crescer com o tamanho da Gold | A carga antiga guardava os 12 CSVs inteiros na memória e derrubou o WSL de 8 GB com os ~4 milhões de linhas da Gold real; a conferência antes de gravar continua garantindo que um arquivo fora do contrato não altera o banco | Felipe |
 | 27/10/2026 | DEC-039: Workflow do Databricks com os notebooks lidos do GitHub (`main`), serverless, Landing → Bronze → Silver → Gold + export, reprocessando tudo (diverge da ADR-07); agendamento mensal no dia 6, pausado | Roda o código revisado e mantém o tudo ou nada de cada camada numa extração única; a origem fecha o faturamento uma vez por mês | Arthur |
 | 27/10/2026 | DEC-041: redesign da tela da diretoria: frase de leitura, receita e energia de 12 meses contra os 12 primeiros da base, tesoura em variação de 12 meses corridos e faixa mês contra mês com sparklines; área do `TrendChart` só com eixo a partir do zero; rotas `GET /indicadores/comparacao` e `GET /indicadores/janelas`; API 0.10.0 | A tela responde à pergunta da diretoria (receita sobe, volume cai) em vez de listar seis números de mesmo peso; a área sobre eixo truncado exagerava a variação; DEC, FEC, satisfação, base de UCs e tarifa de um período são contas de backend | João Euclides |
+| 27/10/2026 | DEC-040: `GET /receita/insight` devolve o insight de IA da tela de receita; o backend monta o JSON de métricas a partir da ponte da Gold, com valores arredondados como a tela os mostra, e guarda o texto num cache em memória pelo conteúdo das métricas; sem a chave do Gemini a rota responde 503; API 0.9.0 | O agente só aceita texto cujos números sejam exatamente valores do JSON (DEC-019), e uma Gold recarregada precisa gerar um insight novo, nunca um velho | Felipe |
+| 27/10/2026 | DEC-044: a visão 360 da unidade consumidora sai de uma rota só, `GET /unidades-consumidoras/{cod_uc}/visao-360`; os 12 meses terminam na última competência da Gold e a "conta alta" é o último mês contra o mesmo mês do ano anterior, com faixa de ±10%; integrada à API 0.9.0 da main | O atendente está com o cliente na linha: uma chamada só à API e uma resposta pronta para "o consumo subiu?", sem a tela refazer conta de negócio | Felipe |
 
 ## DEC-001 · Localização dos arquivos de origem (landing)
 
@@ -890,6 +892,8 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
       | 7% | 112 | 0,919 | 0,889 |
       | **5% (adotado)** | 194 | 0,901 | 0,930 |
 
+      **O case confirma a ordem de grandeza:** a gerente de perdas diz que a equipe faz mais de 200 inspeções por mês e que pouco mais da metade encontra alguma irregularidade; a fila de 194 UCs cabe nessa capacidade, e uma lista sem ordem não serve a ela (cada inspeção sem achado é um dia de equipe perdido).
+
       **Por que 5% (o top-200 do backlog):** o critério de aceite da D3-07 pede a "taxa de acerto do top-200" da fila, e só com o
       corte de 5% a fila tem o tamanho desse teste (194 UCs; com 8%, 95). A faixa de 5% a 10% ainda acerta 83% (151 irregularidades
       confirmadas para 30 sem irregularidade), bem acima da taxa base das inspeções (0,64, nas mesmas UCs medidas). Abaixo de 5% a precisão da faixa cai para
@@ -941,10 +945,10 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   precisar deles.
 - **Amostra:** o gerador grava os 78 pares de mesmos meses entre 2024 e 2025, para o seletor ter o que mostrar.
 
-## DEC-032 · DEC e FEC de um período somam os mensais (proposta)
+## DEC-032 · DEC e FEC de um período somam os mensais
 
 - **Data:** 24/10/2026 · **Área:** GenAI e Dados · **Autor:** Luis Felipe
-- **Status:** proposta. Precisa da aprovação de Dados (o contrato da Gold) e de GenAI (a camada semântica). Pedido de revisão do Lucas no PR #41.
+- **Status:** aprovada por Dados em 27/10/2026 (Alisson), com a camada semântica do GenAI. Antes: proposta, que precisava da aprovação de Dados (o contrato da Gold) e de GenAI (a camada semântica). Pedido de revisão do Lucas no PR #41.
 - **Contexto:** a camada semântica não dizia como agregar DEC e FEC de vários meses. Nas rodadas de avaliação do PR #41, o agente usou ora a soma, ora a média dos valores mensais da mesma view, para a mesma pergunta (G020: DEC do AL-07 no semestre).
 - **Decisão proposta:**
   - DEC e FEC são indicadores acumulados: o valor de um semestre ou de um ano é a soma dos valores mensais prontos (`sum(dec)`, `sum(fec)`), nunca a média.
@@ -952,7 +956,8 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   - As duas formas dão o mesmo número quando o `n_uc` não muda no período.
 - **Motivo:** a média dos meses subestima o indicador do período. Uma regra explícita tira a ambiguidade, que hoje o modelo resolve sozinho, de um jeito diferente a cada execução.
 - **Consequência:** a regra está na camada semântica 0.3.3 e na referência do G020 (golden set 0.4.0). Se Dados preferir outra definição, por exemplo a ANEEL com o número de UCs no fim do período, mudam a regra, a referência e esta DEC.
-- **Em aberto:** confirmar a definição com Dados. Para o FEC, a mesma regra vale com `n_interrupcoes`.
+- **Confirmação de Dados (27/10/2026):** conferida na Gold v0.3, nos 122 alimentadores e nos 12 meses de 2025. A soma dos DEC mensais e a fórmula do contrato (horas somadas ÷ média mensal de UCs faturadas) diferem em 0,01% na média e 0,13% no pior alimentador; no FEC, 0,005% e 0,10%. A diferença vem só da variação mensal do `n_uc`. A média dos valores mensais, ao contrário, dá cerca de um doze avos do indicador do ano. As duas formas são equivalentes para a Gold; a do contrato continua sendo a dos recortes de `gold_kpis_segmento_mensal`.
+- **Golden set:** a pergunta G010 ("DEC médio dos alimentadores com painel solar") passou a usar o DEC do grupo, como esta regra pede, na versão 0.5.0.
 
 ## DEC-033 · DEC e FEC por período e recorte, e a fila de suspeitas paginada
 
@@ -1243,7 +1248,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
     (agora em `venergy_api/indices.py`), chamados e satisfação (Σ notas ÷ notas dadas). `variacao_pct` de cada indicador.
   - `GET /indicadores/janelas`: janelas corridas de 1 a 24 meses (padrão 12), só as completas, com receita, kWh, base de UCs e
     tarifas.
-  - Versão da API 0.10.0 (0.8.0 e 0.9.0 estão em branches abertas).
+  - Versão da API 0.10.0, incorporando a API 0.9.0 da main com agente, auditoria, insights e UC (DEC-044).
 - **Limites:**
   - A tarifa das rotas é a **realizada** (com mix de classes). O reajuste homologado da B1 (+10,52%, medido na Silver pelo
     diagnóstico) não tem tabela na Gold.
@@ -1251,3 +1256,87 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
     das duas telas diferem até a ponte ganhar o degrau de tributos.
   - O seletor de rede e atendimento continua mensal; a comparação e a tesoura já consomem `/indicadores/*`.
     `/receita/mensal` permanece para as competências e sparklines porque a rota de janelas não retorna DEC, FEC nem satisfação.
+
+## DEC-040 · Insight de IA na tela de Receita: métricas montadas no backend, cache pelo conteúdo
+
+- **Data:** 27/10/2026 · **Área:** Portal e IA · **Autor:** Felipe
+- **Contexto:** o case (5.3) pede insights gerados por IA em pelo menos uma tela, fiéis aos dados. O agente já tinha o
+  `InsightWriter` (spec §5, item 9), que narra um JSON de métricas e descarta o texto se algum número dele não for exatamente um
+  valor do JSON (DEC-019). Faltava o lado do backend (D9): montar o JSON, ligar o redator, guardar em cache e expor a rota.
+- **Decisão:**
+  - **Rota:** `GET /receita/insight` com os filtros da decomposição (`periodo_base`, `periodo_atual`, `municipio`, `bairro`,
+    `classe`). Devolve `texto` (2 a 4 frases, ou vazio) e as `metricas` que sustentam o texto. Recorte sem segmentos devolve os dois
+    vazios, sem chamar o modelo. Sem a chave do Gemini, `503` (DEC-034).
+  - **O JSON sai da ponte da Gold, somada como a tela soma (DEC-035):** base, efeitos de tarifa, bandeira, volume e mix, receita
+    atual = base + efeitos, variação em R$ e em %, as 3 maiores quedas do nível abaixo, o período e o recorte em palavras. Não há
+    fórmula nova do PVM. A consulta é a mesma da rota de decomposição (`consultar_decomposicao`).
+  - **Valores arredondados como a tela mostra:** R$ com 2 casas e % com 1. A checagem do agente exige igualdade exata, e um
+    `-3.912621…` no JSON recusaria o "−3,9%" do texto.
+  - **O período entra como valor** (`"periodo_base": "2024-01/2024-12"`), porque só os valores validam os números do texto.
+  - **Cache em memória, pelo conteúdo das métricas** (texto canônico, até 256 entradas, o menos usado sai primeiro). Só entra
+    texto que passou na checagem; a falha não é guardada.
+  - **Montagem na subida da API,** como o agente: `build_insight_writer` (agente) e `montar_redator_insights` (API). Configuração
+    inválida ou prompt inexistente desligam só os insights; o `/health` e as telas continuam.
+- **Por que não é cálculo de negócio novo:** a DEC-035 previa que, se outro consumidor precisasse dos mesmos números da ponte, a
+  conta passaria para o backend. O insight é esse consumidor, e soma o que a Gold já calculou.
+- **Alternativas descartadas:**
+  - Cache pelos filtros: uma Gold recarregada devolveria um insight velho.
+  - Cache com prazo de validade: dois números para combinar, sem ganho sobre a chave pelo conteúdo.
+  - Cache numa tabela do schema `app`: mais peso para uma tela; o insight só é refeito depois de reiniciar a API.
+  - Valores crus no JSON: o texto nunca passaria na checagem.
+  - O backend instanciar a classe do redator: a regra do `ai-agent` é depender só da porta.
+- **Limites:** o texto sai em português do Gemini e pode ser descartado se ele escrever um número de outro jeito (por exemplo
+  "R$ 1,2 milhão" para 1.234.567,89): a tela fica sem insight, que é o comportamento seguro. O cache zera a cada reinício, e a
+  qualidade do texto só se prova com a chave do Gemini (não há chave nos testes automáticos, que usam um redator falso).
+- **Log do agente:** o uvicorn só configura os loggers dele, então a API sobe com o logger `venergy_agent` em INFO e um handler
+  (`configurar_logs_do_agente`, no `lifespan`). Sem isso, uma tela sem insight não deixa rastro do motivo (erro do modelo, texto
+  vazio ou número sem suporte). O log traz o motivo, nunca o texto do insight nem a chave. Reprovação por número não vai para o
+  cache: o redator devolve `None` tanto para ela quanto para falha do provedor, e guardá-la travaria o recorte mesmo que uma nova
+  tentativa do modelo passasse. Revisitar com a taxa de aprovação medida pelo GenAI.
+- **Impacto:** API 0.9.0 (rota nova). A tela de Receita pode exibir o insight com o tipo gerado do OpenAPI. Agente: configuração
+  nova `insight_prompt_version` (padrão `v1`) e `build_insight_writer`; o prompt e o redator não mudam.
+
+## DEC-044 · Visão 360 da unidade consumidora: rota única, janela da Gold e regra da conta alta
+
+- **Data:** 27/10/2026 · **Área:** Portal · **Autor:** Felipe
+- **Contexto:** a Camila (Atendimento) pede que o atendente digite o número da unidade consumidora e veja numa tela só o cliente,
+  o consumo dos últimos meses ao lado do mesmo período do ano anterior, as faturas em aberto, o medidor, o painel solar, as
+  interrupções e os chamados, e que consiga responder na hora se a "conta alta" é consumo que subiu. A rota
+  `GET /unidades-consumidoras/{cod_uc}` devolvia só o cadastro.
+- **Decisão:**
+  - **Uma rota agregada:** `GET /unidades-consumidoras/{cod_uc}/visao-360` devolve cadastro (com o painel solar), consumo, faturas
+    não pagas, medidor, interrupções, chamados e inspeções. A rota do cadastro continua igual. `404` se a unidade não existe.
+  - **Os 12 meses terminam na última competência da Gold**, e não no mês de hoje nem na última fatura da própria unidade. O dado
+    é uma extração única: com a data de hoje a janela viria vazia, e uma unidade que parou de faturar passaria por "recente".
+    Cada mês traz o consumo, o mesmo mês do ano anterior, a receita, a bandeira e os `dias_faturados`; o mês sem fatura vem
+    vazio, e não zero.
+  - **Variação dos 12 meses:** compara só os meses com fatura nos dois anos e informa quantos são (`meses_comparados`); sem
+    nenhum par, ou com a base em zero, fica vazia. Os totais (`kwh_12m` e `kwh_12m_ano_anterior`) continuam somando tudo o que
+    foi faturado. Sem essa regra, uma unidade ligada em 2024-12 apareceria com +1100% (12 meses contra 1), e uma que parou de
+    faturar no meio da janela com uma queda que é falta de fatura, não de consumo.
+  - **Conta alta:** o backend devolve `tendencia`, que compara a última competência com o mesmo mês do ano anterior (o que tira o
+    efeito das estações): acima de +10% é `subiu`, abaixo de −10% é `caiu`, no meio é `estavel`, e sem fatura num dos meses ou
+    com a base em zero é `sem_comparacao`. Os 10% exatos ainda são `estavel`. Junto vêm a variação do último mês, a dos 12 meses
+    e, em cada mês, a bandeira e os dias faturados, que explicam uma conta maior sem consumo maior.
+  - **Faturas não pagas:** todas as `em_aberto` e `em_atraso` da unidade, da mais antiga para a mais nova, com a quantidade e o
+    valor total somado em Decimal (DEC-010). Dívida antiga continua sendo dívida, então não há corte de 12 meses. No dataset
+    todas as não pagas estão em atraso, porque a data de corte da Gold é posterior a todos os vencimentos.
+  - **Interrupções, chamados e inspeções:** todo o histórico, do mais recente para o mais antigo. São poucas linhas por unidade.
+  - A variação percentual passou a ser a mesma função da tela de receita (`variacao.py`): base zero não tem percentual.
+- **Suposição nossa:** o corte de 10% não vem do case. Uma variação pequena de consumo não explica uma conta que o cliente achou
+  alta, e 10% separa o ruído do mês de uma mudança que o atendente deve tratar como real. Fica num único lugar
+  (`LIMITE_DA_TENDENCIA`) se a diretoria pedir outra faixa.
+- **Alternativas descartadas:**
+  - Uma rota por bloco: seis chamadas e seis conjuntos de testes para uma tela que sempre usa tudo.
+  - A tela decidir o rótulo: contraria a regra de que o cálculo de negócio fica no backend.
+  - Comparar com a média dos 12 meses anteriores: mistura estações, e uma conta de janeiro sempre pareceria alta.
+  - Somar os 12 meses de cada lado na variação: compara períodos diferentes quando falta fatura. Anular a variação se faltar
+    qualquer mês também foi descartado: uma única fatura faltando apagaria a comparação do ano inteiro.
+- **Limitação conhecida:** a rota busca a última competência da Gold com `max(competencia)`, e a chave primária da fato é
+  `(cod_uc, competencia)`, então a consulta lê a tabela inteira a cada chamada. Com o volume do case isso não pesa. Se pesar, a
+  saída é um índice em `competencia`, que fica para depois da carga em lotes (PR #60), porque mexe no modelo e na carga.
+- **Impacto:** rota nova, sem quebra de contrato; na atualização com a `main`, a API mantém a versão 0.9.0,
+  o `lifespan` do agente e o cache de insights. Nenhuma mudança na Gold nem nas views do agente.
+  A tela `/uc` do frontend pode usar o tipo gerado do OpenAPI.
+  A decisão foi renumerada de DEC-036 para DEC-044 na resolução do PR #55: DEC-036 já identifica a tela
+  da diretoria na `main`, e DEC-041 a DEC-043 estão reservadas nas branches do portal.

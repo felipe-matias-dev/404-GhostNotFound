@@ -3,22 +3,29 @@
 from decimal import Decimal
 from typing import Annotated
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, status
+from fastapi.concurrency import run_in_threadpool
 from sqlalchemy import ColumnElement, case, func, or_, select
-from sqlalchemy.orm import InstrumentedAttribute
+from sqlalchemy.orm import InstrumentedAttribute, Session
 
+from venergy_api.agente import RedatorInsightsDep
 from venergy_api.database import SessionDep
+from venergy_api.insight_receita import metricas_da_receita
+from venergy_api.insights import CacheInsightsDep, chave_do_cache
 from venergy_api.models import DimUc, FatoFaturamentoMensal, KpisMensais, ReceitaDecomposicao
 from venergy_api.schemas import (
     ComparacaoFiltroSchema,
     ComparacaoReceitaSchema,
     DecomposicaoFiltroSchema,
     DecomposicaoLinhaSchema,
+    ErroSchema,
+    InsightReceitaSchema,
     KpisMensaisSchema,
     ParPeriodosSchema,
     PeriodoSchema,
     TotaisPeriodoSchema,
 )
+from venergy_api.variacao import variacao_pct
 
 router = APIRouter(prefix="/receita", tags=["receita"])
 
@@ -44,12 +51,6 @@ def _soma_no_periodo(
     # CASE dentro do SUM: os dois períodos saem da mesma leitura, numa ida só ao banco.
     # Sem nenhuma linha no período, a soma é zero, e não nula.
     return func.coalesce(func.sum(case((no_periodo, coluna))), 0)
-
-
-def _variacao_pct(base: Decimal, atual: Decimal) -> float | None:
-    if base == 0:
-        return None
-    return float((atual - base) / base * 100)
 
 
 @router.get("/comparacao")
@@ -94,8 +95,8 @@ def get_comparacao(
         ),
         variacao_kwh=kwh_atual - kwh_base,
         variacao_receita=receita_atual - receita_base,
-        variacao_kwh_pct=_variacao_pct(kwh_base, kwh_atual),
-        variacao_receita_pct=_variacao_pct(receita_base, receita_atual),
+        variacao_kwh_pct=variacao_pct(kwh_base, kwh_atual),
+        variacao_receita_pct=variacao_pct(receita_base, receita_atual),
     )
 
 
@@ -116,13 +117,12 @@ def get_pares_de_periodos(session: SessionDep) -> list[ParPeriodosSchema]:
     ]
 
 
-@router.get("/decomposicao")
-def get_decomposicao(
-    filtro: Annotated[DecomposicaoFiltroSchema, Query()], session: SessionDep
+def consultar_decomposicao(
+    filtro: DecomposicaoFiltroSchema, session: Session
 ) -> list[DecomposicaoLinhaSchema]:
-    """Ponte de receita de um par de períodos, por município, por bairro ou por classe.
+    """A ponte do nível abaixo do filtro, da maior queda para a maior alta.
 
-    Ordenada da maior queda para a maior alta: o topo é onde a receita mais caiu.
+    Fica fora da rota para a tela e o insight de IA lerem exatamente os mesmos números.
     """
     decomposicao = ReceitaDecomposicao
     # O breadcrumb da tela só acrescenta filtros: o nível da resposta é o próximo abaixo.
@@ -176,3 +176,41 @@ def get_decomposicao(
         DecomposicaoLinhaSchema(nivel=nivel, **linha._mapping)
         for linha in session.execute(consulta)
     ]
+
+
+@router.get("/decomposicao")
+def get_decomposicao(
+    filtro: Annotated[DecomposicaoFiltroSchema, Query()], session: SessionDep
+) -> list[DecomposicaoLinhaSchema]:
+    """Ponte de receita de um par de períodos, por município, por bairro ou por classe.
+
+    Ordenada da maior queda para a maior alta: o topo é onde a receita mais caiu.
+    """
+    return consultar_decomposicao(filtro, session)
+
+
+@router.get("/insight", responses={status.HTTP_503_SERVICE_UNAVAILABLE: {"model": ErroSchema}})
+async def get_insight(
+    filtro: Annotated[DecomposicaoFiltroSchema, Query()],
+    session: SessionDep,
+    redator: RedatorInsightsDep,
+    cache: CacheInsightsDep,
+) -> InsightReceitaSchema:
+    """Um insight de IA sobre a ponte de receita do recorte que a tela está mostrando."""
+    # A sessão do backend é síncrona: a consulta sai do laço de eventos para não travar as
+    # outras requisições, como na gravação da auditoria.
+    linhas = await run_in_threadpool(consultar_decomposicao, filtro, session)
+    metricas = metricas_da_receita(filtro, linhas)
+    if metricas is None:
+        return InsightReceitaSchema(texto=None, metricas=None)
+
+    chave = chave_do_cache("receita", metricas)
+    texto = cache.obter(chave)
+    if texto is None:
+        insight = await redator.narrate("receita", metricas)
+        # None: o redator descartou o texto (número fora das métricas) ou o provedor falhou.
+        # A tela aparece sem insight, e a falha não fica no cache.
+        if insight is not None:
+            texto = insight.text
+            cache.guardar(chave, texto)
+    return InsightReceitaSchema(texto=texto, metricas=metricas)

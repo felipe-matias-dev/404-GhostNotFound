@@ -60,6 +60,7 @@ a UC `0003` em `GET /unidades-consumidoras/{cod_uc}`.
 |---|---|
 | `GET /health` | `200` se a API alcança o banco, `503` se não alcança |
 | `GET /unidades-consumidoras/{cod_uc}` | Resumo de uma unidade consumidora, ou `404` se ela não existir |
+| `GET /unidades-consumidoras/{cod_uc}/visao-360` | A unidade consumidora numa tela só: cadastro e painel solar, consumo dos 12 meses até a última competência da Gold contra o ano anterior (com `tendencia`: `subiu`, `estavel`, `caiu` ou `sem_comparacao`, faixa de ±10%), faturas não pagas, medidor, interrupções, chamados e inspeções ([DEC-044](../docs/decisoes.md)). `404` se a unidade não existir |
 | `GET /receita/mensal?inicio=&fim=` | KPIs de cada competência (`gold_kpis_mensais`), do mês mais antigo ao mais recente, com recorte opcional (`AAAA-MM`, inclusivo) |
 | `GET /receita/comparacao` | kWh e receita de dois períodos (`base_inicio`, `base_fim`, `atual_inicio`, `atual_fim`) e a variação, com filtros opcionais de `municipio`, `bairro` e `classe` |
 | `GET /receita/decomposicao/periodos` | Os pares de períodos (`periodo_base`, `periodo_atual`, no formato `AAAA-MM/AAAA-MM`) que a Gold gravou na decomposição: o que o seletor da tela pode oferecer ([DEC-028](../docs/decisoes.md)) |
@@ -74,6 +75,7 @@ a UC `0003` em `GET /unidades-consumidoras/{cod_uc}`.
 | `PATCH /ordens-inspecao/{id}` | Muda o status (`EM_CAMPO`, `CONCLUIDA` com `resultado`, `CANCELADA`), com `observacao` opcional: `409` se a mudança não for permitida |
 | `POST /ai/ask` | Pergunta ao agente de IA (`{"question": "...", "session_id": "..."}`) e devolve a resposta com o `audit_id` do registro gravado em `app.ai_auditoria`. Todo status é gravado, e se a gravação falhar a resposta não sai (`500`). Sem a chave do Gemini, `503` ([DEC-034](../docs/decisoes.md)) |
 | `GET /ai/audit/{id}` | A auditoria de uma resposta: pergunta, SQL executado, views, linhas, modelo, versão do prompt, latência e horário. `404` se não existir |
+| `GET /receita/insight?periodo_base=&periodo_atual=&municipio=&bairro=&classe=` | Um insight de IA sobre a ponte de receita do recorte da tela (2 a 4 frases), com as `metricas` que sustentam cada número do texto. Os filtros são os de `/receita/decomposicao`. `texto` vem vazio quando o agente descarta a narração (número fora das métricas) ou o provedor falha: a tela aparece sem insight. O mesmo recorte não paga o modelo duas vezes (cache em memória pelo conteúdo das métricas). `503` sem a chave do Gemini ([DEC-040](../docs/decisoes.md)) |
 
 Com filtro de segmento, a receita e o kWh são somados da fatura de cada UC. DEC e FEC só
 existem no total da empresa e por alimentador, porque não dá para somá-los por bairro
