@@ -382,8 +382,12 @@ class ConsumoUcSchema(BaseModel):
     meses: list[ConsumoMesSchema]
     kwh_12m: ExactNumber
     kwh_12m_ano_anterior: ExactNumber
-    # Em %, vazias quando a base é zero ou falta a fatura de um dos meses.
+    # Em %. A de 12 meses compara só os meses com fatura nos dois anos (`meses_comparados`) e
+    # fica vazia sem nenhum par ou com a base em zero; a do último mês fica vazia se faltar a
+    # fatura de um dos dois meses ou se a base for zero. Os totais acima somam tudo o que foi
+    # faturado.
     variacao_12m_pct: float | None
+    meses_comparados: int
     variacao_ultimo_mes_pct: float | None
     # A resposta para "minha conta veio alta": o último mês contra o mesmo mês do ano anterior.
     tendencia: Tendencia

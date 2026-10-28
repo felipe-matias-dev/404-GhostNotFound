@@ -1351,6 +1351,10 @@
             ],
             "title": "Variacao 12M Pct"
           },
+          "meses_comparados": {
+            "type": "integer",
+            "title": "Meses Comparados"
+          },
           "variacao_ultimo_mes_pct": {
             "anyOf": [
               {
@@ -1380,6 +1384,7 @@
           "kwh_12m",
           "kwh_12m_ano_anterior",
           "variacao_12m_pct",
+          "meses_comparados",
           "variacao_ultimo_mes_pct",
           "tendencia"
         ],

@@ -399,6 +399,45 @@ def test_twelve_month_totals_and_variation(client: TestClient, seed) -> None:
     assert body["kwh_12m"] == 300
     assert body["kwh_12m_ano_anterior"] == 200
     assert body["variacao_12m_pct"] == 50.0
+    assert body["meses_comparados"] == 2
+
+
+def test_variation_compares_only_the_months_with_an_invoice_in_both_years(
+    client: TestClient, seed
+) -> None:
+    # Unidade ligada em 2024-12: 12 faturas na janela contra 1 no ano anterior. Somar tudo daria
+    # +1100%, que mede a falta de fatura e não o consumo; só dezembro tem os dois lados.
+    seed(
+        make_uc("0001"),
+        make_invoice("0001", "2024-12"),
+        *(make_invoice("0001", f"2025-{mes:02d}") for mes in range(1, 13)),
+    )
+
+    body = consumption(client)
+
+    assert body["kwh_12m"] == 1200
+    assert body["kwh_12m_ano_anterior"] == 100
+    assert body["variacao_12m_pct"] == 0.0
+    assert body["meses_comparados"] == 1
+
+
+def test_variation_is_empty_when_no_month_has_an_invoice_in_both_years(
+    client: TestClient, seed
+) -> None:
+    seed(
+        make_uc("0001"),
+        make_uc("0002"),
+        make_invoice("0001", "2024-12", kwh_faturado=Decimal("100")),
+        make_invoice("0001", "2025-11", kwh_faturado=Decimal("150")),
+        make_invoice("0002", "2025-12"),
+    )
+
+    body = consumption(client)
+
+    assert body["kwh_12m"] == 150
+    assert body["kwh_12m_ano_anterior"] == 100
+    assert body["variacao_12m_pct"] is None
+    assert body["meses_comparados"] == 0
 
 
 def test_no_previous_year_means_no_percentage(client: TestClient, seed) -> None:

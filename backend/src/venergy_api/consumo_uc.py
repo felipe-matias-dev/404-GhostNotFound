@@ -50,6 +50,7 @@ def montar_consumo(
             kwh_12m=Decimal(0),
             kwh_12m_ano_anterior=Decimal(0),
             variacao_12m_pct=None,
+            meses_comparados=0,
             variacao_ultimo_mes_pct=None,
             tendencia="sem_comparacao",
         )
@@ -71,17 +72,25 @@ def montar_consumo(
             )
         )
 
-    # Soma em Decimal, ignorando os meses sem fatura. Sem nenhuma fatura no ano anterior, a
-    # soma é zero e a porcentagem fica vazia (variacao_pct não divide por zero).
+    # Soma em Decimal, ignorando os meses sem fatura: os totais mostram o que foi faturado.
     kwh_12m = sum((mes.kwh_faturado or Decimal(0) for mes in meses), Decimal(0))
     kwh_12m_ano_anterior = sum((mes.kwh_ano_anterior or Decimal(0) for mes in meses), Decimal(0))
+    # A porcentagem usa só os meses com fatura nos dois anos. Somar tudo compararia 12 meses
+    # com 3 (unidade recém-ligada) e mediria a falta de fatura, não o consumo. Sem nenhum par,
+    # ou com a base em zero, ela fica vazia (variacao_pct não divide por zero).
+    pares = [
+        mes for mes in meses if mes.kwh_faturado is not None and mes.kwh_ano_anterior is not None
+    ]
+    base_dos_pares = sum((mes.kwh_ano_anterior for mes in pares), Decimal(0))
+    atual_dos_pares = sum((mes.kwh_faturado for mes in pares), Decimal(0))
     ultimo = meses[-1]
     return ConsumoUcSchema(
         referencia=referencia,
         meses=meses,
         kwh_12m=kwh_12m,
         kwh_12m_ano_anterior=kwh_12m_ano_anterior,
-        variacao_12m_pct=variacao_pct(kwh_12m_ano_anterior, kwh_12m),
+        variacao_12m_pct=variacao_pct(base_dos_pares, atual_dos_pares),
+        meses_comparados=len(pares),
         variacao_ultimo_mes_pct=(
             variacao_pct(ultimo.kwh_ano_anterior, ultimo.kwh_faturado)
             if ultimo.kwh_ano_anterior is not None and ultimo.kwh_faturado is not None

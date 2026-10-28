@@ -358,6 +358,8 @@ export interface components {
             kwh_12m_ano_anterior: number;
             /** Variacao 12M Pct */
             variacao_12m_pct: number | null;
+            /** Meses Comparados */
+            meses_comparados: number;
             /** Variacao Ultimo Mes Pct */
             variacao_ultimo_mes_pct: number | null;
             /**
