@@ -52,7 +52,9 @@
 #          interrupções da própria UC (decisão da issue #56), e entram G067 a G074, sobre interrupções,
 #          atendimentos e medidor por UC, inadimplência, leitura estimada e GD. Escritos antes de qualquer
 #          rodada do modelo, conferidos na amostra; pendentes de revisão por Dados. G075 (inspeções, fora do
-#          agente) repõe o mínimo de 8 perguntas sem resposta.
+#          agente) repõe o mínimo de 8 perguntas sem resposta. Revisão de Dados (28/10/2026): revisado_por
+#          preenchido (Alisson Ramos) em G062, G067, G069, G070, G073, G074 e G075; G068, G071 e G072 esperam
+#          o ajuste pedido na revisão do PR #67.
 versao: 0.9.0
 status: rascunho
 
@@ -701,8 +703,8 @@ itens:
     expected_status: answered
     datasets: [amostra]
     follow_up_of: null
-    notes: "Pergunta da Camila (case p. 5; RESUMO §1.7). Ocorrências por UC (gold_interrupcoes_uc) não têm chave definida e não estão nas views. Pergunta aberta ao GenAI (Dados, 27/10/2026): o case (Camila) pede, na tela da UC, saber se a rua dele teve falta de luz, e o glossário define o alimentador como o circuito que abastece um conjunto de ruas e bairros. Se 'rua' for o alimentador da UC, o item é answered (a camada já permite responder, e a resposta deve dizer que é do alimentador). Se a pergunta for sobre a própria UC, o unknown vale até a camada v0.3 expor as interrupções por UC. Esperado mantido até a decisão. Mudança de 0.6.0 para 0.7.0 (28/10/2026, camada 0.4.0, antes de qualquer rodada do modelo): a camada expõe sem_interrupcoes_uc, e a decisão da issue #56 é responder pelas interrupções da própria UC; o DEC do alimentador não diz se a UC foi afetada. Só na amostra (código fictício); a Gold real ganha um equivalente agregado na conferência de Dados. Pendente de revisão por Dados."
-    revisado_por: null
+    notes: "Pergunta da Camila (case p. 5; RESUMO §1.7). Ocorrências por UC (gold_interrupcoes_uc) não têm chave definida e não estão nas views. Pergunta aberta ao GenAI (Dados, 27/10/2026): o case (Camila) pede, na tela da UC, saber se a rua dele teve falta de luz, e o glossário define o alimentador como o circuito que abastece um conjunto de ruas e bairros. Se 'rua' for o alimentador da UC, o item é answered (a camada já permite responder, e a resposta deve dizer que é do alimentador). Se a pergunta for sobre a própria UC, o unknown vale até a camada v0.3 expor as interrupções por UC. Esperado mantido até a decisão. Mudança de 0.6.0 para 0.7.0 (28/10/2026, camada 0.4.0, antes de qualquer rodada do modelo): a camada expõe sem_interrupcoes_uc, e a decisão da issue #56 é responder pelas interrupções da própria UC; o DEC do alimentador não diz se a UC foi afetada. Só na amostra (código fictício); a Gold real ganha um equivalente agregado na conferência de Dados. Conferência de Dados (28/10/2026): bate com o case (a Camila pede, na tela da UC, as interrupções da UC), e a referência foi executada na amostra e bate linha a linha com as interrupções da UC. Revisado por Dados. Segue a decisão da issue #56."
+    revisado_por: "Alisson Ramos"
 
   - id: G063
     question: "Quais são os 3 alimentadores com maior DEC em março de 2025?"
@@ -755,8 +757,8 @@ itens:
     expected_status: answered
     datasets: [amostra]
     follow_up_of: null
-    notes: "UC 360: interrupções da própria UC em sem_interrupcoes_uc. 'Ficou sem luz' é sinônimo de falta de luz no glossário. Código fictício: só na amostra. Pendente de revisão por Dados."
-    revisado_por: null
+    notes: "UC 360: interrupções da própria UC em sem_interrupcoes_uc. 'Ficou sem luz' é sinônimo de falta de luz no glossário. Código fictício: só na amostra. Conferência de Dados (28/10/2026): bate com o case (a Camila pede, na tela da UC, as interrupções da UC), e a referência foi executada na amostra e bate linha a linha com as interrupções da UC. Revisado por Dados."
+    revisado_por: "Alisson Ramos"
 
   - id: G068
     question: "Qual canal de atendimento teve a pior nota de satisfação em 2025?"
@@ -775,8 +777,8 @@ itens:
     expected_status: answered
     datasets: [amostra, gold_real]
     follow_up_of: null
-    notes: "Medidor vigente de cada UC em sem_medidor_uc (hipótese H5 do diagnóstico). Não usar o tipo_medidor de sem_faturamento_mensal, que é o medidor de cada leitura. Pendente de revisão por Dados."
-    revisado_por: null
+    notes: "Medidor vigente de cada UC em sem_medidor_uc (hipótese H5 do diagnóstico). Não usar o tipo_medidor de sem_faturamento_mensal, que é o medidor de cada leitura. Conferência de Dados (28/10/2026): a referência foi executada na Gold real e volta com resultado; o tipo eletromecanico existe no medidor vigente da Gold real. Revisado por Dados."
+    revisado_por: "Alisson Ramos"
 
   - id: G070
     question: "Quantas faturas de 2025 ainda não foram pagas e qual o valor delas?"
@@ -785,8 +787,8 @@ itens:
     expected_status: answered
     datasets: [amostra, gold_real]
     follow_up_of: null
-    notes: "Inadimplência pelos componentes de sem_kpis_segmento_mensal. Contar em sem_faturamento_mensal com status_pagamento em ('em_aberto', 'em_atraso') dá o mesmo número. Pendente de revisão por Dados."
-    revisado_por: null
+    notes: "Inadimplência pelos componentes de sem_kpis_segmento_mensal. Contar em sem_faturamento_mensal com status_pagamento em ('em_aberto', 'em_atraso') dá o mesmo número. Conferência de Dados (28/10/2026): a referência foi executada na Gold real e volta com resultado; a soma dos componentes dá o mesmo número e o mesmo valor que contar as faturas não pagas na fato. Revisado por Dados."
+    revisado_por: "Alisson Ramos"
 
   - id: G071
     question: "Qual município teve mais leituras estimadas em 2025?"
@@ -815,8 +817,8 @@ itens:
     expected_status: answered
     datasets: [amostra, gold_real]
     follow_up_of: null
-    notes: "Conta é fatura no glossário. 'Paga com atraso' é um status próprio, diferente de 'em atraso' (ainda não paga). Pendente de revisão por Dados."
-    revisado_por: null
+    notes: "Conta é fatura no glossário. 'Paga com atraso' é um status próprio, diferente de 'em atraso' (ainda não paga). Conferência de Dados (28/10/2026): a referência foi executada na Gold real e volta com resultado; o status paga_com_atraso existe na Gold real. Revisado por Dados."
+    revisado_por: "Alisson Ramos"
 
   - id: G074
     question: "Quantas UCs tiveram falta de luz e também abriram chamado sobre falta de energia em 2025?"
@@ -825,8 +827,8 @@ itens:
     expected_status: answered
     datasets: [amostra, gold_real]
     follow_up_of: null
-    notes: "Testa a regra da camada 0.4.0: duas tabelas de eventos por UC não se juntam direto (a junção multiplica linhas); a contagem distinta ou o EXISTS evita isso. Na amostra todas as UCs com interrupção também abriram chamado, então o número coincide com o de UCs interrompidas. Pendente de revisão por Dados."
-    revisado_por: null
+    notes: "Testa a regra da camada 0.4.0: duas tabelas de eventos por UC não se juntam direto (a junção multiplica linhas); a contagem distinta ou o EXISTS evita isso. Na amostra todas as UCs com interrupção também abriram chamado, então o número coincide com o de UCs interrompidas. Conferência de Dados (28/10/2026): a referência foi executada na Gold real e volta com resultado; o EXISTS dá o mesmo que a junção com DISTINCT, então não multiplica linhas. Revisado por Dados."
+    revisado_por: "Alisson Ramos"
 
   - id: G075
     question: "Quantas inspeções de campo encontraram irregularidade em 2025?"
@@ -835,8 +837,8 @@ itens:
     expected_status: unknown
     datasets: [amostra, gold_real]
     follow_up_of: null
-    notes: "gold_inspecoes_uc fica fora do agente por decisão de produto, como a fila de suspeitas (contrato v0.3, consumers sem agente). O esperado é 'não sei', mesmo com as tabelas por UC da camada 0.4.0. Pendente de revisão por Dados."
-    revisado_por: null
+    notes: "gold_inspecoes_uc fica fora do agente por decisão de produto, como a fila de suspeitas (contrato v0.3, consumers sem agente). O esperado é 'não sei', mesmo com as tabelas por UC da camada 0.4.0. Conferência de Dados (28/10/2026): bate com o contrato v0.3 (gold_inspecoes_uc sem agente em consumers). Revisado por Dados."
+    revisado_por: "Alisson Ramos"
 
   # --- gold_real: gabarito publicado no diagnóstico (expected_values) ---
 
