@@ -222,7 +222,10 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   o notebook só valida e confere tabelas existentes. Uma fonte com falha é marcada e não
   é gravada, e o resumo final falha se houver fonte com falha, pendente ou sem
   idempotência comprovada. As opções de leitura ficam no código da fonte, versionadas,
-  e são impressas a cada execução.
+  e são impressas a cada execução. O widget `exigir_idempotencia` (padrão `sim`) pode ser
+  `nao` no Workflow: a conferência contra a origem continua, e só a comparação entre as duas
+  últimas gravações é pulada, porque depende de time travel (7 dias de retenção) e não se
+  aplica a cargas mensais com dados novos ([DEC-039](#dec-039--workflow-do-databricks-e-agendamento-mensal)).
 - **Formatos:** CSV com `FAILFAST` e tudo string. Uma pasta com vários CSVs (`leituras/`)
   vira uma tabela só se todos os arquivos tiverem o mesmo conjunto de colunas, unidos por
   nome. JSON preserva structs e arrays, com valores primitivos como string
@@ -1194,14 +1197,14 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   única.
 - **Falhas:** o Resumo de cada notebook dá erro se alguma tabela falhar, e o Job para na primeira task com erro, sem gravar as
   camadas seguintes.
-- **Limitação conhecida:** a conferência pós-gravação da Bronze (DEC-008) compara as duas últimas gravações de cada tabela por
-  time travel. O VACUUM automático do Databricks (predictive optimization) apaga os arquivos antigos depois de 7 dias
-  (`deletedFileRetentionDuration`). Se a última gravação tiver mais de 7 dias, a task `landing_to_bronze` grava a Bronze e falha
-  nessa comparação; o run seguinte passa, porque compara duas gravações recentes. Com dado novo, as duas gravações nem deveriam
-  ser iguais, então essa checagem falharia em todo run mensal.
-- **Para produção:** despausar o agendamento depende de tornar essa comparação opcional no Job (por exemplo, um widget
-  `exigir_idempotencia = nao`), mantendo a conferência contra a origem. Fica para um PR próprio, combinado com o autor do
-  `Landing_to_Bronze`.
+- **Idempotência da Bronze no Job (atualizado em 28/10):** a conferência pós-gravação da Bronze (DEC-008) compara as duas
+  últimas gravações de cada tabela por time travel. O VACUUM automático do Databricks (predictive optimization) apaga os arquivos
+  antigos depois de 7 dias (`deletedFileRetentionDuration`), e com dado novo as duas gravações nem deveriam ser iguais: no Job
+  mensal essa comparação falharia em todo run. Por isso o Job passa `exigir_idempotencia = nao` ao `Landing_to_Bronze`: a
+  conferência contra a origem (schema, contagem e conteúdo) continua, e só a comparação entre gravações é pulada. Na execução
+  manual o padrão continua `sim`.
+- **Para produção:** basta despausar o agendamento. A carga incremental por competência continua como evolução, se o volume
+  mensal justificar.
 
 ## DEC-040 · Insight de IA na tela de Receita: métricas montadas no backend, cache pelo conteúdo
 
