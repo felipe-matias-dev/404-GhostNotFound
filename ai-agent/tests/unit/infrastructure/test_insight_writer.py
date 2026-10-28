@@ -137,3 +137,11 @@ async def test_accepted_insight_is_logged_as_accepted(caplog):
     await writer(model).narrate("Receita", METRICS)
 
     assert logged(caplog) == [{"step": "insight", "screen": "Receita", "status": "aceito"}]
+
+
+async def test_blank_text_is_logged_as_empty(caplog):
+    caplog.set_level(logging.INFO, logger="venergy_agent.insight")
+    model, _ = narrating_model("   ")
+
+    assert await writer(model).narrate("Receita", METRICS) is None
+    assert logged(caplog) == [{"step": "insight", "screen": "Receita", "status": "texto_vazio"}]
