@@ -325,6 +325,35 @@ def test_gap_removes_windows_that_cross_it(engine: Engine, client: TestClient) -
     assert [w["fim"] for w in windows] == [month(i) for i in [*range(5, 12), *range(18, 24)]]
 
 
+def test_windows_keep_months_missing_only_in_the_segment(
+    engine: Engine, client: TestClient
+) -> None:
+    store(
+        engine,
+        *(segment(month(i)) for i in range(12) if i != 5),
+        segment(month(5), municipio="Olinda", bairro="Carmo"),
+    )
+    recorte = {"municipio": "Recife", "bairro": "Boa Viagem"}
+
+    response = client.get(WINDOWS, params={"meses": 12, **recorte})
+    assert response.status_code == 200
+    assert [(w["inicio"], w["fim"]) for w in response.json()] == [("2024-01", "2024-12")]
+    window = response.json()[0]
+    assert window["receita_faturada"] == 13200.0
+    assert window["kwh_faturado"] == 11000.0
+    assert window["n_uc_medio"] == pytest.approx(1100 / 12)
+    comparison = compare(client, ("2024-01", "2024-12"), ("2024-01", "2024-12"), **recorte)["atual"]
+    for field in (
+        "receita_faturada",
+        "receita_energia",
+        "kwh_faturado",
+        "n_uc_medio",
+        "tarifa_media",
+        "tarifa_base_media",
+    ):
+        assert window[field] == pytest.approx(comparison[field])
+
+
 def test_windows_respect_the_segment(engine: Engine, client: TestClient) -> None:
     store(
         engine,
@@ -336,7 +365,9 @@ def test_windows_respect_the_segment(engine: Engine, client: TestClient) -> None
     only_b3 = client.get(WINDOWS, params={"meses": 3, "classe": "B3"}).json()
 
     assert len(all_classes) == 1
-    assert only_b3 == []
+    assert [(w["inicio"], w["fim"]) for w in only_b3] == [("2024-01", "2024-03")]
+    assert only_b3[0]["receita_faturada"] == 2400.0
+    assert only_b3[0]["n_uc_medio"] == pytest.approx(200 / 3)
 
 
 def test_windows_months_out_of_range_is_422(client: TestClient) -> None:

@@ -152,6 +152,10 @@ Recorte da tela no topo (ex.: `Receita › Recife ▾ › Boa Viagem ▾`): a p�
 - Tesoura: somas de `GET /indicadores/janelas?meses=12`, sem acumulação no frontend. A primeira
   e a última janelas completas sem sobreposição definem o par do resumo; o gráfico só converte
   as somas em variação sobre a primeira janela.
+- Competências das janelas vêm da empresa inteira: um mês sem linha no recorte vale zero,
+  enquanto uma lacuna global continua invalidando a janela.
+- O link do resumo para a ponte só aparece se o mesmo par existir em
+  `GET /receita/decomposicao/periodos`, sem fallback silencioso para outro período.
 - `GET /receita/mensal` permanece para as competências do seletor mensal e as sparklines.
   DEC, FEC e satisfação da comparação são calculados no backend, não pela série mensal.
 - Comparação mensal, resumo e série de janelas têm estados de erro e repetição independentes.

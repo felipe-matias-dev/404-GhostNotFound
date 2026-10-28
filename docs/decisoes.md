@@ -1215,7 +1215,8 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
     provedor), a frase determinística continua, e a tela nunca fica sem leitura.
   - **Receita e energia de 12 meses:** primeira e última janelas completas de `GET /indicadores/janelas?meses=12`, sem
     sobreposição, comparadas por `GET /indicadores/comparacao`. Sem duas janelas não sobrepostas, a tela diz que não há
-    comparação. O botão "Abrir a ponte de receita" leva o mesmo par de janelas para a tela de receita.
+    comparação. O botão "Abrir a ponte de receita" só aparece quando esse mesmo par existe em
+    `GET /receita/decomposicao/periodos`, sem abrir outro período por fallback.
   - **Tesoura:** receita e energia faturadas em 12 meses corridos, como variação sobre a primeira janela (0%), na mesma escala.
     As somas vêm prontas de `GET /indicadores/janelas?meses=12`, sobre `gold_kpis_segmento_mensal`; o frontend só normaliza
     cada série sobre a primeira soma para exibir a variação. O backend exclui janelas incompletas. O tooltip mostra as somas em R$
@@ -1247,7 +1248,9 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
     (Σ receita de energia ÷ Σ kWh) e `tarifa_base_media` (sem o acréscimo da bandeira, DEC-029), DEC e FEC pelo helper da DEC-033
     (agora em `venergy_api/indices.py`), chamados e satisfação (Σ notas ÷ notas dadas). `variacao_pct` de cada indicador.
   - `GET /indicadores/janelas`: janelas corridas de 1 a 24 meses (padrão 12), só as completas, com receita, kWh, base de UCs e
-    tarifas.
+    tarifas. As competências vêm da tabela inteira, antes do recorte: mês existente na empresa
+    sem linha no recorte contribui com zero, inclusive para a média de UCs. Mês ausente na
+    empresa inteira continua invalidando as janelas que o atravessam.
   - Versão da API 0.10.0, incorporando a API 0.9.0 da main com agente, auditoria, insights e UC (DEC-044).
 - **Limites:**
   - A tarifa das rotas é a **realizada** (com mix de classes). O reajuste homologado da B1 (+10,52%, medido na Silver pelo
