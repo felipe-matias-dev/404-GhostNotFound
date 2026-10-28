@@ -131,9 +131,20 @@ A última task grava a Gold e exporta os 12 CSVs para `/Volumes/v_energy/gold/cs
 
 ![Execução bem-sucedida do Workflow no Databricks](docs/img/workflow-databricks.png)
 
-**Para reexecutar:** em **Jobs & Pipelines → v_energy_workflow**, clique em **Run now** uma vez. A checagem de
-idempotência da Bronze compara as duas últimas gravações por time travel, que expira em 7 dias: se a última gravação da
-Bronze for mais antiga que isso, o primeiro run grava a Bronze e falha nessa checagem, e o segundo passa (ver DEC-039).
+**Para reexecutar:** em **Jobs & Pipelines → v_energy_workflow**, clique em **Run now** uma vez.
+
+### Estratégia de agendamento
+
+| Decisão | Justificativa |
+|---|---|
+| **Mensal** | Os sistemas de origem fecham o faturamento uma vez por mês. Rodar todo dia gastaria compute sem dado novo, e rodar por evento exigiria um aviso que os sistemas legados não emitem. |
+| **Dia 6, às 03h** | D+5 do fechamento do ciclo de faturamento, de madrugada, fora do horário de uso do portal. O prazo de D+5 é suposição do time: o case não informa quando o faturamento fecha. |
+| **Reprocessamento completo** | Cada run relê toda a landing e regrava Bronze, Silver e Gold. Com uma extração única e cerca de 15 minutos de execução, isso mantém o tudo ou nada de cada camada. Diverge da ADR-07, que previa carga incremental por competência: ela fica como evolução se o volume mensal crescer. |
+| **Pausado** | O dataset do case é uma extração única; não há dado novo para buscar. |
+| **Falha interrompe o pipeline** | As travas de cada notebook dão erro antes de publicar uma camada inconsistente, e o Job não segue para as camadas seguintes. O export dos CSVs só acontece com a Gold validada. |
+| **Pronto para produção** | Basta despausar. A Bronze continua conferida contra a origem a cada run; a comparação com a gravação anterior (time travel, 7 dias de retenção) fica desligada no Job, porque com dado novo as gravações nunca são iguais. |
+
+Detalhes e alternativas descartadas: [DEC-039](docs/decisoes.md#dec-039--workflow-do-databricks-e-agendamento-mensal).
 
 ## Dicionário de dados e diagnóstico da receita
 
