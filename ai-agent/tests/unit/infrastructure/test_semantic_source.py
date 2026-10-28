@@ -31,6 +31,9 @@ async def test_real_files_load_the_agent_views():
             "sem_kpis_mensais",
             "sem_kpis_segmento_mensal",
             "sem_receita_decomposicao",
+            "sem_interrupcoes_uc",
+            "sem_atendimentos_uc",
+            "sem_medidor_uc",
         }
     )
 
@@ -49,6 +52,9 @@ def test_relations_come_from_the_foreign_key_and_the_entity_keys(documents):
     }
     assert links == {
         frozenset({("sem_faturamento_mensal", "cod_uc"), ("sem_uc", "cod_uc")}),
+        frozenset({("sem_interrupcoes_uc", "cod_uc"), ("sem_uc", "cod_uc")}),
+        frozenset({("sem_atendimentos_uc", "cod_uc"), ("sem_uc", "cod_uc")}),
+        frozenset({("sem_medidor_uc", "cod_uc"), ("sem_uc", "cod_uc")}),
         frozenset(
             {
                 ("sem_uc", "cod_alimentador"),
@@ -92,7 +98,7 @@ def test_standalone_must_be_a_boolean(documents):
 def test_each_link_appears_once_even_when_fk_and_shared_key_both_apply(documents):
     layer = build_layer(*documents)
 
-    assert len(layer.relations) == 2
+    assert len(layer.relations) == 5
 
 
 def test_competencia_is_not_a_join_key(documents):
@@ -200,3 +206,29 @@ def test_every_problem_is_reported_together(documents):
         build_layer(layer, contract)
 
     assert len(error.value.problems) == 2
+
+
+def test_a_key_with_a_foreign_key_links_only_through_it(documents):
+    layer_doc, contract = documents
+    layer_doc["views"].append(
+        {
+            "name": "sem_outro_fato",
+            "source": "gold_fato_faturamento_mensal",
+            "description": "cópia para o teste",
+            "grain": "UC por competência",
+            "columns": [
+                {"name": "cod_uc", "description": "código da UC"},
+                {"name": "competencia", "description": "mês"},
+            ],
+        }
+    )
+
+    layer = build_layer(layer_doc, contract)
+
+    links = {
+        frozenset({relation.left_view, relation.right_view})
+        for relation in layer.relations
+        if relation.left_column == "cod_uc"
+    }
+    assert frozenset({"sem_outro_fato", "sem_uc"}) in links
+    assert frozenset({"sem_outro_fato", "sem_faturamento_mensal"}) not in links
