@@ -43,7 +43,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | 26/10/2026 | DEC-031: a API lista os pares de períodos da decomposição e passa a exigir o par; API 0.5.0 | A Gold grava centenas de pares (DEC-028): sem o par, a resposta somaria períodos que não se comparam, e o seletor precisa saber quais existem | Felipe |
 | 24/10/2026 | DEC-032 (proposta): DEC e FEC de um período de vários meses somam os valores mensais, nunca a média | Indicador de continuidade é acumulado; a média dos meses subestima o período e o agente alternava entre as duas formas | Luis Felipe |
 | 26/10/2026 | DEC-033: DEC e FEC de um período saem da soma dos componentes ÷ média mensal de UCs, no backend, com rotas por alimentador, ranking e recortes; fila de suspeitas paginada com a ordem de inspeção ativa; API 0.6.0 | DEC e FEC não se somam nem se tiram a média entre recortes; a fila mostra quais UCs já têm ordem, para a tela não oferecer o que daria 409 | Felipe |
-| 27/10/2026 | DEC-036: a visão 360 da unidade consumidora sai de uma rota só, `GET /unidades-consumidoras/{cod_uc}/visao-360`; os 12 meses terminam na última competência da Gold e a "conta alta" é o último mês contra o mesmo mês do ano anterior, com faixa de ±10%; API 0.8.0 | O atendente está com o cliente na linha: uma ida só ao banco e uma resposta pronta para "o consumo subiu?", sem a tela refazer conta de negócio | Felipe |
+| 27/10/2026 | DEC-036: a visão 360 da unidade consumidora sai de uma rota só, `GET /unidades-consumidoras/{cod_uc}/visao-360`; os 12 meses terminam na última competência da Gold e a "conta alta" é o último mês contra o mesmo mês do ano anterior, com faixa de ±10%; API 0.8.0 | O atendente está com o cliente na linha: uma chamada só à API e uma resposta pronta para "o consumo subiu?", sem a tela refazer conta de negócio | Felipe |
 
 ## DEC-001 · Localização dos arquivos de origem (landing)
 
@@ -1045,6 +1045,10 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
     é uma extração única: com a data de hoje a janela viria vazia, e uma unidade que parou de faturar passaria por "recente".
     Cada mês traz o consumo, o mesmo mês do ano anterior, a receita, a bandeira e os `dias_faturados`; o mês sem fatura vem
     vazio, e não zero.
+  - **Variação dos 12 meses:** compara só os meses com fatura nos dois anos e informa quantos são (`meses_comparados`); sem
+    nenhum par, ou com a base em zero, fica vazia. Os totais (`kwh_12m` e `kwh_12m_ano_anterior`) continuam somando tudo o que
+    foi faturado. Sem essa regra, uma unidade ligada em 2024-12 apareceria com +1100% (12 meses contra 1), e uma que parou de
+    faturar no meio da janela com uma queda que é falta de fatura, não de consumo.
   - **Conta alta:** o backend devolve `tendencia`, que compara a última competência com o mesmo mês do ano anterior (o que tira o
     efeito das estações): acima de +10% é `subiu`, abaixo de −10% é `caiu`, no meio é `estavel`, e sem fatura num dos meses ou
     com a base em zero é `sem_comparacao`. Os 10% exatos ainda são `estavel`. Junto vêm a variação do último mês, a dos 12 meses
@@ -1061,5 +1065,10 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   - Uma rota por bloco: seis chamadas e seis conjuntos de testes para uma tela que sempre usa tudo.
   - A tela decidir o rótulo: contraria a regra de que o cálculo de negócio fica no backend.
   - Comparar com a média dos 12 meses anteriores: mistura estações, e uma conta de janeiro sempre pareceria alta.
+  - Somar os 12 meses de cada lado na variação: compara períodos diferentes quando falta fatura. Anular a variação se faltar
+    qualquer mês também foi descartado: uma única fatura faltando apagaria a comparação do ano inteiro.
+- **Limitação conhecida:** a rota busca a última competência da Gold com `max(competencia)`, e a chave primária da fato é
+  `(cod_uc, competencia)`, então a consulta lê a tabela inteira a cada chamada. Com o volume do case isso não pesa. Se pesar, a
+  saída é um índice em `competencia`, que fica para depois da carga em lotes (PR #60), porque mexe no modelo e na carga.
 - **Impacto:** API 0.8.0 (rota nova, nada que quebre). Nenhuma mudança na Gold nem nas views do agente. A tela `/uc` do frontend
   pode usar o tipo gerado do OpenAPI.
