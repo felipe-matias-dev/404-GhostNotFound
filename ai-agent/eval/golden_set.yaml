@@ -41,7 +41,12 @@
 #          continua nulo até a conferência de quem escreve o próprio nome.
 #   0.6.0  Issue #56: datasets em todos os itens e allow_empty_reference em G019, G029 e G030. Nenhuma
 #          pergunta, referência ou esperado mudou. Numerada depois da 0.5.0 do PR #57 (Dados).
-versao: 0.6.0
+#   0.7.0  Camada semântica 0.4.0 (contrato da Gold v0.3): G062 passa de unknown a answered, pelas
+#          interrupções da própria UC (decisão da issue #56), e entram G067 a G074, sobre interrupções,
+#          atendimentos e medidor por UC, inadimplência, leitura estimada e GD. Escritos antes de qualquer
+#          rodada do modelo, conferidos na amostra; pendentes de revisão por Dados. G075 (inspeções, fora do
+#          agente) repõe o mínimo de 8 perguntas sem resposta.
+versao: 0.7.0
 status: rascunho
 
 itens:
@@ -685,11 +690,11 @@ itens:
   - id: G062
     question: "A UC 0003 teve falta de luz na rua em 2025?"
     category: case
-    reference_sql: null
-    expected_status: unknown
+    reference_sql: "SELECT count(*) AS interrupcoes, sum(duracao_horas) AS horas FROM sem_interrupcoes_uc WHERE cod_uc = '0003' AND competencia BETWEEN '2025-01' AND '2025-12'"
+    expected_status: answered
     datasets: [amostra]
     follow_up_of: null
-    notes: "Pergunta da Camila (case p. 5; RESUMO §1.7). Ocorrências por UC (gold_interrupcoes_uc) não têm chave definida e não estão nas views. Pergunta aberta ao GenAI (Dados, 27/10/2026): o case (Camila) pede, na tela da UC, saber se a rua dele teve falta de luz, e o glossário define o alimentador como o circuito que abastece um conjunto de ruas e bairros. Se 'rua' for o alimentador da UC, o item é answered (a camada já permite responder, e a resposta deve dizer que é do alimentador). Se a pergunta for sobre a própria UC, o unknown vale até a camada v0.3 expor as interrupções por UC. Esperado mantido até a decisão."
+    notes: "Pergunta da Camila (case p. 5; RESUMO §1.7). Ocorrências por UC (gold_interrupcoes_uc) não têm chave definida e não estão nas views. Pergunta aberta ao GenAI (Dados, 27/10/2026): o case (Camila) pede, na tela da UC, saber se a rua dele teve falta de luz, e o glossário define o alimentador como o circuito que abastece um conjunto de ruas e bairros. Se 'rua' for o alimentador da UC, o item é answered (a camada já permite responder, e a resposta deve dizer que é do alimentador). Se a pergunta for sobre a própria UC, o unknown vale até a camada v0.3 expor as interrupções por UC. Esperado mantido até a decisão. Mudança de 0.6.0 para 0.7.0 (28/10/2026, camada 0.4.0, antes de qualquer rodada do modelo): a camada expõe sem_interrupcoes_uc, e a decisão da issue #56 é responder pelas interrupções da própria UC; o DEC do alimentador não diz se a UC foi afetada. Só na amostra (código fictício); a Gold real ganha um equivalente agregado na conferência de Dados. Pendente de revisão por Dados."
     revisado_por: null
 
   - id: G063
@@ -733,3 +738,95 @@ itens:
     follow_up_of: null
     notes: "Versão com períodos explícitos da pergunta do Henrique (G060). A pergunta pede só o efeito bandeira; o efeito preço e a variação total são contexto opcional para a resposta. Os efeitos são lidos e somados, nunca recalculados. A receita da decomposição é de energia, sem tributos (DEC-023). Mudança de 0.2.0 para 0.4.0 (24/10/2026, feita depois de ver rodadas do modelo): a referência pedia efeito preço e variação total, que a pergunta não pede. Agora devolve só o efeito bandeira. Pendente de revisão por Dados. Conferência de Dados (27/10/2026): bate com o case (a bandeira muda a receita sem mudar o consumo, e Henrique quer o preço separado do volume). O par de períodos existe na Gold real e a referência devolve o efeito. Revisado por Dados."
     revisado_por: "Alisson Ramos"
+
+  # --- camada v0.4: dados por UC e colunas do contrato v0.3 ---
+
+  - id: G067
+    question: "Quantas vezes a UC 0001 ficou sem luz em 2025 e por quantas horas no total?"
+    category: simples
+    reference_sql: "SELECT count(*) AS interrupcoes, sum(duracao_horas) AS horas FROM sem_interrupcoes_uc WHERE cod_uc = '0001' AND competencia BETWEEN '2025-01' AND '2025-12'"
+    expected_status: answered
+    datasets: [amostra]
+    follow_up_of: null
+    notes: "UC 360: interrupções da própria UC em sem_interrupcoes_uc. 'Ficou sem luz' é sinônimo de falta de luz no glossário. Código fictício: só na amostra. Pendente de revisão por Dados."
+    revisado_por: null
+
+  - id: G068
+    question: "Qual canal de atendimento teve a pior nota de satisfação em 2025?"
+    category: simples
+    reference_sql: "SELECT canal, avg(nota_satisfacao) AS satisfacao_media FROM sem_atendimentos_uc WHERE competencia BETWEEN '2025-01' AND '2025-12' GROUP BY canal ORDER BY satisfacao_media ASC LIMIT 1"
+    expected_status: answered
+    datasets: [amostra, gold_real]
+    follow_up_of: null
+    notes: "Satisfação por canal só existe em sem_atendimentos_uc. A média é sobre os chamados avaliados (avg ignora as notas vazias). Pendente de revisão por Dados."
+    revisado_por: null
+
+  - id: G069
+    question: "Quantas UCs ainda têm medidor eletromecânico?"
+    category: simples
+    reference_sql: "SELECT count(*) AS ucs FROM sem_medidor_uc WHERE tipo_medidor = 'eletromecanico'"
+    expected_status: answered
+    datasets: [amostra, gold_real]
+    follow_up_of: null
+    notes: "Medidor vigente de cada UC em sem_medidor_uc (hipótese H5 do diagnóstico). Não usar o tipo_medidor de sem_faturamento_mensal, que é o medidor de cada leitura. Pendente de revisão por Dados."
+    revisado_por: null
+
+  - id: G070
+    question: "Quantas faturas de 2025 ainda não foram pagas e qual o valor delas?"
+    category: simples
+    reference_sql: "SELECT sum(n_faturas_nao_pagas) AS faturas_nao_pagas, sum(valor_nao_pago) AS valor_nao_pago FROM sem_kpis_segmento_mensal WHERE competencia BETWEEN '2025-01' AND '2025-12'"
+    expected_status: answered
+    datasets: [amostra, gold_real]
+    follow_up_of: null
+    notes: "Inadimplência pelos componentes de sem_kpis_segmento_mensal. Contar em sem_faturamento_mensal com status_pagamento em ('em_aberto', 'em_atraso') dá o mesmo número. Pendente de revisão por Dados."
+    revisado_por: null
+
+  - id: G071
+    question: "Qual município teve mais leituras estimadas em 2025?"
+    category: simples
+    reference_sql: "SELECT municipio, sum(n_leituras_estimadas) AS leituras_estimadas FROM sem_kpis_segmento_mensal WHERE competencia BETWEEN '2025-01' AND '2025-12' GROUP BY municipio ORDER BY leituras_estimadas DESC LIMIT 1"
+    expected_status: answered
+    datasets: [amostra, gold_real]
+    follow_up_of: null
+    notes: "Leitura estimada pelos componentes do recorte (hipótese H5). A pergunta pede a quantidade, não o percentual. Pendente de revisão por Dados."
+    revisado_por: null
+
+  - id: G072
+    question: "Quantas UCs conectaram painel solar em 2023?"
+    category: temporal
+    reference_sql: "SELECT count(*) AS ucs FROM sem_uc WHERE possui_gd AND data_conexao_gd BETWEEN '2023-01-01' AND '2023-12-31'"
+    expected_status: answered
+    datasets: [amostra, gold_real]
+    follow_up_of: null
+    notes: "Data de conexão da GD no cadastro (contrato v0.3, hipótese H1). Painel solar é GD no glossário. Pendente de revisão por Dados."
+    revisado_por: null
+
+  - id: G073
+    question: "Quantas contas de março de 2025 foram pagas com atraso?"
+    category: sinonimo
+    reference_sql: "SELECT count(*) AS faturas FROM sem_faturamento_mensal WHERE competencia = '2025-03' AND status_pagamento = 'paga_com_atraso'"
+    expected_status: answered
+    datasets: [amostra, gold_real]
+    follow_up_of: null
+    notes: "Conta é fatura no glossário. 'Paga com atraso' é um status próprio, diferente de 'em atraso' (ainda não paga). Pendente de revisão por Dados."
+    revisado_por: null
+
+  - id: G074
+    question: "Quantas UCs tiveram falta de luz e também abriram chamado sobre falta de energia em 2025?"
+    category: juncao
+    reference_sql: "SELECT count(DISTINCT i.cod_uc) AS ucs FROM sem_interrupcoes_uc i WHERE i.competencia BETWEEN '2025-01' AND '2025-12' AND EXISTS (SELECT 1 FROM sem_atendimentos_uc a WHERE a.cod_uc = i.cod_uc AND a.competencia BETWEEN '2025-01' AND '2025-12' AND a.assunto = 'FALTA DE ENERGIA')"
+    expected_status: answered
+    datasets: [amostra, gold_real]
+    follow_up_of: null
+    notes: "Testa a regra da camada 0.4.0: duas tabelas de eventos por UC não se juntam direto (a junção multiplica linhas); a contagem distinta ou o EXISTS evita isso. Na amostra todas as UCs com interrupção também abriram chamado, então o número coincide com o de UCs interrompidas. Pendente de revisão por Dados."
+    revisado_por: null
+
+  - id: G075
+    question: "Quantas inspeções de campo encontraram irregularidade em 2025?"
+    category: sem_resposta
+    reference_sql: null
+    expected_status: unknown
+    datasets: [amostra, gold_real]
+    follow_up_of: null
+    notes: "gold_inspecoes_uc fica fora do agente por decisão de produto, como a fila de suspeitas (contrato v0.3, consumers sem agente). O esperado é 'não sei', mesmo com as tabelas por UC da camada 0.4.0. Pendente de revisão por Dados."
+    revisado_por: null
