@@ -44,7 +44,8 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | 24/10/2026 | DEC-032 (proposta): DEC e FEC de um período de vários meses somam os valores mensais, nunca a média | Indicador de continuidade é acumulado; a média dos meses subestima o período e o agente alternava entre as duas formas | Luis Felipe |
 | 26/10/2026 | DEC-033: DEC e FEC de um período saem da soma dos componentes ÷ média mensal de UCs, no backend, com rotas por alimentador, ranking e recortes; fila de suspeitas paginada com a ordem de inspeção ativa; API 0.6.0 | DEC e FEC não se somam nem se tiram a média entre recortes; a fila mostra quais UCs já têm ordem, para a tela não oferecer o que daria 409 | Felipe |
 | 27/10/2026 | DEC-034: cada resposta do agente de IA é gravada em `app.ai_auditoria` (qualquer status) por `POST /ai/ask`, e lida por `GET /ai/audit/{id}`; sem a chave do Gemini a API sobe e o `/ai` responde 503; API 0.7.0 | A auditoria só serve se ninguém recebe uma resposta que não dá para conferir depois; e a chave ausente não pode derrubar o `/health` nem as telas | Felipe |
-| 27/10/2026 | DEC-037: `GET /receita/insight` devolve o insight de IA da tela de receita; o backend monta o JSON de métricas a partir da ponte da Gold, com valores arredondados como a tela os mostra, e guarda o texto num cache em memória pelo conteúdo das métricas; sem a chave do Gemini a rota responde 503; API 0.9.0 | O agente só aceita texto cujos números sejam exatamente valores do JSON (DEC-019), e uma Gold recarregada precisa gerar um insight novo, nunca um velho | Felipe |
+| 27/10/2026 | DEC-039: Workflow do Databricks com os notebooks lidos do GitHub (`main`), serverless, Landing → Bronze → Silver → Gold + export, reprocessando tudo (diverge da ADR-07); agendamento mensal no dia 6, pausado | Roda o código revisado e mantém o tudo ou nada de cada camada numa extração única; a origem fecha o faturamento uma vez por mês | Arthur |
+| 27/10/2026 | DEC-040: `GET /receita/insight` devolve o insight de IA da tela de receita; o backend monta o JSON de métricas a partir da ponte da Gold, com valores arredondados como a tela os mostra, e guarda o texto num cache em memória pelo conteúdo das métricas; sem a chave do Gemini a rota responde 503; API 0.9.0 | O agente só aceita texto cujos números sejam exatamente valores do JSON (DEC-019), e uma Gold recarregada precisa gerar um insight novo, nunca um velho | Felipe |
 
 ## DEC-001 · Localização dos arquivos de origem (landing)
 
@@ -421,6 +422,11 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Motivo:** no Free Tier, o Google pode usar o conteúdo enviado para melhorar os produtos dele. O dataset é confidencial e nunca vai para o repositório.
 - **Estado atual:** o README orienta o uso do plano gratuito só para a amostra. O código ainda não verifica o tipo de chave, e o modelo padrão do quickstart é o Gemini direto, então nada impede quem segue o README de enviar a Gold real pelo plano gratuito.
 - **Em aberto:** (1) confirmar se a Gold agregada entra no mesmo critério do dataset; (2) definir quem fornece a chave paga; (3) decidir se o código recusa a chave gratuita quando a configuração aponta para a Gold real.
+- **Atualização (27/10/2026, issue #56, proposta de Dados e GenAI):** o time roda tudo em máquina local e não vai usar plano pago. A chamada ao modelo, porém, sai da máquina. Proposta:
+  - o plano gratuito segue valendo para a amostra sintética;
+  - **avaliação na Gold real só no modo "só SQL"** (`--dataset gold_real` liga `--sql-only`): o agente não monta o redator, então só a pergunta e o esquema (com linhas de exemplo sintéticas) chegam ao modelo, e nenhuma linha da Gold sai da máquina. O relatório vai para `eval/runs_gold/`, fora do Git. Feito no PR da issue #56. Na correção de SQL, a mensagem de erro do banco volta ao modelo; nos erros de dado (SQLSTATE da classe 22, como `invalid input syntax`), tudo o que vem depois do primeiro `:` da mensagem, que pode ser um código de UC, vira `<valor>` antes, e o contexto `LINE` sai (revisão do Lucas no #65). Nos erros de sintaxe e de coluna (classe 42), o que fica entre aspas é o nome que o próprio modelo escreveu, e a mensagem fica inteira;
+  - **demonstração ao vivo com a Gold real:** só perguntas agregadas, que não devolvem `cod_uc` linha a linha;
+  - **o que ainda manda dado da Gold ao modelo e precisa de decisão:** a narrativa do `/ai/ask` (as linhas da amostra da resposta) e o insight da tela de receita (#58, as métricas agregadas do recorte). Opções: aceitar o envio de agregados no plano gratuito, desligar a narrativa e o insight com a Gold real (o texto determinístico continua), ou usar uma chave da organização.
 
 ## DEC-016 · Exceção de versionamento do prompt v1 (proposta)
 
@@ -471,6 +477,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Motivo:** a spec (§5, item 5) manda montar relações a partir de `foreign_keys` e `shared_keys`. Juntar duas views só pelo período gera produto cartesiano, e o modelo tende a fazer essa junção quando a relação existe.
 - **Consequência:** `sem_faturamento_mensal` liga a `sem_uc` por `cod_uc`, e `sem_uc` liga a `sem_continuidade_alimentador_mensal` por `cod_alimentador`.
 - **Decomposição (23/10/2026):** `sem_receita_decomposicao` entra sem relação com outras views. A junção composta com `gold_dim_uc` (município, bairro, classe e GD) continua `a_confirmar` no contrato e repetiria cada efeito uma vez por UC do recorte. As perguntas de recorte se respondem filtrando a própria view.
+- **Atualização (26/10/2026):** views de recorte agregado, marcadas com `standalone: true` no `semantic_layer.yaml` (hoje `sem_kpis_segmento_mensal`), não entram nas relações por chave de entidade. Motivo: elas já trazem `cod_alimentador` como recorte, e o join com `sem_uc` ou com a continuidade repete e multiplica somas (pedido da Dados no #43).
 
 ## DEC-019 · Verificação numérica da narrativa
 
@@ -860,16 +867,16 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
     fatura e nada foi pago; `soma_notas` fica vazia quando nenhum chamado foi avaliado. Não arrecadar e não ter fatura são coisas
     diferentes para o agente. Na fatura (fato), a não paga continua com zero.
   - **Fila de suspeitas:**
-    - **Quem entra:** UCs sem GD, com medidor, com pelo menos 6 meses em cada janela e queda de 8% ou mais no consumo médio
-      (`kwh_faturado`) das 12 últimas competências contra as 12 anteriores. O corte era de 15% e passou a 8% (ver Volume).
-    - **Quem sai:** UCs com irregularidade confirmada (já regularizadas) e UCs inspecionadas sem irregularidade nos 12 meses antes
+    - **Quem entra:** UCs sem GD, com medidor, com pelo menos 6 meses em cada janela e queda de 5% ou mais no consumo médio
+      (`kwh_faturado`) das 12 últimas competências contra as 12 anteriores. O corte era de 15%, foi a 8% e ficou em 5% (ver Volume).
+    - **Quem sai:** UCs com irregularidade confirmada (o próximo passo delas é a regularização, e não a inspeção; ver Volume) e UCs inspecionadas sem irregularidade nos 12 meses antes
       do fim dos dados. Uma UC inspecionada sem irregularidade há mais tempo pode voltar à fila.
-    - **Ordem:** pontos (queda de 30% ou mais: 3; de 8% a 30%: 1; medidor eletromecânico: 1; 25% ou mais de leituras estimadas: 1)
+    - **Ordem:** pontos (queda de 30% ou mais: 3; de 5% a 30%: 1; medidor eletromecânico: 1; 25% ou mais de leituras estimadas: 1)
       e depois o kWh a recuperar (`kwh_recuperavel_est` = média anterior − média recente).
     - **Validação:** nas UCs inspecionadas, a regra é medida com a janela na **data de cada inspeção** (as 12 competências antes dela
       contra as 12 anteriores), que é o que a equipe via ao decidir; a janela atual inclui meses depois da regularização. Precisão e
       cobertura saem a cada carga.
-    - **Volume (calibração de 27/10/2026):** com o corte de 15%, a regra era precisa (0,906) mas pegava menos da metade das
+    - **Volume (calibração de 27/10/2026, corte final de 5%):** com o corte de 15%, a regra era precisa (0,906) mas pegava menos da metade das
       irregularidades (cobertura 0,477) e a fila tinha 50 UCs, abaixo da capacidade de inspeção de um mês (as inspeções do dado
       são cerca de 280 por mês). Nas UCs inspecionadas, a faixa de queda entre 5% e 15% é quase toda de irregularidades
       confirmadas, então o corte foi medido de 15% a 5%, com a janela na data de cada inspeção:
@@ -878,11 +885,31 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
       |---|---:|---:|---:|
       | 15% | 50 | 0,906 | 0,477 |
       | 10% | 77 | 0,919 | 0,755 |
-      | **8% (adotado)** | 95 | 0,922 | 0,857 |
+      | 8% | 95 | 0,922 | 0,857 |
       | 7% | 112 | 0,919 | 0,889 |
-      | 5% | 194 | 0,901 | 0,930 |
+      | **5% (adotado)** | 194 | 0,901 | 0,930 |
 
-      O 8% fica no ponto de maior precisão da tabela, e passar para 7% dá só 3 pontos de cobertura por 17 UCs a mais.
+      **Por que 5% (o top-200 do backlog):** o critério de aceite da D3-07 pede a "taxa de acerto do top-200" da fila, e só com o
+      corte de 5% a fila tem o tamanho desse teste (194 UCs; com 8%, 95). A faixa de 5% a 10% ainda acerta 83% (151 irregularidades
+      confirmadas para 30 sem irregularidade), bem acima da taxa base das inspeções (0,64, nas mesmas UCs medidas). Abaixo de 5% a precisão da faixa cai para
+      22% (45 para 163), então 5% é o ponto onde a UC marginal deixa de valer a inspeção. Nas UCs inspecionadas, ordenadas pela queda
+      que a equipe via na data da inspeção, a precisão do top-200 é 0,92, contra a taxa base de 0,64 (o backlog supunha cerca de 50%). Essa medida ordena só pela queda; a fila de fato ordena
+      por pontos (queda forte, medidor eletromecânico, leituras estimadas) e depois por kWh a recuperar, e essa ordem não foi medida na data da
+      inspeção. O 0,92 vale para o sinal principal, e não para a ordem final da fila.
+      Faixas, na data da inspeção:
+
+      | Queda | Com irregularidade | Sem irregularidade | Precisão |
+      |---|---:|---:|---:|
+      | 15% ou mais | 413 | 43 | 91% |
+      | 10% a 15% | 241 | 15 | 94% |
+      | 5% a 10% | 151 | 30 | 83% |
+      | 0% a 5% | 45 | 163 | 22% |
+    - **Confirmadas fora da fila:** as UCs com irregularidade confirmada saem porque o próximo passo delas é a regularização
+      (recomendação 1 do diagnóstico), e não porque já foram regularizadas: a Gold não sabe se houve regularização, e o consumo
+      delas continua baixo depois da inspeção (cerca de 57% do histórico antes e 62% depois, com até 6 meses de dados). A energia a
+      recuperar nesse grupo (cerca de 2,65 GWh por ano) é muito maior que a das UCs novas da fila, e é o que sustenta a recomendação.
+    - **Em aberto:** o portal precisa de uma lista de "regularização pendente" para as confirmadas, já que elas saem da fila (sugestão da
+      revisão do #54).
     - **Limites desta calibração:** as UCs inspecionadas não são uma amostra aleatória (a distribuidora já escolhia quem
       inspecionar), então a precisão tende a ser menor na população toda; o corte foi escolhido no mesmo grupo em que foi medido;
       e só cerca de 7% das irregularidades confirmadas aparecem com consumo estável ou em alta, fora do alcance de qualquer regra
@@ -1059,7 +1086,78 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   (por exemplo, o JSON de métricas que o backend monta para o insight da tela, D9): aí a conta passa para o backend, e a tela só
   exibe.
 
-## DEC-037 · Insight de IA na tela de Receita: métricas montadas no backend, cache pelo conteúdo
+## DEC-036 · Tela da diretoria compara mês contra mês, até existir a rota de comparação
+
+- **Data:** 27/10/2026 · **Área:** Portal · **Autor:** João Euclides
+- **Contexto:** a tela da diretoria (V2-04, V2-05) mostra receita, kWh faturado, DEC, FEC, chamados e satisfação média do período
+  atual e a variação sobre o período base. A API não tem uma rota que devolva esses seis indicadores para dois períodos: o
+  `GET /receita/comparacao` só traz kWh e receita, e o `GET /receita/mensal` traz os seis por competência. Juntar vários meses de
+  DEC, FEC e satisfação não é soma nem média (DEC-033: componentes somados ÷ média mensal de UCs; satisfação = soma das notas ÷
+  notas dadas), e essa conta não pode ficar no frontend.
+- **Decisão:**
+  - Por ora, a tela compara **um mês contra outro**, com os valores de `GET /receita/mensal` como a Gold gravou. O mês atual abre no
+    mais recente, e a base no mesmo mês do ano anterior (sem sazonalidade); o seletor troca o mês atual e oferece como base o mesmo
+    mês do ano anterior ou o mês anterior.
+  - A tela só calcula a variação percentual (atual ÷ base − 1), como a tela de receita (DEC-035). Sem um dos lados ou com base zero,
+    o card mostra o valor sem variação.
+  - A URL usa `periodo_base` e `periodo_atual` no formato `AAAA-MM/AAAA-MM`, igual à tela de receita: o card de receita abre a ponte no
+    mesmo período, e trechos de vários meses cabem no mesmo formato.
+  - O modelo da tela (`ComparacaoIndicadores`, em `features/visaoGeral/types.ts`) já é o da rota futura: os dois períodos e a variação
+    de cada indicador.
+- **Próximo passo (backend):** uma rota de comparação dos seis indicadores entre dois períodos quaisquer, somando os componentes da
+  `gold_kpis_segmento_mensal` com o helper de índices da continuidade. Quando ela existir, mudam só a consulta de
+  `useComparacaoIndicadores` e o seletor, que passa a aceitar trechos de vários meses.
+- **Alternativa descartada:** somar ou tirar a média dos meses na tela: daria um DEC diferente da tela de rede e do agente.
+
+## DEC-037 · Gráficos do portal em SVG próprio, com d3 só para as contas
+
+- **Data:** 27/10/2026 · **Área:** Portal · **Autor:** João Euclides
+- **Contexto:** a tela da diretoria ganhou o gráfico de tendência dos seis indicadores, mês a mês ou ano a ano, e ele precisa
+  servir a outras telas. O design system não usa biblioteca de componentes, e o `WaterfallChart` da receita já é desenhado à mão
+  com `motion`.
+- **Decisão:**
+  - O `TrendChart` (`components/ui/trend-chart`) é SVG próprio. `d3-scale` (escala e ticks do eixo y) e `d3-shape` (curva
+    `monotoneX`, que não passa do valor real entre dois meses) fazem só as contas; o desenho, as cores (tokens `chart-*`) e o
+    movimento (`motion`) são do projeto.
+  - Mês a mês: a série corrida da `gold_kpis_mensais`. Ano a ano: um ano por linha sobre jan–dez, o mais recente em destaque e o
+    anterior como comparação. O tooltip mostra a variação sobre o mês anterior ou sobre o mesmo mês do ano anterior; é a mesma
+    conta de variação da DEC-036, sem nova regra de negócio.
+  - Indicador e visão ficam na URL (`indicador`, `tendencia`), como os outros filtros.
+- **Alternativa descartada:** Recharts (o gráfico do shadcn) ou outra biblioteca completa. A troca entre mês a mês e ano a ano
+  redesenharia o gráfico do zero em vez de mudar a forma das linhas, o tema e a acessibilidade seguiriam o modelo dela e o
+  bundle cresceria para fazer o que duas bibliotecas pequenas do d3 já fazem.
+
+## DEC-039 · Workflow do Databricks e agendamento mensal
+
+- **Data:** 27/10/2026 · **Área:** Dados · **Autor:** Arthur · **Atende:** D1-08 e D1-11
+- **Decisão:** o Job `v_energy_workflow` ([`data-engineering/workflow/v_energy_workflow.yaml`](../data-engineering/workflow/v_energy_workflow.yaml))
+  roda três tasks em sequência, `landing_to_bronze` → `bronze_to_silver` → `silver_to_gold_export`, com os notebooks lidos do
+  GitHub (branch `main`) e compute serverless. Cada task passa `gravar = sim`, e a da Gold também `exportar_csv = sim` e
+  `schema_gold = gold`. Timeout de 2h e fila ligada, para um segundo disparo esperar o primeiro em vez de gravar as mesmas tabelas
+  ao mesmo tempo.
+- **Por que o Git como fonte:** o Job roda o código revisado em PR, não uma cópia do workspace, e a Gold gravada fica rastreável
+  a um commit da `main`.
+- **Reprocessamento completo, e não incremental:** cada run relê todos os arquivos da landing e regrava as três camadas (full
+  refresh, como na DEC-008). Isso **diverge da ADR-07**, que previa ingestão incremental por competência. O motivo: o dataset do
+  case é uma extração única, o run completo leva cerca de 15 minutos, e o full refresh mantém o tudo ou nada de cada camada (as
+  travas e o Resumo de cada notebook validam a tabela inteira). A carga incremental por competência fica como evolução para
+  produção, quando o volume mensal justificar.
+- **Agendamento:** mensal, no dia 6 às 03h (`America/Fortaleza`, mesmo fuso do Recife, UTC-03 sem horário de verão; a interface do Job não oferece `America/Recife`). Os sistemas de origem só geram dado novo uma vez por mês, então
+  rodar todo dia gastaria compute sem dado novo. **Suposição:** o fechamento do ciclo de faturamento termina até D+5; o case não
+  informa esse prazo, o número vem do exemplo da ADR-07. O agendamento fica **pausado**, porque o dataset do case é uma extração
+  única.
+- **Falhas:** o Resumo de cada notebook dá erro se alguma tabela falhar, e o Job para na primeira task com erro, sem gravar as
+  camadas seguintes.
+- **Limitação conhecida:** a conferência pós-gravação da Bronze (DEC-008) compara as duas últimas gravações de cada tabela por
+  time travel. O VACUUM automático do Databricks (predictive optimization) apaga os arquivos antigos depois de 7 dias
+  (`deletedFileRetentionDuration`). Se a última gravação tiver mais de 7 dias, a task `landing_to_bronze` grava a Bronze e falha
+  nessa comparação; o run seguinte passa, porque compara duas gravações recentes. Com dado novo, as duas gravações nem deveriam
+  ser iguais, então essa checagem falharia em todo run mensal.
+- **Para produção:** despausar o agendamento depende de tornar essa comparação opcional no Job (por exemplo, um widget
+  `exigir_idempotencia = nao`), mantendo a conferência contra a origem. Fica para um PR próprio, combinado com o autor do
+  `Landing_to_Bronze`.
+
+## DEC-040 · Insight de IA na tela de Receita: métricas montadas no backend, cache pelo conteúdo
 
 - **Data:** 27/10/2026 · **Área:** Portal e IA · **Autor:** Felipe
 - **Contexto:** o case (5.3) pede insights gerados por IA em pelo menos uma tela, fiéis aos dados. O agente já tinha o

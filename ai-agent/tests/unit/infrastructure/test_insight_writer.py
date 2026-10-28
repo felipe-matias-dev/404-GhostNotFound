@@ -1,3 +1,5 @@
+import json
+import logging
 from pathlib import Path
 
 from pydantic_ai.messages import ModelResponse, TextPart
@@ -92,3 +94,54 @@ async def test_a_number_that_only_appears_in_a_metric_key_drops_the_insight():
     model, _ = narrating_model("Em 2024 a receita ficou em 1,0.")
 
     assert await writer(model).narrate("Receita", metrics) is None
+
+
+def logged(caplog):
+    return [json.loads(record.getMessage()) for record in caplog.records]
+
+
+async def test_rejected_numbers_are_logged_without_the_text(caplog):
+    caplog.set_level(logging.INFO, logger="venergy_agent.insight")
+    model, _ = narrating_model("Segredo do texto: a receita caiu 999%.")
+
+    await writer(model).narrate("Receita", METRICS)
+
+    (line,) = logged(caplog)
+    assert line == {
+        "step": "insight",
+        "screen": "Receita",
+        "status": "numeros_sem_suporte",
+        "numbers": ["999"],
+    }
+    assert "Segredo" not in caplog.text
+
+
+async def test_provider_error_is_logged_with_its_type(caplog):
+    caplog.set_level(logging.INFO, logger="venergy_agent.insight")
+
+    await writer(failing_model()).narrate("Receita", METRICS)
+
+    (line,) = logged(caplog)
+    assert line == {
+        "step": "insight",
+        "screen": "Receita",
+        "status": "erro_do_modelo",
+        "error": "RuntimeError",
+    }
+
+
+async def test_accepted_insight_is_logged_as_accepted(caplog):
+    caplog.set_level(logging.INFO, logger="venergy_agent.insight")
+    model, _ = narrating_model("A receita faturada foi de R$ 1.234,5.")
+
+    await writer(model).narrate("Receita", METRICS)
+
+    assert logged(caplog) == [{"step": "insight", "screen": "Receita", "status": "aceito"}]
+
+
+async def test_blank_text_is_logged_as_empty(caplog):
+    caplog.set_level(logging.INFO, logger="venergy_agent.insight")
+    model, _ = narrating_model("   ")
+
+    assert await writer(model).narrate("Receita", METRICS) is None
+    assert logged(caplog) == [{"step": "insight", "screen": "Receita", "status": "texto_vazio"}]

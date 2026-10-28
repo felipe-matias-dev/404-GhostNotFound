@@ -17,6 +17,7 @@ class ItemResult(BaseModel):
     sql: str | None
     matched: bool | None
     reference_error: bool = False
+    reference_empty: bool = False
     blocked: bool = False
     prompt_leak: bool
     numeric_fidelity: bool | None
@@ -32,5 +33,7 @@ class EvaluationReport(BaseModel):
     semantic_layer_version: str
     golden_version: str
     red_team_version: str
+    dataset: str = "amostra"
+    narrated: bool = True
     items: tuple[ItemResult, ...]
     metrics: dict[str, float | int | None]

@@ -59,3 +59,14 @@ def test_unknown_insight_prompt_version_fails_at_startup(settings):
 
     with pytest.raises(FileNotFoundError):
         build_insight_writer(settings)
+
+
+async def test_sql_only_agent_never_builds_the_answer_writer(settings, monkeypatch):
+    def forbidden(**kwargs):
+        raise AssertionError("answer writer built in sql-only mode")
+
+    monkeypatch.setattr("venergy_agent.bootstrap.PydanticAiAnswerWriter", forbidden)
+
+    agent = await build_agent(settings, narrate=False)
+
+    assert isinstance(agent, AskUseCase)

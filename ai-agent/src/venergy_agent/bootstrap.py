@@ -10,7 +10,7 @@ from venergy_agent.infrastructure.sql_generator import PydanticAiSqlGenerator
 from venergy_agent.infrastructure.sql_validator import SqlglotValidator
 
 
-async def build_agent(settings: AgentSettings) -> AskUseCase:
+async def build_agent(settings: AgentSettings, narrate: bool = True) -> AskUseCase:
     layer = await YamlSemanticLayerSource(
         settings.semantic_layer_path, settings.gold_contract_path
     ).load()
@@ -29,12 +29,16 @@ async def build_agent(settings: AgentSettings) -> AskUseCase:
             allowed_schema=settings.allowed_schema,
         ),
         executor=PostgresQueryExecutor(settings.database_url, settings.query_timeout_seconds),
-        answer_writer=PydanticAiAnswerWriter(
-            model=model,
-            prompts_dir=settings.prompts_dir / "answer",
-            prompt_version=settings.answer_prompt_version,
-            temperature=settings.temperature,
-            units=layer.column_units,
+        answer_writer=(
+            PydanticAiAnswerWriter(
+                model=model,
+                prompts_dir=settings.prompts_dir / "answer",
+                prompt_version=settings.answer_prompt_version,
+                temperature=settings.temperature,
+                units=layer.column_units,
+            )
+            if narrate
+            else None
         ),
         max_question_chars=settings.max_question_chars,
         max_correction_attempts=settings.max_correction_attempts,
