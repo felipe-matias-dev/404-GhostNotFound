@@ -24,6 +24,32 @@ Plataforma de visão 360 da V-Energy (Rocket Lab 2026.2 · Visagio): pipeline de
 
 _TODO_
 
+### Atendimento: visão 360 da UC
+
+Use **Consulta de UC** na sidebar ou Ctrl/Cmd + K para abrir a palette. Busque pelo código
+exatamente como aparece na conta, preservando zeros iniciais, ou selecione uma consulta recente.
+A sidebar separa **Análise** (Visão geral, Receita, Rede) de **Operação** (Consulta de UC, Perdas).
+Somente os cinco códigos consultados com sucesso mais recentemente ficam salvos neste navegador,
+sem titular ou valores; a ação **Limpar recentes** remove a lista.
+O link `/uc?cod_uc=0001` continua abrindo a visão 360 diretamente. Sem código, `/uc` tem uma
+entrada compacta para abrir a busca. A palette valida a consulta antes de navegar e a tela
+reúne cadastro mascarado, consumo, contas pendentes, medidor/GD, interrupções e chamados em
+uma única consulta: `GET /unidades-consumidoras/{cod_uc}/visao-360`. A rota antiga de cadastro
+permanece disponível. O fluxo de entrada e os limites do histórico local estão na DEC-043.
+
+O diagnóstico segue a DEC-044 e o `Uc360Schema` aprovado no PR #55: a referência é a última
+competência **de toda a Gold**, não a última fatura da UC. A tendência vem do backend:
+alta acima de +10%, queda abaixo de −10% e estabilidade na faixa inclusiva de ±10%.
+Estabilidade pode incluir uma alta de 5%; a tela mostra os percentuais fornecidos pela API.
+A variação de 12 meses considera somente pares com fatura e informa `meses_comparados`.
+Lacunas são desconhecidas, não zero; base zero não tem percentual. Não há explicação causal
+do valor da conta. Faturas pendentes não têm corte por período e os históricos são paginados
+somente na apresentação. A Gold é histórica, não indica falta de energia em tempo real.
+Diferenças da apresentação e limites em
+[DEC-042](docs/decisoes.md#dec-042--visão-360-da-uc-e-comparação-sazonal-do-consumo).
+A comparação monetária com o ano anterior, o tipo de leitura e a diferença absoluta em kWh
+saíram da tela porque não estão no contrato aprovado; não são simulados por outras chamadas.
+
 ## Como executar localmente
 
 _TODO: passo a passo dos módulos de dados e agente._
