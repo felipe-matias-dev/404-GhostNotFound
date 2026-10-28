@@ -426,6 +426,40 @@ async def test_assumption_naming_a_technical_name_is_left_out_of_the_text(layer)
     assert answer.assumptions == assumptions
 
 
+async def test_narrative_without_the_period_falls_back_to_a_text_that_has_it(layer):
+    writer = FixedWriter(text="Há 3 UCs.")
+    executor = ScriptedExecutor(table(("competencia", "total"), ("2025-06", 3)))
+
+    answer = await use_case(
+        layer, ScriptedGenerator(generation()), executor=executor, writer=writer
+    ).ask("quantas?", "s1")
+
+    assert answer.answer.startswith("A consulta devolveu 1 linha(s). Período: 2025-06.")
+
+
+@pytest.mark.parametrize("text", ["Em junho de 2025 havia 3 UCs.", "Em 06/2025 havia 3 UCs."])
+async def test_narrative_that_names_the_period_is_kept(layer, text):
+    writer = FixedWriter(text=text)
+    executor = ScriptedExecutor(table(("competencia", "total"), ("2025-06", 3)))
+
+    answer = await use_case(
+        layer, ScriptedGenerator(generation()), executor=executor, writer=writer
+    ).ask("quantas?", "s1")
+
+    assert answer.answer == text
+
+
+async def test_a_range_needs_both_ends_in_the_narrative(layer):
+    writer = FixedWriter(text="Em dezembro de 2025 havia 3 UCs.")
+    executor = ScriptedExecutor(table(("competencia", "total"), ("2025-01", 3), ("2025-12", 3)))
+
+    answer = await use_case(
+        layer, ScriptedGenerator(generation()), executor=executor, writer=writer
+    ).ask("quantas?", "s1")
+
+    assert answer.answer.startswith("A consulta devolveu 2 linha(s). Período: 2025-01 a 2025-12.")
+
+
 def table(columns, *rows):
     return QueryResult(
         columns=columns,
