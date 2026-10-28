@@ -38,11 +38,12 @@ pergunta → Question → SemanticLayer (carregada uma vez)
                  erro corrigível → AttemptFeedback → nova tentativa (até 3)
                  erro do banco não classificado → failed
         → AnswerWriter (narrativa) → números conferidos com as linhas (DEC-019)
-            falhou → texto determinístico (com os valores, se o resultado for pequeno)
+            falhou ou citou nome técnico → texto determinístico (com os valores, se o resultado for pequeno,
+              e as colunas em palavras com a unidade da camada: "receita faturada = R$ 35.482,79")
         → AgentAnswer
 ```
 
-Detalhes, confiança e logs: spec §5.1. O backend monta o agente uma vez por processo com `build_agent(AgentSettings())`.
+Pedido de esclarecimento que cita nome técnico vira uma pergunta genérica sobre período e recorte. Detalhes, confiança e logs: spec §5.1. O backend monta o agente uma vez por processo com `build_agent(AgentSettings())`.
 
 `InsightWriter` (item 9, `infrastructure/insight_writer.py`, prompt em `prompts/insight/v1/`): narra o JSON de métricas de uma tela e devolve `None` se algum número do texto não estiver no JSON. O backend monta o JSON, guarda o insight em cache e liga o redator (D9): feito para a tela de Receita (`GET /receita/insight`, DEC-040), com `build_insight_writer` em `bootstrap.py`. O golden set está em `eval/golden_set.yaml` (66 itens, alinhado à camada v0.2, rascunho até a revisão humana).
 
