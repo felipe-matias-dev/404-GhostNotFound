@@ -8,6 +8,7 @@ import type { ReactNode } from "react";
 import { Button, buttonVariants } from "#/components/ui/button";
 import { KpiDelta, KpiValue } from "#/components/ui/kpi-card";
 import { TrendChart } from "#/components/ui/trend-chart";
+import { usePeriodosDecomposicao } from "#/features/receita";
 import {
 	formatBRL,
 	formatKWh,
@@ -88,6 +89,13 @@ export function ResumoReceita({
 			: undefined,
 	);
 	const tesoura = useTesoura();
+	const periodos = usePeriodosDecomposicao();
+	const par = janelas
+		? periodos.data?.find(
+				(p) =>
+					p.periodo_base === janelas.base && p.periodo_atual === janelas.atual,
+			)
+		: undefined;
 	const dados = comparacao.data;
 	const frase = leitura(
 		dados?.variacao_pct.receita_faturada,
@@ -166,22 +174,20 @@ export function ResumoReceita({
 			<div className="grid gap-6 lg:grid-cols-[minmax(13rem,16rem)_minmax(0,1fr)]">
 				<div className="flex flex-col gap-4">
 					{numeros}
-					<Link
-						to="/receita"
-						search={
-							janelas
-								? { periodo_base: janelas.base, periodo_atual: janelas.atual }
-								: {}
-						}
-						className={buttonVariants({
-							variant: "outline",
-							size: "sm",
-							className: "self-start",
-						})}
-					>
-						Abrir a ponte de receita
-						<CaretRightIcon aria-hidden />
-					</Link>
+					{par ? (
+						<Link
+							to="/receita"
+							search={par}
+							className={buttonVariants({
+								variant: "outline",
+								size: "sm",
+								className: "self-start",
+							})}
+						>
+							Abrir a ponte de receita
+							<CaretRightIcon aria-hidden />
+						</Link>
+					) : null}
 				</div>
 				<TrendChart
 					label="Receita e energia faturadas em 12 meses corridos, variação sobre a primeira janela"

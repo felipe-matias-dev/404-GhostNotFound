@@ -137,7 +137,8 @@ def get_janelas(
 ) -> list[IndicadoresJanelaSchema]:
     """Janelas corridas de `meses` competências, da mais antiga para a mais recente."""
     meses = filtro.meses
-    mensal = (
+    competencias = select(Segmento.competencia).distinct().cte("competencias")
+    recorte_mensal = (
         select(
             Segmento.competencia,
             func.sum(Segmento.receita_faturada).label("receita_faturada"),
@@ -148,6 +149,21 @@ def get_janelas(
         )
         .where(*_recorte(filtro.municipio, filtro.bairro, filtro.classe))
         .group_by(Segmento.competencia)
+        .cte("recorte_mensal")
+    )
+    mensal = (
+        select(
+            competencias.c.competencia,
+            *(
+                func.coalesce(coluna, 0).label(coluna.key)
+                for coluna in recorte_mensal.c
+                if coluna.key != "competencia"
+            ),
+        )
+        .outerjoin(
+            recorte_mensal,
+            recorte_mensal.c.competencia == competencias.c.competencia,
+        )
         .cte("mensal")
     )
     # n_uc é estoque: dentro de cada mês soma recortes, e a janela só o soma para dividir por
