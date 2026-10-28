@@ -595,3 +595,85 @@ class ErroSchema(BaseModel):
     """Corpo das respostas de erro do FastAPI (HTTPException), documentado no OpenAPI."""
 
     detail: str
+
+
+class IndicadoresComparacaoFiltroSchema(ComparacaoFiltroSchema):
+    """Dois períodos e, se quiser, o recorte: os mesmos filtros da comparação de receita."""
+
+
+class IndicadoresJanelasFiltroSchema(BaseModel):
+    """Tamanho da janela corrida, em competências, e o recorte opcional."""
+
+    meses: int = Field(default=12, ge=1, le=24)
+    municipio: RequiredText | None = None
+    bairro: RequiredText | None = None
+    classe: Classe | None = None
+
+    @model_validator(mode="after")
+    def recorte_valido(self) -> "IndicadoresJanelasFiltroSchema":
+        if self.bairro and not self.municipio:
+            raise ValueError("Informe o município junto com o bairro")
+        return self
+
+
+class IndicadoresPeriodoSchema(BaseModel):
+    """Os indicadores da diretoria somados num período, todos calculados no banco."""
+
+    inicio: Competencia
+    fim: Competencia
+    # Competências com dado na tabela inteira dentro do período: o divisor de n_uc_medio.
+    n_meses: int
+    receita_faturada: ExactNumber
+    receita_energia: ExactNumber
+    tributos: ExactNumber
+    kwh_faturado: ExactNumber
+    n_uc_medio: float | None
+    n_uc_fim: int
+    tarifa_media: float | None
+    tarifa_base_media: float | None
+    horas_interrompidas: float
+    n_interrupcoes: int
+    dec: float | None
+    fec: float | None
+    n_chamados: int
+    n_notas: int
+    satisfacao_media: float | None
+
+
+class VariacaoIndicadoresSchema(BaseModel):
+    """Variação em % de cada indicador (8.0 = +8,0%); nula sem base ou com base zero."""
+
+    receita_faturada: float | None
+    receita_energia: float | None
+    tributos: float | None
+    kwh_faturado: float | None
+    n_uc_medio: float | None
+    n_uc_fim: float | None
+    tarifa_media: float | None
+    tarifa_base_media: float | None
+    horas_interrompidas: float | None
+    n_interrupcoes: float | None
+    dec: float | None
+    fec: float | None
+    n_chamados: float | None
+    n_notas: float | None
+    satisfacao_media: float | None
+
+
+class ComparacaoIndicadoresSchema(BaseModel):
+    base: IndicadoresPeriodoSchema
+    atual: IndicadoresPeriodoSchema
+    variacao_pct: VariacaoIndicadoresSchema
+
+
+class IndicadoresJanelaSchema(BaseModel):
+    """Uma janela corrida completa: `meses` competências seguidas, todas com dado."""
+
+    inicio: Competencia
+    fim: Competencia
+    receita_faturada: ExactNumber
+    receita_energia: ExactNumber
+    kwh_faturado: ExactNumber
+    n_uc_medio: float | None
+    tarifa_media: float | None
+    tarifa_base_media: float | None

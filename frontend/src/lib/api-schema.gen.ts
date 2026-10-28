@@ -180,6 +180,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/indicadores/comparacao": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Comparacao
+         * @description Os indicadores da diretoria em dois períodos, da empresa inteira ou de um recorte.
+         */
+        get: operations["get_comparacao_indicadores_comparacao_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/indicadores/janelas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Janelas
+         * @description Janelas corridas de `meses` competências, da mais antiga para a mais recente.
+         */
+        get: operations["get_janelas_indicadores_janelas_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/fila-suspeitas": {
         parameters: {
             query?: never;
@@ -350,6 +390,12 @@ export interface components {
              * Format: date-time
              */
             criado_em: string;
+        };
+        /** ComparacaoIndicadoresSchema */
+        ComparacaoIndicadoresSchema: {
+            base: components["schemas"]["IndicadoresPeriodoSchema"];
+            atual: components["schemas"]["IndicadoresPeriodoSchema"];
+            variacao_pct: components["schemas"]["VariacaoIndicadoresSchema"];
         };
         /**
          * ComparacaoReceitaSchema
@@ -528,6 +574,70 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /**
+         * IndicadoresJanelaSchema
+         * @description Uma janela corrida completa: `meses` competências seguidas, todas com dado.
+         */
+        IndicadoresJanelaSchema: {
+            /** Inicio */
+            inicio: string;
+            /** Fim */
+            fim: string;
+            /** Receita Faturada */
+            receita_faturada: number;
+            /** Receita Energia */
+            receita_energia: number;
+            /** Kwh Faturado */
+            kwh_faturado: number;
+            /** N Uc Medio */
+            n_uc_medio: number | null;
+            /** Tarifa Media */
+            tarifa_media: number | null;
+            /** Tarifa Base Media */
+            tarifa_base_media: number | null;
+        };
+        /**
+         * IndicadoresPeriodoSchema
+         * @description Os indicadores da diretoria somados num período, todos calculados no banco.
+         */
+        IndicadoresPeriodoSchema: {
+            /** Inicio */
+            inicio: string;
+            /** Fim */
+            fim: string;
+            /** N Meses */
+            n_meses: number;
+            /** Receita Faturada */
+            receita_faturada: number;
+            /** Receita Energia */
+            receita_energia: number;
+            /** Tributos */
+            tributos: number;
+            /** Kwh Faturado */
+            kwh_faturado: number;
+            /** N Uc Medio */
+            n_uc_medio: number | null;
+            /** N Uc Fim */
+            n_uc_fim: number;
+            /** Tarifa Media */
+            tarifa_media: number | null;
+            /** Tarifa Base Media */
+            tarifa_base_media: number | null;
+            /** Horas Interrompidas */
+            horas_interrompidas: number;
+            /** N Interrupcoes */
+            n_interrupcoes: number;
+            /** Dec */
+            dec: number | null;
+            /** Fec */
+            fec: number | null;
+            /** N Chamados */
+            n_chamados: number;
+            /** N Notas */
+            n_notas: number;
+            /** Satisfacao Media */
+            satisfacao_media: number | null;
         };
         /**
          * KpisMensaisSchema
@@ -774,6 +884,42 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /**
+         * VariacaoIndicadoresSchema
+         * @description Variação em % de cada indicador (8.0 = +8,0%); nula sem base ou com base zero.
+         */
+        VariacaoIndicadoresSchema: {
+            /** Receita Faturada */
+            receita_faturada: number | null;
+            /** Receita Energia */
+            receita_energia: number | null;
+            /** Tributos */
+            tributos: number | null;
+            /** Kwh Faturado */
+            kwh_faturado: number | null;
+            /** N Uc Medio */
+            n_uc_medio: number | null;
+            /** N Uc Fim */
+            n_uc_fim: number | null;
+            /** Tarifa Media */
+            tarifa_media: number | null;
+            /** Tarifa Base Media */
+            tarifa_base_media: number | null;
+            /** Horas Interrompidas */
+            horas_interrompidas: number | null;
+            /** N Interrupcoes */
+            n_interrupcoes: number | null;
+            /** Dec */
+            dec: number | null;
+            /** Fec */
+            fec: number | null;
+            /** N Chamados */
+            n_chamados: number | null;
+            /** N Notas */
+            n_notas: number | null;
+            /** Satisfacao Media */
+            satisfacao_media: number | null;
         };
     };
     responses: never;
@@ -1059,6 +1205,77 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RecortesContinuidadeSchema"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_comparacao_indicadores_comparacao_get: {
+        parameters: {
+            query: {
+                base_inicio: string;
+                base_fim: string;
+                atual_inicio: string;
+                atual_fim: string;
+                municipio?: string | null;
+                bairro?: string | null;
+                classe?: ("B1" | "B2" | "B3" | "A4") | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ComparacaoIndicadoresSchema"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_janelas_indicadores_janelas_get: {
+        parameters: {
+            query?: {
+                meses?: number;
+                municipio?: string | null;
+                bairro?: string | null;
+                classe?: ("B1" | "B2" | "B3" | "A4") | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IndicadoresJanelaSchema"][];
                 };
             };
             /** @description Validation Error */
