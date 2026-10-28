@@ -5,20 +5,18 @@ import { formatPeriodoCurto } from "#/lib/format";
 import { DEFINICOES, GRUPOS } from "../indicadores";
 import type { ComparacaoIndicadores, Indicador, ParPeriodos } from "../types";
 
-const LINKS: Partial<
-	Record<Indicador, (par: ParPeriodos | undefined) => ReactElement>
-> = {
-	receita_faturada: (par) => (
+const LINKS: Partial<Record<Indicador, ReactElement>> = {
+	// TODO: quando a ponte de receita aceitar o par de meses desta tela (DEC-036), passar
+	// `periodo_base` e `periodo_atual` no link. Hoje a `ReceitaPage` descarta pares que não
+	// estão em `gold_receita_decomposicao` e abre no período padrão dela.
+	receita_faturada: (
 		<Link
 			to="/receita"
-			search={{
-				periodo_base: par?.periodo_base,
-				periodo_atual: par?.periodo_atual,
-			}}
+			title="A ponte de receita abre no período padrão da tela."
 		/>
 	),
-	dec: () => <Link to="/rede" />,
-	fec: () => <Link to="/rede" />,
+	dec: <Link to="/rede" />,
+	fec: <Link to="/rede" />,
 };
 
 /**
@@ -69,7 +67,7 @@ export function IndicadoresCards({
 									value={valor}
 									format={definicao.format}
 									hint={definicao.hint}
-									link={LINKS[indicador]?.(par)}
+									link={LINKS[indicador]}
 									loading={carregando}
 									error={erro}
 									onRetry={onRetry}

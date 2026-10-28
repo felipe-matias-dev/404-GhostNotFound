@@ -192,12 +192,17 @@ describe("variacaoNoPonto", () => {
 		linha("2025-01", 120),
 	];
 
-	it("mês a mês compara com o mês anterior da série", () => {
+	it("mês a mês compara com o mês anterior do calendário", () => {
 		const t = tendencia(linhas, "receita_faturada", "mes", "Receita");
 		expect(variacaoNoPonto(t, 0)).toBeUndefined();
 		const ponto = variacaoNoPonto(t, 1);
 		expect(ponto?.valor).toBeCloseTo(0.1);
 		expect(ponto?.base).toBe("jan/2024");
+	});
+
+	it("mês a mês não mostra variação quando o mês anterior falta na série", () => {
+		const t = tendencia(linhas, "receita_faturada", "mes", "Receita");
+		expect(variacaoNoPonto(t, 2)).toBeUndefined();
 	});
 
 	it("ano a ano compara o ano em destaque com o mesmo mês do anterior", () => {

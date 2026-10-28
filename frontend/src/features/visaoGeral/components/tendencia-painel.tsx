@@ -130,8 +130,12 @@ export function TendenciaPainel({
 						<p className="text-text-muted">Sem base para comparar.</p>
 					);
 				}}
-				loading={serie.isFetching}
-				error={serie.isError ? "Não foi possível carregar a série." : null}
+				loading={serie.isPending}
+				error={
+					serie.isError && !serie.data
+						? "Não foi possível carregar a série."
+						: null
+				}
 				onRetry={() => serie.refetch()}
 				emptyMessage="Sem meses carregados."
 				height="fill"

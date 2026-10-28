@@ -245,10 +245,17 @@ export function variacaoNoPonto(
 	indice: number,
 ): { valor: number; base: string } | undefined {
 	if (t.visao === "mes") {
+		const atual = t.categories[indice];
+		if (!atual) return undefined;
 		const valores = t.series[0]?.values ?? [];
-		const base = t.categories[indice - 1];
+		// O mês anterior é o do calendário, não a posição anterior da série: com um mês
+		// faltando na Gold, o ponto anterior não é o mês anterior e não serve de base.
+		const indiceBase = t.categories.findIndex(
+			(c) => c.key === deslocar(atual.key, -1),
+		);
+		const base = t.categories[indiceBase];
 		const valor = variacao(
-			valores[indice - 1] ?? null,
+			valores[indiceBase] ?? null,
 			valores[indice] ?? null,
 		);
 		return base && valor !== null

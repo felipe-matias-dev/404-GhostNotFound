@@ -486,7 +486,9 @@ export function TrendChart({
 				describe={describe}
 				tooltipFooter={tooltipFooter}
 				onPointer={onPointer}
-				onLeave={() => setActive(null)}
+				onLeave={(event) => {
+					if (event.pointerType === "mouse") setActive(null);
+				}}
 				onKeyDown={onKeyDown}
 				onFocus={() => setActive((prev) => prev ?? count - 1)}
 				onBlur={() => setActive(null)}
@@ -530,7 +532,9 @@ export function TrendChart({
 				className={cn("relative", height === "fill" && "min-h-60 flex-1")}
 				style={height === "fill" ? undefined : { height }}
 			>
-				{body}
+				{/* Fora do fluxo: a altura do SVG não pode definir a altura medida do
+				    contêiner, senão `fill` trava no tamanho que já tinha. */}
+				<div className="absolute inset-0">{body}</div>
 			</div>
 			{hasData && categories && series ? (
 				// Embrulhada: a `caption` escapa do `sr-only` aplicado direto na tabela.
@@ -580,7 +584,7 @@ type PlotProps = {
 	describe: (index: number) => string;
 	tooltipFooter?: (index: number) => ReactNode;
 	onPointer: (event: PointerEvent<HTMLDivElement>) => void;
-	onLeave: () => void;
+	onLeave: (event: PointerEvent<HTMLDivElement>) => void;
 	onKeyDown: (event: KeyboardEvent<HTMLDivElement>) => void;
 	onFocus: () => void;
 	onBlur: () => void;
