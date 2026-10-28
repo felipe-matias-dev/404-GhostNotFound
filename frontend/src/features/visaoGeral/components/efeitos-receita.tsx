@@ -1,7 +1,12 @@
-import { ArrowsClockwiseIcon, CaretRightIcon } from "@phosphor-icons/react";
+import { ArrowsClockwiseIcon, InfoIcon } from "@phosphor-icons/react";
 import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { Button } from "#/components/ui/button";
+import {
+	Popover,
+	PopoverContent,
+	PopoverTrigger,
+} from "#/components/ui/popover";
 import {
 	EFEITOS,
 	passosDaPonte,
@@ -14,6 +19,10 @@ import { efeitosDaReceita, type Janelas } from "../conversions";
 
 const SEM_RECORTE = {};
 
+// Rótulo, barra e valor juntos: a barra não atravessa a tela até o número.
+const LINHA =
+	"grid h-9 grid-cols-[7.5rem_minmax(0,1fr)_3.5rem] items-center gap-4 sm:grid-cols-[9rem_minmax(0,14rem)_4rem]";
+
 function Molde() {
 	return (
 		<ul aria-hidden className="flex flex-col gap-1">
@@ -21,7 +30,7 @@ function Molde() {
 				<li
 					// biome-ignore lint/suspicious/noArrayIndexKey: linhas fixas do molde.
 					key={i}
-					className="grid h-10 grid-cols-[7.5rem_minmax(0,1fr)_3.5rem] items-center gap-4 sm:grid-cols-[9rem_minmax(0,1fr)_4rem]"
+					className={LINHA}
 				>
 					<div className="h-3 w-20 rounded-sm bg-pressed" />
 					<div className={cn("h-2.5 rounded-sm bg-pressed", largura)} />
@@ -98,7 +107,10 @@ export function EfeitosReceita({ janelas }: { janelas: Janelas | undefined }) {
 									efeito: EFEITOS.find((e) => e === efeito.id),
 								}}
 								aria-label={`${efeito.rotulo}: ${texto} sobre a receita base. Abrir na ponte de receita`}
-								className="group -mx-2 grid h-10 grid-cols-[7.5rem_minmax(0,1fr)_3.5rem_auto] items-center gap-4 rounded-sm px-2 outline-none transition-colors hover:bg-hover focus-visible:ring-3 focus-visible:ring-focus-ring/50 sm:grid-cols-[9rem_minmax(0,1fr)_4rem_auto]"
+								className={cn(
+									LINHA,
+									"-mx-2 rounded-sm px-2 outline-none transition-colors hover:bg-hover focus-visible:ring-3 focus-visible:ring-focus-ring/50",
+								)}
 							>
 								<span className="truncate text-body text-text">
 									{efeito.rotulo}
@@ -131,10 +143,6 @@ export function EfeitosReceita({ janelas }: { janelas: Janelas | undefined }) {
 								>
 									{texto}
 								</span>
-								<CaretRightIcon
-									aria-hidden
-									className="size-3.5 text-text-muted transition-[color,translate] group-hover:translate-x-0.5 group-hover:text-text motion-reduce:transition-none"
-								/>
 							</Link>
 						</li>
 					);
@@ -147,16 +155,27 @@ export function EfeitosReceita({ janelas }: { janelas: Janelas | undefined }) {
 		<section
 			aria-labelledby="efeitos-titulo"
 			aria-busy={decomposicao.isFetching || undefined}
-			className="flex max-w-3xl flex-col gap-3"
+			className="flex flex-col gap-3"
 		>
-			<header className="flex flex-col gap-1">
+			<header className="flex h-8 items-center gap-1.5">
 				<h2 id="efeitos-titulo" className="text-heading">
 					Por que a receita mudou
 				</h2>
-				<p className="text-pretty text-small text-text-muted">
-					Peso de cada efeito sobre a receita de energia de{" "}
-					{formatPeriodoCurto(janelas.base)}.
-				</p>
+				<Popover>
+					<PopoverTrigger
+						openOnHover
+						delay={200}
+						aria-label="Sobre os efeitos da receita"
+						className="grid size-6 place-items-center rounded-sm text-text-muted outline-none transition-colors hover:text-text focus-visible:ring-3 focus-visible:ring-focus-ring/50"
+					>
+						<InfoIcon aria-hidden className="size-3.5" />
+					</PopoverTrigger>
+					<PopoverContent className="max-w-64 p-3 text-body">
+						Peso de cada efeito sobre a receita de energia de{" "}
+						{formatPeriodoCurto(janelas.base)}. Clique num efeito para vê-lo na
+						ponte de receita.
+					</PopoverContent>
+				</Popover>
 			</header>
 			{corpo}
 		</section>
