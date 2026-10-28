@@ -54,22 +54,3 @@ export const DEFINICOES: Record<Indicador, DefinicaoIndicador> = {
 		hint: "Média das notas de 1 a 5 dos chamados avaliados no período; chamado sem nota fica fora.",
 	},
 };
-
-/** Os seis indicadores em três grupos, na ordem da tela. */
-export const GRUPOS: {
-	id: string;
-	titulo: string;
-	indicadores: Indicador[];
-}[] = [
-	{
-		id: "comercial",
-		titulo: "Comercial",
-		indicadores: ["receita_faturada", "kwh_faturado"],
-	},
-	{ id: "rede", titulo: "Rede", indicadores: ["dec", "fec"] },
-	{
-		id: "atendimento",
-		titulo: "Atendimento",
-		indicadores: ["n_chamados", "satisfacao_media"],
-	},
-];
