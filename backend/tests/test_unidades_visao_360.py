@@ -440,6 +440,18 @@ def test_variation_is_empty_when_no_month_has_an_invoice_in_both_years(
     assert body["meses_comparados"] == 0
 
 
+def test_consumption_is_empty_before_the_gold_has_invoices(client: TestClient, seed) -> None:
+    seed(make_uc("0001"))
+
+    body = consumption(client)
+
+    assert body["referencia"] is None
+    assert body["meses"] == []
+    assert body["variacao_12m_pct"] is None
+    assert body["meses_comparados"] == 0
+    assert body["tendencia"] == "sem_comparacao"
+
+
 def test_no_previous_year_means_no_percentage(client: TestClient, seed) -> None:
     seed(make_uc("0001"), make_invoice("0001", "2025-12", kwh_faturado=Decimal("150")))
 
