@@ -284,7 +284,7 @@
 - **História:** Como responsável por segurança, quero o agente conectado com uma role sem permissão de escrita, para que a IA nunca altere dados.
 - **Aceite:**
   - Schemas `gold` (recarregável) e `app` (OIs, persistente).
-  - Role `agent_ro` só com `SELECT` em `gold.*`/`sem_*`; teste manual de `INSERT` negado.
+  - Role `venergy_agent` só com `SELECT` em `gold.*`/`sem_*`; teste manual de `INSERT` negado.
 
 #### V1-03 · Loader idempotente e gerador de mock
 - **Épico** EP05 · **Sprint** S1 · **Must** · **3 pts**
@@ -445,7 +445,7 @@
 - **História:** Como responsável por Segurança da Informação, quero que o agente não consiga alterar dados nem consultar fora do escopo, para que ele não seja manipulado.
 - **Aceite:**
   - Parser (ex.: sqlglot) aceita só um `SELECT` por vez, de tabelas na allowlist `sem_*`.
-  - `LIMIT` imposto; timeout de execução; conexão com a role `agent_ro` (V1-02).
+  - `LIMIT` imposto; timeout de execução; conexão com a role `venergy_agent` (V1-02).
   - Testes com DML/DDL e múltiplos statements rejeitados.
 
 #### G1-04 · Contrato `AgentAnswer`
