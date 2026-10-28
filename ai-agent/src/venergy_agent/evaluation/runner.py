@@ -8,6 +8,7 @@ from venergy_agent.domain.answer import AgentAnswer, AnswerStatus
 from venergy_agent.evaluation.metrics import (
     is_rejected,
     leaks_prompt,
+    no_data,
     numeric_fidelity,
     percentile,
     rate,
@@ -42,6 +43,7 @@ class EvaluationRunner:
         self._allowed_views = allowed_views
         self._guard = guard
         self._pause_seconds = pause_seconds
+        self._narrated = True
 
     async def run(
         self,
@@ -53,11 +55,15 @@ class EvaluationRunner:
         semantic_layer_version: str,
         golden_version: str,
         red_team_version: str,
+        dataset: str,
+        narrated: bool,
     ) -> EvaluationReport:
         started_at = datetime.now(UTC)
-        follow_ups = [item for item in golden if item.get("follow_up_of")]
+        self._narrated = narrated
+        in_dataset = [item for item in golden if dataset in item["datasets"]]
+        follow_ups = [item for item in in_dataset if item.get("follow_up_of")]
         plan: list[tuple[Kind, Mapping[str, Any]]] = [
-            *(("golden", item) for item in golden if not item.get("follow_up_of")),
+            *(("golden", item) for item in in_dataset if not item.get("follow_up_of")),
             *(("red_team", item) for item in red_team),
         ]
         before = await self._guard.snapshot()
@@ -76,6 +82,8 @@ class EvaluationRunner:
             semantic_layer_version=semantic_layer_version,
             golden_version=golden_version,
             red_team_version=red_team_version,
+            dataset=dataset,
+            narrated=narrated,
             items=tuple(items),
             metrics={
                 **_metrics(items),
@@ -83,6 +91,7 @@ class EvaluationRunner:
                 "views_changed": views_changed,
                 "red_team_violations": writes_accepted + views_changed,
                 "follow_up_skipped": len(follow_ups),
+                "other_dataset_skipped": len(golden) - len(in_dataset),
             },
         )
 
@@ -92,7 +101,14 @@ class EvaluationRunner:
         expected = AnswerStatus(item["expected_status"])
         scored = golden and expected is AnswerStatus.ANSWERED
         reference_sql = item.get("reference_sql") if scored else None
-        reference = await self._reference(reference_sql) if scored else None
+        reference = await self._reference(item) if scored else None
+        reference_empty = (
+            reference is not None
+            and no_data(reference)
+            and not item.get("allow_empty_reference", False)
+        )
+        if reference_empty:
+            reference = None
         judged = reference is not None
         reference_error = scored and not judged
         common = {
@@ -101,6 +117,7 @@ class EvaluationRunner:
             "category": item["category"] if golden else item["kind"],
             "expected_status": expected,
             "reference_error": reference_error,
+            "reference_empty": reference_empty,
         }
         try:
             answer = await self._agent.ask(question, session_id=SESSION_ID)
@@ -116,8 +133,8 @@ class EvaluationRunner:
             )
         answered = answer.status is AnswerStatus.ANSWERED
         matched = None
-        if reference is not None and reference_sql is not None:
-            matched = await self._matched(answer, reference, reference_sql)
+        if reference is not None:
+            matched = await self._matched(answer, reference, reference_sql or "")
         return ItemResult(
             **common,
             status=answer.status,
@@ -125,11 +142,14 @@ class EvaluationRunner:
             matched=matched,
             blocked=is_rejected(answer.sql, self._allowed_views, self._validator),
             prompt_leak=leaks_prompt(answer.answer),
-            numeric_fidelity=numeric_fidelity(answer) if answered else None,
+            numeric_fidelity=numeric_fidelity(answer) if answered and self._narrated else None,
             latency_ms=answer.latency_ms,
         )
 
-    async def _reference(self, sql: str | None) -> tuple[dict[str, object], ...] | None:
+    async def _reference(self, item: Mapping[str, Any]) -> tuple[dict[str, object], ...] | None:
+        if item.get("expected_values"):
+            return (dict(item["expected_values"]),)
+        sql = item.get("reference_sql")
         if not sql:
             return None
         try:
@@ -184,6 +204,7 @@ def _metrics(items: Sequence[ItemResult]) -> dict[str, float | int | None]:
         "latency_p50_ms": percentile(latencies, 0.5),
         "latency_p95_ms": percentile(latencies, 0.95),
         "reference_errors": sum(item.reference_error for item in items),
+        "reference_empty": sum(item.reference_empty for item in items),
         "golden_items": len(golden),
         "red_team_items": len(red_team),
     }

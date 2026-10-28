@@ -76,7 +76,7 @@ RESULTS = {
 }
 
 
-def golden(item_id, question, reference_sql=None, expected_status="answered"):
+def golden(item_id, question, reference_sql=None, expected_status="answered", **extra):
     return {
         "id": item_id,
         "question": question,
@@ -86,6 +86,8 @@ def golden(item_id, question, reference_sql=None, expected_status="answered"):
         "follow_up_of": None,
         "notes": "",
         "revisado_por": None,
+        "datasets": ["amostra", "gold_real"],
+        **extra,
     }
 
 
@@ -118,7 +120,7 @@ def runner(script, results=RESULTS, guard=None):
     )
 
 
-async def run(evaluation, golden_items=(), red_team_items=()):
+async def run(evaluation, golden_items=(), red_team_items=(), dataset="amostra", narrated=True):
     return await evaluation.run(
         list(golden_items),
         list(red_team_items),
@@ -127,6 +129,8 @@ async def run(evaluation, golden_items=(), red_team_items=()):
         semantic_layer_version="0.3.0",
         golden_version="0.3.2",
         red_team_version="0.1.0",
+        dataset=dataset,
+        narrated=narrated,
     )
 
 
@@ -362,3 +366,67 @@ async def test_report_records_the_version_of_each_set():
     report = await run(evaluation, [golden("G001", "Quantas UCs?", COUNT_SQL)])
 
     assert (report.golden_version, report.red_team_version) == ("0.3.2", "0.1.0")
+
+
+EMPTY_SQL = "SELECT count(*) AS total FROM sem_uc WHERE municipio = 'Nenhum'"
+
+
+async def test_items_of_another_dataset_are_never_sent_to_the_agent():
+    agent, evaluation = runner({"Quantas UCs?": make_answer()})
+    only_sample = golden("G002", "Quantas em Olinda?", OLINDA_SQL, datasets=["amostra"])
+
+    report = await run(
+        evaluation, [golden("G001", "Quantas UCs?", COUNT_SQL), only_sample], dataset="gold_real"
+    )
+
+    assert [question for question, _ in agent.calls] == ["Quantas UCs?"]
+    assert report.dataset == "gold_real"
+    assert report.metrics["other_dataset_skipped"] == 1
+
+
+async def test_empty_reference_without_permission_is_a_reference_error_not_a_match():
+    _, evaluation = runner(
+        {"Nenhuma?": make_answer(sql=EMPTY_SQL, rows=())}, {EMPTY_SQL: [], **RESULTS}
+    )
+
+    report = await run(evaluation, [golden("G001", "Nenhuma?", EMPTY_SQL)])
+
+    (item,) = report.items
+    assert (item.matched, item.reference_error, item.reference_empty) == (None, True, True)
+    assert report.metrics["execution_accuracy"] is None
+    assert report.metrics["reference_empty"] == 1
+
+
+async def test_empty_reference_with_permission_still_matches_an_empty_answer():
+    _, evaluation = runner(
+        {"Nenhuma?": make_answer(sql=EMPTY_SQL, rows=())}, {EMPTY_SQL: [], **RESULTS}
+    )
+
+    report = await run(
+        evaluation, [golden("G001", "Nenhuma?", EMPTY_SQL, allow_empty_reference=True)]
+    )
+
+    assert report.items[0].matched is True
+
+
+async def test_expected_values_are_the_reference_when_there_is_no_reference_sql():
+    generated = "select count(*) as n from sem_uc"
+    _, evaluation = runner(
+        {"Quantas UCs?": make_answer(sql=generated)}, {generated: [{"n": 8}], **RESULTS}
+    )
+    right = golden("G001", "Quantas UCs?", expected_values={"total_uc": 8})
+    wrong = golden("G002", "Quantas UCs?", expected_values={"total_uc": 9})
+
+    report = await run(evaluation, [right, wrong])
+
+    assert [item.matched for item in report.items] == [True, False]
+
+
+async def test_sql_only_run_records_it_and_leaves_numeric_fidelity_out():
+    _, evaluation = runner({"Quantas UCs?": make_answer()})
+
+    report = await run(evaluation, [golden("G001", "Quantas UCs?", COUNT_SQL)], narrated=False)
+
+    assert report.narrated is False
+    assert report.items[0].numeric_fidelity is None
+    assert report.metrics["numeric_fidelity"] is None

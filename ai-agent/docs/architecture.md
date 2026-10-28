@@ -22,7 +22,7 @@ Hexagonal: `domain` ← `application` ← `infrastructure`.
 | domain | `answer.py` | `AgentAnswer` com `status` e invariantes por status (DEC-020), `Insight` | pronto (PR #21; texto em branco e `row_count >= 0` no PR #29) |
 | application | `ports.py` | `TextToSqlAgent`, `SemanticLayerSource`, `SqlGenerator`, `SqlValidator`, `QueryExecutor`, `AnswerWriter`, `InsightWriter` | `ask.py` (`AskUseCase`), pronto (PR #30) |
 | infrastructure | `sql_validator.py` | `SqlglotValidator`: um `SELECT`, allowlist de views, funções conhecidas, `LIMIT` imposto | pronto |
-| infrastructure | `postgres_executor.py` | `PostgresQueryExecutor`: `BEGIN READ ONLY`, `statement_timeout`, SQLSTATE → `ErrorKind` | pronto |
+| infrastructure | `postgres_executor.py` | `PostgresQueryExecutor`: `BEGIN READ ONLY`, `statement_timeout`, SQLSTATE → `ErrorKind`; erro de dado (classe 22) volta só com o tipo, sem o valor | pronto |
 | infrastructure | `sql_generator.py`, `prompt_renderer.py`, `llm.py` | PydanticAI com `output_type=SqlDraft`; prompt em `prompts/v1/`; delimitadores com nonce; Gemini direto (padrão) ou OpenRouter | pronto |
 | infrastructure | `semantic_source.py`, `views_sql.py` | `YamlSemanticLayerSource` valida `semantic/semantic_layer.yaml` contra `contracts/gold_schema.yaml` (inclusive `consumers` e `sensitive`); `views_sql` gera `semantic/views.sql` | pronto |
 | infrastructure | `answer_writer.py` | `PydanticAiAnswerWriter`: narra as linhas, com o conteúdo do banco delimitado como dado e a unidade de cada coluna vinda da camada semântica; prompt em `prompts/answer/v2/` | item 8 |
@@ -94,7 +94,7 @@ O banco local só tem a amostra sintética do backend (`venergy_api.amostra`). A
 - `evaluation/metrics.py`: execution accuracy por conjunto de linhas, tentativa barrada pelo validador, vazamento de prompt, fidelidade numérica, taxas e percentis.
 - `evaluation/runner.py`: `EvaluationRunner` sobre as portas.
 - `evaluation/database_guard.py`: `PostgresDatabaseGuard` mede a violação no banco: impressão digital das views antes e depois da rodada e escritas reais com o usuário do agente, sempre com rollback (spec §9.2).
-- `evaluation/__main__.py`: CLI que grava `eval/runs/<data>.json`.
+- `evaluation/__main__.py`: CLI que grava `eval/runs/<data>.json`; `--dataset amostra|gold_real` confere a base carregada, e `--sql-only` (sempre ligado na Gold real) monta o agente sem o redator. Os relatórios da Gold real vão para `eval/runs_gold/`, fora do Git (issue #56).
 - Linha de base e achados: spec §9.6.
 
 ## 7. Onde está cada coisa
