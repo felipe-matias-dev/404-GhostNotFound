@@ -31,6 +31,13 @@ export const semanticos = [
 	["pressed", "Camada translúcida de pressionado."],
 	["cover-slab", "Bloco escuro de identidade (capa, hero)."],
 	["scrim", "Véu atrás de modais e command palette."],
+	["chart-1", "Série que importa (brand). No claro: brand-600."],
+	["chart-2", "Série de comparação (indigo)."],
+	["chart-3", "Terceira série (cyan)."],
+	["chart-4", "Quarta série (violet)."],
+	["chart-5", "Quinta série (green)."],
+	["chart-6", "Sexta série (orange)."],
+	["chart-muted", "Série de contexto, sem destaque."],
 ];
 
 export const familias = [
@@ -181,9 +188,11 @@ Estados (hover, desabilitado, selecionado, badges) em **Fundamentos/Estados**.
 
 - **Ordem categórica:** `brand-400` (a série que importa), `indigo-500` (comparação),
   `cyan-500`, `violet-500`, `green-500`, `orange-500`. No claro, desça para o passo 600.
+  Os tokens `chart-1` a `chart-6` já fazem essa troca: gráficos usam `stroke-chart-1`,
+  `fill-chart-2`…, nunca o primitivo direto.
   Mais de 6 séries: agrupe em “outros” com `graphite-500`.
 - **Destaque com uma cor só:** a série toda em `graphite-600` (escuro) / `graphite-300`
-  (claro) e só o ponto relevante em `brand-400`.
+  (claro) e só o ponto relevante em `brand-400`. Token: `chart-muted`.
 - **Sequencial** (heatmap, intensidade): `brand-950` → `brand-700` → `brand-500` →
   `brand-300` → `brand-100`. Mais corrente, mais luz.
 - **Divergente:** `indigo-600` → `graphite-700` (neutro) → `brand-400`. Azul × amarelo

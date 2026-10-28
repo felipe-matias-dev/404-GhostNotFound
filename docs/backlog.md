@@ -123,7 +123,7 @@
 - **História:** Como avaliador, quero ver o print da execução e a justificativa do agendamento, para validar a orquestração.
 - **Aceite:**
   - Print no README.
-  - Entrada `DEC-NNN` em [`decisoes.md`](decisoes.md) com a estratégia de agendamento (ADR-07: mensal após o fechamento do ciclo, incremental por competência).
+  - Entrada `DEC-NNN` em [`decisoes.md`](decisoes.md) com a estratégia de agendamento (ADR-07: mensal após o fechamento do ciclo, incremental por competência). Atendido pela DEC-039: mensal, com reprocessamento completo no lugar do incremental, e o motivo da divergência.
 
 #### D1-12 · Dicionário de dados: Receita e Perdas
 - **Épico** EP17 · **Sprint** S3 · **Must** · **2 pts**

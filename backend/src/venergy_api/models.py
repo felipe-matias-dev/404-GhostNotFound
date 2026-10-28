@@ -3,6 +3,7 @@
 from datetime import date, datetime
 from decimal import Decimal
 from enum import StrEnum
+from typing import Any
 
 from sqlalchemy import (
     ARRAY,
@@ -16,6 +17,7 @@ from sqlalchemy import (
     func,
     text,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from venergy_api.database import Base
@@ -383,3 +385,35 @@ class OrdemEvento(Base):
     )
 
     ordem: Mapped[OrdemInspecao] = relationship(back_populates="eventos")
+
+
+class AiAuditoria(Base):
+    """Uma resposta do agente de IA, gravada como ele a devolveu: a trilha de auditoria."""
+
+    __tablename__ = "ai_auditoria"
+    # Schema app: o agente nunca o acessa e a carga da Gold nunca o apaga. A gravação usa a
+    # conexão do backend, e não a do agente, que é somente leitura.
+    __table_args__ = {"schema": "app"}
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    session_id: Mapped[str]
+    pergunta: Mapped[str]
+    # Um campo por coluna do AgentAnswer. status e confidence ficam em texto livre, e não em
+    # enum com CHECK: um status novo do agente não pode fazer a gravação falhar e perder a trilha.
+    answer: Mapped[str]
+    status: Mapped[str]
+    sql: Mapped[str | None]
+    # JSONB: a amostra tem as colunas que a consulta devolveu, que mudam a cada pergunta.
+    rows: Mapped[list[dict[str, Any]]] = mapped_column(JSONB)
+    row_count: Mapped[int]
+    truncated: Mapped[bool]
+    confidence: Mapped[str]
+    sources: Mapped[list[str]] = mapped_column(JSONB)
+    assumptions: Mapped[list[str]] = mapped_column(JSONB)
+    clarification: Mapped[str | None]
+    refused_reason: Mapped[str | None]
+    request_id: Mapped[str]
+    model: Mapped[str]
+    prompt_version: Mapped[str]
+    latency_ms: Mapped[int]

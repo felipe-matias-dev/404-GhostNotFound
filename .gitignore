@@ -38,3 +38,6 @@ Thumbs.db
 
 # Claude Code (configuração pessoal de cada integrante)
 .claude/
+
+# Relatórios da avaliação sobre a Gold real: o SQL gerado pode trazer valores (DEC-024, issue #56)
+ai-agent/eval/runs_gold/
