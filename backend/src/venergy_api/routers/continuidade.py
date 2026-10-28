@@ -3,10 +3,11 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Query
-from sqlalchemy import ColumnElement, Double, cast, distinct, func, select
+from sqlalchemy import ColumnElement, distinct, func, select
 from sqlalchemy.orm import InstrumentedAttribute, Session
 
 from venergy_api.database import SessionDep
+from venergy_api.indices import indices
 from venergy_api.models import ContinuidadeAlimentadorMensal, KpisSegmentoMensal
 from venergy_api.schemas import (
     ContinuidadeAlimentadorMensalSchema,
@@ -30,32 +31,6 @@ def contar_meses(
     # mês, e não sumir do divisor. Texto AAAA-MM compara na ordem do calendário (DEC-011).
     consulta = select(func.count(distinct(competencia))).where(competencia.between(inicio, fim))
     return session.scalar(consulta) or 0
-
-
-def indices(
-    horas: InstrumentedAttribute[float],
-    interrupcoes: InstrumentedAttribute[int],
-    n_uc: InstrumentedAttribute[int],
-    n_meses: int,
-) -> list[ColumnElement]:
-    """Colunas dos índices de um período: soma dos componentes ÷ média mensal de UCs.
-
-    É a regra do contrato (gold_schema.yaml) e a mesma da camada semântica do agente. A conta
-    mora aqui, e não no frontend: DEC e FEC não se somam nem se tiram a média entre recortes.
-    """
-    total_horas = func.sum(horas)
-    total_interrupcoes = func.sum(interrupcoes)
-    total_uc = cast(func.sum(n_uc), Double)
-    # soma ÷ (Σ n_uc ÷ meses) = soma × meses ÷ Σ n_uc; sem UC, o índice fica nulo.
-    divisor = func.nullif(total_uc, 0)
-    return [
-        (total_horas * n_meses / divisor).label("dec"),
-        (total_interrupcoes * n_meses / divisor).label("fec"),
-        total_horas.label("horas_interrompidas"),
-        total_interrupcoes.label("n_interrupcoes"),
-        # Sem meses com dado não há linha a agrupar, então o max() só evita dividir por zero.
-        (total_uc / max(n_meses, 1)).label("n_uc_medio"),
-    ]
 
 
 def _pior_primeiro(criterio: str, colunas: list[ColumnElement]) -> list[ColumnElement]:
