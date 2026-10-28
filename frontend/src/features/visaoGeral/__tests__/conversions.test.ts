@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
 	compararMeses,
+	efeitosDaReceita,
 	janelasDaBase,
 	leitura,
 	parDoMes,
@@ -198,5 +199,28 @@ describe("leitura", () => {
 			"A receita ficou estável com menos energia faturada.",
 		);
 		expect(leitura(null, 2)).toBeNull();
+	});
+});
+
+describe("efeitosDaReceita", () => {
+	it("dá o peso de cada efeito sobre a receita base, sem os totais", () => {
+		const efeitos = efeitosDaReceita([
+			{ id: "base", label: "Receita base", value: 200, kind: "total" },
+			{ id: "tarifa", label: "Preço · tarifa", value: 16, kind: "delta" },
+			{ id: "volume", label: "Volume", value: -6, kind: "delta" },
+			{ id: "atual", label: "Receita atual", value: 210, kind: "total" },
+		]);
+		expect(efeitos.map((e) => [e.id, e.pct])).toEqual([
+			["tarifa", 0.08],
+			["volume", -0.03],
+		]);
+	});
+
+	it("não dá peso sem receita base", () => {
+		const [efeito] = efeitosDaReceita([
+			{ id: "base", label: "Receita base", value: 0, kind: "total" },
+			{ id: "tarifa", label: "Preço · tarifa", value: 5, kind: "delta" },
+		]);
+		expect(efeito?.pct).toBeNull();
 	});
 });

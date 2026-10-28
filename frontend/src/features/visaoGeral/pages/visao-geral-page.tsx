@@ -1,5 +1,6 @@
 import { getRouteApi } from "@tanstack/react-router";
 import { Pagina } from "#/components/layout/pagina";
+import { EfeitosReceita } from "../components/efeitos-receita";
 import { IndicadoresMes } from "../components/indicadores-mes";
 import { ResumoReceita } from "../components/resumo-receita";
 import { janelasDaBase, parEscolhido } from "../conversions";
@@ -41,6 +42,7 @@ export function VisaoGeralPage() {
 				erroSerie={competencias.isError}
 				onRetrySerie={() => competencias.refetch()}
 			/>
+			<EfeitosReceita janelas={janelas} />
 			<IndicadoresMes
 				competencias={competencias.data ?? []}
 				par={par}

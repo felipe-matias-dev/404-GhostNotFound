@@ -1,4 +1,5 @@
 import type { TrendCategory, TrendSeries } from "#/components/ui/trend-chart";
+import type { WaterfallStep } from "#/components/ui/waterfall-chart";
 import { formatCompetencia, formatCompetenciaCurta } from "#/lib/format";
 import type {
 	ComparacaoIndicadores,
@@ -275,4 +276,26 @@ export function leitura(
 	if (ritmo < 0) return "A receita caiu mais que a energia faturada.";
 	if (ritmo > 0) return "A receita caiu menos que a energia faturada.";
 	return "Receita e energia faturada caíram no mesmo ritmo.";
+}
+
+export type EfeitoDaReceita = {
+	id: string;
+	rotulo: string;
+	pct: number | null;
+};
+
+/**
+ * Os efeitos da ponte de receita como peso sobre a receita base, como a tela de Receita mostra
+ * em % (DEC-035). Em % e não em R$: a ponte é sobre a receita de energia e o resumo, sobre a
+ * faturada; o peso de cada efeito é o mesmo nas duas medidas, o valor em reais não.
+ */
+export function efeitosDaReceita(passos: WaterfallStep[]): EfeitoDaReceita[] {
+	const base = passos.find((p) => p.kind === "total")?.value ?? 0;
+	return passos
+		.filter((p) => p.kind === "delta")
+		.map((p) => ({
+			id: p.id,
+			rotulo: p.label,
+			pct: base > 0 ? p.value / base : null,
+		}));
 }
