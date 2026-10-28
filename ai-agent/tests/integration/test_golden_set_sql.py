@@ -17,7 +17,9 @@ ALLOWED = frozenset(
 
 def answered_items():
     items = yaml.safe_load(Path(GOLDEN).read_text(encoding="utf-8"))["itens"]
-    return [item for item in items if item["expected_status"] == "answered"]
+    return [
+        item for item in items if item["expected_status"] == "answered" and item["reference_sql"]
+    ]
 
 
 @pytest.mark.parametrize("item", answered_items(), ids=lambda item: item["id"])

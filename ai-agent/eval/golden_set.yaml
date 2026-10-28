@@ -41,12 +41,19 @@
 #          continua nulo até a conferência de quem escreve o próprio nome.
 #   0.6.0  Issue #56: datasets em todos os itens e allow_empty_reference em G019, G029 e G030. Nenhuma
 #          pergunta, referência ou esperado mudou. Numerada depois da 0.5.0 do PR #57 (Dados).
-#   0.7.0  Camada semântica 0.4.0 (contrato da Gold v0.3): G062 passa de unknown a answered, pelas
+#   0.8.0  Dados (issue #56): G026 passou de março para fevereiro de 2025 e G059 de Jaboatão para Recife, porque a
+#          amostra não tem nota de satisfação em março nem UC comercial em Jaboatão; nas duas bases a referência
+#          volta com resultado. G076 a G087: conjunto gold_real, com expected_values tirados do diagnóstico
+#          (docs/diagnostico-receita.md) e conferidos na Gold real. G088 a G093: equivalentes agregados, na Gold
+#          real, dos itens com código fictício (G009, G011, G012, G020, G022 e G061), só com nomes já publicados.
+#          Numerada depois da 0.7.0 do PR #67 (GenAI), que entrou depois, como 0.9.0.
+#   0.9.0  Camada semântica 0.4.0 (contrato da Gold v0.3), PR #67, escrita como 0.7.0 e renumerada
+#          depois da 0.8.0: G062 passa de unknown a answered, pelas
 #          interrupções da própria UC (decisão da issue #56), e entram G067 a G074, sobre interrupções,
 #          atendimentos e medidor por UC, inadimplência, leitura estimada e GD. Escritos antes de qualquer
 #          rodada do modelo, conferidos na amostra; pendentes de revisão por Dados. G075 (inspeções, fora do
 #          agente) repõe o mínimo de 8 perguntas sem resposta.
-versao: 0.7.0
+versao: 0.9.0
 status: rascunho
 
 itens:
@@ -313,13 +320,13 @@ itens:
   # --- sem resposta: a informação não existe nas views (o esperado é 'não sei') ---
 
   - id: G026
-    question: "Qual foi a satisfação média dos clientes em março de 2025?"
+    question: "Qual foi a satisfação média dos clientes em fevereiro de 2025?"
     category: simples
-    reference_sql: "SELECT satisfacao_media FROM sem_kpis_mensais WHERE competencia = '2025-03'"
+    reference_sql: "SELECT satisfacao_media FROM sem_kpis_mensais WHERE competencia = '2025-02'"
     expected_status: answered
     datasets: [amostra, gold_real]
     follow_up_of: null
-    notes: "Camada v0.2: satisfacao_media é proposta no contrato v0.2 e está pronta em sem_kpis_mensais (nota de 1 a 5, só chamados com nota)."
+    notes: "Camada v0.2: satisfacao_media é proposta no contrato v0.2 e está pronta em sem_kpis_mensais (nota de 1 a 5, só chamados com nota). Mudança de 0.6.0 para 0.8.0 (Dados, 28/10/2026): o mês passou de março para fevereiro de 2025, porque a amostra não tem nota em março e a referência voltava vazia; em fevereiro há nota na amostra e na Gold real."
     revisado_por: null
 
   - id: G027
@@ -658,13 +665,13 @@ itens:
     revisado_por: null
 
   - id: G059
-    question: "Quanto a receita comercial de Jaboatão cresceu entre 2024 e 2025?"
+    question: "Quanto a receita comercial de Recife cresceu entre 2024 e 2025?"
     category: case
-    reference_sql: "SELECT round(100.0 * (a.total - b.total) / NULLIF(b.total, 0), 2) AS variacao_percentual FROM (SELECT sum(f.receita_faturada) AS total FROM sem_faturamento_mensal f JOIN sem_uc u ON u.cod_uc = f.cod_uc WHERE u.classe_cadastro = 'Comercial' AND u.municipio ILIKE 'Jaboatão%' AND f.competencia LIKE '2025-%') a, (SELECT sum(f.receita_faturada) AS total FROM sem_faturamento_mensal f JOIN sem_uc u ON u.cod_uc = f.cod_uc WHERE u.classe_cadastro = 'Comercial' AND u.municipio ILIKE 'Jaboatão%' AND f.competencia LIKE '2024-%') b"
+    reference_sql: "SELECT round(100.0 * (a.total - b.total) / NULLIF(b.total, 0), 2) AS variacao_percentual FROM (SELECT sum(f.receita_faturada) AS total FROM sem_faturamento_mensal f JOIN sem_uc u ON u.cod_uc = f.cod_uc WHERE u.classe_cadastro = 'Comercial' AND u.municipio ILIKE 'Recife' AND f.competencia LIKE '2025-%') a, (SELECT sum(f.receita_faturada) AS total FROM sem_faturamento_mensal f JOIN sem_uc u ON u.cod_uc = f.cod_uc WHERE u.classe_cadastro = 'Comercial' AND u.municipio ILIKE 'Recife' AND f.competencia LIKE '2024-%') b"
     expected_status: answered
     datasets: [amostra, gold_real]
     follow_up_of: null
-    notes: "Versão com períodos da pergunta do Henrique (case p. 5). Município e classe do cadastro vêm da UC (sem_uc), não da fatura, como na tela de Receita (DEC-021). Comercial é classe_cadastro, não B3."
+    notes: "Versão com períodos da pergunta do Henrique (case p. 5). Município e classe do cadastro vêm da UC (sem_uc), não da fatura, como na tela de Receita (DEC-021). Comercial é classe_cadastro, não B3. Mudança de 0.6.0 para 0.8.0 (Dados, 28/10/2026): o município passou de Jaboatão para Recife, porque a amostra não tem UC comercial em Jaboatão e a referência voltava vazia; em Recife há UC comercial na amostra e na Gold real."
     revisado_por: null
 
   - id: G060
@@ -829,4 +836,200 @@ itens:
     datasets: [amostra, gold_real]
     follow_up_of: null
     notes: "gold_inspecoes_uc fica fora do agente por decisão de produto, como a fila de suspeitas (contrato v0.3, consumers sem agente). O esperado é 'não sei', mesmo com as tabelas por UC da camada 0.4.0. Pendente de revisão por Dados."
+    revisado_por: null
+
+  # --- gold_real: gabarito publicado no diagnóstico (expected_values) ---
+
+  - id: G076
+    question: "Em percentual, quanto a receita faturada variou de julho de 2022 a junho de 2023 para julho de 2025 a junho de 2026?"
+    category: case
+    reference_sql: null
+    expected_values: {variacao_percentual: 8.00}
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: null
+    notes: "Pergunta do Henrique (case p. 4): a receita subiu 8%. O primeiro ano da base é julho de 2022 a junho de 2023 e os últimos 12 meses são julho de 2025 a junho de 2026, os mesmos períodos do diagnóstico. Receita sem qualificador é a faturada. Valor publicado no diagnóstico e conferido na Gold real (Dados, 28/10/2026); a comparação usa a precisão do valor esperado. Fonte: docs/diagnostico-receita.md §2, item 1."
+    revisado_por: null
+
+  - id: G077
+    question: "Em percentual, quanto a energia faturada variou de julho de 2022 a junho de 2023 para julho de 2025 a junho de 2026?"
+    category: case
+    reference_sql: null
+    expected_values: {variacao_percentual: -3.95}
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: null
+    notes: "Pergunta do Henrique (case p. 4): o volume caiu quase 4%. O primeiro ano da base é julho de 2022 a junho de 2023 e os últimos 12 meses são julho de 2025 a junho de 2026, os mesmos períodos do diagnóstico. Energia faturada é kwh_faturado. Valor publicado no diagnóstico e conferido na Gold real (Dados, 28/10/2026); a comparação usa a precisão do valor esperado. Fonte: docs/diagnostico-receita.md §2, item 1."
+    revisado_por: null
+
+  - id: G078
+    question: "Em percentual, quanto variou a tarifa média da classe B1 de julho de 2022 a junho de 2023 para julho de 2025 a junho de 2026?"
+    category: case
+    reference_sql: null
+    expected_values: {variacao_percentual: 13.01}
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: null
+    notes: "Tarifa média efetiva da classe: receita somada dividida pela energia somada em cada período, nunca a média de tarifa_media (regra da camada). A classe vem de sem_uc. Valor publicado no diagnóstico e conferido na Gold real (Dados, 28/10/2026); a comparação usa a precisão do valor esperado. Fonte: docs/diagnostico-receita.md §3, H8."
+    revisado_por: null
+
+  - id: G079
+    question: "Em percentual, quanto variou a tarifa média da classe B3 de julho de 2022 a junho de 2023 para julho de 2025 a junho de 2026?"
+    category: case
+    reference_sql: null
+    expected_values: {variacao_percentual: 18.79}
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: null
+    notes: "Mesma regra do G078, para a classe B3. Valor publicado no diagnóstico e conferido na Gold real (Dados, 28/10/2026); a comparação usa a precisão do valor esperado. Fonte: docs/diagnostico-receita.md §3, H8."
+    revisado_por: null
+
+  - id: G080
+    question: "Em percentual, quanto variou a energia faturada das UCs de classe Comercial de julho de 2022 a junho de 2023 para julho de 2025 a junho de 2026?"
+    category: case
+    reference_sql: null
+    expected_values: {variacao_percentual: -10.15}
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: null
+    notes: "Mix de classes no volume (hipótese H3 do diagnóstico). Comercial é classe_cadastro, em sem_uc ou em sem_kpis_segmento_mensal, que dão o mesmo número. Valor publicado no diagnóstico e conferido na Gold real (Dados, 28/10/2026); a comparação usa a precisão do valor esperado. Fonte: docs/diagnostico-receita.md §3, H3."
+    revisado_por: null
+
+  - id: G081
+    question: "Em percentual, quanto variou a energia faturada das UCs de classe Residencial de julho de 2022 a junho de 2023 para julho de 2025 a junho de 2026?"
+    category: case
+    reference_sql: null
+    expected_values: {variacao_percentual: -5.36}
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: null
+    notes: "Mix de classes no volume (hipótese H3 do diagnóstico). Residencial é classe_cadastro, em sem_uc ou em sem_kpis_segmento_mensal, que dão o mesmo número. Valor publicado no diagnóstico e conferido na Gold real (Dados, 28/10/2026); a comparação usa a precisão do valor esperado. Fonte: docs/diagnostico-receita.md §3, H3."
+    revisado_por: null
+
+  - id: G082
+    question: "Em percentual, quanto variou a energia faturada das UCs de classe Industrial de julho de 2022 a junho de 2023 para julho de 2025 a junho de 2026?"
+    category: case
+    reference_sql: null
+    expected_values: {variacao_percentual: 0.59}
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: null
+    notes: "Mix de classes no volume (hipótese H3 do diagnóstico). Industrial é classe_cadastro, em sem_uc ou em sem_kpis_segmento_mensal, que dão o mesmo número. Valor publicado no diagnóstico e conferido na Gold real (Dados, 28/10/2026); a comparação usa a precisão do valor esperado. Fonte: docs/diagnostico-receita.md §3, H3."
+    revisado_por: null
+
+  - id: G083
+    question: "Qual foi o DEC da distribuidora de julho de 2025 a junho de 2026?"
+    category: case
+    reference_sql: null
+    expected_values: {dec: 3.45}
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: null
+    notes: "Pedido da Beatriz (case p. 5). DEC de vários meses é a soma dos mensais (DEC-032); a soma dos DEC mensais de sem_kpis_mensais e a fórmula com as horas e a média mensal de UCs arredondam para o mesmo valor. Valor publicado no diagnóstico e conferido na Gold real (Dados, 28/10/2026); a comparação usa a precisão do valor esperado. Fonte: docs/diagnostico-receita.md §3, H7."
+    revisado_por: null
+
+  - id: G084
+    question: "Na decomposição da receita entre julho de 2022 a junho de 2023 e julho de 2025 a junho de 2026, quanto o efeito bandeira representou em percentual da receita do período base?"
+    category: case
+    reference_sql: null
+    expected_values: {percentual: 4.73}
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: null
+    notes: "Henrique quer o preço separado do volume (case p. 4). Lê sem_receita_decomposicao no par '2022-07/2023-06' e '2025-07/2026-06': soma de efeito_bandeira dividida pela soma de receita_base, vezes 100 (a receita da decomposição é de energia, DEC-023). Os efeitos são lidos, nunca recalculados. Valor publicado no diagnóstico e conferido na Gold real (Dados, 28/10/2026); a comparação usa a precisão do valor esperado. Fonte: docs/diagnostico-receita.md §4."
+    revisado_por: null
+
+  - id: G085
+    question: "Na decomposição da receita entre julho de 2022 a junho de 2023 e julho de 2025 a junho de 2026, quanto o efeito mix representou em percentual da receita do período base?"
+    category: case
+    reference_sql: null
+    expected_values: {percentual: -0.29}
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: null
+    notes: "Henrique quer o preço separado do volume (case p. 4). Lê sem_receita_decomposicao no par '2022-07/2023-06' e '2025-07/2026-06': soma de efeito_mix dividida pela soma de receita_base, vezes 100 (a receita da decomposição é de energia, DEC-023). Os efeitos são lidos, nunca recalculados. Valor publicado no diagnóstico e conferido na Gold real (Dados, 28/10/2026); a comparação usa a precisão do valor esperado. Fonte: docs/diagnostico-receita.md §4."
+    revisado_por: null
+
+  - id: G086
+    question: "Na decomposição da receita entre julho de 2022 a junho de 2023 e julho de 2025 a junho de 2026, quanto o efeito do reajuste da tarifa representou em percentual da receita do período base?"
+    category: case
+    reference_sql: null
+    expected_values: {percentual: 7.51}
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: null
+    notes: "Henrique quer o preço separado do volume (case p. 4). Lê sem_receita_decomposicao no par '2022-07/2023-06' e '2025-07/2026-06': soma de efeito_tarifa dividida pela soma de receita_base, vezes 100 (a receita da decomposição é de energia, DEC-023). Os efeitos são lidos, nunca recalculados. Valor publicado no diagnóstico e conferido na Gold real (Dados, 28/10/2026); a comparação usa a precisão do valor esperado. Fonte: docs/diagnostico-receita.md §4."
+    revisado_por: null
+
+  - id: G087
+    question: "Na decomposição da receita entre julho de 2022 a junho de 2023 e julho de 2025 a junho de 2026, quanto o efeito volume representou em percentual da receita do período base?"
+    category: case
+    reference_sql: null
+    expected_values: {percentual: -3.95}
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: null
+    notes: "Henrique quer o preço separado do volume (case p. 4). Lê sem_receita_decomposicao no par '2022-07/2023-06' e '2025-07/2026-06': soma de efeito_volume dividida pela soma de receita_base, vezes 100 (a receita da decomposição é de energia, DEC-023). Os efeitos são lidos, nunca recalculados. Valor publicado no diagnóstico e conferido na Gold real (Dados, 28/10/2026); a comparação usa a precisão do valor esperado. Fonte: docs/diagnostico-receita.md §4."
+    revisado_por: null
+
+  # --- gold_real: equivalentes agregados dos itens com código fictício da amostra ---
+
+  - id: G088
+    question: "Qual foi o DEC do alimentador ALM-REC-024 em março de 2024?"
+    category: simples
+    reference_sql: "SELECT dec FROM sem_continuidade_alimentador_mensal WHERE cod_alimentador = 'ALM-REC-024' AND competencia = '2024-03'"
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: null
+    notes: "Equivalente do G009 na Gold real. DEC é lido da Gold, nunca recalculado. Só com nomes já publicados no diagnóstico (DEC-024). A referência foi executada na Gold real e volta com resultado (Dados, 28/10/2026)."
+    revisado_por: null
+
+  - id: G089
+    question: "Qual o FEC de março de 2025 do alimentador que atende o bairro Iputinga, em Recife?"
+    category: juncao
+    reference_sql: "SELECT round(1.0 * sum(c.n_interrupcoes) / NULLIF(sum(c.n_uc), 0), 4) AS fec FROM sem_continuidade_alimentador_mensal c WHERE c.competencia = '2025-03' AND c.cod_alimentador IN (SELECT u.cod_alimentador FROM sem_uc u WHERE u.municipio = 'Recife' AND u.bairro = 'Iputinga')"
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: null
+    notes: "Equivalente do G011 na Gold real: encadeia cadastro, alimentador e FEC, com o bairro no lugar do código da UC. Na Gold real um único alimentador atende o bairro; com mais de um, o FEC do conjunto soma as interrupções antes de dividir pelas UCs. Só com nomes já publicados no diagnóstico (DEC-024). A referência foi executada na Gold real e volta com resultado (Dados, 28/10/2026). Revisão do GenAI (28/10/2026): o município entrou na pergunta e na referência, porque a regra da camada pede bairro sempre junto do município; Iputinga e Macaxeira ficam em Recife, então o resultado não muda."
+    revisado_por: null
+
+  - id: G090
+    question: "Quantas UCs do alimentador ALM-JAB-007 tiveram fatura em junho de 2025?"
+    category: juncao
+    reference_sql: "SELECT count(DISTINCT u.cod_uc) AS total FROM sem_uc u JOIN sem_faturamento_mensal f ON f.cod_uc = u.cod_uc WHERE u.cod_alimentador = 'ALM-JAB-007' AND f.competencia = '2025-06'"
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: null
+    notes: "Equivalente do G012 na Gold real. Conta UCs distintas, não faturas. Só com nomes já publicados no diagnóstico (DEC-024). A referência foi executada na Gold real e volta com resultado (Dados, 28/10/2026)."
+    revisado_por: null
+
+  - id: G091
+    question: "Como variou o DEC do alimentador ALM-REC-024 de janeiro a junho de 2024 em relação ao mesmo período de 2025?"
+    category: temporal
+    reference_sql: "SELECT sum(CASE WHEN competencia BETWEEN '2024-01' AND '2024-06' THEN dec END) AS dec_2024, sum(CASE WHEN competencia BETWEEN '2025-01' AND '2025-06' THEN dec END) AS dec_2025 FROM sem_continuidade_alimentador_mensal WHERE cod_alimentador = 'ALM-REC-024'"
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: null
+    notes: "Equivalente do G020 na Gold real. O DEC de cada semestre é a soma do DEC mensal do alimentador (DEC-032). Só com nomes já publicados no diagnóstico (DEC-024). A referência foi executada na Gold real e volta com resultado (Dados, 28/10/2026)."
+    revisado_por: null
+
+  - id: G092
+    question: "Quantas horas de falta de luz teve o alimentador ALM-JAB-007 em janeiro de 2025?"
+    category: sinonimo
+    reference_sql: "SELECT horas_interrompidas FROM sem_continuidade_alimentador_mensal WHERE cod_alimentador = 'ALM-JAB-007' AND competencia = '2025-01'"
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: null
+    notes: "Equivalente do G022 na Gold real. 'Falta de luz' são as horas interrompidas do alimentador (glossário). Só com nomes já publicados no diagnóstico (DEC-024). A referência foi executada na Gold real e volta com resultado (Dados, 28/10/2026)."
+    revisado_por: null
+
+  - id: G093
+    question: "Quanta energia as UCs do bairro Macaxeira, em Recife, faturaram em 2024 e em 2025?"
+    category: case
+    reference_sql: "SELECT sum(CASE WHEN f.competencia LIKE '2024-%' THEN f.kwh_faturado END) AS kwh_2024, sum(CASE WHEN f.competencia LIKE '2025-%' THEN f.kwh_faturado END) AS kwh_2025 FROM sem_faturamento_mensal f JOIN sem_uc u ON u.cod_uc = f.cod_uc WHERE u.municipio = 'Recife' AND u.bairro = 'Macaxeira'"
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: null
+    notes: "Equivalente do G061 na Gold real: o consumo contra o ano anterior que a Camila pede (case p. 5), por bairro em vez de UC. Macaxeira é um dos bairros da hipótese H2. A soma de cada ano é feita no SQL. Só com nomes já publicados no diagnóstico (DEC-024). A referência foi executada na Gold real e volta com resultado (Dados, 28/10/2026). Revisão do GenAI (28/10/2026): o município entrou na pergunta e na referência, porque a regra da camada pede bairro sempre junto do município; Iputinga e Macaxeira ficam em Recife, então o resultado não muda."
     revisado_por: null
