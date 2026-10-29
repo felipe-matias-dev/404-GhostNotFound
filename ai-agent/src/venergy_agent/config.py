@@ -52,27 +52,3 @@ class AgentSettings(BaseSettings):
             if secret is None or not secret.get_secret_value().strip():
                 raise ValueError(f"{model!r} requires VENERGY_AGENT_{key.upper()}")
         return self
-
-    @model_validator(mode="after")
-    def check_judge_model(self) -> Self:
-        provider, _, name = self.judge_model.partition(":")
-        if provider not in PROVIDER_KEYS:
-            raise ValueError(
-                f"judge_model has unsupported provider {provider!r}, "
-                f"use one of {list(PROVIDER_KEYS)}"
-            )
-        if not name:
-            raise ValueError(
-                f"judge_model {self.judge_model!r} has no model name after the provider"
-            )
-        generators = filter(None, (self.llm_model, self.fallback_model))
-        if _base_name(self.judge_model) in {_base_name(model) for model in generators}:
-            raise ValueError(
-                "judge_model must be a different model from llm_model and fallback_model"
-            )
-        return self
-
-
-def _base_name(model: str) -> str:
-    _, _, name = model.partition(":")
-    return name.rpartition("/")[2]

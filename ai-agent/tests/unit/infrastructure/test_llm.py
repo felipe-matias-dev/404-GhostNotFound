@@ -85,3 +85,25 @@ def test_judge_without_its_provider_key_names_the_variable_and_not_a_key():
         build_judge_model(only_openrouter)
 
     assert "sk-secret-999" not in str(error.value)
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"llm_model": "google-gla:gemini-3.1-flash"},
+        {"fallback_model": "google-gla:gemini-3.1-flash"},
+        {
+            "llm_model": "google-gla:gemini-3.1-flash-lite",
+            "judge_model": "openrouter:google/gemini-3.1-flash-lite",
+        },
+    ],
+)
+def test_judge_equal_to_the_generator_or_fallback_is_refused_when_built(overrides):
+    with pytest.raises(ValueError, match="judge_model"):
+        build_judge_model(settings(**overrides))
+
+
+@pytest.mark.parametrize("judge_model", ["anthropic:claude-x", "google-gla:", ""])
+def test_judge_needs_a_known_provider_and_a_name_when_built(judge_model):
+    with pytest.raises(ValueError, match="judge_model"):
+        build_judge_model(settings(judge_model=judge_model))

@@ -217,7 +217,7 @@ O validador é a primeira trava. A segunda é o banco: role somente leitura, com
 | `query_timeout_seconds` | `10` | `> 0` |
 | `max_correction_attempts` | `3` | `1 ≤ n ≤ 3` |
 | `prompt_version` | `v2` | Pasta em `prompts/`. A v2 (23/10/2026) pede só as suposições que mudam o número da resposta; a v1 fica como registro |
-| `judge_model` | `google-gla:gemini-3.1-flash` | Mesma regra de provedor e nome; precisa ser diferente do `llm_model` e do `fallback_model` (nome sem provedor e sem organização). A chave do provedor do juiz só é conferida ao montar o juiz (`--judge`) |
+| `judge_model` | `google-gla:gemini-3.1-flash` | Provedor e nome conferidos ao montar o juiz (`--judge`), não ao carregar as settings; precisa ser diferente do `llm_model` e do `fallback_model` (nome sem provedor e sem organização). A chave do provedor do juiz só é conferida ao montar o juiz (`--judge`) |
 | `judge_prompt_version` | `v1` | Pasta em `prompts/judge/` |
 | `answer_sample_rows` | `20` | **Item 6.** `> 0`; linhas em `AgentAnswer.rows` e no `AnswerWriter` |
 | `semantic_layer_path` | `ai-agent/semantic/semantic_layer.yaml` | **Item 5.** Resolvido pelo caminho do pacote, como o `.env` |
