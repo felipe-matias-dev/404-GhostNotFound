@@ -1,6 +1,6 @@
 from collections import defaultdict
 
-from venergy_agent.domain.answer import AgentAnswer
+from venergy_agent.domain.answer import AgentAnswer, AnswerStatus
 from venergy_agent.domain.conversation import ConversationTurn
 
 
@@ -23,7 +23,12 @@ class InMemoryConversationHistory:
     async def recent(self, session_id: str, limit: int) -> tuple[ConversationTurn, ...]:
         if limit <= 0:
             return ()
-        return tuple(self._turns[session_id][-limit:]) if session_id in self._turns else ()
+        turns = [
+            turn
+            for turn in self._turns.get(session_id, [])
+            if turn.status is not AnswerStatus.REFUSED
+        ]
+        return tuple(turns[-limit:])
 
     async def tokens_used(self, session_id: str) -> int:
         return self._tokens.get(session_id, 0)

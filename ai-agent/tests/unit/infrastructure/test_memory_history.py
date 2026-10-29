@@ -54,3 +54,15 @@ async def test_tokens_used_sums_input_and_output_of_the_session():
 
     assert await history.tokens_used("s1") == 36
     assert await history.tokens_used("nova") == 0
+
+
+async def test_refused_turns_do_not_take_a_slot_of_the_limit():
+    history = InMemoryConversationHistory()
+    await history.record("s1", "respondida", answer())
+    await history.record("s1", "recusada 1", answer(status=AnswerStatus.REFUSED))
+    await history.record("s1", "recusada 2", answer(status=AnswerStatus.REFUSED))
+    await history.record("s1", "mais recente", answer())
+
+    turns = await history.recent("s1", 2)
+
+    assert [turn.question for turn in turns] == ["respondida", "mais recente"]

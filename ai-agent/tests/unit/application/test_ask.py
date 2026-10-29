@@ -23,6 +23,7 @@ from venergy_agent.config import AGENT_ROOT, REPO_ROOT
 from venergy_agent.domain.answer import AnswerStatus, Confidence
 from venergy_agent.domain.conversation import ConversationTurn
 from venergy_agent.domain.errors import ErrorKind, QueryExecutionError
+from venergy_agent.domain.narration import Narration
 from venergy_agent.domain.sql import DraftStatus, Generation, QueryResult, SqlDraft
 from venergy_agent.infrastructure.semantic_source import YamlSemanticLayerSource
 from venergy_agent.infrastructure.sql_validator import SqlglotValidator
@@ -79,16 +80,17 @@ class ScriptedExecutor:
 
 
 class FixedWriter:
-    def __init__(self, text=None, error=None):
+    def __init__(self, text=None, error=None, input_tokens=0):
         self._text = text
         self._error = error
+        self._input_tokens = input_tokens
         self.calls = 0
 
     async def write(self, question, draft, result):
         self.calls += 1
         if self._error:
             raise self._error
-        return self._text
+        return Narration(text=self._text, input_tokens=self._input_tokens)
 
 
 class FakeHistory:
@@ -969,3 +971,14 @@ async def test_budget_log_has_numbers_only(layer, caplog):
     lines = [json.loads(record.getMessage()) for record in caplog.records]
     (line,) = [entry for entry in lines if entry["step"] == "orcamento"]
     assert (line["tokens_usados"], line["orcamento"]) == (7, 1000)
+
+
+async def test_narration_tokens_count_toward_the_answer_usage(layer):
+    writer = FixedWriter(text="Há 3 UCs.", input_tokens=500)
+
+    answer = await use_case(layer, ScriptedGenerator(generation()), writer=writer).ask(
+        "quantas?", "s1"
+    )
+
+    assert answer.answer == "Há 3 UCs."
+    assert answer.input_tokens == generation().input_tokens + 500

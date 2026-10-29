@@ -38,9 +38,9 @@ async def test_returns_the_text_the_model_wrote_without_surrounding_spaces():
     model, _ = narrating_model("  Há 3 UCs em Olinda.  ")
     result = QueryResult(columns=("total",), rows=({"total": 3},), row_count=1, truncated=False)
 
-    text = await writer(model).write(QUESTION, DRAFT, result)
+    narration = await writer(model).write(QUESTION, DRAFT, result)
 
-    assert text == "Há 3 UCs em Olinda."
+    assert narration.text == "Há 3 UCs em Olinda."
 
 
 async def test_shipped_prompt_v3_asks_to_name_the_period_of_the_rows():
