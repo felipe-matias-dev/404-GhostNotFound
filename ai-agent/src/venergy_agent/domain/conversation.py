@@ -10,3 +10,4 @@ class ConversationTurn(BaseModel):
     question: NonBlankText
     sql: NonBlankText | None
     status: AnswerStatus
+    clarification: NonBlankText | None = None

@@ -393,7 +393,10 @@ class AiAuditoria(Base):
     __tablename__ = "ai_auditoria"
     # Schema app: o agente nunca o acessa e a carga da Gold nunca o apaga. A gravação usa a
     # conexão do backend, e não a do agente, que é somente leitura.
-    __table_args__ = {"schema": "app"}
+    __table_args__ = (
+        Index("ix_ai_auditoria_session_id", "session_id", "id"),
+        {"schema": "app"},
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

@@ -26,6 +26,7 @@ def gravar(
     input_tokens: int = 0,
     output_tokens: int = 0,
     minutos_atras: int = 0,
+    clarification: str | None = None,
 ) -> None:
     with Session(engine) as session, session.begin():
         session.add(
@@ -48,6 +49,7 @@ def gravar(
                 latency_ms=1,
                 input_tokens=input_tokens,
                 output_tokens=output_tokens,
+                clarification=clarification,
             )
         )
 
@@ -88,3 +90,30 @@ def test_tokens_used_sums_input_and_output_of_the_session_only(engine: Engine) -
 
     assert asyncio.run(historico.tokens_used("s1")) == 175
     assert asyncio.run(historico.tokens_used("sem-linhas")) == 0
+
+
+def test_refused_turns_do_not_take_a_slot_of_the_limit(engine: Engine) -> None:
+    gravar(engine, "s1", "respondida", minutos_atras=30)
+    gravar(engine, "s1", "recusada 1", status="refused", sql=None, minutos_atras=20)
+    gravar(engine, "s1", "recusada 2", status="refused", sql=None, minutos_atras=10)
+    gravar(engine, "s1", "mais recente", minutos_atras=5)
+
+    turnos = asyncio.run(HistoricoAuditoria(engine).recent("s1", 2))
+
+    assert [turno.question for turno in turnos] == ["respondida", "mais recente"]
+
+
+def test_a_clarify_turn_keeps_the_question_the_agent_asked(engine: Engine) -> None:
+    gravar(
+        engine,
+        "s1",
+        "E o FEC?",
+        status="clarify",
+        sql=None,
+        minutos_atras=5,
+        clarification="Qual período você quer?",
+    )
+
+    [turno] = asyncio.run(HistoricoAuditoria(engine).recent("s1", 3))
+
+    assert turno.clarification == "Qual período você quer?"

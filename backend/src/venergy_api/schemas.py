@@ -642,15 +642,14 @@ class PerguntaIaSchema(BaseModel):
     session_id: UUID | None = None
 
 
-class RespostaIaSchema(BaseModel):
-    """A resposta do agente (AgentAnswer) mais o id do registro de auditoria dela."""
+class RespostaIaBaseSchema(BaseModel):
+    """A resposta do agente (AgentAnswer) mais o id do registro de auditoria dela, sem a sessão."""
 
     model_config = ConfigDict(from_attributes=True)
 
     # O registro é lido pelo atributo id; no JSON o campo se chama audit_id, para o portal
     # montar o link do painel de auditoria sem confundir com outros ids.
     audit_id: int = Field(validation_alias="id")
-    session_id: str
     answer: str
     status: AnswerStatus
     sql: str | None
@@ -672,7 +671,14 @@ class RespostaIaSchema(BaseModel):
     output_tokens: int
 
 
-class AuditoriaIaSchema(RespostaIaSchema):
+class RespostaIaSchema(RespostaIaBaseSchema):
+    """A resposta devolvida pelo POST /ai/ask. Só ela traz o session_id, para o cliente
+    continuar a conversa; a auditoria não o expõe (o id da sessão protege o histórico)."""
+
+    session_id: str
+
+
+class AuditoriaIaSchema(RespostaIaBaseSchema):
     """O registro completo da auditoria: a resposta com a pergunta e o momento em que veio."""
 
     pergunta: str

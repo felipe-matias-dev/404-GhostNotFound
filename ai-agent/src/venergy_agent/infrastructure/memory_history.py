@@ -11,7 +11,12 @@ class InMemoryConversationHistory:
 
     async def record(self, session_id: str, question: str, answer: AgentAnswer) -> None:
         self._turns[session_id].append(
-            ConversationTurn(question=question, sql=answer.sql, status=answer.status)
+            ConversationTurn(
+                question=question,
+                sql=answer.sql,
+                status=answer.status,
+                clarification=answer.clarification,
+            )
         )
         self._tokens[session_id] += answer.input_tokens + answer.output_tokens
 

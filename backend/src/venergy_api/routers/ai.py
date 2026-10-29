@@ -34,12 +34,23 @@ async def perguntar(
     """Pergunta ao agente e grava a resposta, qualquer que seja o status, na auditoria.
 
     Responde 429, sem chamar o agente, se a sessão já fez o máximo de perguntas na janela.
+    O limite só vale quando o pedido traz o session_id: sem ele, cada pedido ganha uma sessão
+    nova, com o contador zerado. O identificador é a única proteção do histórico e do
+    orçamento (DEC-046), e não há autenticação.
     """
     session_id = str(pedido.session_id or uuid4())
     limite = request.app.state.ai_limite_perguntas
     janela = request.app.state.ai_janela_segundos
     if limite > 0:
-        feitas = await run_in_threadpool(contar_perguntas_recentes, session, session_id, janela)
+        try:
+            feitas = await run_in_threadpool(contar_perguntas_recentes, session, session_id, janela)
+        except SQLAlchemyError as error:
+            # Só o tipo do erro vai para o log: a mensagem do SQLAlchemy traz os parâmetros.
+            logger.error("Falha ao contar as perguntas da sessão (%s)", type(error).__name__)
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Não foi possível verificar o limite de perguntas agora. Tente de novo.",
+            ) from error
         if feitas >= limite:
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,

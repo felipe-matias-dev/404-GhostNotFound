@@ -339,6 +339,9 @@ export interface paths {
          * @description Pergunta ao agente e grava a resposta, qualquer que seja o status, na auditoria.
          *
          *     Responde 429, sem chamar o agente, se a sessão já fez o máximo de perguntas na janela.
+         *     O limite só vale quando o pedido traz o session_id: sem ele, cada pedido ganha uma sessão
+         *     nova, com o contador zerado. O identificador é a única proteção do histórico e do
+         *     orçamento (DEC-046), e não há autenticação.
          */
         post: operations["perguntar_ai_ask_post"];
         delete?: never;
@@ -423,8 +426,6 @@ export interface components {
         AuditoriaIaSchema: {
             /** Audit Id */
             audit_id: number;
-            /** Session Id */
-            session_id: string;
             /** Answer */
             answer: string;
             status: components["schemas"]["AnswerStatus"];
@@ -1061,13 +1062,12 @@ export interface components {
         };
         /**
          * RespostaIaSchema
-         * @description A resposta do agente (AgentAnswer) mais o id do registro de auditoria dela.
+         * @description A resposta devolvida pelo POST /ai/ask. Só ela traz o session_id, para o cliente
+         *     continuar a conversa; a auditoria não o expõe (o id da sessão protege o histórico).
          */
         RespostaIaSchema: {
             /** Audit Id */
             audit_id: number;
-            /** Session Id */
-            session_id: string;
             /** Answer */
             answer: string;
             status: components["schemas"]["AnswerStatus"];
@@ -1102,6 +1102,8 @@ export interface components {
             input_tokens: number;
             /** Output Tokens */
             output_tokens: number;
+            /** Session Id */
+            session_id: string;
         };
         /**
          * ResultadoOrdem

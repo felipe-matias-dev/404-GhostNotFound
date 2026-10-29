@@ -11,4 +11,7 @@ def render_history(template: str, turns: tuple[ConversationTurn, ...], nonce: st
 
 
 def _turn_text(turn: ConversationTurn) -> str:
-    return f"Pergunta: {turn.question}\nStatus: {turn.status.value}\nSQL: {turn.sql or NO_SQL}"
+    text = f"Pergunta: {turn.question}\nStatus: {turn.status.value}\nSQL: {turn.sql or NO_SQL}"
+    if turn.clarification is None:
+        return text
+    return f"{text}\nEsclarecimento pedido: {turn.clarification}"

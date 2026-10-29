@@ -234,9 +234,12 @@ def test_audit_returns_what_the_post_answered(
     assert response.status_code == 200, response.text
     auditoria = response.json()
     # Tudo o que o POST entregou volta igual, inclusive a amostra com Decimal e data.
-    assert {campo: auditoria[campo] for campo in resposta} == resposta
+    # A auditoria não expõe o session_id: ele só volta na resposta do POST.
+    assert {campo: auditoria[campo] for campo in resposta if campo != "session_id"} == {
+        campo: valor for campo, valor in resposta.items() if campo != "session_id"
+    }
+    assert resposta["session_id"] == SESSAO
     assert auditoria["pergunta"] == PERGUNTA
-    assert auditoria["session_id"] == SESSAO
     assert auditoria["criado_em"]
     assert auditoria["sql"].startswith("SELECT competencia")
     assert auditoria["rows"][0]["receita_faturada"] == "1234.50"
@@ -388,3 +391,37 @@ def test_echoes_the_session_id_sent_by_the_client(
     corpo = client.post("/ai/ask", json={"question": PERGUNTA, "session_id": SESSAO}).json()
 
     assert corpo["session_id"] == SESSAO
+
+
+def test_answers_503_when_the_limit_cannot_be_checked_and_does_not_call_the_agent(
+    engine: Engine,
+    client_with_limit: Callable[[int], tuple[TestClient, AgenteFalso]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, agente = client_with_limit(2)
+
+    def contador_quebrado(*args: object, **kwargs: object) -> int:
+        raise OperationalError(
+            "SELECT count(*) FROM app.ai_auditoria", {"sessao": SESSAO}, Exception()
+        )
+
+    monkeypatch.setattr("venergy_api.routers.ai.contar_perguntas_recentes", contador_quebrado)
+
+    response = client.post("/ai/ask", json={"question": PERGUNTA, "session_id": SESSAO})
+
+    assert response.status_code == 503
+    assert agente.chamadas == []
+    assert SESSAO not in response.text
+
+
+def test_audit_does_not_expose_the_session_id(
+    engine: Engine, client_for: Callable[[Engine], TestClient]
+) -> None:
+    with Session(engine) as session:
+        gravar_auditoria(session, PERGUNTA, SESSAO, answered_answer())
+    [auditoria] = stored_audits(engine)
+
+    response = client_for(engine).get(f"/ai/audit/{auditoria.id}")
+
+    assert response.status_code == 200
+    assert "session_id" not in response.json()

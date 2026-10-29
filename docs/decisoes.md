@@ -1399,6 +1399,8 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Pendente (regra de merge, DEC-016):** a troca do prompt padrão para a v3 só entra na `main` depois de `make eval ONLY=golden`
   na v2 e na v3 e `make eval ONLY=red_team` na v3, sem regressão nos itens comuns (os que não são follow-up) e com pelo menos 4 dos 5 follow-ups do golden
   (G046, G099, G100, G102, G103) certos, inclusive o G046, com a memória ligada no runner da avaliação (amostra). Sem cota do Gemini na data, a rodada não foi feita; os números entram aqui e na spec §9.6.
+- **Atualização (29/10/2026, revisão do Felipe no #86):** o `session_id` não sai na auditoria (`GET /ai/audit/{id}`), só na resposta do `POST /ai/ask`. Sem o campo no pedido, cada chamada ganha uma sessão nova e o limite de perguntas e o orçamento não valem para ela. O identificador aleatório é a única proteção do histórico, sem autenticação: é trava de custo, não de segurança. O limite de perguntas e o orçamento começam a contar a partir do `session_id` recebido.
+
 
 ## DEC-042 · Visão 360 da UC e comparação sazonal do consumo
 

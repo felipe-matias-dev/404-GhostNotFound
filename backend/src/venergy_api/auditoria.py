@@ -66,6 +66,20 @@ def garantir_colunas_de_tokens(connection: Connection) -> None:
     )
 
 
+def garantir_indice_da_sessao(connection: Connection) -> None:
+    """Acrescenta o índice (session_id, id) à auditoria de um banco criado antes dele.
+
+    O contador do limite, a soma de tokens e o histórico filtram por sessão a cada pergunta.
+    Sem o índice, isso lê a tabela inteira, que só cresce.
+    """
+    connection.execute(
+        text(
+            "CREATE INDEX IF NOT EXISTS ix_ai_auditoria_session_id "
+            "ON app.ai_auditoria (session_id, id)"
+        )
+    )
+
+
 def garantir_colunas_na_subida(obter_engine: Callable[[], Engine]) -> None:
     """Garante as colunas na subida da API, para um banco antigo não quebrar o /ai/ask.
 
@@ -75,6 +89,7 @@ def garantir_colunas_na_subida(obter_engine: Callable[[], Engine]) -> None:
     try:
         with obter_engine().begin() as connection:
             garantir_colunas_de_tokens(connection)
+            garantir_indice_da_sessao(connection)
     except SQLAlchemyError as error:
         logger.warning(
             "Não foi possível conferir as colunas da auditoria na subida (%s). "

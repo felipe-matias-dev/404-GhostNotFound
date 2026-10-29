@@ -8,7 +8,9 @@ from venergy_agent.domain.conversation import ConversationTurn
 
 from venergy_api.models import AiAuditoria
 
-STATUS_CONHECIDOS = [status.value for status in AnswerStatus]
+STATUS_DO_HISTORICO = [
+    status.value for status in AnswerStatus if status is not AnswerStatus.REFUSED
+]
 
 
 class HistoricoAuditoria:
@@ -34,18 +36,28 @@ class HistoricoAuditoria:
             return ()
         with Session(self._engine) as session:
             linhas = session.execute(
-                select(AiAuditoria.pergunta, AiAuditoria.sql, AiAuditoria.status)
+                select(
+                    AiAuditoria.pergunta,
+                    AiAuditoria.sql,
+                    AiAuditoria.status,
+                    AiAuditoria.clarification,
+                )
                 .where(
                     AiAuditoria.session_id == session_id,
                     # Um status que o agente não conhece fica de fora, em vez de derrubar a leitura.
-                    AiAuditoria.status.in_(STATUS_CONHECIDOS),
+                    AiAuditoria.status.in_(STATUS_DO_HISTORICO),
                 )
                 .order_by(AiAuditoria.id.desc())
                 .limit(limit)
             ).all()
         return tuple(
-            ConversationTurn(question=pergunta, sql=sql or None, status=AnswerStatus(status))
-            for pergunta, sql, status in reversed(linhas)
+            ConversationTurn(
+                question=pergunta,
+                sql=sql or None,
+                status=AnswerStatus(status),
+                clarification=clarification,
+            )
+            for pergunta, sql, status, clarification in reversed(linhas)
         )
 
     def _tokens_used(self, session_id: str) -> int:
