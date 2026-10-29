@@ -47,6 +47,8 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | 27/10/2026 | DEC-038: a carga da Gold lê cada CSV aos poucos e grava em lotes de 10 mil linhas, depois de uma primeira rodada que só confere os arquivos; a memória deixa de crescer com o tamanho da Gold | A carga antiga guardava os 12 CSVs inteiros na memória e derrubou o WSL de 8 GB com os ~4 milhões de linhas da Gold real; a conferência antes de gravar continua garantindo que um arquivo fora do contrato não altera o banco | Felipe |
 | 27/10/2026 | DEC-039: Workflow do Databricks com os notebooks lidos do GitHub (`main`), serverless, Landing → Bronze → Silver → Gold + export, reprocessando tudo (diverge da ADR-07); agendamento mensal no dia 6, pausado | Roda o código revisado e mantém o tudo ou nada de cada camada numa extração única; a origem fecha o faturamento uma vez por mês | Arthur |
 | 27/10/2026 | DEC-041: redesign da tela da diretoria: frase de leitura, receita e energia de 12 meses contra os 12 primeiros da base, tesoura em variação de 12 meses corridos e faixa mês contra mês com sparklines; área do `TrendChart` só com eixo a partir do zero; rotas `GET /indicadores/comparacao` e `GET /indicadores/janelas`; API 0.10.0 | A tela responde à pergunta da diretoria (receita sobe, volume cai) em vez de listar seis números de mesmo peso; a área sobre eixo truncado exagerava a variação; DEC, FEC, satisfação, base de UCs e tarifa de um período são contas de backend | João Euclides |
+| 28/10/2026 | DEC-042: a interface de UC consome exclusivamente `Uc360Schema` e as regras da DEC-044; a referência é global à Gold, e estabilidade não significa ausência de alta | Elimina o backend duplicado e mantém a apresentação fiel ao contrato aprovado do PR #55 | João Euclides |
+| 28/10/2026 | DEC-043: Consulta de UC na sidebar e Ctrl/Cmd + K abrem a palette global; só os cinco códigos consultados com sucesso ficam nos recentes locais | Consulta rápida sem abandonar o contexto, sem persistir nomes ou valores e sem navegar antes de validar a UC | João Euclides |
 | 27/10/2026 | DEC-040: `GET /receita/insight` devolve o insight de IA da tela de receita; o backend monta o JSON de métricas a partir da ponte da Gold, com valores arredondados como a tela os mostra, e guarda o texto num cache em memória pelo conteúdo das métricas; sem a chave do Gemini a rota responde 503; API 0.9.0 | O agente só aceita texto cujos números sejam exatamente valores do JSON (DEC-019), e uma Gold recarregada precisa gerar um insight novo, nunca um velho | Felipe |
 | 27/10/2026 | DEC-044: a visão 360 da unidade consumidora sai de uma rota só, `GET /unidades-consumidoras/{cod_uc}/visao-360`; os 12 meses terminam na última competência da Gold e a "conta alta" é o último mês contra o mesmo mês do ano anterior, com faixa de ±10%; integrada à API 0.9.0 da main | O atendente está com o cliente na linha: uma chamada só à API e uma resposta pronta para "o consumo subiu?", sem a tela refazer conta de negócio | Felipe |
 
@@ -1348,3 +1350,67 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   A tela `/uc` do frontend pode usar o tipo gerado do OpenAPI.
   A decisão foi renumerada de DEC-036 para DEC-044 na resolução do PR #55: DEC-036 já identifica a tela
   da diretoria na `main`, e DEC-041 a DEC-043 estão reservadas nas branches do portal.
+
+## DEC-042 · Visão 360 da UC e comparação sazonal do consumo
+
+- **Data:** 28/10/2026 · **Área:** Portal · **Revisada após o PR #55:** a DEC-044 é a autoridade
+  para endpoint, schemas, janela e cálculos. Esta decisão trata somente da apresentação.
+- **Contrato único:** `/uc` consome `Uc360Schema`, gerado do OpenAPI, em uma única chamada a
+  `GET /unidades-consumidoras/{cod_uc}/visao-360`. Não há implementação ou schema concorrente
+  nem adaptação de compatibilidade com o contrato anterior.
+- **Consumo:** `consumo.meses` cobre os 12 meses até `consumo.referencia`, a última competência
+  de toda a Gold, mesmo se a UC parou de faturar antes. Lacunas são `null`, não zero.
+  `tendencia` vem pronta: `subiu` acima de +10%, `caiu` abaixo de −10%, `estavel` entre os
+  limites inclusive, `sem_comparacao` sem par ou com base zero. Estável pode ser uma alta de 5%:
+  a tela descreve a faixa e mostra `variacao_ultimo_mes_pct`, sem classificar por conta própria.
+  `variacao_12m_pct` e `meses_comparados` vêm do backend e consideram somente pares com fatura.
+  Os totais de kWh do payload somam tudo faturado, não apenas os pares; não são recalculados.
+- **Diferenças funcionais:** deixam de existir a diferença absoluta em kWh, a conta monetária
+  do ano anterior e o tipo de leitura na tela, pois o contrato aprovado não os fornece.
+  Permanecem consumo dos dois anos, valor/dias/bandeira do mês de referência e percentuais
+  calculados pelo backend. Sem fatura na referência global, não se promove uma conta antiga
+  a atual. Não há chamadas em cascata para recuperar o formato removido.
+- **Limite de interpretação:** consumo faturado não explica sozinho o valor da conta.
+  Com GD, energia faturada não representa necessariamente todo o consumo do imóvel.
+- **Históricos:** `faturas_nao_pagas.itens` não tem corte de período, e `atendimentos` alimenta
+  os chamados. Situação e dias em atraso vêm da Gold. A API não trunca listas; paginação de
+  cinco registros ocorre na apresentação. Falha é erro, não lista vazia. Inspeções continuam
+  no contrato, sem criar uma funcionalidade nova na interface.
+- **Interface:** shell e DS VE-360 preservados, sem dependências novas. Consumo e faturas na
+  coluna principal, cadastro/equipamento/GD na auxiliar, históricos em largura total. No mobile,
+  tabelas viram cards. Avisos usam `danger`/`danger-subtle`, com retry neutro.
+- **Atualização:** troca de UC não mostra dados da anterior; refetch da mesma UC mantém o
+  conteúdo e identifica dados anteriores em caso de falha. Busca textual exata, sem normalizar zeros.
+- **Segurança operacional:** sem carga ou migration na base de desenvolvimento. Fixtures
+  destrutivas só em `venergy_test`, na porta publicada pelo compose. Sem estado de rede
+  em tempo real, pagamento ou abertura de chamado.
+
+## DEC-043 · Palette global de UCs e navegação por contexto
+
+- **Data:** 28/10/2026 · **Área:** Portal · **Complementa:** DEC-042
+- **Problema:** uma página inicial dedicada a um único campo de busca interrompia o fluxo
+  de quem já estava analisando outra tela. A sidebar plana não distinguia análise de operação.
+- **Decisão:** **Consulta de UC** abre uma palette global, acessível também por Ctrl/Cmd + K.
+  Seleção por teclado (setas, Home/End, Enter), ponteiro ou toque. Esc/fundo/fechar dispensam
+  o modal. Reutiliza `Modal`, incluindo foco preso, restauração de foco, `inert` e scroll lock,
+  e o feedback de seleção/reordenação do Interior como referência, com tokens VE-360 e reduced-motion.
+- **Busca:** o código continua textual e exato. Não existe autocomplete global por nome nem
+  normalização arbitrária de zeros. O filtro é somente sobre os códigos recentes. A palette
+  consulta o endpoint agregado e só navega após sucesso, preenchendo o cache da página com
+  essa resposta. Falhas permanecem na palette; alterar o texto ou fechar aborta o pedido.
+  O fechamento aborta sincronamente, antes da animação de saída; não depende do cleanup de
+  desmontagem para impedir navegação tardia. Toda consulta bem-sucedida na palette registra o
+  código, inclusive reconsulta da UC atual após limpar recentes, sem depender de mudança no cache.
+- **Recentes:** até cinco códigos únicos em ordem de consulta bem-sucedida, incluindo acesso
+  por link direto. Reconsultar move ao topo. `localStorage` guarda só códigos, nunca titular,
+  documento ou valores. A lista é deste navegador, não é um histórico de atendimentos nem
+  uma lista compartilhada entre operadores. Há ação de limpar. Conteúdo inválido é descartado;
+  armazenamento bloqueado não impede consultar, mas limita os recentes à sessão e informa isso.
+- **Sidebar:** dois grupos discretos, sem submenus ou equipes fictícias: **Análise**
+  (Visão geral, Receita, Rede) e **Operação** (Consulta de UC, Perdas). Preserva o recolhimento
+  para ícones e o Sheet no mobile, sem duplicar a lista de recentes na navegação.
+- **Página:** `/uc?cod_uc=...` segue sendo a visão 360. Sem código, entrada compacta com
+  **Buscar UC**; com código, **Trocar UC** abre a mesma palette e **Atualizar dados** faz refetch.
+  Registro de conversa, abertura de chamado e pagamento continuam fora deste fluxo.
+- **Arquitetura:** provider dentro da feature, montado pela rota raiz. Shell e sidebar
+  recebem callback, sem importar regras ou dados de UC. Nenhuma dependência ou tabela nova.

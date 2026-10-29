@@ -138,7 +138,7 @@ export const Route = createFileRoute("/perdas")({
 
 `src/routes/__root.tsx` envolve todas as rotas no `AppShell` (`components/layout/app-shell`), montado sobre a Sidebar do shadcn (`components/ui/sidebar`, variante `inset`): a navegação recolhe para ícones pelo trigger, pelo rail ou com Ctrl/Cmd+B. Com a navegação aberta, o trigger fica ao lado da logo; recolhida, ele passa para o header. Abaixo de 768px a navegação vira um `Sheet` e o trigger fica sempre no header. O header traz o título da seção (o `<h1>` da página) e o painel de conteúdo rola sozinho e volta ao topo a cada tela. Rota sem match cai em `pages/nao-encontrado.tsx`, sem título no header nem item ativo na navegação.
 
-Tela nova na navegação: crie a rota e adicione o item em `NAVEGACAO` (`components/layout/app-sidebar/navegacao.ts`), com o ícone de **Fundamentos/Ícones**. O título do header e o item ativo da sidebar vêm de `useItemAtivo`; rotas filhas que existem (`/uc/$id`) herdam a seção. O conteúdo da página vai dentro de `Pagina` (`components/layout/pagina`), que fixa largura e respiro.
+Tela nova na navegação: crie a rota e adicione o item em `NAVEGACAO` (`components/layout/app-sidebar/navegacao.ts`), com grupo **Análise** ou **Operação** e o ícone de **Fundamentos/Ícones**. O título do header e o item ativo da sidebar vêm de `useItemAtivo`; rotas filhas que existem (`/uc/$id`) herdam a seção. **Consulta de UC** é uma ação que abre a palette, não um link para uma página de busca. O conteúdo da página vai dentro de `Pagina` (`components/layout/pagina`), que fixa largura e respiro.
 
 Recorte da tela no topo (ex.: `Receita › Recife ▾ › Boa Viagem ▾`): a página renderiza `<HeaderTrilha>` (`components/layout/header`) com um `Breadcrumb`, e o conteúdo aparece no header logo depois do título, que vira link para a seção sem recorte. Na Receita, cada nível é um `DropdownMenu` para trocar de município ou bairro: é a forma acessível de escolher o que o mapa também escolhe.
 
@@ -146,6 +146,37 @@ Recorte da tela no topo (ex.: `Receita › Recife ▾ › Boa Viagem ▾`): a p�
 
 `visaoGeral` (KPIs), `receita` (preço × volume), `unidadeConsumidora` (visão 360), `perdas` (fila e ordens de inspeção), `operacao` (DEC/FEC), `agente` (chat e insights de IA), `auth` (perfis, quando entrar).
 
+### Visão 360 da unidade consumidora
+
+- **Consulta de UC** na sidebar abre a palette global, também disponível por Ctrl/Cmd + K.
+  A navegação se divide em **Análise** (Visão geral, Receita, Rede) e **Operação** (Consulta de UC, Perdas).
+- A palette consulta `GET /unidades-consumidoras/{cod_uc}/visao-360` antes de navegar para
+  `/uc?cod_uc=...`. A resposta preenche o cache da visão 360, sem uma segunda consulta.
+  O código continua textual e exato; filtrar recentes não é busca global nem resolução aproximada de identidade.
+- Os cinco códigos consultados com sucesso mais recentemente ficam em `localStorage`
+  (`venergy:ucs-recentes`), sem nomes ou dados financeiros. Reconsulta move o código ao topo.
+  **Limpar recentes** apaga a lista. Armazenamento bloqueado mantém a sessão funcional e informa a limitação.
+- Setas, Home/End e Enter selecionam/consultam; Esc fecha e o modal restaura o foco.
+  Alterar o texto ou fechar cancela o pedido pendente; 404 e falha técnica não navegam nem entram nos recentes.
+  Avisos usam os tokens `danger` e `danger-subtle` (texto, borda e fundo), mantendo mensagem explícita e retry neutro.
+- Links diretos continuam funcionando. `/uc` sem código só oferece **Buscar UC**; uma UC aberta
+  oferece **Trocar UC** e **Atualizar dados**. A página não conserva um segundo formulário de busca.
+- O provider da feature é montado na rota raiz; o shell recebe apenas o callback de abertura,
+  sem importar a feature. Sem código não há consulta automática; troca de UC não reaproveita dados da anterior.
+- O único tipo agregado é `Uc360Schema` do OpenAPI (alias `Uc360`); não há contrato antigo nem
+  adaptador. `consumo.meses` alimenta o `TrendChart`; `null` interrompe a linha e zero permanece.
+  A referência é `consumo.referencia`, global à Gold. `tendencia` e os dois percentuais vêm
+  prontos do backend; estável significa faixa inclusiva de ±10%, não ausência de aumento.
+  A variação de 12 meses informa `meses_comparados` e considera somente pares com fatura.
+- A conta do ano anterior, o tipo de leitura e a diferença absoluta em kWh foram removidos:
+  não existem no contrato aprovado. Valor, dias e bandeira exibidos são só do mês de referência.
+  Não há cálculo de negócio nem chamadas em cascata para reconstruir os campos antigos.
+- `faturas_nao_pagas.itens`, interrupções e `atendimentos` usam `DataTable`, cinco linhas por página.
+  Cadastro, equipamento e GD ficam visíveis sem abas. Só dados mascarados identificam o titular.
+- Refetch mantém os dados da mesma UC; uma falha os identifica como anteriores e oferece
+  repetição. 404 é distinto de falha técnica. Não há operação de pagamento nem abertura de chamado.
+- DS VE-360 preservado: grid operacional de duas colunas no desktop, uma no mobile,
+  tabelas responsivas em cards e motion somente dos componentes internos (V3 M2 D8).
 ### Visão geral da diretoria
 
 - Resumo de 12 meses e faixa mensal: valores e variações de `GET /indicadores/comparacao`.

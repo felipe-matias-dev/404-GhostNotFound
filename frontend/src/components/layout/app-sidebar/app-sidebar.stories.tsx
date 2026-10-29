@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { fn } from "storybook/test";
 import { SidebarProvider } from "#/components/ui/sidebar";
 import { TooltipProvider } from "#/components/ui/tooltip";
 import { AppSidebar } from "./app-sidebar";
@@ -10,7 +11,7 @@ const meta = {
 	title: "Layout/AppSidebar",
 	component: AppSidebar,
 	tags: ["autodocs"],
-	args: { itens: NAVEGACAO },
+	args: { itens: NAVEGACAO, onConsultarUc: fn() },
 	parameters: { layout: "fullscreen", rota: "/" },
 	decorators: [
 		(Story, { parameters }) => (
