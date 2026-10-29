@@ -31,6 +31,11 @@ def frontend_origin() -> str:
 
 
 @pytest.fixture
+def jwt_secret() -> str:
+    return JWT_SECRET
+
+
+@pytest.fixture
 def engine() -> Iterator[Engine]:
     engine = create_db_engine(TEST_DATABASE_URL)
     try:

@@ -18,6 +18,7 @@ from venergy_api.config import Settings, get_settings
 from venergy_api.insights import CacheInsights
 from venergy_api.routers import (
     ai,
+    auth,
     continuidade,
     fila,
     health,
@@ -49,6 +50,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # Criado com o app, e não no lifespan: o cache não depende de nada externo, e o app dos
     # testes (sem lifespan) também precisa dele.
     app.state.cache_insights = CacheInsights()
+    # A dependência de login lê o segredo daqui, e não de get_settings(): os testes montam o
+    # app com as próprias configurações.
+    app.state.settings = settings
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
@@ -56,6 +60,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_methods=["GET", "POST", "PATCH"],
     )
     app.include_router(health.router)
+    app.include_router(auth.router)
     app.include_router(unidades.router)
     app.include_router(receita.router)
     app.include_router(continuidade.router)

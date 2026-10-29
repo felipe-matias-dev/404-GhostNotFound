@@ -30,6 +30,109 @@
         }
       }
     },
+    "/auth/login": {
+      "post": {
+        "tags": [
+          "autenticação"
+        ],
+        "summary": "Entrar",
+        "operationId": "entrar_auth_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginSchema"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsuarioLogado"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErroSchema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/me": {
+      "get": {
+        "tags": [
+          "autenticação"
+        ],
+        "summary": "Quem Sou Eu",
+        "description": "Quem está logado. O portal chama ao abrir, para saber o perfil e montar o menu.",
+        "operationId": "quem_sou_eu_auth_me_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsuarioLogado"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErroSchema"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ]
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "tags": [
+          "autenticação"
+        ],
+        "summary": "Sair",
+        "description": "Apaga o cookie. Sem sessão também responde 204: sair duas vezes não é erro.",
+        "operationId": "sair_auth_logout_post",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        }
+      }
+    },
     "/unidades-consumidoras/{cod_uc}": {
       "get": {
         "tags": [
@@ -3014,6 +3117,29 @@
         "title": "KpisMensaisSchema",
         "description": "Indicadores executivos de uma competência."
       },
+      "LoginSchema": {
+        "properties": {
+          "login": {
+            "type": "string",
+            "maxLength": 50,
+            "minLength": 1,
+            "title": "Login"
+          },
+          "senha": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Senha"
+          }
+        },
+        "type": "object",
+        "required": [
+          "login",
+          "senha"
+        ],
+        "title": "LoginSchema",
+        "description": "Pedido de login. Os tetos evitam que um corpo gigante vire trabalho para o Argon2."
+      },
       "MedidorUcSchema": {
         "properties": {
           "cod_uc": {
@@ -3250,6 +3376,17 @@
         ],
         "title": "ParPeriodosSchema",
         "description": "Um par de períodos que a Gold gravou na decomposição (DEC-028)."
+      },
+      "Perfil": {
+        "type": "string",
+        "enum": [
+          "diretoria",
+          "atendimento",
+          "perdas",
+          "operacao",
+          "ti"
+        ],
+        "title": "Perfil"
       },
       "PerguntaIaSchema": {
         "properties": {
@@ -3714,6 +3851,28 @@
         "title": "Uc360Schema",
         "description": "Tudo o que o atendente precisa de uma UC numa tela só."
       },
+      "UsuarioLogado": {
+        "properties": {
+          "login": {
+            "type": "string",
+            "title": "Login"
+          },
+          "nome": {
+            "type": "string",
+            "title": "Nome"
+          },
+          "perfil": {
+            "$ref": "#/components/schemas/Perfil"
+          }
+        },
+        "type": "object",
+        "required": [
+          "login",
+          "nome",
+          "perfil"
+        ],
+        "title": "UsuarioLogado"
+      },
       "ValidationError": {
         "properties": {
           "loc": {
@@ -3942,6 +4101,13 @@
         ],
         "title": "VariacaoIndicadoresSchema",
         "description": "Variação em % de cada indicador (8.0 = +8,0%); nula sem base ou com base zero."
+      }
+    },
+    "securitySchemes": {
+      "APIKeyCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "venergy_sessao"
       }
     }
   }
