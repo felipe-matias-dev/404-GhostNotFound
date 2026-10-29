@@ -166,7 +166,7 @@ function BuscaUc({
 	const [texto, setTexto] = useState("");
 	const [selecionado, setSelecionado] = useState<string | null>(null);
 	const [pendente, setPendente] = useState<string | null>(null);
-	const [erro, setErro] = useState<string | null>(null);
+	const [erro, setErro] = useState<{ mensagem: string; codigo?: string } | null>(null);
 	const queryClient = useQueryClient();
 	const navigate = useNavigate();
 	const { registrar } = useConsultaUc();
@@ -205,11 +205,13 @@ function BuscaUc({
 			}
 		} catch (error) {
 			if (controller.signal.aborted) return;
-			setErro(
-				error instanceof ApiError && error.status === 404
-					? "UC não encontrada. Confira o código informado."
-					: "Não foi possível consultar esta UC. Tente de novo.",
-			);
+			setErro({
+				codigo: valor,
+				mensagem:
+					error instanceof ApiError && error.status === 404
+						? "UC não encontrada. Confira o código informado."
+						: "Não foi possível consultar esta UC. Tente de novo.",
+			});
 		} finally {
 			if (!controller.signal.aborted) setPendente(null);
 		}
@@ -233,7 +235,7 @@ function BuscaUc({
 		} else if (event.key === "Enter") {
 			event.preventDefault();
 			if (ativo) void consultar(ativo);
-			else setErro("Informe o número da UC.");
+			else setErro({ mensagem: "Informe o número da UC." });
 		}
 	}
 
@@ -360,13 +362,13 @@ function BuscaUc({
 					role="alert"
 					className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-danger/40 bg-danger-subtle p-3"
 				>
-					<p className="text-body text-danger">{erro}</p>
-					{codigo && (
+					<p className="text-body text-danger">{erro.mensagem}</p>
+					{erro.codigo && (
 						<Button
 							variant="outline"
 							size="sm"
 							disabled={Boolean(pendente)}
-							onClick={() => void consultar(codigo)}
+							onClick={() => void consultar(erro.codigo!)}
 						>
 							Tentar de novo
 						</Button>

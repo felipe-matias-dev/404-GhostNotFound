@@ -215,7 +215,8 @@ carrega `src/styles.css`.
   tamanho, peso, cor e acessibilidade em **Fundamentos/Ícones**.
 - Gráficos: SVG próprio com `motion`; `d3-scale` e `d3-shape` só para escalas e curvas
   (DEC-037). Cores das séries pelos tokens `chart-1` a `chart-6` e `chart-muted`. Tendência
-  ao longo do tempo: `TrendChart`; ponte de efeitos: `WaterfallChart`.
+  ao longo do tempo: `TrendChart`; séries compactas: `Sparkline`; ponte de efeitos:
+  `WaterfallChart`. A área do `TrendChart` só é usada com eixo a partir do zero (DEC-041).
 
 Regras e modelo de story na página **Introdução** do Storybook
 (`.storybook/docs/introducao.mdx`).
