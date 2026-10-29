@@ -7,8 +7,10 @@ from venergy_agent.evaluation.__main__ import (
     RUNS_DIR,
     RUNS_GOLD_DIR,
     DatasetMismatch,
+    JudgeNotAllowed,
     check_dataset,
     format_metrics,
+    judges,
     load_set,
     main,
     narrates,
@@ -102,3 +104,34 @@ def test_loaded_database_must_be_the_declared_dataset(dataset, uc_count):
 @pytest.mark.parametrize(("dataset", "uc_count"), [("amostra", 8), ("gold_real", 50_000)])
 def test_matching_database_passes_the_check(dataset, uc_count):
     check_dataset(dataset, uc_count)
+
+
+def test_judge_is_off_unless_requested():
+    assert judges("amostra", judge=False, sql_only=False) is False
+    assert judges("gold_real", judge=False, sql_only=False) is False
+
+
+def test_judge_runs_on_the_sample_when_requested():
+    assert judges("amostra", judge=True, sql_only=False) is True
+
+
+def test_judge_is_refused_on_the_real_gold_and_names_the_reason():
+    with pytest.raises(JudgeNotAllowed, match="#56"):
+        judges("gold_real", judge=True, sql_only=False)
+
+
+def test_judge_is_refused_without_the_narrative():
+    with pytest.raises(JudgeNotAllowed, match="--sql-only"):
+        judges("amostra", judge=True, sql_only=True)
+
+
+def test_judge_mean_score_is_a_number_and_not_a_percentage():
+    lines = format_metrics({"judge_mean_score": 4.2, "judge_pass_rate": 0.8})
+
+    assert lines[0].endswith("4.20")
+    assert lines[1].endswith("80.0%")
+
+
+def test_judge_flag_is_refused_before_any_connection_on_the_real_gold(capsys):
+    assert main(["--dataset", "gold_real", "--judge"]) == 1
+    assert "juiz" in capsys.readouterr().err
