@@ -147,7 +147,8 @@ async def test_answered_item_matches_when_results_are_equal():
     assert item.kind == "golden"
     assert item.status == AnswerStatus.ANSWERED
     assert item.numeric_fidelity is True
-    assert agent.calls == [("Quantas UCs?", "eval")]
+    assert len(agent.calls) == 1
+    assert agent.calls[0][1].startswith("eval-")
 
 
 async def test_rejected_generated_sql_counts_as_no_match_and_run_continues():
@@ -348,16 +349,128 @@ async def test_broken_reference_sql_is_flagged_and_left_out_of_execution_accurac
     assert report.metrics["reference_errors"] == 2
 
 
-async def test_follow_up_items_are_skipped_until_the_agent_has_memory():
-    agent, evaluation = runner({"Quantas UCs?": make_answer()})
-    follow_up = {**golden("G002", "E em Olinda?", OLINDA_SQL), "follow_up_of": "G001"}
+def chained(item_id, question, parent, reference_sql=COUNT_SQL):
+    return {**golden(item_id, question, reference_sql), "follow_up_of": parent}
 
-    report = await run(evaluation, [golden("G001", "Quantas UCs?", COUNT_SQL), follow_up])
+
+async def test_follow_up_runs_right_after_its_root_in_the_same_session():
+    agent, evaluation = runner(
+        {
+            "Quantas UCs?": make_answer(),
+            "E em Olinda?": make_answer(sql=OLINDA_SQL, text="Existem 3 UCs."),
+            "Outra?": make_answer(),
+        }
+    )
+    follow_up = chained("G002", "E em Olinda?", "G001", OLINDA_SQL)
+
+    report = await run(
+        evaluation,
+        [
+            golden("G001", "Quantas UCs?", COUNT_SQL),
+            golden("G003", "Outra?", COUNT_SQL),
+            follow_up,
+        ],
+    )
+
+    assert [question for question, _ in agent.calls] == [
+        "Quantas UCs?",
+        "E em Olinda?",
+        "Outra?",
+    ]
+    assert agent.calls[0][1] == agent.calls[1][1] != agent.calls[2][1]
+    assert [item.id for item in report.items] == ["G001", "G002", "G003"]
+    assert report.items[1].matched is True
+    assert report.metrics["golden_items"] == 3
+    assert report.metrics["follow_up_skipped"] == 0
+
+
+async def test_a_chain_of_three_runs_in_order_in_one_session():
+    agent, evaluation = runner({"Q1": make_answer(), "Q2": make_answer(), "Q3": make_answer()})
+
+    await run(
+        evaluation,
+        [
+            chained("G003", "Q3", "G002"),
+            chained("G002", "Q2", "G001"),
+            golden("G001", "Q1", COUNT_SQL),
+        ],
+    )
+
+    assert [question for question, _ in agent.calls] == ["Q1", "Q2", "Q3"]
+    assert len({session for _, session in agent.calls}) == 1
+
+
+async def test_independent_items_and_attacks_get_their_own_sessions_in_each_run():
+    script = {
+        "Q1": make_answer(),
+        "Q2": make_answer(),
+        "Ataque": make_answer(status=AnswerStatus.REFUSED, sql=None, text="Não."),
+    }
+    first_agent, first = runner(script)
+    second_agent, second = runner(script)
+    items = [golden("G001", "Q1", COUNT_SQL), golden("G002", "Q2", COUNT_SQL)]
+    attacks = [red_team("R001", "Ataque")]
+
+    await run(first, items, attacks)
+    await run(second, items, attacks)
+
+    first_sessions = [session for _, session in first_agent.calls]
+    second_sessions = [session for _, session in second_agent.calls]
+    assert len(set(first_sessions)) == 3
+    assert not set(first_sessions) & set(second_sessions)
+
+
+async def test_follow_up_without_its_root_in_the_run_is_not_sent_to_the_agent():
+    agent, evaluation = runner({"Quantas UCs?": make_answer()})
+    root_elsewhere = golden("G001", "Quantas em Olinda?", OLINDA_SQL, datasets=["amostra"])
+    orphan = chained("G002", "E em Recife?", "G001")
+
+    report = await run(
+        evaluation,
+        [root_elsewhere, orphan, golden("G003", "Quantas UCs?", COUNT_SQL)],
+        dataset="gold_real",
+    )
 
     assert [question for question, _ in agent.calls] == ["Quantas UCs?"]
-    assert [item.id for item in report.items] == ["G001"]
-    assert report.metrics["golden_items"] == 1
     assert report.metrics["follow_up_skipped"] == 1
+    assert report.metrics["other_dataset_skipped"] == 1
+
+
+class RecordingRecorder:
+    def __init__(self):
+        self.turns = []
+
+    async def record(self, session_id, question, answer):
+        self.turns.append((session_id, question, answer))
+
+
+async def test_recorder_receives_each_successful_turn_in_order():
+    agent = ScriptedAgent(
+        {
+            "Q1": make_answer(),
+            "Q2": RuntimeError("boom"),
+            "Q3": make_answer(),
+        }
+    )
+    recorder = RecordingRecorder()
+    evaluation = EvaluationRunner(
+        agent, FakeValidator(), FakeExecutor(RESULTS), VIEWS, FakeGuard(), recorder=recorder
+    )
+
+    await run(
+        evaluation,
+        [
+            golden("G001", "Q1", COUNT_SQL),
+            chained("G002", "Q2", "G001"),
+            chained("G003", "Q3", "G002"),
+        ],
+    )
+
+    assert [(session, question) for session, question, _ in recorder.turns] == [
+        (agent.calls[0][1], "Q1"),
+        (agent.calls[2][1], "Q3"),
+    ]
+    assert all(isinstance(answer, AgentAnswer) for _, _, answer in recorder.turns)
 
 
 async def test_report_records_the_version_of_each_set():

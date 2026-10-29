@@ -1,4 +1,5 @@
 import asyncio
+import uuid
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from typing import Any, Literal, Protocol
@@ -16,8 +17,6 @@ from venergy_agent.evaluation.metrics import (
 )
 from venergy_agent.evaluation.report import EvaluationReport, ItemResult
 
-SESSION_ID = "eval"
-
 Kind = Literal["golden", "red_team"]
 
 
@@ -25,6 +24,10 @@ class DatabaseGuard(Protocol):
     async def snapshot(self) -> Mapping[str, str]: ...
 
     async def accepted_writes(self) -> int: ...
+
+
+class TurnRecorder(Protocol):
+    async def record(self, session_id: str, question: str, answer: AgentAnswer) -> None: ...
 
 
 class EvaluationRunner:
@@ -36,6 +39,7 @@ class EvaluationRunner:
         allowed_views: frozenset[str],
         guard: DatabaseGuard,
         pause_seconds: float = 0.0,
+        recorder: TurnRecorder | None = None,
     ) -> None:
         self._agent = agent
         self._validator = validator
@@ -43,6 +47,7 @@ class EvaluationRunner:
         self._allowed_views = allowed_views
         self._guard = guard
         self._pause_seconds = pause_seconds
+        self._recorder = recorder
         self._narrated = True
 
     async def run(
@@ -60,18 +65,24 @@ class EvaluationRunner:
     ) -> EvaluationReport:
         started_at = datetime.now(UTC)
         self._narrated = narrated
+        run_id = uuid.uuid4().hex[:8]
         in_dataset = [item for item in golden if dataset in item["datasets"]]
-        follow_ups = [item for item in in_dataset if item.get("follow_up_of")]
-        plan: list[tuple[Kind, Mapping[str, Any]]] = [
-            *(("golden", item) for item in in_dataset if not item.get("follow_up_of")),
-            *(("red_team", item) for item in red_team),
+        chains = _chains(in_dataset)
+        scheduled = sum(len(chain) for chain in chains)
+        plan: list[tuple[Kind, Mapping[str, Any], str]] = [
+            *(
+                ("golden", item, f"eval-{run_id}-{chain[0]['id']}")
+                for chain in chains
+                for item in chain
+            ),
+            *(("red_team", item, f"eval-{run_id}-{item['id']}") for item in red_team),
         ]
         before = await self._guard.snapshot()
         items: list[ItemResult] = []
-        for index, (kind, item) in enumerate(plan):
+        for index, (kind, item, session_id) in enumerate(plan):
             if index and self._pause_seconds:
                 await asyncio.sleep(self._pause_seconds)
-            items.append(await self._evaluate(kind, item))
+            items.append(await self._evaluate(kind, item, session_id))
         writes_accepted = await self._guard.accepted_writes()
         after = await self._guard.snapshot()
         views_changed = sum(after.get(view) != fingerprint for view, fingerprint in before.items())
@@ -90,12 +101,12 @@ class EvaluationRunner:
                 "writes_accepted": writes_accepted,
                 "views_changed": views_changed,
                 "red_team_violations": writes_accepted + views_changed,
-                "follow_up_skipped": len(follow_ups),
+                "follow_up_skipped": len(in_dataset) - scheduled,
                 "other_dataset_skipped": len(golden) - len(in_dataset),
             },
         )
 
-    async def _evaluate(self, kind: Kind, item: Mapping[str, Any]) -> ItemResult:
+    async def _evaluate(self, kind: Kind, item: Mapping[str, Any], session_id: str) -> ItemResult:
         golden = kind == "golden"
         question = item["question"] if golden else item["attack"]
         expected = AnswerStatus(item["expected_status"])
@@ -120,7 +131,7 @@ class EvaluationRunner:
             "reference_empty": reference_empty,
         }
         try:
-            answer = await self._agent.ask(question, session_id=SESSION_ID)
+            answer = await self._agent.ask(question, session_id=session_id)
         except Exception:
             return ItemResult(
                 **common,
@@ -131,6 +142,8 @@ class EvaluationRunner:
                 numeric_fidelity=None,
                 latency_ms=None,
             )
+        if self._recorder is not None:
+            await self._recorder.record(session_id, question, answer)
         answered = answer.status is AnswerStatus.ANSWERED
         matched = None
         if reference is not None:
@@ -174,6 +187,21 @@ class EvaluationRunner:
     async def _rows(self, sql: str) -> tuple[dict[str, object], ...]:
         query = self._validator.validate(sql, self._allowed_views)
         return (await self._executor.execute(query)).rows
+
+
+def _chains(items: Sequence[Mapping[str, Any]]) -> list[list[Mapping[str, Any]]]:
+    children: dict[str, list[Mapping[str, Any]]] = {}
+    for item in items:
+        if item.get("follow_up_of"):
+            children.setdefault(item["follow_up_of"], []).append(item)
+
+    def descendants(item: Mapping[str, Any]) -> list[Mapping[str, Any]]:
+        ordered: list[Mapping[str, Any]] = []
+        for child in children.get(item["id"], []):
+            ordered += [child, *descendants(child)]
+        return ordered
+
+    return [[item, *descendants(item)] for item in items if not item.get("follow_up_of")]
 
 
 def _metrics(items: Sequence[ItemResult]) -> dict[str, float | int | None]:
