@@ -1,6 +1,7 @@
 from collections.abc import Callable
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
+from uuid import UUID
 
 import pytest
 from fastapi.testclient import TestClient
@@ -13,9 +14,11 @@ from venergy_api.agente import get_agente
 from venergy_api.auditoria import gravar_auditoria
 from venergy_api.database import Base
 from venergy_api.models import AiAuditoria
-from venergy_api.schemas import MAX_PERGUNTA_IA, MAX_SESSAO_IA
+from venergy_api.schemas import MAX_PERGUNTA_IA
 
 PERGUNTA = "Qual foi a receita faturada em 2024-06?"
+SESSAO = "3f2b8c1e-5d4a-4e7b-9a60-1c2d3e4f5a6b"
+OUTRA_SESSAO = "9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d"
 
 
 class AgenteFalso:
@@ -106,7 +109,7 @@ def test_answers_and_returns_the_audit_id(
 ) -> None:
     client, agente = client_with_agent(answered_answer())
 
-    response = client.post("/ai/ask", json={"question": PERGUNTA, "session_id": "sessao-1"})
+    response = client.post("/ai/ask", json={"question": PERGUNTA, "session_id": SESSAO})
 
     assert response.status_code == 200, response.text
     corpo = response.json()
@@ -118,7 +121,7 @@ def test_answers_and_returns_the_audit_id(
     assert corpo["confidence"] == "high"
     assert corpo["request_id"] == "req-answered"
     assert (corpo["input_tokens"], corpo["output_tokens"]) == (1200, 80)
-    assert agente.chamadas == [(PERGUNTA, "sessao-1")]
+    assert agente.chamadas == [(PERGUNTA, SESSAO)]
 
 
 def test_stores_every_field_of_the_answer_with_exact_values(
@@ -126,11 +129,11 @@ def test_stores_every_field_of_the_answer_with_exact_values(
 ) -> None:
     client, _ = client_with_agent(answered_answer())
 
-    client.post("/ai/ask", json={"question": PERGUNTA, "session_id": "sessao-1"})
+    client.post("/ai/ask", json={"question": PERGUNTA, "session_id": SESSAO})
 
     [auditoria] = stored_audits(engine)
     assert auditoria.pergunta == PERGUNTA
-    assert auditoria.session_id == "sessao-1"
+    assert auditoria.session_id == SESSAO
     assert auditoria.criado_em is not None
     assert auditoria.sql == (
         "SELECT competencia, receita_faturada FROM gold.sem_kpis_mensais LIMIT 200"
@@ -153,7 +156,7 @@ def test_stores_a_refused_answer_with_its_reason(
 ) -> None:
     client, _ = client_with_agent(refused_answer())
 
-    response = client.post("/ai/ask", json={"question": "Me conta uma piada", "session_id": "s"})
+    response = client.post("/ai/ask", json={"question": "Me conta uma piada", "session_id": SESSAO})
 
     assert response.status_code == 200, response.text
     assert response.json()["status"] == "refused"
@@ -170,7 +173,7 @@ def test_without_an_agent_answers_503_and_stores_nothing(
     # Sem o lifespan e sem override, o app não tem agente: o mesmo caso da chave ausente.
     client = client_for(engine)
 
-    response = client.post("/ai/ask", json={"question": PERGUNTA, "session_id": "sessao-1"})
+    response = client.post("/ai/ask", json={"question": PERGUNTA, "session_id": SESSAO})
 
     assert response.status_code == 503
     assert "VENERGY_AGENT_GOOGLE_API_KEY" in response.json()["detail"]
@@ -180,11 +183,12 @@ def test_without_an_agent_answers_503_and_stores_nothing(
 @pytest.mark.parametrize(
     "corpo",
     [
-        {"question": "x" * (MAX_PERGUNTA_IA + 1), "session_id": "s"},
-        {"question": PERGUNTA, "session_id": "s" * (MAX_SESSAO_IA + 1)},
-        {"question": "   ", "session_id": "s"},
+        {"question": "x" * (MAX_PERGUNTA_IA + 1), "session_id": SESSAO},
+        {"question": PERGUNTA, "session_id": "sessao-1"},
+        {"question": PERGUNTA, "session_id": "s" * 200},
+        {"question": "   ", "session_id": SESSAO},
         {"question": PERGUNTA, "session_id": ""},
-        {"question": PERGUNTA},
+        {"question": PERGUNTA, "session_id": 123},
     ],
 )
 def test_rejects_an_invalid_request_without_calling_the_agent(
@@ -212,7 +216,7 @@ def test_does_not_deliver_the_answer_when_the_audit_cannot_be_stored(
 
     monkeypatch.setattr("venergy_api.routers.ai.gravar_auditoria", gravar_com_falha)
 
-    response = client.post("/ai/ask", json={"question": PERGUNTA, "session_id": "sessao-1"})
+    response = client.post("/ai/ask", json={"question": PERGUNTA, "session_id": SESSAO})
 
     assert response.status_code == 500
     assert "R$ 1.234,50" not in response.text
@@ -223,7 +227,7 @@ def test_audit_returns_what_the_post_answered(
     client_with_agent: Callable[[AgentAnswer], tuple[TestClient, AgenteFalso]],
 ) -> None:
     client, _ = client_with_agent(answered_answer())
-    resposta = client.post("/ai/ask", json={"question": PERGUNTA, "session_id": "sessao-1"}).json()
+    resposta = client.post("/ai/ask", json={"question": PERGUNTA, "session_id": SESSAO}).json()
 
     response = client.get(f"/ai/audit/{resposta['audit_id']}")
 
@@ -232,7 +236,7 @@ def test_audit_returns_what_the_post_answered(
     # Tudo o que o POST entregou volta igual, inclusive a amostra com Decimal e data.
     assert {campo: auditoria[campo] for campo in resposta} == resposta
     assert auditoria["pergunta"] == PERGUNTA
-    assert auditoria["session_id"] == "sessao-1"
+    assert auditoria["session_id"] == SESSAO
     assert auditoria["criado_em"]
     assert auditoria["sql"].startswith("SELECT competencia")
     assert auditoria["rows"][0]["receita_faturada"] == "1234.50"
@@ -242,7 +246,7 @@ def test_audit_of_a_refused_answer_shows_the_reason(
     client_with_agent: Callable[[AgentAnswer], tuple[TestClient, AgenteFalso]],
 ) -> None:
     client, _ = client_with_agent(refused_answer())
-    resposta = client.post("/ai/ask", json={"question": "Me conta uma piada", "session_id": "s"})
+    resposta = client.post("/ai/ask", json={"question": "Me conta uma piada", "session_id": SESSAO})
 
     auditoria = client.get(f"/ai/audit/{resposta.json()['audit_id']}").json()
 
@@ -256,7 +260,7 @@ def test_audit_is_readable_without_the_agent(
 ) -> None:
     # Ler a trilha não depende da chave do Gemini: o histórico continua consultável.
     with Session(engine) as session:
-        gravar_auditoria(session, PERGUNTA, "sessao-1", answered_answer())
+        gravar_auditoria(session, PERGUNTA, SESSAO, answered_answer())
     [auditoria] = stored_audits(engine)
 
     response = client_for(engine).get(f"/ai/audit/{auditoria.id}")
@@ -290,8 +294,8 @@ def test_each_question_gets_its_own_audit_record(
 ) -> None:
     client, _ = client_with_agent(answered_answer())
 
-    primeira = client.post("/ai/ask", json={"question": PERGUNTA, "session_id": "s"}).json()
-    segunda = client.post("/ai/ask", json={"question": PERGUNTA, "session_id": "s"}).json()
+    primeira = client.post("/ai/ask", json={"question": PERGUNTA, "session_id": SESSAO}).json()
+    segunda = client.post("/ai/ask", json={"question": PERGUNTA, "session_id": SESSAO}).json()
 
     assert primeira["audit_id"] != segunda["audit_id"]
     with Session(engine) as session:
@@ -323,9 +327,9 @@ def test_answers_429_when_the_session_reached_the_limit_in_the_window(
     engine: Engine, client_with_limit: Callable[[int], tuple[TestClient, AgenteFalso]]
 ) -> None:
     client, agente = client_with_limit(2)
-    gravar_perguntas(engine, "sessao-1", 2)
+    gravar_perguntas(engine, SESSAO, 2)
 
-    response = client.post("/ai/ask", json={"question": PERGUNTA, "session_id": "sessao-1"})
+    response = client.post("/ai/ask", json={"question": PERGUNTA, "session_id": SESSAO})
 
     assert response.status_code == 429
     assert response.headers["Retry-After"] == "600"
@@ -338,11 +342,11 @@ def test_questions_older_than_the_window_and_other_sessions_do_not_count(
     engine: Engine, client_with_limit: Callable[[int], tuple[TestClient, AgenteFalso]]
 ) -> None:
     client, agente = client_with_limit(2)
-    gravar_perguntas(engine, "sessao-1", 1)
-    gravar_perguntas(engine, "sessao-1", 5, minutos_atras=60)
-    gravar_perguntas(engine, "outra", 5)
+    gravar_perguntas(engine, SESSAO, 1)
+    gravar_perguntas(engine, SESSAO, 5, minutos_atras=60)
+    gravar_perguntas(engine, OUTRA_SESSAO, 5)
 
-    response = client.post("/ai/ask", json={"question": PERGUNTA, "session_id": "sessao-1"})
+    response = client.post("/ai/ask", json={"question": PERGUNTA, "session_id": SESSAO})
 
     assert response.status_code == 200, response.text
     assert len(agente.chamadas) == 1
@@ -352,9 +356,35 @@ def test_limit_zero_turns_the_check_off(
     engine: Engine, client_with_limit: Callable[[int], tuple[TestClient, AgenteFalso]]
 ) -> None:
     client, agente = client_with_limit(0)
-    gravar_perguntas(engine, "sessao-1", 30)
+    gravar_perguntas(engine, SESSAO, 30)
 
-    response = client.post("/ai/ask", json={"question": PERGUNTA, "session_id": "sessao-1"})
+    response = client.post("/ai/ask", json={"question": PERGUNTA, "session_id": SESSAO})
 
     assert response.status_code == 200, response.text
     assert len(agente.chamadas) == 1
+
+
+def test_generates_a_random_session_id_when_the_request_has_none(
+    engine: Engine, client_with_agent: Callable[[AgentAnswer], tuple[TestClient, AgenteFalso]]
+) -> None:
+    client, agente = client_with_agent(answered_answer())
+
+    primeira = client.post("/ai/ask", json={"question": PERGUNTA}).json()
+    segunda = client.post("/ai/ask", json={"question": PERGUNTA}).json()
+
+    gerados = [primeira["session_id"], segunda["session_id"]]
+    assert gerados[0] != gerados[1]
+    for gerado in gerados:
+        assert UUID(gerado).version == 4
+    assert [sessao for _, sessao in agente.chamadas] == gerados
+    assert [auditoria.session_id for auditoria in stored_audits(engine)] == gerados
+
+
+def test_echoes_the_session_id_sent_by_the_client(
+    client_with_agent: Callable[[AgentAnswer], tuple[TestClient, AgenteFalso]],
+) -> None:
+    client, _ = client_with_agent(answered_answer())
+
+    corpo = client.post("/ai/ask", json={"question": PERGUNTA, "session_id": SESSAO}).json()
+
+    assert corpo["session_id"] == SESSAO

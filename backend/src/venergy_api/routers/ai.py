@@ -2,6 +2,7 @@
 
 import logging
 from typing import Annotated
+from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException, Path, Request, status
 from fastapi.concurrency import run_in_threadpool
@@ -34,12 +35,11 @@ async def perguntar(
 
     Responde 429, sem chamar o agente, se a sessão já fez o máximo de perguntas na janela.
     """
+    session_id = str(pedido.session_id or uuid4())
     limite = request.app.state.ai_limite_perguntas
     janela = request.app.state.ai_janela_segundos
     if limite > 0:
-        feitas = await run_in_threadpool(
-            contar_perguntas_recentes, session, pedido.session_id, janela
-        )
+        feitas = await run_in_threadpool(contar_perguntas_recentes, session, session_id, janela)
         if feitas >= limite:
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
@@ -50,12 +50,12 @@ async def perguntar(
                 # A janela inteira é o teto da espera: o relógio só libera a pergunta mais velha.
                 headers={"Retry-After": str(janela)},
             )
-    answer = await agente.ask(pedido.question, pedido.session_id)
+    answer = await agente.ask(pedido.question, session_id)
     try:
         # A sessão do backend é síncrona: a gravação sai do laço de eventos para não
         # travar as outras requisições enquanto o banco responde.
         auditoria = await run_in_threadpool(
-            gravar_auditoria, session, pedido.question, pedido.session_id, answer
+            gravar_auditoria, session, pedido.question, session_id, answer
         )
     except SQLAlchemyError as error:
         # Sem auditoria, sem resposta: entregar algo que não dá para conferir depois

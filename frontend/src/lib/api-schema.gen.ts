@@ -423,6 +423,8 @@ export interface components {
         AuditoriaIaSchema: {
             /** Audit Id */
             audit_id: number;
+            /** Session Id */
+            session_id: string;
             /** Answer */
             answer: string;
             status: components["schemas"]["AnswerStatus"];
@@ -459,8 +461,6 @@ export interface components {
             output_tokens: number;
             /** Pergunta */
             pergunta: string;
-            /** Session Id */
-            session_id: string;
             /**
              * Criado Em
              * Format: date-time
@@ -984,7 +984,7 @@ export interface components {
             /** Question */
             question: string;
             /** Session Id */
-            session_id: string;
+            session_id?: string | null;
         };
         /** RankingAlimentadorSchema */
         RankingAlimentadorSchema: {
@@ -1066,6 +1066,8 @@ export interface components {
         RespostaIaSchema: {
             /** Audit Id */
             audit_id: number;
+            /** Session Id */
+            session_id: string;
             /** Answer */
             answer: string;
             status: components["schemas"]["AnswerStatus"];

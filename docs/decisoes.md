@@ -1385,8 +1385,17 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   memória no processo do agente (some no restart e não escala); o agente gravar o histórico (é somente leitura); contador de
   perguntas em memória na API (some no restart, não vale com mais de um processo); um total único de tokens (entrada e saída têm
   preços diferentes).
-- **Limitações:** sem autenticação, o `session_id` é escolhido pelo cliente, e trocar de sessão zera o limite e o orçamento: é trava
-  de custo e de abuso acidental, não de segurança (mesma ressalva da DEC-034). A contagem do limite não é atômica: rajadas
+- **Identificador da sessão (revisão do PR #86):** o `session_id` de `POST /ai/ask` é opcional. Sem ele, o servidor gera um UUID4
+  aleatório e o devolve na resposta (`RespostaIaSchema.session_id`); com ele, só aceita UUID válido (`422` caso contrário). Um UUID
+  que o servidor não gerou continua aceito, porque sem autenticação não há como provar a origem, mas ids fáceis de adivinhar
+  (`"sessao-1"`) deixam de existir.
+- **Memória e a Gold real (DEC-015):** o SQL do turno anterior vai ao Gemini junto com o histórico. Na API, a memória segue a mesma
+  decisão pendente da DEC-015 que a narrativa e o insight: com a Gold real no plano gratuito, os SQLs anteriores vão ao Gemini. Na
+  avaliação, a memória fica desligada com `--dataset gold_real` (modo só SQL); na amostra, o runner exercita os follow-ups com o
+  histórico em memória.
+- **Limitações:** sem autenticação, o histórico da sessão (perguntas e SQL) só é protegido por um identificador aleatório (UUID4):
+  quem souber o id lê o histórico. Trocar de id zera o limite e o orçamento: é trava de custo e de abuso acidental, não de
+  segurança (mesma ressalva da DEC-034). A contagem do limite não é atômica: rajadas
   simultâneas da mesma sessão podem passar um pouco do limite. O orçamento não conta a narrativa. O padrão de
   200000 tokens é uma suposição a medir nos logs (`input_tokens` da etapa `geracao`).
 - **Pendente (regra de merge, DEC-016):** a troca do prompt padrão para a v3 só entra na `main` depois de `make eval ONLY=golden`

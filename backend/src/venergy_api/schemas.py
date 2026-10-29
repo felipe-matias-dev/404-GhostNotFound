@@ -3,6 +3,7 @@
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Annotated, Any, Literal
+from uuid import UUID
 
 from pydantic import (
     BaseModel,
@@ -628,7 +629,6 @@ class OrdemDetalheSchema(OrdemSchema):
 # A entrada é limitada na API, antes de chegar ao agente. O teto de 500 caracteres da pergunta
 # continua sendo do agente; este é folgado, só para não aceitar um corpo gigante.
 MAX_PERGUNTA_IA = 2000
-MAX_SESSAO_IA = 100
 
 
 class PerguntaIaSchema(BaseModel):
@@ -637,9 +637,9 @@ class PerguntaIaSchema(BaseModel):
     question: Annotated[
         str, StringConstraints(strip_whitespace=True, min_length=1, max_length=MAX_PERGUNTA_IA)
     ]
-    session_id: Annotated[
-        str, StringConstraints(strip_whitespace=True, min_length=1, max_length=MAX_SESSAO_IA)
-    ]
+    # Opcional: sem ele o servidor gera um UUID4 aleatório e o devolve na resposta. Com ele, só
+    # UUID (o histórico da sessão é protegido por esse identificador, não por autenticação).
+    session_id: UUID | None = None
 
 
 class RespostaIaSchema(BaseModel):
@@ -650,6 +650,7 @@ class RespostaIaSchema(BaseModel):
     # O registro é lido pelo atributo id; no JSON o campo se chama audit_id, para o portal
     # montar o link do painel de auditoria sem confundir com outros ids.
     audit_id: int = Field(validation_alias="id")
+    session_id: str
     answer: str
     status: AnswerStatus
     sql: str | None
@@ -675,7 +676,6 @@ class AuditoriaIaSchema(RespostaIaSchema):
     """O registro completo da auditoria: a resposta com a pergunta e o momento em que veio."""
 
     pergunta: str
-    session_id: str
     criado_em: datetime
 
 

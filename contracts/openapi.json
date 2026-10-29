@@ -1669,6 +1669,10 @@
             "type": "integer",
             "title": "Audit Id"
           },
+          "session_id": {
+            "type": "string",
+            "title": "Session Id"
+          },
           "answer": {
             "type": "string",
             "title": "Answer"
@@ -1770,10 +1774,6 @@
             "type": "string",
             "title": "Pergunta"
           },
-          "session_id": {
-            "type": "string",
-            "title": "Session Id"
-          },
           "criado_em": {
             "type": "string",
             "format": "date-time",
@@ -1783,6 +1783,7 @@
         "type": "object",
         "required": [
           "audit_id",
+          "session_id",
           "answer",
           "status",
           "sql",
@@ -1801,7 +1802,6 @@
           "input_tokens",
           "output_tokens",
           "pergunta",
-          "session_id",
           "criado_em"
         ],
         "title": "AuditoriaIaSchema",
@@ -3280,16 +3280,21 @@
             "title": "Question"
           },
           "session_id": {
-            "type": "string",
-            "maxLength": 100,
-            "minLength": 1,
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Session Id"
           }
         },
         "type": "object",
         "required": [
-          "question",
-          "session_id"
+          "question"
         ],
         "title": "PerguntaIaSchema",
         "description": "Pergunta em português para o agente de IA, dentro de uma conversa."
@@ -3516,6 +3521,10 @@
             "type": "integer",
             "title": "Audit Id"
           },
+          "session_id": {
+            "type": "string",
+            "title": "Session Id"
+          },
           "answer": {
             "type": "string",
             "title": "Answer"
@@ -3617,6 +3626,7 @@
         "type": "object",
         "required": [
           "audit_id",
+          "session_id",
           "answer",
           "status",
           "sql",
