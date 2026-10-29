@@ -182,6 +182,9 @@ class EvaluationRunner:
             return await self._judge.judge(question, answer), False
         except Exception:
             return None, True
+        finally:
+            if self._pause_seconds:
+                await asyncio.sleep(self._pause_seconds)
 
     async def _reference(self, item: Mapping[str, Any]) -> tuple[dict[str, object], ...] | None:
         if item.get("expected_values"):

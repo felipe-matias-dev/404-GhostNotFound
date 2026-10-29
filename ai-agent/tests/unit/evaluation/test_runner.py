@@ -722,3 +722,26 @@ async def test_report_with_the_judge_on_still_has_no_rows_or_answer_text():
     dumped = json.dumps(report.model_dump(mode="json"))
     assert "UC-MARCADOR-777" not in dumped
     assert "mais antiga" not in dumped
+
+
+async def test_pause_also_follows_each_judge_call(monkeypatch):
+    sleeps = []
+
+    async def fake_sleep(seconds):
+        sleeps.append(seconds)
+
+    monkeypatch.setattr("venergy_agent.evaluation.runner.asyncio.sleep", fake_sleep)
+    judge = ScriptedJudge({"Q1": JudgeVerdict(score=5, passed=True, rationale="ok")})
+    evaluation = EvaluationRunner(
+        ScriptedAgent({"Q1": make_answer()}),
+        FakeValidator(),
+        FakeExecutor(RESULTS),
+        VIEWS,
+        FakeGuard(),
+        pause_seconds=2.0,
+        judge=judge,
+    )
+
+    await run(evaluation, [golden("G001", "Q1", COUNT_SQL)])
+
+    assert sleeps == [2.0]
