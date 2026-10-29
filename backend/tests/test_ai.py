@@ -1,7 +1,7 @@
 from collections.abc import Callable
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
@@ -12,13 +12,18 @@ from venergy_agent.domain.answer import AgentAnswer, AnswerStatus, Confidence
 
 from venergy_api.agente import get_agente
 from venergy_api.auditoria import gravar_auditoria
+from venergy_api.auth import Perfil, UsuarioLogado
 from venergy_api.database import Base
+from venergy_api.historico_ia import usuario_da_requisicao
 from venergy_api.models import AiAuditoria
 from venergy_api.schemas import MAX_PERGUNTA_IA
+from venergy_api.sessao import usuario_atual
 
 PERGUNTA = "Qual foi a receita faturada em 2024-06?"
 SESSAO = "3f2b8c1e-5d4a-4e7b-9a60-1c2d3e4f5a6b"
 OUTRA_SESSAO = "9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d"
+USUARIO = "teste"
+OUTRO_USUARIO = "outra.pessoa"
 
 
 class AgenteFalso:
@@ -90,6 +95,12 @@ def refused_answer() -> AgentAnswer:
         prompt_version="v2",
         latency_ms=210,
     )
+
+
+@pytest.fixture
+def perfil() -> Perfil:
+    # Os testes deste arquivo leem a auditoria, e só a TI pode (DEC-049).
+    return Perfil.TI
 
 
 @pytest.fixture(autouse=True)
@@ -274,7 +285,7 @@ def test_audit_is_readable_without_the_agent(
 ) -> None:
     # Ler a trilha não depende da chave do Gemini: o histórico continua consultável.
     with Session(engine) as session:
-        gravar_auditoria(session, PERGUNTA, SESSAO, answered_answer())
+        gravar_auditoria(session, PERGUNTA, SESSAO, answered_answer(), USUARIO)
     [auditoria] = stored_audits(engine)
 
     response = client_for(engine).get(f"/ai/audit/{auditoria.id}")
@@ -316,10 +327,16 @@ def test_each_question_gets_its_own_audit_record(
         assert session.scalar(select(func.count()).select_from(AiAuditoria)) == 2
 
 
-def gravar_perguntas(engine: Engine, session_id: str, quantas: int, minutos_atras: int = 0) -> None:
+def gravar_perguntas(
+    engine: Engine,
+    session_id: str,
+    quantas: int,
+    minutos_atras: int = 0,
+    usuario: str | None = USUARIO,
+) -> None:
     with Session(engine) as session:
         for _ in range(quantas):
-            auditoria = gravar_auditoria(session, PERGUNTA, session_id, answered_answer())
+            auditoria = gravar_auditoria(session, PERGUNTA, session_id, answered_answer(), usuario)
             auditoria.criado_em = datetime.now(UTC) - timedelta(minutes=minutos_atras)
             session.commit()
 
@@ -352,13 +369,13 @@ def test_answers_429_when_the_session_reached_the_limit_in_the_window(
     assert len(stored_audits(engine)) == 2
 
 
-def test_questions_older_than_the_window_and_other_sessions_do_not_count(
+def test_questions_older_than_the_window_and_other_users_do_not_count(
     engine: Engine, client_with_limit: Callable[[int], tuple[TestClient, AgenteFalso]]
 ) -> None:
     client, agente = client_with_limit(2)
     gravar_perguntas(engine, SESSAO, 1)
     gravar_perguntas(engine, SESSAO, 5, minutos_atras=60)
-    gravar_perguntas(engine, OUTRA_SESSAO, 5)
+    gravar_perguntas(engine, OUTRA_SESSAO, 5, usuario=OUTRO_USUARIO)
 
     response = client.post("/ai/ask", json={"question": PERGUNTA, "session_id": SESSAO})
 
@@ -429,7 +446,7 @@ def test_audit_does_not_expose_the_session_id(
     engine: Engine, client_for: Callable[[Engine], TestClient]
 ) -> None:
     with Session(engine) as session:
-        gravar_auditoria(session, PERGUNTA, SESSAO, answered_answer())
+        gravar_auditoria(session, PERGUNTA, SESSAO, answered_answer(), USUARIO)
     [auditoria] = stored_audits(engine)
 
     response = client_for(engine).get(f"/ai/audit/{auditoria.id}")
@@ -449,3 +466,118 @@ def test_the_request_releases_its_connection_before_calling_the_model(
 
     assert response.status_code == 200
     assert agente.conexoes_ao_responder == 0
+
+
+def como(client: TestClient, login: str) -> TestClient:
+    usuario = UsuarioLogado(login=login, nome=login, perfil=Perfil.TI)
+    client.app.dependency_overrides[usuario_atual] = lambda: usuario
+    return client
+
+
+def test_stores_the_logged_user_in_the_audit(
+    engine: Engine, client_with_agent: Callable[[AgentAnswer], tuple[TestClient, AgenteFalso]]
+) -> None:
+    client, _ = client_with_agent(answered_answer())
+
+    client.post("/ai/ask", json={"question": PERGUNTA, "session_id": SESSAO})
+
+    [auditoria] = stored_audits(engine)
+    assert auditoria.usuario == USUARIO
+
+
+def test_limit_counts_the_user_questions_across_sessions(
+    engine: Engine, client_with_limit: Callable[[int], tuple[TestClient, AgenteFalso]]
+) -> None:
+    client, agente = client_with_limit(2)
+    gravar_perguntas(engine, SESSAO, 1)
+    gravar_perguntas(engine, OUTRA_SESSAO, 1)
+
+    response = client.post("/ai/ask", json={"question": PERGUNTA, "session_id": str(uuid4())})
+
+    assert response.status_code == 429
+    assert agente.chamadas == []
+
+
+def test_omitting_the_session_id_does_not_reset_the_limit(
+    engine: Engine, client_with_limit: Callable[[int], tuple[TestClient, AgenteFalso]]
+) -> None:
+    client, agente = client_with_limit(2)
+    gravar_perguntas(engine, SESSAO, 2)
+
+    response = client.post("/ai/ask", json={"question": PERGUNTA})
+
+    assert response.status_code == 429
+    assert agente.chamadas == []
+
+
+def test_another_user_has_the_own_limit(
+    engine: Engine, client_with_limit: Callable[[int], tuple[TestClient, AgenteFalso]]
+) -> None:
+    client, agente = client_with_limit(2)
+    gravar_perguntas(engine, SESSAO, 2)
+
+    response = como(client, OUTRO_USUARIO).post("/ai/ask", json={"question": PERGUNTA})
+
+    assert response.status_code == 200, response.text
+    assert len(agente.chamadas) == 1
+
+
+def test_answers_403_when_the_session_belongs_to_another_user(
+    engine: Engine, client_with_agent: Callable[[AgentAnswer], tuple[TestClient, AgenteFalso]]
+) -> None:
+    client, agente = client_with_agent(answered_answer())
+    gravar_perguntas(engine, SESSAO, 1, usuario=OUTRO_USUARIO)
+
+    response = client.post("/ai/ask", json={"question": PERGUNTA, "session_id": SESSAO})
+
+    assert response.status_code == 403
+    assert "sessão" in response.json()["detail"].lower()
+    assert agente.chamadas == []
+    assert len(stored_audits(engine)) == 1
+
+
+def test_a_session_without_an_owner_is_not_open_to_anyone(
+    engine: Engine, client_with_agent: Callable[[AgentAnswer], tuple[TestClient, AgenteFalso]]
+) -> None:
+    client, agente = client_with_agent(answered_answer())
+    gravar_perguntas(engine, SESSAO, 1, usuario=None)
+
+    response = client.post("/ai/ask", json={"question": PERGUNTA, "session_id": SESSAO})
+
+    assert response.status_code == 403
+    assert agente.chamadas == []
+
+
+def test_the_owner_keeps_using_the_own_session(
+    engine: Engine, client_with_agent: Callable[[AgentAnswer], tuple[TestClient, AgenteFalso]]
+) -> None:
+    client, agente = client_with_agent(answered_answer())
+    gravar_perguntas(engine, SESSAO, 1)
+
+    response = client.post("/ai/ask", json={"question": PERGUNTA, "session_id": SESSAO})
+
+    assert response.status_code == 200, response.text
+    assert len(agente.chamadas) == 1
+
+
+class AgenteQueLeOUsuario(AgenteFalso):
+    def __init__(self, answer: AgentAnswer) -> None:
+        super().__init__(answer)
+        self.usuario_visto: str | None = None
+
+    async def ask(self, question: str, session_id: str) -> AgentAnswer:
+        self.usuario_visto = usuario_da_requisicao.get()
+        return await super().ask(question, session_id)
+
+
+def test_the_agent_runs_with_the_requesting_user_and_the_context_is_cleared_after(
+    engine: Engine, client_for: Callable[..., TestClient]
+) -> None:
+    client = client_for(engine)
+    agente = AgenteQueLeOUsuario(answered_answer())
+    client.app.dependency_overrides[get_agente] = lambda: agente
+
+    client.post("/ai/ask", json={"question": PERGUNTA})
+
+    assert agente.usuario_visto == USUARIO
+    assert usuario_da_requisicao.get() is None

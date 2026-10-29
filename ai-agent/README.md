@@ -127,21 +127,21 @@ Não está no Git. Os 12 CSVs ficam no Volume do Databricks (`/Volumes/v_energy/
 
 Para voltar à amostra, rode de novo `venergy_api.amostra --force` e `venergy_api.carga`.
 
-## Memória e orçamento por sessão
+## Memória e orçamento
 
-Follow-up ("e em Olinda?" depois de uma pergunta sobre Recife) e orçamento de tokens, ambos por `session_id` (G1-10, DEC-046).
+Follow-up ("e em Olinda?" depois de uma pergunta sobre Recife) e orçamento de tokens, o histórico por `session_id` e o orçamento por usuário (G1-10, DEC-046).
 
 | Variável | Para quê |
 |---|---|
 | `VENERGY_AGENT_HISTORY_TURNS` | Turnos anteriores da sessão que o gerador de SQL recebe. Padrão `3`, `0` desliga a memória |
-| `VENERGY_AGENT_SESSION_TOKEN_BUDGET` | Tokens (entrada + saída do gerador de SQL) que uma sessão pode gastar. Padrão `200000`, `0` desliga. Esgotado, o agente responde `refused` sem chamar o modelo |
+| `VENERGY_AGENT_SESSION_TOKEN_BUDGET` | Tokens (entrada + saída do gerador de SQL) que cada usuário pode gastar na API (no agente isolado, cada sessão). Padrão `200000`, `0` desliga. Esgotado, o agente responde `refused` sem chamar o modelo |
 | `VENERGY_AGENT_PROMPT_VERSION` | `v3` (padrão) lê o histórico; `v2` e `v1` o ignoram |
 
 - O histórico vem da auditoria do backend (`app.ai_auditoria`), e não do agente: o usuário `venergy_agent` nunca lê o schema `app`. O agente isolado (terminal, avaliação) só tem memória com o adapter em memória (`InMemoryConversationHistory`).
 - Turnos recusados nunca entram no histórico. O histórico é dado delimitado, nunca instrução.
-- O backend responde `429` em `POST /ai/ask` quando a sessão passa de `VENERGY_API_AI_LIMITE_PERGUNTAS` perguntas (padrão 20) em `VENERGY_API_AI_JANELA_SEGUNDOS` (padrão 600); `0` desliga.
+- O backend responde `429` em `POST /ai/ask` quando o usuário passa de `VENERGY_API_AI_LIMITE_PERGUNTAS` perguntas (padrão 20) em `VENERGY_API_AI_JANELA_SEGUNDOS` (padrão 600); `0` desliga.
 - A auditoria ganhou `input_tokens` e `output_tokens`. A subida da API e a carga da Gold as acrescentam a um banco antigo sozinhas (`ADD COLUMN IF NOT EXISTS`, sem tocar nas linhas): não há passo manual.
-- Limitação: sem autenticação, o `session_id` é escolhido pelo cliente; trocar de sessão zera o limite e o orçamento. É trava de custo e de abuso acidental, não de segurança.
+- Com o login (DEC-049), o limite e o orçamento valem por usuário, em todas as sessões dele: omitir ou trocar o `session_id` não zera nada. Um `session_id` de outro usuário responde `403` sem chamar o agente.
 
 ## Chave do modelo
 
@@ -154,3 +154,13 @@ Cada integrante usa a própria chave, no próprio `ai-agent/.env` (fora do Git):
 No Free Tier, o Google pode usar o conteúdo enviado para melhorar os produtos dele. Por isso, o plano gratuito serve para a amostra sintética. Para a Gold real, a regra ainda não foi decidida pelo time: até decidir, não envie a Gold real pelo plano gratuito.
 
 O OpenRouter continua disponível pelo prefixo `openrouter:` (veja `.env.example`). Os testes não usam nenhuma chave: o modelo é simulado.
+
+### Modelo reserva
+
+Na API do `docker compose`, o agente sobe com um modelo reserva: `VENERGY_AGENT_FALLBACK_MODEL`, padrão `google-gla:gemini-3.5-flash` (troque por `GEMINI_FALLBACK_MODEL` no `.env` da raiz). Se o modelo principal falhar com 429 (cota) ou 503 (sobrecarga) depois das retentativas, a mesma pergunta vai para o reserva, com a mesma chave. No plano gratuito a cota é contada por modelo, então o reserva tem cota própria. O reserva precisa ser diferente do modelo do juiz (`VENERGY_AGENT_JUDGE_MODEL`, padrão `gemini-3.5-flash-lite`). Fora do compose (`python -m venergy_agent`, avaliação), o reserva só entra se a variável estiver no `ai-agent/.env`.
+
+### Dia da apresentação
+
+- Use a chave de quem não rodou nada no dia; a cota renova por volta das 4h (horário de Brasília). Leve a chave de outro integrante como segunda opção: trocar o `GOOGLE_API_KEY` no `.env` da raiz e reiniciar a API leva menos de um minuto.
+- Não rode avaliação no dia: uma rodada do golden set gasta de 90 a 140 chamadas. Uma pergunta ao agente gasta cerca de 2 (SQL e narração), e um insight de tela, 1 por combinação de filtros (fica em cache).
+- Antes de começar, faça uma pergunta de teste pelo portal ou pelo `POST /ai/ask`. A resposta mostra o `model` que respondeu: se for o reserva, o principal está sem cota.

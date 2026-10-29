@@ -1,4 +1,6 @@
-"""Histórico e consumo de tokens de uma sessão do agente, lidos da trilha de auditoria."""
+"""Histórico de uma sessão e consumo de tokens do usuário, lidos da trilha de auditoria."""
+
+from contextvars import ContextVar
 
 from sqlalchemy import Engine, func, select
 from sqlalchemy.orm import Session
@@ -11,6 +13,13 @@ from venergy_api.models import AiAuditoria
 STATUS_DO_HISTORICO = [
     status.value for status in AnswerStatus if status is not AnswerStatus.REFUSED
 ]
+
+
+# Quem faz a pergunta em andamento. A rota define antes de chamar o agente, cuja porta
+# `SessionUsage` só recebe o session_id: o orçamento de tokens vale por usuário, em todas as
+# sessões dele, e o contrato `ask(question, session_id)` do agente não muda. O contexto
+# acompanha o await e o run_in_threadpool; cada pedido roda na própria tarefa.
+usuario_da_requisicao: ContextVar[str | None] = ContextVar("usuario_da_requisicao", default=None)
 
 
 class HistoricoAuditoria:
@@ -61,6 +70,13 @@ class HistoricoAuditoria:
         )
 
     def _tokens_used(self, session_id: str) -> int:
+        usuario = usuario_da_requisicao.get()
+        # Sem usuário no contexto (uso fora da rota), cai para a sessão.
+        dono = (
+            AiAuditoria.usuario == usuario
+            if usuario is not None
+            else AiAuditoria.session_id == session_id
+        )
         with Session(self._engine) as session:
             return int(
                 session.scalar(
@@ -68,7 +84,7 @@ class HistoricoAuditoria:
                         func.coalesce(
                             func.sum(AiAuditoria.input_tokens + AiAuditoria.output_tokens), 0
                         )
-                    ).where(AiAuditoria.session_id == session_id)
+                    ).where(dono)
                 )
                 or 0
             )

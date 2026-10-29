@@ -4,7 +4,7 @@ import logging
 from collections.abc import Callable
 from datetime import timedelta
 
-from sqlalchemy import Connection, Engine, func, select, text
+from sqlalchemy import Connection, Engine, exists, func, select, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 from venergy_agent.domain.answer import AgentAnswer
@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 def gravar_auditoria(
-    session: Session, pergunta: str, session_id: str, answer: AgentAnswer
+    session: Session, pergunta: str, session_id: str, answer: AgentAnswer, usuario: str | None
 ) -> AiAuditoria:
     """Grava a resposta do agente como ele a devolveu e confirma a transação."""
     # mode="json": a amostra de linhas traz Decimal e date, que o JSONB não aceita. O
@@ -23,7 +23,10 @@ def gravar_auditoria(
     # Os campos do AgentAnswer têm o mesmo nome das colunas: um campo novo no contrato do
     # agente quebra aqui e nos testes, em vez de sumir da auditoria em silêncio.
     auditoria = AiAuditoria(
-        session_id=session_id, pergunta=pergunta, **answer.model_dump(mode="json")
+        session_id=session_id,
+        pergunta=pergunta,
+        usuario=usuario,
+        **answer.model_dump(mode="json"),
     )
     session.add(auditoria)
     session.commit()
@@ -32,22 +35,38 @@ def gravar_auditoria(
     return auditoria
 
 
-def contar_perguntas_recentes(session: Session, session_id: str, janela_segundos: int) -> int:
-    """Quantas perguntas a sessão fez na janela, contadas pelas linhas da auditoria.
+def contar_perguntas_recentes(session: Session, usuario: str, janela_segundos: int) -> int:
+    """Quantas perguntas o usuário fez na janela, em todas as sessões, pelas linhas da auditoria.
 
     O relógio é o do banco (o mesmo que preenche `criado_em`) e o contador mora na tabela, e não
-    na memória da API: não some no restart e vale com mais de um processo.
+    na memória da API: não some no restart e vale com mais de um processo. Conta por usuário, e
+    não por sessão: o cliente escolhe o session_id e trocá-lo não pode zerar o limite.
     """
     return (
         session.scalar(
             select(func.count())
             .select_from(AiAuditoria)
             .where(
-                AiAuditoria.session_id == session_id,
+                AiAuditoria.usuario == usuario,
                 AiAuditoria.criado_em > func.now() - timedelta(seconds=janela_segundos),
             )
         )
         or 0
+    )
+
+
+def sessao_de_outro_usuario(session: Session, session_id: str, usuario: str) -> bool:
+    """Se a sessão já tem registros que não são do usuário (inclusive os sem dono, de antes da
+    coluna): o histórico dela não pode ser lido nem continuado por ele."""
+    return bool(
+        session.scalar(
+            select(
+                exists().where(
+                    AiAuditoria.session_id == session_id,
+                    AiAuditoria.usuario.is_distinct_from(usuario),
+                )
+            )
+        )
     )
 
 
@@ -80,6 +99,26 @@ def garantir_indice_da_sessao(connection: Connection) -> None:
     )
 
 
+def garantir_coluna_do_usuario(connection: Connection) -> None:
+    """Acrescenta a coluna `usuario` e o índice (usuario, id) à auditoria de um banco antigo.
+
+    O limite de perguntas e o orçamento de tokens filtram por usuário a cada pergunta. As
+    linhas de antes ficam com usuário nulo. Só acrescenta: nunca apaga nem altera dado.
+    """
+    connection.execute(
+        text("ALTER TABLE IF EXISTS app.ai_auditoria ADD COLUMN IF NOT EXISTS usuario text")
+    )
+    connection.execute(
+        text("CREATE INDEX IF NOT EXISTS ix_ai_auditoria_usuario ON app.ai_auditoria (usuario, id)")
+    )
+
+
+def garantir_estrutura_da_auditoria(connection: Connection) -> None:
+    garantir_colunas_de_tokens(connection)
+    garantir_coluna_do_usuario(connection)
+    garantir_indice_da_sessao(connection)
+
+
 def garantir_colunas_na_subida(obter_engine: Callable[[], Engine]) -> None:
     """Garante as colunas na subida da API, para um banco antigo não quebrar o /ai/ask.
 
@@ -88,8 +127,7 @@ def garantir_colunas_na_subida(obter_engine: Callable[[], Engine]) -> None:
     """
     try:
         with obter_engine().begin() as connection:
-            garantir_colunas_de_tokens(connection)
-            garantir_indice_da_sessao(connection)
+            garantir_estrutura_da_auditoria(connection)
     except SQLAlchemyError as error:
         logger.warning(
             "Não foi possível conferir as colunas da auditoria na subida (%s). "

@@ -36,7 +36,14 @@ export function useConsultaUc() {
 	return context;
 }
 
-export function ConsultaUcProvider({ children }: { children: ReactNode }) {
+export function ConsultaUcProvider({
+	children,
+	usuario,
+}: {
+	children: ReactNode;
+	usuario: string;
+}) {
+	const recentKey = `${RECENTES_UC_KEY}:${usuario}`;
 	const [open, setOpen] = useState(false);
 	const [recentes, setRecentes] = useState<string[]>([]);
 	const [loaded, setLoaded] = useState(false);
@@ -55,7 +62,7 @@ export function ConsultaUcProvider({ children }: { children: ReactNode }) {
 
 	useEffect(() => {
 		try {
-			const salvos = parseRecentes(localStorage.getItem(RECENTES_UC_KEY));
+			const salvos = parseRecentes(localStorage.getItem(recentKey));
 			setRecentes((previous) =>
 				[...new Set([...previous, ...salvos])].slice(0, 5),
 			);
@@ -63,16 +70,16 @@ export function ConsultaUcProvider({ children }: { children: ReactNode }) {
 			setLocalDisponivel(false);
 		}
 		setLoaded(true);
-	}, []);
+	}, [recentKey]);
 
 	useEffect(() => {
 		if (!loaded || !localDisponivel) return;
 		try {
-			localStorage.setItem(RECENTES_UC_KEY, JSON.stringify(recentes));
+			localStorage.setItem(recentKey, JSON.stringify(recentes));
 		} catch {
 			setLocalDisponivel(false);
 		}
-	}, [recentes, loaded, localDisponivel]);
+	}, [recentes, loaded, localDisponivel, recentKey]);
 
 	useEffect(() => {
 		function shortcut(event: globalThis.KeyboardEvent) {

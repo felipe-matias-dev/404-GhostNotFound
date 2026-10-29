@@ -58,7 +58,7 @@ Período (G1-05): quando as linhas têm `competencia`, o texto determinístico c
 - O histórico e o consumo de tokens vêm das portas `ConversationHistory` e `SessionUsage`. Quem as implementa é o backend (`HistoricoAuditoria`, sobre `app.ai_auditoria`): o `venergy_agent` nunca lê `app` e o agente continua sem gravar nada.
 - `history_turns=3` e `session_token_budget=200000` (0 desliga cada um). O orçamento é conferido antes da pergunta; leitura do consumo que falha → `failed` sem chamar o modelo; leitura do histórico que falha → segue sem ele.
 - `AgentAnswer.input_tokens` e `output_tokens` somam só o gerador de SQL.
-- O backend limita as perguntas por sessão numa janela (`429`). Limitação: sem autenticação, trocar de `session_id` zera o limite e o orçamento.
+- O backend limita as perguntas por usuário numa janela (`429`), soma o orçamento de tokens por usuário e só deixa o dono usar a sessão (`403`), com o login da DEC-049.
 - Estado: a rodada do golden que libera o `prompts/v3` como padrão (DEC-016) está pendente. A avaliação já exercita a memória nos follow-ups: o `evaluation/__main__.py` monta o agente com `InMemoryConversationHistory` (sem orçamento) e a entrega ao runner como `recorder`, de modo que G046, G099, G100, G102 e G103 usam o histórico da própria sessão. A memória vale nas duas bases (DEC-015, aceita em 29/10/2026). A rodada pendente compara v2 e v3: sem regressão nos itens comuns e ao menos 4 dos 5 follow-ups certos, inclusive o G046.
 
 ## 4. Camada semântica hoje

@@ -51,11 +51,12 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | 28/10/2026 | DEC-043: Consulta de UC na sidebar e Ctrl/Cmd + K abrem a palette global; só os cinco códigos consultados com sucesso ficam nos recentes locais | Consulta rápida sem abandonar o contexto, sem persistir nomes ou valores e sem navegar antes de validar a UC | João Euclides |
 | 27/10/2026 | DEC-040: `GET /receita/insight` devolve o insight de IA da tela de receita; o backend monta o JSON de métricas a partir da ponte da Gold, com valores arredondados como a tela os mostra, e guarda o texto num cache em memória pelo conteúdo das métricas; sem a chave do Gemini a rota responde 503; API 0.9.0 | O agente só aceita texto cujos números sejam exatamente valores do JSON (DEC-019), e uma Gold recarregada precisa gerar um insight novo, nunca um velho | Felipe |
 | 27/10/2026 | DEC-044: a visão 360 da unidade consumidora sai de uma rota só, `GET /unidades-consumidoras/{cod_uc}/visao-360`; os 12 meses terminam na última competência da Gold e a "conta alta" é o último mês contra o mesmo mês do ano anterior, com faixa de ±10%; integrada à API 0.9.0 da main | O atendente está com o cliente na linha: uma chamada só à API e uma resposta pronta para "o consumo subiu?", sem a tela refazer conta de negócio | Felipe |
-| 29/10/2026 | DEC-046 (proposta): follow-up com memória, orçamento de tokens por sessão e limite de perguntas; o histórico vem da auditoria do backend, `AgentAnswer` ganha `input_tokens` e `output_tokens`, `prompts/v3` e `429` em `POST /ai/ask` (API 0.10.0) | Follow-up ("e em Olinda?") sem o agente guardar estado nem ler `app`, e trava de custo por sessão | GenAI |
+| 29/10/2026 | DEC-046 (proposta): follow-up com memória, orçamento de tokens e limite de perguntas por usuário; o histórico vem da auditoria do backend, `AgentAnswer` ganha `input_tokens` e `output_tokens`, `prompts/v3` e `429` em `POST /ai/ask` (API 0.10.0) | Follow-up ("e em Olinda?") sem o agente guardar estado nem ler `app`, e trava de custo por sessão | GenAI |
 
 | 29/10/2026 | DEC-045: tela de Rede usa período padrão de até 12 meses, aceita período válido da URL e apresenta histórico global do alimentador | Preserva o recorte escolhido e distingue o índice local do histórico do alimentador inteiro | João Euclides |
 | 29/10/2026 | DEC-047: avaliação comparativa sobre os itens em comum, aviso quando `failed` passa de 5%, e juiz (LLM as a judge) só em respostas `answered` narradas da amostra, com modelo diferente do gerador | Rodadas com versões diferentes do golden set só se comparam no que têm em comum, e o juiz não pode enviar linhas da Gold real a um modelo | Perylo |
 | 28/10/2026 | DEC-048: ordem de inspeção em campo pode voltar para gerada; a observação da volta fica só no histórico | Uma OI enviada a campo sem querer não precisa ser cancelada e gerada de novo, o que sujaria a métrica de visita desnecessária | Felipe |
+| 29/10/2026 | DEC-049: login com cookie httpOnly e cinco perfis; só `perdas` escreve nas ordens de inspeção e só `ti` lê a auditoria do agente | Esconder o menu não é segurança: a permissão é checada no backend, onde estão os dados; o agente já lê toda a Gold, então bloquear a leitura por tela daria falsa proteção | Felipe |
 
 ## DEC-001 · Localização dos arquivos de origem (landing)
 
@@ -304,7 +305,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Limitações:** a OI valida a UC contra `gold_dim_uc`, porque a fila de suspeitas
   (`gold_fila_suspeitas`) ainda não existe; quando existir, a tela da fila só passa a
   enviar os `cod_uc` escolhidos, sem mudança no backend. Não há registro de quem fez
-  cada mudança, porque o portal ainda não tem login. Alterar colunas exige recriar as
+  cada mudança, porque o portal ainda não tinha login (a autoria segue em aberto, DEC-049). Alterar colunas exige recriar as
   tabelas do `app`, já que não há migrações.
 
 ## DEC-010 · Energia e dinheiro como `numeric`, número na API
@@ -795,7 +796,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   - gerar OIs por códigos de UC digitados (repetidos ignorados, até 200 por pedido), enquanto não existe endpoint da fila de suspeitas;
   - Vitest no frontend só para funções puras (`src/**/__tests__/*.test.ts`, sem DOM).
 - **Motivo:** cobre o ciclo de vida da OI sem regra de negócio nova no frontend; o Kanban dá a visão do trabalho em andamento sem a lista de finalizadas crescer sem limite.
-- **Em aberto:** (1) gerar a partir da fila de suspeitas quando houver `GET` da `gold_fila_suspeitas`; (2) autoria das mudanças no histórico quando houver autenticação.
+- **Em aberto:** (1) gerar a partir da fila de suspeitas quando houver `GET` da `gold_fila_suspeitas`; (2) autoria das mudanças no histórico: o login existe (DEC-049), falta gravar quem agiu.
 
 ## DEC-027 · Contrato da Gold v0.3: UC 360, inspeções e recortes completos
 
@@ -1082,8 +1083,8 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Limitações conhecidas:**
   - Sem expurgo: a tabela só cresce. A pergunta e as linhas ficam guardadas como o agente as devolveu, e podem conter dados de UC.
     A `pergunta` é o texto livre que o usuário digitou (até 2000 caracteres): se alguém digitar um CPF ou um nome, ele fica em `app`.
-    Expurgo e mascaramento ficam para quando houver autenticação.
-  - Sem autenticação: nenhuma rota da API tem hoje, então quem alcança a API lê qualquer auditoria.
+    Expurgo e mascaramento ficam em aberto.
+  - Leitura da auditoria: desde a DEC-049 só o perfil `ti` lê `GET /ai/audit/{id}`. A pergunta e as linhas continuam sem expurgo.
   - Sem migrações, mudar uma coluna da tabela exige apagá-la e recriá-la à mão, como nas ordens de inspeção.
 
 ## DEC-035 · Soma dos efeitos e percentual sobre a base na tela de receita
@@ -1359,7 +1360,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   da diretoria na `main`, e DEC-041 a DEC-043 estão reservadas nas branches do portal.
 
 
-## DEC-046 · Memória de conversa, orçamento de tokens e limite de perguntas por sessão
+## DEC-046 · Memória de conversa, orçamento de tokens e limite de perguntas por usuário
 
 - **Status:** proposta, até o aceite do V1 (muda o contrato `AgentAnswer`, spec §4 e DEC-020).
 - **Data:** 29/10/2026 · **Área:** IA e Backend · **Autor:** GenAI
@@ -1376,7 +1377,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   - **Orçamento:** porta `SessionUsage.tokens_used(session_id)`. Com `session_token_budget` (padrão 200000, 0 desliga) esgotado, o
     `ask()` devolve `refused` com motivo próprio, sem chamar o modelo. Conferido antes de cada pergunta: a que cruza o limite termina.
     Leitura do consumo que falha → `failed` sem chamar o modelo; leitura do histórico que falha → segue sem histórico.
-  - **Limite de perguntas no backend:** `POST /ai/ask` responde `429` (`ErroSchema`, `Retry-After`) quando a sessão já fez
+  - **Limite de perguntas no backend:** `POST /ai/ask` responde `429` (`ErroSchema`, `Retry-After`) quando o usuário já fez
     `VENERGY_API_AI_LIMITE_PERGUNTAS` (20) perguntas em `VENERGY_API_AI_JANELA_SEGUNDOS` (600), contadas pelas linhas da auditoria
     com o relógio do banco. 0 desliga. API 0.10.0.
 - **Contrato (para o V1 revisar):** `AgentAnswer` ganha `input_tokens` e `output_tokens` (`int >= 0`, padrão 0, tokens do gerador de
@@ -1393,15 +1394,12 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   (`"sessao-1"`) deixam de existir.
 - **Memória e a Gold real (DEC-015, aceita em 29/10/2026):** o SQL do turno anterior vai ao Gemini junto com o histórico, na API e na
   avaliação, nas duas bases. O time aceita esse envio pelo plano gratuito; o dataset e as saídas com dados dele continuam fora do Git (DEC-024).
-- **Limitações:** sem autenticação, o histórico da sessão (perguntas e SQL) só é protegido por um identificador aleatório (UUID4):
-  quem souber o id lê o histórico. Trocar de id zera o limite e o orçamento: é trava de custo e de abuso acidental, não de
-  segurança (mesma ressalva da DEC-034). A contagem do limite não é atômica: rajadas
-  simultâneas da mesma sessão podem passar um pouco do limite. O orçamento não conta a narrativa. O padrão de
+- **Limitações:** a contagem do limite não é atômica: rajadas simultâneas do mesmo usuário podem passar um pouco do limite. O orçamento não conta a narrativa. O padrão de
   200000 tokens é uma suposição a medir nos logs (`input_tokens` da etapa `geracao`).
 - **Pendente (regra de merge, DEC-016):** a troca do prompt padrão para a v3 só entra na `main` depois de `make eval ONLY=golden`
   na v2 e na v3 e `make eval ONLY=red_team` na v3, sem regressão nos itens comuns (os que não são follow-up) e com pelo menos 4 dos 5 follow-ups do golden
   (G046, G099, G100, G102, G103) certos, inclusive o G046, com a memória ligada no runner da avaliação (amostra). Sem cota do Gemini na data, a rodada não foi feita; os números entram aqui e na spec §9.6.
-- **Atualização (29/10/2026, revisão do Felipe no #86):** o `session_id` não sai na auditoria (`GET /ai/audit/{id}`), só na resposta do `POST /ai/ask`. Sem o campo no pedido, cada chamada ganha uma sessão nova e o limite de perguntas e o orçamento não valem para ela. O identificador aleatório é a única proteção do histórico, sem autenticação: é trava de custo, não de segurança. O limite de perguntas e o orçamento começam a contar a partir do `session_id` recebido.
+- **Atualização (29/10/2026, revisão do Felipe no #86):** o `session_id` não sai na auditoria (`GET /ai/audit/{id}`), só na resposta do `POST /ai/ask`. (Substituída pela atualização do login, abaixo: o limite e o orçamento deixam de contar pelo `session_id`.)
 
 
 ## DEC-042 · Visão 360 da UC e comparação sazonal do consumo
@@ -1459,9 +1457,9 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   documento ou valores. A lista é deste navegador, não é um histórico de atendimentos nem
   uma lista compartilhada entre operadores. Há ação de limpar. Conteúdo inválido é descartado;
   armazenamento bloqueado não impede consultar, mas limita os recentes à sessão e informa isso.
-- **Sidebar:** dois grupos discretos, sem submenus ou equipes fictícias: **Análise**
-  (Visão geral, Receita, Rede) e **Operação** (Consulta de UC, Perdas). Preserva o recolhimento
-  para ícones e o Sheet no mobile, sem duplicar a lista de recentes na navegação.
+- **Sidebar:** o agrupamento inicial em Análise e Operação foi substituído pela navegação por cargo
+  da DEC-049: **Minha área** e **Outras consultas**, sem submenus ou exclusão de telas.
+  Preserva o recolhimento para ícones e o Sheet no mobile, sem duplicar recentes na navegação.
 - **Página:** `/uc?cod_uc=...` segue sendo a visão 360. Sem código, entrada compacta com
   **Buscar UC**; com código, **Trocar UC** abre a mesma palette e **Atualizar dados** faz refetch.
   Registro de conversa, abertura de chamado e pagamento continuam fora deste fluxo.
@@ -1529,3 +1527,76 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   para a coluna "Gerada" também passa a valer, porque o arrastar usa o mesmo mapa.
   A decisão foi renumerada de DEC-045 para DEC-048 na resolução do PR #79: DEC-045 já identifica a tela de Rede
   na `main`, DEC-046 está reservada no PR #86 e DEC-047 é a avaliação comparativa.
+
+## DEC-049 · Login com cookie httpOnly e perfis por cargo
+
+- **Data:** 29/10/2026 · **Área:** Portal · **Autor:** Felipe
+- **Contexto:** o card V1-13 pede login com perfil por cargo e menu filtrado. A decisão de 19/10 já pôs autenticação e perfis no
+  FastAPI, e duas decisões deixaram lacunas à espera de login: as ordens de inspeção não registram quem agiu (DEC-009, DEC-026) e
+  qualquer pessoa que alcança a API lê a auditoria do agente (DEC-034).
+- **Decisão:**
+  - `POST /auth/login` confere a senha (hash Argon2, `pwdlib`) e grava um JWT HS256 num cookie `venergy_sessao` com `HttpOnly`,
+    `SameSite=Lax` e validade de 8 horas; `GET /auth/me` devolve `{login, nome, perfil}` e `POST /auth/logout` apaga o cookie;
+  - usuários em `app.usuarios` (login, nome, perfil, hash), criados por `uv run python -m venergy_api.usuarios` (ou `make users`),
+    um por persona, todos com a senha de demonstração `VENERGY_API_SENHA_DEMO`. O comando é idempotente e só cria essa tabela;
+  - o segredo do token (`VENERGY_API_JWT_SECRET`, mínimo 32 caracteres) é obrigatório e não tem valor padrão no código;
+  - cinco perfis: `diretoria` (henrique), `atendimento` (camila), `perdas` (rafael), `operacao` (beatriz) e `ti` (patricia). O backlog
+    previa quatro; a TI entra porque a auditoria do agente precisa de um dono, e dá-la à diretoria faria o diretor comercial ler as
+    perguntas do atendimento.
+- **Regras de acesso:**
+
+  | Rota | Quem |
+  |---|---|
+  | `GET /health`, `POST /auth/login`, `POST /auth/logout` | sem login |
+  | demais `GET` de dados, `POST /ai/ask`, `GET /auth/me` | qualquer usuário logado |
+  | `POST /ordens-inspecao`, `PATCH /ordens-inspecao/{id}` | só `perdas` |
+  | `GET /ai/audit/{id}` | só `ti` |
+
+  Sem login a resposta é 401; com o perfil errado, 403. O login é exigido ao incluir cada router em `create_app`, e um teste percorre
+  o OpenAPI e aponta pelo nome qualquer rota nova sem login.
+- **Menu dá foco, backend dá segurança:** o menu por cargo é do frontend e serve para a Camila não se perder em tela de DEC. A
+  permissão vale para quem chama a API direto. A leitura dos indicadores não é restrita por tela porque o agente consulta toda a
+  Gold: bloquear `GET /receita/*` para o atendimento não impediria a pergunta ao chat.
+  - A entrada segue o cargo e **Minha área** destaca suas telas prioritárias: diretoria → Visão geral (Visão geral, Receita, Rede, UC);
+    atendimento → UC (UC); perdas → Perdas (UC, Perdas); operação → Rede (Rede, UC); TI → Visão geral (todas as telas existentes).
+    **Outras consultas** reúne todas as demais telas, sem exclusão nem duplicação. Minha área vem primeiro; grupos vazios
+    não aparecem. `PROFILES.primaryRoutes` é prioridade de navegação, não allowlist de acesso.
+    A decisão torna descobríveis as leituras já permitidas por link direto, sem mudar login, entrada por cargo ou permissões
+    do backend. Os demais perfis continuam consultando as OIs em tabela, sem geração ou ações de escrita.
+  - `/login` consulta a sessão antes de montar o portal; um link local de dados é retomado depois de entrar. `401` encerra a
+    visualização da sessão; indisponibilidade permite tentar novamente e `403` não é tratado como logout. Consultas em memória
+    são descartadas na troca de sessão, e as UCs recentes do navegador passam a ser separadas pelo login.
+  - A identidade da entrada preserva os tokens e componentes do design system: marca VE-360 sobe e revela o formulário,
+    sobre uma malha ilustrativa de conexões elétricas e UCs em Canvas 2D. Sem dependência 3D/CDN; pausa manual, suspensão em
+    aba oculta e movimento reduzido respeitado. Não há cadastro, recuperação de senha ou OAuth sem suporte no backend.
+- **Por que a diretoria não escreve nas ordens:** segregação de funções. Quem vê tudo não opera a inspeção, e uma conta da diretoria
+  vazada fica limitada a leitura. Dar `diretoria` à escrita é uma linha em `ordens.py` se o time quiser.
+- **Alternativas descartadas:**
+  - Seletor de perfil sem senha: o menu esconde, mas a API devolve tudo a quem a chama direto.
+  - `Authorization: Bearer` com o token no `localStorage`: um XSS lê o token; só na memória, o F5 derruba o login; e o frontend
+    teria de anexar o cabeçalho em toda chamada. O cookie `HttpOnly` dispensa o frontend de guardar token.
+  - Sessão guardada no banco: permitiria derrubar uma sessão na hora, mas é mais uma tabela sem migração e o case não pede.
+  - Provedor externo (OAuth, Keycloak): um serviço a mais a poucos dias da entrega.
+  - Matriz rígida de `GET` por perfil: o agente fura a regra e triplica os testes de 403 sem ganho real.
+- **Limitações conhecidas:**
+  - a senha de demonstração é a mesma para todos e serve só para rodar localmente;
+  - o logout apaga o cookie, mas um token já copiado vale até expirar (8 horas), e um usuário apagado do banco também;
+  - sem limite de tentativas de login;
+  - o cookie não tem `Secure`, porque o portal roda em http no ambiente local; quem publicar com https liga o flag;
+  - o portal e a API têm de ficar na mesma origem (o proxy `/api` do Vite faz isso), porque o CORS não libera credenciais.
+- **Em aberto:** a autoria. `app.ordem_evento` e `app.ai_auditoria` ainda não guardam quem agiu, e a regra da auditoria poderia
+  virar "o próprio autor ou a TI". Mexer em tabela que já existe, sem migrações, quebra o banco local de quem não recriar as
+  tabelas; por isso fica para uma tarefa própria, com `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`.
+- **Atualização (29/10/2026, login da DEC-049; revisão do Felipe no #86):** com o login, o backend sabe quem pergunta, e as
+  limitações de "omitir ou trocar o `session_id` zera os contadores" e "quem souber o id lê o histórico" deixam de valer.
+  - `app.ai_auditoria` ganha `usuario` (texto, o login de quem perguntou; nulo nas linhas de antes) e o índice `(usuario, id)`,
+    acrescentados pela subida da API e pela carga com `ADD COLUMN/INDEX IF NOT EXISTS`, sem tocar nas linhas.
+  - **O limite de perguntas é por usuário**, em todas as sessões dele, com as mesmas variáveis (`VENERGY_API_AI_LIMITE_PERGUNTAS`,
+    `VENERGY_API_AI_JANELA_SEGUNDOS`).
+  - **O orçamento de tokens é por usuário.** O contrato `ask(question, session_id)` do agente não muda: a rota define o usuário numa
+    `ContextVar` antes de chamar o agente, e `HistoricoAuditoria.tokens_used` soma os tokens do usuário em todas as sessões dele
+    (sem usuário no contexto, cai para a sessão).
+  - **A sessão pertence ao usuário:** um `session_id` que já tem linhas na auditoria de outro usuário (ou sem dono, de antes da
+    coluna) responde `403`, sem chamar o agente. Sem `session_id`, o servidor gera um UUID4 novo. O histórico continua por
+    `session_id` (separa as conversas), mas só o dono o usa.
+  - Limitação que fica: os contadores são por login, e não por pessoa; quem tem várias contas tem vários limites.

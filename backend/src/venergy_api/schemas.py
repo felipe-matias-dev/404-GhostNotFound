@@ -771,3 +771,12 @@ class IndicadoresJanelaSchema(BaseModel):
     n_uc_medio: float | None
     tarifa_media: float | None
     tarifa_base_media: float | None
+
+
+class LoginSchema(BaseModel):
+    """Pedido de login. Os tetos evitam que um corpo gigante vire trabalho para o Argon2."""
+
+    login: Annotated[
+        str, StringConstraints(strip_whitespace=True, to_lower=True, min_length=1, max_length=50)
+    ]
+    senha: Annotated[str, StringConstraints(min_length=1, max_length=200)]

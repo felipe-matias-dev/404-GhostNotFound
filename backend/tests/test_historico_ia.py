@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from venergy_agent.domain.answer import AnswerStatus
 
 from venergy_api.database import Base
-from venergy_api.historico_ia import HistoricoAuditoria
+from venergy_api.historico_ia import HistoricoAuditoria, usuario_da_requisicao
 from venergy_api.models import AiAuditoria
 
 
@@ -27,6 +27,7 @@ def gravar(
     output_tokens: int = 0,
     minutos_atras: int = 0,
     clarification: str | None = None,
+    usuario: str | None = None,
 ) -> None:
     with Session(engine) as session, session.begin():
         session.add(
@@ -50,6 +51,7 @@ def gravar(
                 input_tokens=input_tokens,
                 output_tokens=output_tokens,
                 clarification=clarification,
+                usuario=usuario,
             )
         )
 
@@ -117,3 +119,17 @@ def test_a_clarify_turn_keeps_the_question_the_agent_asked(engine: Engine) -> No
     [turno] = asyncio.run(HistoricoAuditoria(engine).recent("s1", 3))
 
     assert turno.clarification == "Qual período você quer?"
+
+
+def test_tokens_used_of_the_requesting_user_add_up_across_all_the_sessions(engine: Engine) -> None:
+    gravar(engine, "s1", "a", input_tokens=100, output_tokens=20, usuario="ana")
+    gravar(engine, "s2", "b", input_tokens=50, output_tokens=5, usuario="ana")
+    gravar(engine, "s1", "c", input_tokens=999, output_tokens=999, usuario="bia")
+    gravar(engine, "s3", "d", input_tokens=777, output_tokens=777)
+    historico = HistoricoAuditoria(engine)
+
+    token = usuario_da_requisicao.set("ana")
+    try:
+        assert asyncio.run(historico.tokens_used("s-nova")) == 175
+    finally:
+        usuario_da_requisicao.reset(token)

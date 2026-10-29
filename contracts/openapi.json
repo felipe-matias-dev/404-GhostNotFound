@@ -30,6 +30,109 @@
         }
       }
     },
+    "/auth/login": {
+      "post": {
+        "tags": [
+          "autenticação"
+        ],
+        "summary": "Entrar",
+        "operationId": "entrar_auth_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginSchema"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsuarioLogado"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErroSchema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/me": {
+      "get": {
+        "tags": [
+          "autenticação"
+        ],
+        "summary": "Quem Sou Eu",
+        "description": "Quem está logado. O portal chama ao abrir, para saber o perfil e montar o menu.",
+        "operationId": "quem_sou_eu_auth_me_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsuarioLogado"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErroSchema"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ]
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "tags": [
+          "autenticação"
+        ],
+        "summary": "Sair",
+        "description": "Apaga o cookie. Sem sessão também responde 204: sair duas vezes não é erro.",
+        "operationId": "sair_auth_logout_post",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        }
+      }
+    },
     "/unidades-consumidoras/{cod_uc}": {
       "get": {
         "tags": [
@@ -37,6 +140,11 @@
         ],
         "summary": "Get Unidade Consumidora",
         "operationId": "get_unidade_consumidora_unidades_consumidoras__cod_uc__get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
         "parameters": [
           {
             "name": "cod_uc",
@@ -90,6 +198,11 @@
         "summary": "Get Visao 360",
         "description": "Cadastro, medidor e histórico da UC: o que o atendente precisa com o cliente na linha.",
         "operationId": "get_visao_360_unidades_consumidoras__cod_uc__visao_360_get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
         "parameters": [
           {
             "name": "cod_uc",
@@ -143,6 +256,11 @@
         "summary": "Get Receita Mensal",
         "description": "Indicadores de cada competência do período, do mês mais antigo ao mais recente.",
         "operationId": "get_receita_mensal_receita_mensal_get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
         "parameters": [
           {
             "name": "inicio",
@@ -215,6 +333,11 @@
         "summary": "Get Comparacao",
         "description": "kWh e receita de dois períodos, da empresa inteira ou de um segmento, e a variação.",
         "operationId": "get_comparacao_receita_comparacao_get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
         "parameters": [
           {
             "name": "base_inicio",
@@ -360,7 +483,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ]
       }
     },
     "/receita/decomposicao": {
@@ -371,6 +499,11 @@
         "summary": "Get Decomposicao",
         "description": "Ponte de receita de um par de períodos, por município, por bairro ou por classe.\n\nOrdenada da maior queda para a maior alta: o topo é onde a receita mais caiu.",
         "operationId": "get_decomposicao_receita_decomposicao_get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
         "parameters": [
           {
             "name": "periodo_base",
@@ -485,6 +618,11 @@
         "summary": "Get Insight",
         "description": "Um insight de IA sobre a ponte de receita do recorte que a tela está mostrando.",
         "operationId": "get_insight_receita_insight_get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
         "parameters": [
           {
             "name": "periodo_base",
@@ -605,6 +743,11 @@
         "summary": "Get Serie Alimentadores",
         "description": "DEC e FEC de cada alimentador por competência, como a Gold calculou.",
         "operationId": "get_serie_alimentadores_continuidade_alimentadores_mensal_get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
         "parameters": [
           {
             "name": "inicio",
@@ -690,6 +833,11 @@
         "summary": "Get Ranking Alimentadores",
         "description": "Os piores alimentadores do período, pelo DEC ou pelo FEC.",
         "operationId": "get_ranking_alimentadores_continuidade_alimentadores_ranking_get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
         "parameters": [
           {
             "name": "inicio",
@@ -758,6 +906,11 @@
         "summary": "Get Recortes",
         "description": "DEC e FEC por município, por bairro de um município ou por alimentador de um bairro.",
         "operationId": "get_recortes_continuidade_recortes_get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
         "parameters": [
           {
             "name": "inicio",
@@ -882,6 +1035,11 @@
         "summary": "Get Comparacao",
         "description": "Os indicadores da diretoria em dois períodos, da empresa inteira ou de um recorte.",
         "operationId": "get_comparacao_indicadores_comparacao_get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
         "parameters": [
           {
             "name": "base_inicio",
@@ -1012,6 +1170,11 @@
         "summary": "Get Janelas",
         "description": "Janelas corridas de `meses` competências, da mais antiga para a mais recente.",
         "operationId": "get_janelas_indicadores_janelas_get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
         "parameters": [
           {
             "name": "meses",
@@ -1118,6 +1281,11 @@
         "summary": "Get Fila",
         "description": "A fila da mais para a menos suspeita, com a ordem ativa de cada UC.",
         "operationId": "get_fila_fila_suspeitas_get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
         "parameters": [
           {
             "name": "pagina",
@@ -1185,6 +1353,11 @@
         "summary": "Criar Ordens",
         "description": "Gera uma OI por UC, tudo ou nada: se uma UC falhar, nenhuma OI é criada.",
         "operationId": "criar_ordens_ordens_inspecao_post",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -1209,6 +1382,16 @@
                 }
               }
             }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErroSchema"
+                }
+              }
+            },
+            "description": "Forbidden"
           },
           "404": {
             "content": {
@@ -1249,6 +1432,11 @@
         "summary": "Listar Ordens",
         "description": "Lista as OIs, das mais recentes para as mais antigas, opcionalmente por status.",
         "operationId": "listar_ordens_ordens_inspecao_get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
         "parameters": [
           {
             "name": "status",
@@ -1302,6 +1490,11 @@
         ],
         "summary": "Obter Ordem",
         "operationId": "obter_ordem_ordens_inspecao__ordem_id__get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
         "parameters": [
           {
             "name": "ordem_id",
@@ -1353,6 +1546,11 @@
         "summary": "Atualizar Ordem",
         "description": "Muda o status da OI (inclusive cancelar) e registra a mudança no histórico.",
         "operationId": "atualizar_ordem_ordens_inspecao__ordem_id__patch",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
         "parameters": [
           {
             "name": "ordem_id",
@@ -1384,6 +1582,16 @@
                 }
               }
             }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErroSchema"
+                }
+              }
+            },
+            "description": "Forbidden"
           },
           "404": {
             "content": {
@@ -1424,7 +1632,7 @@
           "agente de IA"
         ],
         "summary": "Perguntar",
-        "description": "Pergunta ao agente e grava a resposta, qualquer que seja o status, na auditoria.\n\nResponde 429, sem chamar o agente, se a sessão já fez o máximo de perguntas na janela.\nO limite só vale quando o pedido traz o session_id: sem ele, cada pedido ganha uma sessão\nnova, com o contador zerado. O identificador é a única proteção do histórico e do\norçamento (DEC-046), e não há autenticação.",
+        "description": "Pergunta ao agente e grava a resposta, qualquer que seja o status, na auditoria.\n\nResponde 403, sem chamar o agente, se o session_id já pertence a outro usuário, e 429, também\nsem chamar o agente, se o usuário já fez o máximo de perguntas na janela. O limite e o\norçamento de tokens valem por usuário, em todas as sessões dele: omitir ou trocar o\nsession_id não zera nada. O session_id só separa as conversas, e cada uma é de quem a\ncomeçou (DEC-046).",
         "operationId": "perguntar_ai_ask_post",
         "requestBody": {
           "content": {
@@ -1443,6 +1651,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/RespostaIaSchema"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErroSchema"
                 }
               }
             }
@@ -1477,7 +1695,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ]
       }
     },
     "/ai/audit/{audit_id}": {
@@ -1488,6 +1711,11 @@
         "summary": "Obter Auditoria",
         "description": "O registro completo de uma resposta: pergunta, SQL, views, linhas, modelo e horário.",
         "operationId": "obter_auditoria_ai_audit__audit_id__get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
         "parameters": [
           {
             "name": "audit_id",
@@ -1511,6 +1739,16 @@
                 }
               }
             }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErroSchema"
+                }
+              }
+            },
+            "description": "Forbidden"
           },
           "404": {
             "content": {
@@ -3029,6 +3267,29 @@
         "title": "KpisMensaisSchema",
         "description": "Indicadores executivos de uma competência."
       },
+      "LoginSchema": {
+        "properties": {
+          "login": {
+            "type": "string",
+            "maxLength": 50,
+            "minLength": 1,
+            "title": "Login"
+          },
+          "senha": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Senha"
+          }
+        },
+        "type": "object",
+        "required": [
+          "login",
+          "senha"
+        ],
+        "title": "LoginSchema",
+        "description": "Pedido de login. Os tetos evitam que um corpo gigante vire trabalho para o Argon2."
+      },
       "MedidorUcSchema": {
         "properties": {
           "cod_uc": {
@@ -3265,6 +3526,17 @@
         ],
         "title": "ParPeriodosSchema",
         "description": "Um par de períodos que a Gold gravou na decomposição (DEC-028)."
+      },
+      "Perfil": {
+        "type": "string",
+        "enum": [
+          "diretoria",
+          "atendimento",
+          "perdas",
+          "operacao",
+          "ti"
+        ],
+        "title": "Perfil"
       },
       "PerguntaIaSchema": {
         "properties": {
@@ -3749,6 +4021,28 @@
         "title": "Uc360Schema",
         "description": "Tudo o que o atendente precisa de uma UC numa tela só."
       },
+      "UsuarioLogado": {
+        "properties": {
+          "login": {
+            "type": "string",
+            "title": "Login"
+          },
+          "nome": {
+            "type": "string",
+            "title": "Nome"
+          },
+          "perfil": {
+            "$ref": "#/components/schemas/Perfil"
+          }
+        },
+        "type": "object",
+        "required": [
+          "login",
+          "nome",
+          "perfil"
+        ],
+        "title": "UsuarioLogado"
+      },
       "ValidationError": {
         "properties": {
           "loc": {
@@ -3977,6 +4271,13 @@
         ],
         "title": "VariacaoIndicadoresSchema",
         "description": "Variação em % de cada indicador (8.0 = +8,0%); nula sem base ou com base zero."
+      }
+    },
+    "securitySchemes": {
+      "APIKeyCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "venergy_sessao"
       }
     }
   }

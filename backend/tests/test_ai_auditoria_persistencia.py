@@ -127,3 +127,32 @@ def test_api_startup_ensures_the_audit_columns(
         pass
 
     assert chamadas == [True]
+
+
+def test_reload_and_startup_add_the_user_column_and_index_to_an_older_audit_table(
+    gold_dir: Path, engine: Engine
+) -> None:
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "INSERT INTO app.ai_auditoria (session_id, pergunta, answer, status, rows, "
+                "row_count, truncated, confidence, sources, assumptions, request_id, model, "
+                "prompt_version, latency_ms) VALUES ('s', 'p', 'a', 'answered', '[]', 0, false, "
+                "'high', '[]', '[]', 'r', 'm', 'v2', 1)"
+            )
+        )
+        connection.execute(text("DROP INDEX app.ix_ai_auditoria_usuario"))
+        connection.execute(text("ALTER TABLE app.ai_auditoria DROP COLUMN usuario"))
+
+    load_gold(gold_dir, engine)
+    garantir_colunas_na_subida(lambda: engine)
+
+    with Session(engine) as session:
+        stored = session.scalars(select(AiAuditoria)).one()
+        assert stored.pergunta == "p"
+        assert stored.usuario is None
+    with engine.connect() as connection:
+        indices = connection.execute(
+            text("SELECT indexname FROM pg_indexes WHERE schemaname = 'app'")
+        ).scalars()
+        assert "ix_ai_auditoria_usuario" in set(indices)

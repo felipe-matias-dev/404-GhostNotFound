@@ -6,7 +6,7 @@ Uso: uv run uvicorn venergy_api.main:create_app --factory --reload --reload-dir 
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from venergy_api.agente import (
@@ -20,6 +20,7 @@ from venergy_api.database import get_engine
 from venergy_api.insights import CacheInsights
 from venergy_api.routers import (
     ai,
+    auth,
     continuidade,
     fila,
     health,
@@ -28,6 +29,7 @@ from venergy_api.routers import (
     receita,
     unidades,
 )
+from venergy_api.sessao import usuario_atual
 
 
 @asynccontextmanager
@@ -55,18 +57,25 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.cache_insights = CacheInsights()
     app.state.ai_limite_perguntas = settings.ai_limite_perguntas
     app.state.ai_janela_segundos = settings.ai_janela_segundos
+    # A dependência de login lê o segredo daqui, e não de get_settings(): os testes montam o
+    # app com as próprias configurações.
+    app.state.settings = settings
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
         # Só o que a API usa: leitura, mais POST e PATCH das ordens de inspeção.
         allow_methods=["GET", "POST", "PATCH"],
     )
+    # Só a saúde e a porta de entrada ficam abertas. O login é exigido aqui, num lugar só, e
+    # não rota a rota: um router novo nasce protegido, e esquecer dele fica difícil.
+    login = [Depends(usuario_atual)]
     app.include_router(health.router)
-    app.include_router(unidades.router)
-    app.include_router(receita.router)
-    app.include_router(continuidade.router)
-    app.include_router(indicadores.router)
-    app.include_router(fila.router)
-    app.include_router(ordens.router)
-    app.include_router(ai.router)
+    app.include_router(auth.router)
+    app.include_router(unidades.router, dependencies=login)
+    app.include_router(receita.router, dependencies=login)
+    app.include_router(continuidade.router, dependencies=login)
+    app.include_router(indicadores.router, dependencies=login)
+    app.include_router(fila.router, dependencies=login)
+    app.include_router(ordens.router, dependencies=login)
+    app.include_router(ai.router, dependencies=login)
     return app
