@@ -1315,14 +1315,15 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
     com o relógio do banco. 0 desliga. API 0.10.0.
 - **Contrato (para o V1 revisar):** `AgentAnswer` ganha `input_tokens` e `output_tokens` (`int >= 0`, padrão 0, tokens do gerador de
   SQL somando as tentativas; a narrativa não entra). Sem invariante nova por status. `app.ai_auditoria` ganha as duas colunas
-  (`integer not null default 0`), que a carga da Gold acrescenta a um banco antigo com `ADD COLUMN IF NOT EXISTS`, sem tocar nas
-  linhas. `RespostaIaSchema` e `AuditoriaIaSchema` expõem os dois campos. Motivo novo de `refused` (`BUDGET_EXHAUSTED`).
+  (`integer not null default 0`), que a subida da API e a carga da Gold acrescentam a um banco antigo com `ADD COLUMN IF NOT EXISTS`, sem tocar nas
+  linhas (sem passo manual; banco fora do ar na subida só gera um aviso). `RespostaIaSchema` e `AuditoriaIaSchema` expõem os dois campos. Motivo novo de `refused` (`BUDGET_EXHAUSTED`).
 - **Alternativas descartadas:** o agente consultar `app.ai_auditoria` (quebra o isolamento do `venergy_agent`, D1 e DEC-034);
   memória no processo do agente (some no restart e não escala); o agente gravar o histórico (é somente leitura); contador de
   perguntas em memória na API (some no restart, não vale com mais de um processo); um total único de tokens (entrada e saída têm
   preços diferentes).
 - **Limitações:** sem autenticação, o `session_id` é escolhido pelo cliente, e trocar de sessão zera o limite e o orçamento: é trava
-  de custo e de abuso acidental, não de segurança (mesma ressalva da DEC-034). O orçamento não conta a narrativa. O padrão de
+  de custo e de abuso acidental, não de segurança (mesma ressalva da DEC-034). A contagem do limite não é atômica: rajadas
+  simultâneas da mesma sessão podem passar um pouco do limite. O orçamento não conta a narrativa. O padrão de
   200000 tokens é uma suposição a medir nos logs (`input_tokens` da etapa `geracao`).
 - **Pendente (regra de merge, DEC-016):** a troca do prompt padrão para a v3 só entra na `main` depois de `make eval ONLY=golden`
   na v2 e na v3 e `make eval ONLY=red_team` na v3, sem regressão fora dos follow-ups e com pelo menos 4 dos 5 follow-ups do golden

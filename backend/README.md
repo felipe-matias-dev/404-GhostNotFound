@@ -180,7 +180,7 @@ Variáveis lidas do `.env` (veja `.env.example`):
 
 Os caminhos são relativos à pasta `backend/`, de onde os comandos rodam.
 
-A auditoria (`app.ai_auditoria`) ganhou as colunas `input_tokens` e `output_tokens`. A carga da Gold as acrescenta sozinha a um banco antigo (`ALTER TABLE ... ADD COLUMN IF NOT EXISTS`, sem tocar nas linhas): rode a carga uma vez antes de subir a API nova, ou aplique o `ALTER TABLE` à mão (DEC-046).
+A auditoria (`app.ai_auditoria`) ganhou as colunas `input_tokens` e `output_tokens`. A API na subida e a carga da Gold as acrescentam sozinhas a um banco antigo (`ALTER TABLE ... ADD COLUMN IF NOT EXISTS`, sem tocar nas linhas): não há passo manual (DEC-046). Com o banco fora do ar na subida, a API sobe e registra um aviso.
 
 ## Testes e qualidade
 

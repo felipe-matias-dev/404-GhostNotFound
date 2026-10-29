@@ -87,3 +87,9 @@ def client_for(tmp_path: Path) -> Callable[..., TestClient]:
 @pytest.fixture
 def client(engine: Engine, client_for: Callable[[Engine], TestClient]) -> TestClient:
     return client_for(engine)
+
+
+@pytest.fixture(autouse=True)
+def no_startup_audit_check(monkeypatch: pytest.MonkeyPatch) -> None:
+    # O lifespan não mexe no banco de desenvolvimento de quem roda os testes.
+    monkeypatch.setattr("venergy_api.main.garantir_colunas_na_subida", lambda *_: None)

@@ -1,12 +1,17 @@
 """Gravação da trilha de auditoria do agente de IA, separada da rota para ser reaproveitada."""
 
+import logging
+from collections.abc import Callable
 from datetime import timedelta
 
-from sqlalchemy import Connection, func, select, text
+from sqlalchemy import Connection, Engine, func, select, text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 from venergy_agent.domain.answer import AgentAnswer
 
 from venergy_api.models import AiAuditoria
+
+logger = logging.getLogger(__name__)
 
 
 def gravar_auditoria(
@@ -54,8 +59,25 @@ def garantir_colunas_de_tokens(connection: Connection) -> None:
     """
     connection.execute(
         text(
-            "ALTER TABLE app.ai_auditoria "
+            "ALTER TABLE IF EXISTS app.ai_auditoria "
             "ADD COLUMN IF NOT EXISTS input_tokens integer NOT NULL DEFAULT 0, "
             "ADD COLUMN IF NOT EXISTS output_tokens integer NOT NULL DEFAULT 0"
         )
     )
+
+
+def garantir_colunas_na_subida(obter_engine: Callable[[], Engine]) -> None:
+    """Garante as colunas na subida da API, para um banco antigo não quebrar o /ai/ask.
+
+    Quem atualiza o código sem rodar a carga não fica com a auditoria quebrada. Banco fora do
+    ar não impede a subida: só o /ai e as telas que usam o banco ficam de fora, como já ficam.
+    """
+    try:
+        with obter_engine().begin() as connection:
+            garantir_colunas_de_tokens(connection)
+    except SQLAlchemyError as error:
+        logger.warning(
+            "Não foi possível conferir as colunas da auditoria na subida (%s). "
+            "A carga da Gold também as acrescenta.",
+            type(error).__name__,
+        )

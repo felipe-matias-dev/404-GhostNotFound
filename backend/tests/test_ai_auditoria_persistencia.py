@@ -1,10 +1,15 @@
+import logging
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
+from fastapi.testclient import TestClient
 from sqlalchemy import Engine, select, text
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 from venergy_api.amostra import write_sample
+from venergy_api.auditoria import garantir_colunas_na_subida
 from venergy_api.carga import load_gold
 from venergy_api.models import AiAuditoria
 
@@ -75,3 +80,50 @@ def test_reload_adds_the_token_columns_to_an_older_audit_table(
         stored = session.scalars(select(AiAuditoria)).one()
         assert stored.pergunta == "p"
         assert (stored.input_tokens, stored.output_tokens) == (0, 0)
+
+
+def test_startup_adds_the_token_columns_to_an_older_audit_table(
+    gold_dir: Path, engine: Engine
+) -> None:
+    with engine.begin() as connection:
+        connection.execute(
+            text("ALTER TABLE app.ai_auditoria DROP COLUMN input_tokens, DROP COLUMN output_tokens")
+        )
+
+    garantir_colunas_na_subida(lambda: engine)
+
+    with Session(engine) as session:
+        assert (
+            session.execute(text("SELECT input_tokens, output_tokens FROM app.ai_auditoria")).all()
+            == []
+        )
+
+
+def test_startup_survives_a_database_that_is_down(caplog: pytest.LogCaptureFixture) -> None:
+    def engine_fora() -> Engine:
+        raise OperationalError("SELECT 1", {}, Exception("banco fora"))
+
+    with caplog.at_level(logging.WARNING):
+        garantir_colunas_na_subida(engine_fora)
+
+    assert "auditoria" in caplog.text.lower()
+
+
+def test_api_startup_ensures_the_audit_columns(
+    engine: Engine, client_for: Callable[..., TestClient], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    chamadas = []
+
+    async def sem_agente() -> None:
+        return None
+
+    monkeypatch.setattr("venergy_api.main.montar_agente", sem_agente)
+    monkeypatch.setattr("venergy_api.main.montar_redator_insights", sem_agente)
+    monkeypatch.setattr(
+        "venergy_api.main.garantir_colunas_na_subida", lambda *_: chamadas.append(True)
+    )
+
+    with client_for(engine):
+        pass
+
+    assert chamadas == [True]

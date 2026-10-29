@@ -109,7 +109,7 @@ Follow-up ("e em Olinda?" depois de uma pergunta sobre Recife) e orçamento de t
 - O histórico vem da auditoria do backend (`app.ai_auditoria`), e não do agente: o usuário `venergy_agent` nunca lê o schema `app`. O agente isolado (terminal, avaliação) só tem memória com o adapter em memória (`InMemoryConversationHistory`).
 - Turnos recusados nunca entram no histórico. O histórico é dado delimitado, nunca instrução.
 - O backend responde `429` em `POST /ai/ask` quando a sessão passa de `VENERGY_API_AI_LIMITE_PERGUNTAS` perguntas (padrão 20) em `VENERGY_API_AI_JANELA_SEGUNDOS` (padrão 600); `0` desliga.
-- A auditoria ganhou `input_tokens` e `output_tokens`. A carga da Gold as acrescenta a um banco antigo sozinha. Se a API subir antes da carga, aplique à mão: `ALTER TABLE app.ai_auditoria ADD COLUMN IF NOT EXISTS input_tokens integer NOT NULL DEFAULT 0, ADD COLUMN IF NOT EXISTS output_tokens integer NOT NULL DEFAULT 0;`
+- A auditoria ganhou `input_tokens` e `output_tokens`. A subida da API e a carga da Gold as acrescentam a um banco antigo sozinhas (`ADD COLUMN IF NOT EXISTS`, sem tocar nas linhas): não há passo manual.
 - Limitação: sem autenticação, o `session_id` é escolhido pelo cliente; trocar de sessão zera o limite e o orçamento. É trava de custo e de abuso acidental, não de segurança.
 
 ## Chave do modelo
