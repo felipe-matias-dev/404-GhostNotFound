@@ -1,7 +1,8 @@
 // Gráfico de tendência: uma ou mais séries em linha sobre categorias em ordem (meses, anos).
 // SVG próprio; escalas e curva do d3 (`d3-scale`, `d3-shape`), movimento do `motion`.
-// - a série em destaque (`emphasis`; sozinha, ela é o destaque) fica por cima, mais grossa,
-//   com área em degradê e um ponto no último valor; as outras ficam finas, atrás;
+// - a série em destaque (`emphasis`; sozinha, ela é o destaque) fica por cima, mais grossa e
+//   com um ponto no último valor; as outras ficam finas, atrás. A área em degradê só aparece
+//   com `zeroBaseline`: num eixo que não começa no zero, a área exageraria a variação;
 // - eixo y com ticks redondos (`nice`), opcionalmente a partir do zero; o eixo x mostra só os
 //   rótulos que cabem, contados a partir do último (o mais recente sempre aparece);
 // - dados novos: a série que continua (mesmo `id`, mesmos pontos) muda de forma com mola, a
@@ -14,7 +15,7 @@
 import {
 	ArrowsClockwiseIcon,
 	TrayIcon,
-	WarningCircleIcon,
+	XCircleIcon,
 } from "@phosphor-icons/react";
 import { scaleLinear, scalePoint } from "d3-scale";
 import { area, curveMonotoneX, line } from "d3-shape";
@@ -135,6 +136,8 @@ export type TrendSeries = {
 	color?: TrendColor;
 	/** Por cima, mais grossa, com área e ponto final. Padrão: só quando é a única série. */
 	emphasis?: boolean;
+	/** Nome curto no fim da linha, com `endLabels` ("receita"). Padrão: `label`. */
+	shortLabel?: string;
 };
 
 export type TrendMarker = {
@@ -159,13 +162,28 @@ export type TrendChartProps = {
 	/** Cabeçalho da coluna de categorias na tabela do leitor de tela. */
 	categoryLabel?: string;
 	markers?: TrendMarker[];
-	/** Eixo y a partir do zero. Padrão: só a faixa dos dados, que é o que mostra tendência. */
+	/**
+	 * Eixo y a partir do zero, com área sob a série em destaque. Padrão: só a faixa dos dados,
+	 * que é o que mostra tendência, e sem área.
+	 */
 	zeroBaseline?: boolean;
 	/**
 	 * Altura da área do gráfico, em px, ou `"fill"` para ocupar a altura que sobra no card
 	 * (com `className="flex-1"` no gráfico e um pai em coluna); a largura acompanha o container.
 	 */
 	height?: number | "fill";
+	/**
+	 * Valor de referência do eixo (ex.: 100 num índice): uma linha mais forte que a grade, sempre
+	 * dentro da escala.
+	 */
+	reference?: number;
+	/** Valor e nome curto no fim de cada série, no lugar da legenda. */
+	endLabels?: boolean;
+	/**
+	 * Ids de duas séries: o espaço entre elas é preenchido em `chart-muted`. Só quando a distância
+	 * entre as duas é o dado do gráfico.
+	 */
+	band?: readonly [string, string];
 	/** Rodapé do tooltip para a categoria sob o cursor (ex.: a variação sobre a anterior). */
 	tooltipFooter?: (index: number) => ReactNode;
 	/** Leitura rápida, à esquerda do cabeçalho. */
@@ -219,6 +237,16 @@ type Layout = {
 	py: (value: number) => number;
 	ticks: number[];
 	labelEvery: number;
+	/** Eixo a partir do zero: só nele a série em destaque ganha área. */
+	zeroBaseline: boolean;
+};
+
+type LayoutOptions = {
+	zeroBaseline: boolean;
+	formatTick: (value: number) => string;
+	reference?: number;
+	/** Espaço à direita do plot: margem padrão ou a largura dos rótulos de fim de linha. */
+	right: number;
 };
 
 function layout(
@@ -226,14 +254,17 @@ function layout(
 	series: TrendSeries[],
 	width: number,
 	height: number,
-	zeroBaseline: boolean,
-	formatTick: (value: number) => string,
+	{ zeroBaseline, formatTick, reference, right }: LayoutOptions,
 ): Layout {
 	const values = series.flatMap((s) =>
 		s.values.filter((v): v is number => v !== null),
 	);
 	let lo = Math.min(...values);
 	let hi = Math.max(...values);
+	if (reference !== undefined) {
+		lo = Math.min(lo, reference);
+		hi = Math.max(hi, reference);
+	}
 	if (zeroBaseline) {
 		lo = Math.min(lo, 0);
 		hi = Math.max(hi, 0);
@@ -248,7 +279,7 @@ function layout(
 	const ticks = y.ticks(4);
 	const widest = Math.max(...ticks.map((t) => formatTick(t).length));
 	const left = widest * CHAR_PX + 12;
-	const plotWidth = Math.max(0, width - left - MARGIN.right);
+	const plotWidth = Math.max(0, width - left - right);
 	const x = scalePoint<number>()
 		.domain(categories.map((_, i) => i))
 		.range([0, plotWidth]);
@@ -265,6 +296,7 @@ function layout(
 		py: (value) => y(value),
 		ticks,
 		labelEvery,
+		zeroBaseline,
 	};
 }
 
@@ -290,19 +322,54 @@ type DrawnSeries = {
 	areaPath: string;
 };
 
+type EndLabel = { id: string; x: number; y: number; text: string };
+
 type ChartGeometry = {
 	drawn: DrawnSeries[];
 	emphasized: DrawnSeries[];
 	rows: DrawnSeries[];
 	markerAt: Map<string, string>;
 	end: { d: DrawnSeries; last: number; value: number }[];
+	bandPath: string;
+	labels: EndLabel[];
 };
+
+type GeometryOptions = {
+	markers: TrendMarker[];
+	band?: readonly [string, string];
+	endLabels: boolean;
+	formatValue: (value: number) => string;
+};
+
+// Distância mínima entre dois rótulos de fim de linha, em px: uma linha de `text-small`.
+const LABEL_GAP = 14;
+
+const endLabelText = (
+	s: TrendSeries,
+	value: number,
+	formatValue: (value: number) => string,
+) => `${formatValue(value)} ${s.shortLabel ?? s.label}`;
+
+/** Largura reservada à direita para os rótulos de fim de linha. */
+function endLabelsWidth(
+	series: TrendSeries[],
+	formatValue: (value: number) => string,
+) {
+	const widest = Math.max(
+		0,
+		...series.map((s) => {
+			const value = s.values[lastDefined(s.values)];
+			return value == null ? 0 : endLabelText(s, value, formatValue).length;
+		}),
+	);
+	return widest * CHAR_PX + 16;
+}
 
 function geometryOf(
 	geo: Layout,
 	series: TrendSeries[],
-	markers: TrendMarker[],
 	count: number,
+	{ markers, band, endLabels, formatValue }: GeometryOptions,
 ): ChartGeometry {
 	const { px, py, plotHeight } = geo;
 	const toLine = line<number | null>()
@@ -330,7 +397,7 @@ function geometryOf(
 		.map((d) => ({
 			...d,
 			path: toLine(d.values) ?? "",
-			areaPath: d.emphasis ? (toArea(d.values) ?? "") : "",
+			areaPath: d.emphasis && geo.zeroBaseline ? (toArea(d.values) ?? "") : "",
 		}));
 	const emphasized = drawn.filter((d) => d.emphasis);
 	const end = emphasized.flatMap((d) => {
@@ -338,12 +405,58 @@ function geometryOf(
 		const value = d.values[last];
 		return last >= 0 && value != null ? [{ d, last, value }] : [];
 	});
+
+	const [bandA, bandB] = band
+		? band.map((id) => series.find((s) => s.id === id)?.values.slice(0, count))
+		: [];
+	const bandPath =
+		bandA && bandB
+			? (area<number>()
+					.defined((i) => bandA[i] != null && bandB[i] != null)
+					.x((i) => px(i))
+					.y0((i) => py(bandA[i] ?? 0))
+					.y1((i) => py(bandB[i] ?? 0))
+					.curve(curveMonotoneX)
+					.digits(1)(bandA.map((_, i) => i)) ?? "")
+			: "";
+
+	// Cada rótulo na altura do último valor da sua série; os que ficariam encavalados são
+	// afastados de cima para baixo.
+	const labels: EndLabel[] = endLabels
+		? drawn
+				.flatMap((d) => {
+					const last = lastDefined(d.values);
+					const value = d.values[last];
+					return last >= 0 && value != null
+						? [
+								{
+									id: d.s.id,
+									x: px(last) + 12,
+									y: py(value),
+									text: endLabelText(d.s, value, formatValue),
+								},
+							]
+						: [];
+				})
+				.sort((a, b) => a.y - b.y)
+		: [];
+	for (let i = 1; i < labels.length; i++) {
+		const previous = labels[i - 1];
+		const label = labels[i];
+		if (previous && label && label.y - previous.y < LABEL_GAP)
+			label.y = previous.y + LABEL_GAP;
+	}
+
 	return {
 		drawn,
 		emphasized,
-		rows: [...drawn].reverse(),
+		// No tooltip, as séries em destaque primeiro e na ordem em que vieram (a mesma dos
+		// rótulos e da legenda); as de contexto depois, da mais recente para a mais antiga.
+		rows: [...emphasized, ...drawn.filter((d) => !d.emphasis).reverse()],
 		markerAt: new Map(markers.map((m) => [m.at, m.label])),
 		end,
+		bandPath,
+		labels,
 	};
 }
 
@@ -356,7 +469,7 @@ function StateBlock({
 	children: ReactNode;
 	action?: ReactNode;
 }) {
-	const Icon = tone === "error" ? WarningCircleIcon : TrayIcon;
+	const Icon = tone === "error" ? XCircleIcon : TrayIcon;
 	return (
 		<div className="flex h-full flex-col items-center justify-center gap-3 px-4 text-center">
 			<Icon
@@ -422,6 +535,9 @@ export function TrendChart({
 	markers = NO_MARKERS,
 	zeroBaseline = false,
 	height = 240,
+	reference,
+	endLabels = false,
+	band,
 	tooltipFooter,
 	summary,
 	toolbar,
@@ -445,12 +561,32 @@ export function TrendChart({
 	const hasData =
 		count > 0 && (series ?? []).some((s) => s.values.some((v) => v !== null));
 	const tick = formatTick ?? formatValue;
+	const right = useMemo(
+		() =>
+			endLabels && series ? endLabelsWidth(series, formatValue) : MARGIN.right,
+		[endLabels, series, formatValue],
+	);
 	const geo = useMemo(
 		() =>
 			hasData && categories && series && size.width > 0 && plotHeight > 0
-				? layout(categories, series, size.width, plotHeight, zeroBaseline, tick)
+				? layout(categories, series, size.width, plotHeight, {
+						zeroBaseline,
+						formatTick: tick,
+						reference,
+						right,
+					})
 				: null,
-		[hasData, categories, series, size.width, plotHeight, zeroBaseline, tick],
+		[
+			hasData,
+			categories,
+			series,
+			size.width,
+			plotHeight,
+			zeroBaseline,
+			tick,
+			reference,
+			right,
+		],
 	);
 	const current = active !== null && active < count ? active : null;
 	const cursorPx = geo && current !== null ? geo.px(current) : null;
@@ -575,12 +711,21 @@ export function TrendChart({
 				onFocus={() => setActive((prev) => prev ?? count - 1)}
 				onBlur={() => setActive(null)}
 				formatTick={tick}
+				formatValue={formatValue}
+				reference={reference}
+				endLabels={endLabels}
+				band={band}
 			/>
 		);
 	}
 
 	const legend =
-		!error && !pending && hasData && series && series.length > 1 ? (
+		!error &&
+		!pending &&
+		hasData &&
+		series &&
+		series.length > 1 &&
+		!endLabels ? (
 			<ul className="flex flex-wrap items-center gap-x-4 gap-y-1 text-small text-text-muted">
 				{series.map((s, i) => (
 					<li key={s.id} className="flex items-center gap-1.5">
@@ -677,6 +822,10 @@ type PlotProps = {
 	onFocus: () => void;
 	onBlur: () => void;
 	formatTick: (value: number) => string;
+	formatValue: (value: number) => string;
+	reference?: number;
+	endLabels: boolean;
+	band?: readonly [string, string];
 };
 
 function Plot({
@@ -700,11 +849,23 @@ function Plot({
 	onFocus,
 	onBlur,
 	formatTick,
+	formatValue,
+	reference,
+	endLabels,
+	band,
 }: PlotProps) {
 	const count = categories.length;
 	const chart = useMemo(
-		() => (geo ? geometryOf(geo, series, markers, count) : null),
-		[geo, series, markers, count],
+		() =>
+			geo
+				? geometryOf(geo, series, count, {
+						markers,
+						band,
+						endLabels,
+						formatValue,
+					})
+				: null,
+		[geo, series, markers, count, band, endLabels, formatValue],
 	);
 
 	if (!geo || !chart) return <div className="h-full" />;
@@ -736,27 +897,29 @@ function Plot({
 				className="block overflow-visible"
 			>
 				<defs>
-					{chart.emphasized.map((d) => (
-						<linearGradient
-							key={d.s.id}
-							id={`${gradientId}-${d.s.id}`}
-							x1="0"
-							x2="0"
-							y1="0"
-							y2="1"
-						>
-							<stop
-								offset="0%"
-								stopOpacity={0.16}
-								style={{ stopColor: COLORS[d.color].stop }}
-							/>
-							<stop
-								offset="100%"
-								stopOpacity={0}
-								style={{ stopColor: COLORS[d.color].stop }}
-							/>
-						</linearGradient>
-					))}
+					{chart.emphasized
+						.filter((d) => d.areaPath)
+						.map((d) => (
+							<linearGradient
+								key={d.s.id}
+								id={`${gradientId}-${d.s.id}`}
+								x1="0"
+								x2="0"
+								y1="0"
+								y2="1"
+							>
+								<stop
+									offset="0%"
+									stopOpacity={0.16}
+									style={{ stopColor: COLORS[d.color].stop }}
+								/>
+								<stop
+									offset="100%"
+									stopOpacity={0}
+									style={{ stopColor: COLORS[d.color].stop }}
+								/>
+							</linearGradient>
+						))}
 				</defs>
 				<g transform={`translate(${left} ${MARGIN.top})`}>
 					<StaticLayers
@@ -767,6 +930,7 @@ function Plot({
 						motionFor={motionFor}
 						reduced={reduced}
 						gradientId={gradientId}
+						reference={reference}
 					/>
 
 					<XLabels geo={geo} categories={categories} current={current} />
@@ -811,6 +975,7 @@ type StaticLayersProps = {
 	motionFor: typeof SPRING | typeof INSTANT;
 	reduced: boolean;
 	gradientId: string;
+	reference?: number;
 };
 
 const StaticLayers = memo(function StaticLayers({
@@ -821,6 +986,7 @@ const StaticLayers = memo(function StaticLayers({
 	motionFor,
 	reduced,
 	gradientId,
+	reference,
 }: StaticLayersProps) {
 	const { plotWidth, plotHeight, px, py, ticks } = geo;
 	const enter = reduced ? INSTANT : DRAW;
@@ -848,6 +1014,25 @@ const StaticLayers = memo(function StaticLayers({
 				))}
 			</AnimatePresence>
 
+			{reference === undefined ? null : (
+				<motion.line
+					x1={0}
+					x2={plotWidth}
+					initial={false}
+					animate={{ y1: py(reference), y2: py(reference) }}
+					transition={motionFor}
+					className="stroke-text-muted"
+				/>
+			)}
+
+			{chart.bandPath ? (
+				<motion.path
+					className="fill-chart-muted/30"
+					initial={reduced ? false : { d: chart.bandPath, opacity: 0 }}
+					animate={{ d: chart.bandPath, opacity: 1 }}
+					transition={{ ...motionFor, opacity: enter }}
+				/>
+			) : null}
 			<AnimatePresence initial={false}>
 				{categories.map((c, i) =>
 					chart.markerAt.has(c.key) ? (
@@ -869,16 +1054,18 @@ const StaticLayers = memo(function StaticLayers({
 			</AnimatePresence>
 
 			<AnimatePresence>
-				{chart.emphasized.map((d) => (
-					<motion.path
-						key={`area-${d.s.id}`}
-						fill={`url(#${gradientId}-${d.s.id})`}
-						initial={reduced ? false : { d: d.areaPath, opacity: 0 }}
-						animate={{ d: d.areaPath, opacity: 1 }}
-						exit={{ opacity: 0, transition: FADE }}
-						transition={{ ...motionFor, opacity: enter }}
-					/>
-				))}
+				{chart.emphasized
+					.filter((d) => d.areaPath)
+					.map((d) => (
+						<motion.path
+							key={`area-${d.s.id}`}
+							fill={`url(#${gradientId}-${d.s.id})`}
+							initial={reduced ? false : { d: d.areaPath, opacity: 0 }}
+							animate={{ d: d.areaPath, opacity: 1 }}
+							exit={{ opacity: 0, transition: FADE }}
+							transition={{ ...motionFor, opacity: enter }}
+						/>
+					))}
 			</AnimatePresence>
 
 			<AnimatePresence>
@@ -901,6 +1088,23 @@ const StaticLayers = memo(function StaticLayers({
 					/>
 				))}
 			</AnimatePresence>
+
+			{chart.labels.map((l) => (
+				<motion.text
+					key={`label-${l.id}`}
+					x={l.x}
+					dy="0.32em"
+					initial={reduced ? false : { opacity: 0, y: l.y }}
+					animate={{ opacity: 1, y: l.y }}
+					transition={{
+						...motionFor,
+						opacity: reduced ? INSTANT : { ...FADE, delay: 0.5 },
+					}}
+					className="fill-text text-small tabular-nums"
+				>
+					{l.text}
+				</motion.text>
+			))}
 		</>
 	);
 });

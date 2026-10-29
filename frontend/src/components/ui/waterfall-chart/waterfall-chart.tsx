@@ -13,7 +13,7 @@
 import {
 	ArrowsClockwiseIcon,
 	TrayIcon,
-	WarningCircleIcon,
+	XCircleIcon,
 } from "@phosphor-icons/react";
 import { motion, useReducedMotion } from "motion/react";
 import type { ReactNode } from "react";
@@ -128,7 +128,7 @@ function StateBlock({
 	children: ReactNode;
 	action?: ReactNode;
 }) {
-	const Icon = tone === "error" ? WarningCircleIcon : TrayIcon;
+	const Icon = tone === "error" ? XCircleIcon : TrayIcon;
 	return (
 		<div className="flex min-h-40 flex-col items-center justify-center gap-3 px-4 py-8 text-center">
 			<Icon

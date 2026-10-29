@@ -146,6 +146,20 @@ Recorte da tela no topo (ex.: `Receita › Recife ▾ › Boa Viagem ▾`): a p�
 
 `visaoGeral` (KPIs), `receita` (preço × volume), `unidadeConsumidora` (visão 360), `perdas` (fila e ordens de inspeção), `operacao` (DEC/FEC), `agente` (chat e insights de IA), `auth` (perfis, quando entrar).
 
+### Visão geral da diretoria
+
+- Resumo de 12 meses e faixa mensal: valores e variações de `GET /indicadores/comparacao`.
+- Tesoura: somas de `GET /indicadores/janelas?meses=12`, sem acumulação no frontend. A primeira
+  e a última janelas completas sem sobreposição definem o par do resumo; o gráfico só converte
+  as somas em variação sobre a primeira janela.
+- Competências das janelas vêm da empresa inteira: um mês sem linha no recorte vale zero,
+  enquanto uma lacuna global continua invalidando a janela.
+- O link do resumo para a ponte só aparece se o mesmo par existir em
+  `GET /receita/decomposicao/periodos`, sem fallback silencioso para outro período.
+- `GET /receita/mensal` permanece para as competências do seletor mensal e as sparklines.
+  DEC, FEC e satisfação da comparação são calculados no backend, não pela série mensal.
+- Comparação mensal, resumo e série de janelas têm estados de erro e repetição independentes.
+
 ## Design system
 
 Os componentes reutilizáveis (backlog V2-02) são construídos e documentados no Storybook
@@ -169,7 +183,8 @@ carrega `src/styles.css`.
   tamanho, peso, cor e acessibilidade em **Fundamentos/Ícones**.
 - Gráficos: SVG próprio com `motion`; `d3-scale` e `d3-shape` só para escalas e curvas
   (DEC-037). Cores das séries pelos tokens `chart-1` a `chart-6` e `chart-muted`. Tendência
-  ao longo do tempo: `TrendChart`; ponte de efeitos: `WaterfallChart`.
+  ao longo do tempo: `TrendChart` (área só com eixo a partir do zero, DEC-041); forma da série
+  ao lado de um número: `Sparkline`; ponte de efeitos: `WaterfallChart`.
 
 Regras e modelo de story na página **Introdução** do Storybook
 (`.storybook/docs/introducao.mdx`).
