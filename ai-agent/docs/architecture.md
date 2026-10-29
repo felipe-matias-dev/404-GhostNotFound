@@ -19,20 +19,24 @@ Hexagonal: `domain` ← `application` ← `infrastructure`.
 | domain | `errors.py` | `ErrorKind`, `SqlRejected`, `QueryExecutionError` | pronto, com `ErrorKind.REJECTED` (item 6) |
 | domain | `numbers.py` | `unsupported_numbers`: números da narrativa (lidos em pt-BR) que não estão nos valores das linhas (DEC-019) | item 8 |
 | domain | `semantic.py` | `SemanticLayer`, `ViewSpec`, `ColumnSpec`, `Relation`, glossário, regras, exemplos | pronto |
+| domain | `conversation.py` | `ConversationTurn(question, sql, status)`: um turno do histórico da sessão | G1-10, DEC-046 |
 | domain | `answer.py` | `AgentAnswer` com `status` e invariantes por status (DEC-020), `Insight` | pronto (PR #21; texto em branco e `row_count >= 0` no PR #29) |
-| application | `ports.py` | `TextToSqlAgent`, `SemanticLayerSource`, `SqlGenerator`, `SqlValidator`, `QueryExecutor`, `AnswerWriter`, `InsightWriter` | `ask.py` (`AskUseCase`), pronto (PR #30) |
+| application | `ports.py` | `TextToSqlAgent`, `ConversationHistory`, `SessionUsage`, `SemanticLayerSource`, `SqlGenerator`, `SqlValidator`, `QueryExecutor`, `AnswerWriter`, `InsightWriter` | `ask.py` (`AskUseCase`), pronto (PR #30) |
 | infrastructure | `sql_validator.py` | `SqlglotValidator`: um `SELECT`, allowlist de views, funções conhecidas, `LIMIT` imposto | pronto |
 | infrastructure | `postgres_executor.py` | `PostgresQueryExecutor`: `BEGIN READ ONLY`, `statement_timeout`, SQLSTATE → `ErrorKind`; erro de dado (classe 22) volta só com o tipo, sem o valor | pronto |
 | infrastructure | `sql_generator.py`, `prompt_renderer.py`, `llm.py` | PydanticAI com `output_type=SqlDraft`; prompt em `prompts/v1/`; delimitadores com nonce; Gemini direto (padrão) ou OpenRouter | pronto |
 | infrastructure | `semantic_source.py`, `views_sql.py` | `YamlSemanticLayerSource` valida `semantic/semantic_layer.yaml` contra `contracts/gold_schema.yaml` (inclusive `consumers` e `sensitive`); `views_sql` gera `semantic/views.sql` | pronto |
 | infrastructure | `answer_writer.py` | `PydanticAiAnswerWriter`: narra as linhas, com o conteúdo do banco delimitado como dado e a unidade de cada coluna vinda da camada semântica; prompt em `prompts/answer/v3/`, que pede o período das linhas | item 8 |
+| infrastructure | `history_renderer.py`, `memory_history.py`, `prompts/v3/` | Bloco `<historico-{nonce}>` com o histórico como dado; adapter em memória (avaliação e testes, não é usado em produção); prompt de SQL v3 (v2 mais `history.md`), padrão desde a DEC-046 | G1-10 |
 | raiz | `config.py`, `bootstrap.py`, `__main__.py` | `AgentSettings` (`VENERGY_AGENT_*`); `build_agent(settings)` monta o agente; `python -m venergy_agent "pergunta"` | pronto |
 
 ## 3. Fluxo do `ask()`
 
 ```
 pergunta → Question → SemanticLayer (carregada uma vez)
-        → SqlGenerator → SqlDraft
+        → orçamento da sessão esgotado? → refused, sem chamar o modelo
+        → histórico da sessão (últimos turnos, sem os refused)
+        → SqlGenerator (com o histórico) → SqlDraft
             unknown | clarify | refuse → AgentAnswer sem SQL
             ok → SqlglotValidator → PostgresQueryExecutor
                  erro corrigível → AttemptFeedback → nova tentativa (até 3)
@@ -46,6 +50,14 @@ pergunta → Question → SemanticLayer (carregada uma vez)
 Período (G1-05): quando as linhas têm `competencia`, o texto determinístico cita o primeiro e o último mês do resultado, e a narrativa só é aceita se citar os dois extremos das linhas que o redator viu (por exemplo "junho de 2025", "06/2025", "jun/2025" ou "entre junho e dezembro de 2025"); senão, o log registra `periodo_ausente_na_resposta`. Os meses usados como literal no SQL (`competencia = '2025-06'`) também valem na checagem de números (DEC-019). Pedido de esclarecimento que cita nome técnico vira uma pergunta genérica sobre período e recorte. Detalhes, confiança e logs: spec §5.1. O backend monta o agente uma vez por processo com `build_agent(AgentSettings())`.
 
 `InsightWriter` (item 9, `infrastructure/insight_writer.py`, prompt em `prompts/insight/v2/`, com unidade, efeito tarifa e bandeira como partes do efeito preço e negativo por extenso): narra o JSON de métricas de uma tela e devolve `None` se algum número do texto não estiver no JSON. O backend monta o JSON, guarda o insight em cache e liga o redator (D9): feito para a tela de Receita (`GET /receita/insight`, DEC-040), com `build_insight_writer` em `bootstrap.py`. O golden set está em `eval/golden_set.yaml` (versão 0.9.0, 93 itens, alinhado à camada 0.4.0). A revisão humana é parcial: `revisado_por` está preenchido em 12 itens (Dados), e os demais aguardam revisão.
+
+## 3b. Memória e orçamento
+
+- O histórico e o consumo de tokens vêm das portas `ConversationHistory` e `SessionUsage`. Quem as implementa é o backend (`HistoricoAuditoria`, sobre `app.ai_auditoria`): o `venergy_agent` nunca lê `app` e o agente continua sem gravar nada.
+- `history_turns=3` e `session_token_budget=200000` (0 desliga cada um). O orçamento é conferido antes da pergunta; leitura do consumo que falha → `failed` sem chamar o modelo; leitura do histórico que falha → segue sem ele.
+- `AgentAnswer.input_tokens` e `output_tokens` somam só o gerador de SQL.
+- O backend limita as perguntas por sessão numa janela (`429`). Limitação: sem autenticação, trocar de `session_id` zera o limite e o orçamento.
+- Estado: a rodada do golden que libera o `prompts/v3` como padrão (DEC-016) está pendente. O runner da avaliação ainda não liga a memória (tarefa pós-merge do plano).
 
 ## 4. Camada semântica hoje
 

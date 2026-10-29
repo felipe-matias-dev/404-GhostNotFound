@@ -48,6 +48,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | 27/10/2026 | DEC-039: Workflow do Databricks com os notebooks lidos do GitHub (`main`), serverless, Landing → Bronze → Silver → Gold + export, reprocessando tudo (diverge da ADR-07); agendamento mensal no dia 6, pausado | Roda o código revisado e mantém o tudo ou nada de cada camada numa extração única; a origem fecha o faturamento uma vez por mês | Arthur |
 | 27/10/2026 | DEC-040: `GET /receita/insight` devolve o insight de IA da tela de receita; o backend monta o JSON de métricas a partir da ponte da Gold, com valores arredondados como a tela os mostra, e guarda o texto num cache em memória pelo conteúdo das métricas; sem a chave do Gemini a rota responde 503; API 0.9.0 | O agente só aceita texto cujos números sejam exatamente valores do JSON (DEC-019), e uma Gold recarregada precisa gerar um insight novo, nunca um velho | Felipe |
 | 27/10/2026 | DEC-044: a visão 360 da unidade consumidora sai de uma rota só, `GET /unidades-consumidoras/{cod_uc}/visao-360`; os 12 meses terminam na última competência da Gold e a "conta alta" é o último mês contra o mesmo mês do ano anterior, com faixa de ±10%; integrada à API 0.9.0 da main | O atendente está com o cliente na linha: uma chamada só à API e uma resposta pronta para "o consumo subiu?", sem a tela refazer conta de negócio | Felipe |
+| 29/10/2026 | DEC-046 (proposta): follow-up com memória, orçamento de tokens por sessão e limite de perguntas; o histórico vem da auditoria do backend, `AgentAnswer` ganha `input_tokens` e `output_tokens`, `prompts/v3` e `429` em `POST /ai/ask` (API 0.10.0) | Follow-up ("e em Olinda?") sem o agente guardar estado nem ler `app`, e trava de custo por sessão | GenAI |
 
 ## DEC-001 · Localização dos arquivos de origem (landing)
 
@@ -1290,3 +1291,39 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   A tela `/uc` do frontend pode usar o tipo gerado do OpenAPI.
   A decisão foi renumerada de DEC-036 para DEC-044 na resolução do PR #55: DEC-036 já identifica a tela
   da diretoria na `main`, e DEC-041 a DEC-043 estão reservadas nas branches do portal.
+
+
+## DEC-046 · Memória de conversa, orçamento de tokens e limite de perguntas por sessão
+
+- **Status:** proposta, até o aceite do V1 (muda o contrato `AgentAnswer`, spec §4 e DEC-020).
+- **Data:** 29/10/2026 · **Área:** IA e Backend · **Autor:** GenAI
+- **Contexto:** o diferencial G1-10 pede follow-up ("e em Olinda?"), e o guia (§5.4) pede orçamento de tokens e limite de uso por
+  sessão. O agente é somente leitura e não guarda estado (§8 do guia); o backend já grava cada pergunta e resposta na auditoria
+  (DEC-034).
+- **Decisão:**
+  - **Histórico vem do backend, pela auditoria.** Porta `ConversationHistory.recent(session_id, limit)`, implementada pelo backend
+    (`HistoricoAuditoria`) com a conexão dele. O `venergy_agent` continua sem ler o schema `app`, e o agente continua sem gravar.
+  - **O turno é `(pergunta, SQL, status)`**, sem texto de resposta nem linhas: o SQL leva os filtros que o follow-up herda, e a
+    resposta traria dado do banco para o prompt de geração. Turnos `refused` ficam de fora; `clarify`, `unknown` e `failed` entram.
+  - **Histórico é dado:** só no prompt do usuário, entre `<historico-{nonce}>`, numa versão nova do prompt de SQL (`prompts/v3`, que
+    passa a ser o padrão). O prompt de sistema continua estável. As versões v1 e v2 ignoram o histórico. Padrão `history_turns = 3`.
+  - **Orçamento:** porta `SessionUsage.tokens_used(session_id)`. Com `session_token_budget` (padrão 200000, 0 desliga) esgotado, o
+    `ask()` devolve `refused` com motivo próprio, sem chamar o modelo. Conferido antes de cada pergunta: a que cruza o limite termina.
+    Leitura do consumo que falha → `failed` sem chamar o modelo; leitura do histórico que falha → segue sem histórico.
+  - **Limite de perguntas no backend:** `POST /ai/ask` responde `429` (`ErroSchema`, `Retry-After`) quando a sessão já fez
+    `VENERGY_API_AI_LIMITE_PERGUNTAS` (20) perguntas em `VENERGY_API_AI_JANELA_SEGUNDOS` (600), contadas pelas linhas da auditoria
+    com o relógio do banco. 0 desliga. API 0.10.0.
+- **Contrato (para o V1 revisar):** `AgentAnswer` ganha `input_tokens` e `output_tokens` (`int >= 0`, padrão 0, tokens do gerador de
+  SQL somando as tentativas; a narrativa não entra). Sem invariante nova por status. `app.ai_auditoria` ganha as duas colunas
+  (`integer not null default 0`), que a carga da Gold acrescenta a um banco antigo com `ADD COLUMN IF NOT EXISTS`, sem tocar nas
+  linhas. `RespostaIaSchema` e `AuditoriaIaSchema` expõem os dois campos. Motivo novo de `refused` (`BUDGET_EXHAUSTED`).
+- **Alternativas descartadas:** o agente consultar `app.ai_auditoria` (quebra o isolamento do `venergy_agent`, D1 e DEC-034);
+  memória no processo do agente (some no restart e não escala); o agente gravar o histórico (é somente leitura); contador de
+  perguntas em memória na API (some no restart, não vale com mais de um processo); um total único de tokens (entrada e saída têm
+  preços diferentes).
+- **Limitações:** sem autenticação, o `session_id` é escolhido pelo cliente, e trocar de sessão zera o limite e o orçamento: é trava
+  de custo e de abuso acidental, não de segurança (mesma ressalva da DEC-034). O orçamento não conta a narrativa. O padrão de
+  200000 tokens é uma suposição a medir nos logs (`input_tokens` da etapa `geracao`).
+- **Pendente (regra de merge, DEC-016):** a troca do prompt padrão para a v3 só entra na `main` depois de `make eval ONLY=golden`
+  na v2 e na v3 e `make eval ONLY=red_team` na v3, sem regressão fora dos follow-ups e com pelo menos 4 dos 5 follow-ups do golden
+  (G046, G095, G096, G098, G099) certos. Sem cota do Gemini na data, a rodada não foi feita; os números entram aqui e na spec §9.6.

@@ -96,6 +96,22 @@ Não está no Git. Os 12 CSVs ficam no Volume do Databricks (`/Volumes/v_energy/
 
 Para voltar à amostra, rode de novo `venergy_api.amostra --force` e `venergy_api.carga`.
 
+## Memória e orçamento por sessão
+
+Follow-up ("e em Olinda?" depois de uma pergunta sobre Recife) e orçamento de tokens, ambos por `session_id` (G1-10, DEC-046).
+
+| Variável | Para quê |
+|---|---|
+| `VENERGY_AGENT_HISTORY_TURNS` | Turnos anteriores da sessão que o gerador de SQL recebe. Padrão `3`, `0` desliga a memória |
+| `VENERGY_AGENT_SESSION_TOKEN_BUDGET` | Tokens (entrada + saída do gerador de SQL) que uma sessão pode gastar. Padrão `200000`, `0` desliga. Esgotado, o agente responde `refused` sem chamar o modelo |
+| `VENERGY_AGENT_PROMPT_VERSION` | `v3` (padrão) lê o histórico; `v2` e `v1` o ignoram |
+
+- O histórico vem da auditoria do backend (`app.ai_auditoria`), e não do agente: o usuário `venergy_agent` nunca lê o schema `app`. O agente isolado (terminal, avaliação) só tem memória com o adapter em memória (`InMemoryConversationHistory`).
+- Turnos recusados nunca entram no histórico. O histórico é dado delimitado, nunca instrução.
+- O backend responde `429` em `POST /ai/ask` quando a sessão passa de `VENERGY_API_AI_LIMITE_PERGUNTAS` perguntas (padrão 20) em `VENERGY_API_AI_JANELA_SEGUNDOS` (padrão 600); `0` desliga.
+- A auditoria ganhou `input_tokens` e `output_tokens`. A carga da Gold as acrescenta a um banco antigo sozinha. Se a API subir antes da carga, aplique à mão: `ALTER TABLE app.ai_auditoria ADD COLUMN IF NOT EXISTS input_tokens integer NOT NULL DEFAULT 0, ADD COLUMN IF NOT EXISTS output_tokens integer NOT NULL DEFAULT 0;`
+- Limitação: sem autenticação, o `session_id` é escolhido pelo cliente; trocar de sessão zera o limite e o orçamento. É trava de custo e de abuso acidental, não de segurança.
+
 ## Chave do modelo
 
 Cada integrante usa a própria chave, no próprio `ai-agent/.env` (fora do Git):
