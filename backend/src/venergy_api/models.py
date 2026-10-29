@@ -381,6 +381,10 @@ class OrdemEvento(Base):
         _enum_como_texto(StatusOrdem, "ck_ordem_evento_status_novo")
     )
     observacao: Mapped[str | None]
+    # Login de quem agiu, em texto e sem chave estrangeira: um token vale até vencer mesmo se o
+    # usuário for apagado, e a ação não pode falhar nem perder a trilha por isso (DEC-050).
+    # Vazio nos eventos de antes do login, que não têm autor conhecido.
+    autor_login: Mapped[str | None]
     ocorrido_em: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
