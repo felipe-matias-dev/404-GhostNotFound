@@ -48,6 +48,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | 27/10/2026 | DEC-039: Workflow do Databricks com os notebooks lidos do GitHub (`main`), serverless, Landing → Bronze → Silver → Gold + export, reprocessando tudo (diverge da ADR-07); agendamento mensal no dia 6, pausado | Roda o código revisado e mantém o tudo ou nada de cada camada numa extração única; a origem fecha o faturamento uma vez por mês | Arthur |
 | 27/10/2026 | DEC-040: `GET /receita/insight` devolve o insight de IA da tela de receita; o backend monta o JSON de métricas a partir da ponte da Gold, com valores arredondados como a tela os mostra, e guarda o texto num cache em memória pelo conteúdo das métricas; sem a chave do Gemini a rota responde 503; API 0.9.0 | O agente só aceita texto cujos números sejam exatamente valores do JSON (DEC-019), e uma Gold recarregada precisa gerar um insight novo, nunca um velho | Felipe |
 | 27/10/2026 | DEC-044: a visão 360 da unidade consumidora sai de uma rota só, `GET /unidades-consumidoras/{cod_uc}/visao-360`; os 12 meses terminam na última competência da Gold e a "conta alta" é o último mês contra o mesmo mês do ano anterior, com faixa de ±10%; integrada à API 0.9.0 da main | O atendente está com o cliente na linha: uma chamada só à API e uma resposta pronta para "o consumo subiu?", sem a tela refazer conta de negócio | Felipe |
+| 29/10/2026 | DEC-047: avaliação comparativa sobre os itens em comum, aviso quando `failed` passa de 5%, e juiz (LLM as a judge) só em respostas `answered` narradas da amostra, com modelo diferente do gerador | Rodadas com versões diferentes do golden set só se comparam no que têm em comum, e o juiz não pode enviar linhas da Gold real a um modelo | Perylo |
 
 ## DEC-001 · Localização dos arquivos de origem (landing)
 
@@ -1289,3 +1290,20 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   A tela `/uc` do frontend pode usar o tipo gerado do OpenAPI.
   A decisão foi renumerada de DEC-036 para DEC-044 na resolução do PR #55: DEC-036 já identifica a tela
   da diretoria na `main`, e DEC-041 a DEC-043 estão reservadas nas branches do portal.
+
+## DEC-047 · Avaliação comparativa e LLM as a judge
+
+- **Data:** 29/10/2026 · **Área:** GenAI · **Autor:** Perylo
+- **Contexto:** o G2-08 pede avaliação automatizada com tabela comparativa de experimentos, e a spec §9.4 prevê um juiz de clareza e fidelidade como diferencial. As rodadas versionadas em `eval/runs/` têm versões diferentes do golden set e da camada semântica.
+- **Decisão:**
+  - **Comparação sobre os itens em comum:** `make eval-compare` recalcula as métricas só dos itens que existem nas duas rodadas, com a mesma função do runner, e diz quantos itens são só de cada lado. As métricas da rodada que não saem dos itens (`writes_accepted`, `views_changed`, `red_team_violations`, `follow_up_skipped`, `other_dataset_skipped`) aparecem como gravadas.
+  - **Aviso de `failed`:** acima de 5% dos itens em qualquer lado, a saída avisa que a comparação provavelmente não vale. O relatório não guarda o tipo de erro, e `failed` em massa é o sintoma conhecido de 429 e 503 (spec §9.6).
+  - **Nova métrica `refusal_accuracy`:** itens com `expected_status = refused` (golden e red team) que terminaram `refused`. O `manipulation_block_rate` mede vazamento, não recusa.
+  - **Sessão por cadeia de follow-up:** o runner passa a rodar os follow-ups em sequência, numa sessão `eval-<rodada>-<raiz>`, e os demais itens numa sessão cada, para que a memória do agente (G1-10) não contamine um item com o anterior. O `TurnRecorder` recebe cada turno.
+  - **Juiz só em `answered` narrados da amostra:** `unknown`, `refused` e `failed` são textos fixos sem LLM, e sem narrativa não há o que julgar. `--judge` com `--dataset gold_real` ou `--sql-only` é erro, porque as linhas da Gold real não saem da máquina (DEC-015, issue #56).
+  - **Modelo do juiz diferente do gerador:** `judge_model` (padrão `google-gla:gemini-3.1-flash`) é comparado com o `llm_model` e o `fallback_model` pelo nome sem provedor e sem organização, e `AgentSettings` recusa o igual. A chave do juiz só é exigida ao montar o juiz.
+  - **`passed` coerente com a nota:** verdadeiro se e só se `score >= 4`.
+  - **`rationale` no relatório**, cortado em 300 caracteres, porque o juiz só roda na amostra sintética. O relatório continua sem linhas e sem o texto da resposta (DEC-024).
+  - **Calibração antes de valer:** em 15 itens `answered` da amostra, uma pessoa dá a nota com a mesma rubrica, sem ver a do juiz. O juiz passa a contar com concordância de `passed` em pelo menos 12 de 15 e diferença média absoluta de nota até 1; se não passar, a rubrica vai para `judge/v2`. Até lá o juiz não decide merge.
+- **Alternativas descartadas:** comparar os `metrics` gravados, que misturam conjuntos diferentes quando a versão do golden set muda; rodar o follow-up sozinho quando a raiz não roda, que mede a pergunta isolada; silenciar `--judge` na Gold real, quando quem pediu o juiz precisa saber que ele não rodou.
+- **Impacto:** nenhuma mudança na Gold, nas views, no backend nem no contrato `AgentAnswer`. Configuração nova: `judge_model` e `judge_prompt_version`. Os relatórios antigos continuam carregando (`golden_version`, `red_team_version` e os campos do juiz têm padrão).
