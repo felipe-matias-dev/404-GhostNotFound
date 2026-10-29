@@ -19,12 +19,14 @@ Hexagonal: `domain` ← `application` ← `infrastructure`.
 | domain | `errors.py` | `ErrorKind`, `SqlRejected`, `QueryExecutionError` | pronto, com `ErrorKind.REJECTED` (item 6) |
 | domain | `numbers.py` | `unsupported_numbers`: números da narrativa (lidos em pt-BR) que não estão nos valores das linhas (DEC-019) | item 8 |
 | domain | `semantic.py` | `SemanticLayer`, `ViewSpec`, `ColumnSpec`, `Relation`, glossário, regras, exemplos | pronto |
+| domain | `judge.py` | `JudgeVerdict` (nota 1–5, `passed` coerente com `PASS_SCORE = 4`, justificativa) | feito (DEC-047) |
 | domain | `answer.py` | `AgentAnswer` com `status` e invariantes por status (DEC-020), `Insight` | pronto (PR #21; texto em branco e `row_count >= 0` no PR #29) |
 | application | `ports.py` | `TextToSqlAgent`, `SemanticLayerSource`, `SqlGenerator`, `SqlValidator`, `QueryExecutor`, `AnswerWriter`, `InsightWriter` | `ask.py` (`AskUseCase`), pronto (PR #30) |
 | infrastructure | `sql_validator.py` | `SqlglotValidator`: um `SELECT`, allowlist de views, funções conhecidas, `LIMIT` imposto | pronto |
 | infrastructure | `postgres_executor.py` | `PostgresQueryExecutor`: `BEGIN READ ONLY`, `statement_timeout`, SQLSTATE → `ErrorKind`; erro de dado (classe 22) volta só com o tipo, sem o valor | pronto |
 | infrastructure | `sql_generator.py`, `prompt_renderer.py`, `llm.py` | PydanticAI com `output_type=SqlDraft`; prompt em `prompts/v1/`; delimitadores com nonce; Gemini direto (padrão) ou OpenRouter | pronto |
 | infrastructure | `semantic_source.py`, `views_sql.py` | `YamlSemanticLayerSource` valida `semantic/semantic_layer.yaml` contra `contracts/gold_schema.yaml` (inclusive `consumers` e `sensitive`); `views_sql` gera `semantic/views.sql` | pronto |
+| infrastructure | `answer_judge.py` | `PydanticAiAnswerJudge`: juiz de clareza e fidelidade, rubrica em `prompts/judge/v1/`, pergunta, resposta e linhas delimitadas por nonce; modelo próprio (`judge_model`) | feito (DEC-047), calibração pendente |
 | infrastructure | `answer_writer.py` | `PydanticAiAnswerWriter`: narra as linhas, com o conteúdo do banco delimitado como dado e a unidade de cada coluna vinda da camada semântica; prompt em `prompts/answer/v3/`, que pede o período das linhas | item 8 |
 | raiz | `config.py`, `bootstrap.py`, `__main__.py` | `AgentSettings` (`VENERGY_AGENT_*`); `build_agent(settings)` monta o agente; `python -m venergy_agent "pergunta"` | pronto |
 
@@ -102,6 +104,8 @@ O banco local só tem a amostra sintética do backend (`venergy_api.amostra`). A
 - `evaluation/runner.py`: `EvaluationRunner` sobre as portas.
 - `evaluation/database_guard.py`: `PostgresDatabaseGuard` mede a violação no banco: impressão digital das views antes e depois da rodada e escritas reais com o usuário do agente, sempre com rollback (spec §9.2).
 - `evaluation/__main__.py`: CLI que grava `eval/runs/<data>.json`; `--dataset amostra|gold_real` confere a base carregada, e `--sql-only` (sempre ligado na Gold real) monta o agente sem o redator. Os relatórios da Gold real vão para `eval/runs_gold/`, fora do Git (issue #56).
+- `evaluation/compare.py` (`make eval-compare A=... B=...`): tabela markdown de duas rodadas, sem chamar modelo; as métricas são recalculadas só sobre os itens em comum, lista os itens que mudaram e avisa quando `failed` passa de 5%.
+- O runner roda cada cadeia de follow-up em sequência, numa sessão própria, e entrega cada turno a um `TurnRecorder` opcional (ponto de ligação da memória, G1-10). `--judge` liga o juiz (porta `AnswerJudge`) só na amostra narrada; as métricas ganham `refusal_accuracy` e `judge_*`.
 - Linha de base e achados: spec §9.6.
 
 ## 7. Onde está cada coisa

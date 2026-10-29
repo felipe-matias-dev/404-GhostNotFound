@@ -52,6 +52,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | 27/10/2026 | DEC-040: `GET /receita/insight` devolve o insight de IA da tela de receita; o backend monta o JSON de métricas a partir da ponte da Gold, com valores arredondados como a tela os mostra, e guarda o texto num cache em memória pelo conteúdo das métricas; sem a chave do Gemini a rota responde 503; API 0.9.0 | O agente só aceita texto cujos números sejam exatamente valores do JSON (DEC-019), e uma Gold recarregada precisa gerar um insight novo, nunca um velho | Felipe |
 | 27/10/2026 | DEC-044: a visão 360 da unidade consumidora sai de uma rota só, `GET /unidades-consumidoras/{cod_uc}/visao-360`; os 12 meses terminam na última competência da Gold e a "conta alta" é o último mês contra o mesmo mês do ano anterior, com faixa de ±10%; integrada à API 0.9.0 da main | O atendente está com o cliente na linha: uma chamada só à API e uma resposta pronta para "o consumo subiu?", sem a tela refazer conta de negócio | Felipe |
 | 29/10/2026 | DEC-045: tela de Rede usa período padrão de até 12 meses, aceita período válido da URL e apresenta histórico global do alimentador | Preserva o recorte escolhido e distingue o índice local do histórico do alimentador inteiro | João Euclides |
+| 29/10/2026 | DEC-047: avaliação comparativa sobre os itens em comum, aviso quando `failed` passa de 5%, e juiz (LLM as a judge) só em respostas `answered` narradas da amostra, com modelo diferente do gerador | Rodadas com versões diferentes do golden set só se comparam no que têm em comum, e o juiz não pode enviar linhas da Gold real a um modelo | Perylo |
 
 ## DEC-001 · Localização dos arquivos de origem (landing)
 
@@ -1429,3 +1430,22 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   mantém-se o período da consulta e informa-se que é preciso reduzi-lo para ver o gráfico.
 - **Navegação:** abrir e fechar o painel cria entradas no histórico, permitindo recuperar
   os estados anteriores com Voltar e Avançar.
+
+## DEC-047 · Avaliação comparativa e LLM as a judge
+
+- **Data:** 29/10/2026 · **Área:** GenAI · **Autor:** Perylo
+- **Contexto:** o G2-08 pede avaliação automatizada com tabela comparativa de experimentos, e a spec §9.4 prevê um juiz de clareza e fidelidade como diferencial. As rodadas versionadas em `eval/runs/` têm versões diferentes do golden set e da camada semântica.
+- **Decisão:**
+  - **Comparação sobre os itens em comum:** `make eval-compare` recalcula as métricas só dos itens que existem nas duas rodadas, com a mesma função do runner, e diz quantos itens são só de cada lado. As métricas da rodada que não saem dos itens (`writes_accepted`, `views_changed`, `red_team_violations`, `follow_up_skipped`, `other_dataset_skipped`) aparecem como gravadas.
+  - **Aviso de `failed`:** acima de 5% dos itens em qualquer lado, a saída avisa que a comparação provavelmente não vale. O relatório não guarda o tipo de erro, e `failed` em massa é o sintoma conhecido de 429 e 503 (spec §9.6).
+  - **Nova métrica `refusal_accuracy`:** itens com `expected_status = refused` (golden e red team) que terminaram `refused`. O `manipulation_block_rate` mede vazamento, não recusa.
+  - **Sessão por cadeia de follow-up:** o runner passa a rodar os follow-ups em sequência, numa sessão `eval-<rodada>-<raiz>`, e os demais itens numa sessão cada, para que a memória do agente (G1-10) não contamine um item com o anterior. O `TurnRecorder` recebe cada turno.
+  - **Juiz só em `answered` narrados da amostra:** `unknown`, `refused` e `failed` são textos fixos sem LLM, e sem narrativa não há o que julgar. `--judge` com `--dataset gold_real` ou `--sql-only` é erro, porque as linhas da Gold real não saem da máquina (DEC-015, issue #56).
+  - **Modelo do juiz diferente do gerador:** `judge_model` (padrão `google-gla:gemini-3.5-flash-lite`) é comparado com o `llm_model` e o `fallback_model` pelo nome sem provedor e sem organização, e montar o juiz com o mesmo modelo é recusado (`--judge` sai com erro). A regra roda ao montar o juiz, e não em `AgentSettings`, para que o backend, que não usa juiz, carregue qualquer `llm_model` válido. A chave do juiz também só é exigida ao montar o juiz.
+  - **Modelo padrão trocado (29/10/2026, revisão do PR #85):** o `gemini-3.1-flash` do plano não existe na API do Gemini (404), e o `gemini-2.5-flash` foi retirado para usuários novos. O `gemini-3.5-flash-lite` responde e não é versão de prévia. A independência em relação ao gerador (`gemini-3.1-flash-lite`) é só nominal: são da mesma família.
+  - **Calibração inicial (Lucas, 29/10/2026, amostra):** 18 respostas com nota humana. 17 ficaram a até 1 ponto da nota do juiz (94%), 5 tiveram nota igual (28%) e 14 tiveram o mesmo passa ou não passa (78%). O juiz é um pouco mais severo, sobretudo quando falta o período. Até uma calibração maior, com mais itens, uma segunda pessoa e um critério de aceite escrito, a nota do juiz é **apoio, não métrica de decisão** da DEC-016.
+  - **`passed` coerente com a nota:** verdadeiro se e só se `score >= 4`.
+  - **`rationale` no relatório**, cortado em 300 caracteres, porque o juiz só roda na amostra sintética. O relatório continua sem linhas e sem o texto da resposta (DEC-024).
+  - **Calibração antes de valer:** em 15 itens `answered` da amostra, uma pessoa dá a nota com a mesma rubrica, sem ver a do juiz. O juiz passa a contar com concordância de `passed` em pelo menos 12 de 15 e diferença média absoluta de nota até 1; se não passar, a rubrica vai para `judge/v2`. Até lá o juiz não decide merge.
+- **Alternativas descartadas:** comparar os `metrics` gravados, que misturam conjuntos diferentes quando a versão do golden set muda; rodar o follow-up sozinho quando a raiz não roda, que mede a pergunta isolada; silenciar `--judge` na Gold real, quando quem pediu o juiz precisa saber que ele não rodou.
+- **Impacto:** nenhuma mudança na Gold, nas views, no backend nem no contrato `AgentAnswer`. Configuração nova: `judge_model` e `judge_prompt_version`. Os relatórios antigos continuam carregando (`golden_version`, `red_team_version` e os campos do juiz têm padrão).
