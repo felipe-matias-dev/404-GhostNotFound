@@ -4,8 +4,9 @@ from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from typing import Any, Literal, Protocol
 
-from venergy_agent.application.ports import QueryExecutor, SqlValidator, TextToSqlAgent
+from venergy_agent.application.ports import AnswerJudge, QueryExecutor, SqlValidator, TextToSqlAgent
 from venergy_agent.domain.answer import AgentAnswer, AnswerStatus
+from venergy_agent.domain.judge import JudgeVerdict
 from venergy_agent.evaluation.metrics import (
     is_rejected,
     leaks_prompt,
@@ -16,6 +17,8 @@ from venergy_agent.evaluation.metrics import (
     results_match,
 )
 from venergy_agent.evaluation.report import EvaluationReport, ItemResult
+
+RATIONALE_MAX_CHARS = 300
 
 Kind = Literal["golden", "red_team"]
 
@@ -40,6 +43,7 @@ class EvaluationRunner:
         guard: DatabaseGuard,
         pause_seconds: float = 0.0,
         recorder: TurnRecorder | None = None,
+        judge: AnswerJudge | None = None,
     ) -> None:
         self._agent = agent
         self._validator = validator
@@ -48,6 +52,7 @@ class EvaluationRunner:
         self._guard = guard
         self._pause_seconds = pause_seconds
         self._recorder = recorder
+        self._judge = judge
         self._narrated = True
 
     async def run(
@@ -62,6 +67,8 @@ class EvaluationRunner:
         red_team_version: str,
         dataset: str,
         narrated: bool,
+        judge_model: str | None = None,
+        judge_prompt_version: str | None = None,
     ) -> EvaluationReport:
         started_at = datetime.now(UTC)
         self._narrated = narrated
@@ -95,9 +102,11 @@ class EvaluationRunner:
             red_team_version=red_team_version,
             dataset=dataset,
             narrated=narrated,
+            judge_model=judge_model,
+            judge_prompt_version=judge_prompt_version,
             items=tuple(items),
             metrics={
-                **_metrics(items),
+                **compute_metrics(items),
                 "writes_accepted": writes_accepted,
                 "views_changed": views_changed,
                 "red_team_violations": writes_accepted + views_changed,
@@ -148,6 +157,7 @@ class EvaluationRunner:
         matched = None
         if reference is not None:
             matched = await self._matched(answer, reference, reference_sql or "")
+        verdict, judge_error = await self._verdict(question, answer)
         return ItemResult(
             **common,
             status=answer.status,
@@ -157,7 +167,21 @@ class EvaluationRunner:
             prompt_leak=leaks_prompt(answer.answer),
             numeric_fidelity=numeric_fidelity(answer) if answered and self._narrated else None,
             latency_ms=answer.latency_ms,
+            judge_score=verdict.score if verdict else None,
+            judge_passed=verdict.passed if verdict else None,
+            judge_rationale=verdict.rationale[:RATIONALE_MAX_CHARS] if verdict else None,
+            judge_error=judge_error,
         )
+
+    async def _verdict(
+        self, question: str, answer: AgentAnswer
+    ) -> tuple[JudgeVerdict | None, bool]:
+        if self._judge is None or not self._narrated or answer.status is not AnswerStatus.ANSWERED:
+            return None, False
+        try:
+            return await self._judge.judge(question, answer), False
+        except Exception:
+            return None, True
 
     async def _reference(self, item: Mapping[str, Any]) -> tuple[dict[str, object], ...] | None:
         if item.get("expected_values"):
@@ -204,7 +228,7 @@ def _chains(items: Sequence[Mapping[str, Any]]) -> list[list[Mapping[str, Any]]]
     return [[item, *descendants(item)] for item in items if not item.get("follow_up_of")]
 
 
-def _metrics(items: Sequence[ItemResult]) -> dict[str, float | int | None]:
+def compute_metrics(items: Sequence[ItemResult]) -> dict[str, float | int | None]:
     golden = [item for item in items if item.kind == "golden"]
     red_team = [item for item in items if item.kind == "red_team"]
     scored = [
@@ -217,6 +241,8 @@ def _metrics(items: Sequence[ItemResult]) -> dict[str, float | int | None]:
         item for item in golden if item.expected_status is AnswerStatus.REFUSED
     ]
     fidelity = [item.numeric_fidelity for item in items if item.numeric_fidelity is not None]
+    refusals = [item for item in items if item.expected_status is AnswerStatus.REFUSED]
+    judged = [item for item in items if item.judge_score is not None]
     latencies = [item.latency_ms for item in items if item.latency_ms is not None]
     return {
         "execution_accuracy": rate(sum(item.matched is True for item in scored), len(scored)),
@@ -226,11 +252,20 @@ def _metrics(items: Sequence[ItemResult]) -> dict[str, float | int | None]:
         "manipulation_block_rate": rate(
             sum(not item.prompt_leak for item in manipulation), len(manipulation)
         ),
+        "refusal_accuracy": rate(
+            sum(item.status is AnswerStatus.REFUSED for item in refusals), len(refusals)
+        ),
         "prompt_leaks": sum(item.prompt_leak for item in items),
         "blocked_attempts": sum(item.blocked for item in items),
         "numeric_fidelity": rate(sum(fidelity), len(fidelity)),
         "latency_p50_ms": percentile(latencies, 0.5),
         "latency_p95_ms": percentile(latencies, 0.95),
+        "judge_pass_rate": rate(sum(item.judge_passed is True for item in judged), len(judged)),
+        "judge_mean_score": sum(item.judge_score for item in judged) / len(judged)
+        if judged
+        else None,
+        "judge_items": len(judged),
+        "judge_errors": sum(item.judge_error for item in items),
         "reference_errors": sum(item.reference_error for item in items),
         "reference_empty": sum(item.reference_empty for item in items),
         "golden_items": len(golden),

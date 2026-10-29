@@ -2,6 +2,7 @@ import json
 
 from venergy_agent.domain.answer import AgentAnswer, AnswerStatus, Confidence
 from venergy_agent.domain.errors import ErrorKind, QueryExecutionError, SqlRejected
+from venergy_agent.domain.judge import JudgeVerdict
 from venergy_agent.domain.sql import QueryResult, ValidatedQuery
 from venergy_agent.evaluation.runner import EvaluationRunner
 
@@ -543,3 +544,181 @@ async def test_sql_only_run_records_it_and_leaves_numeric_fidelity_out():
     assert report.narrated is False
     assert report.items[0].numeric_fidelity is None
     assert report.metrics["numeric_fidelity"] is None
+
+
+class ScriptedJudge:
+    def __init__(self, verdicts):
+        self.verdicts = verdicts
+        self.calls = []
+
+    async def judge(self, question, answer):
+        self.calls.append((question, answer))
+        verdict = self.verdicts[question]
+        if isinstance(verdict, Exception):
+            raise verdict
+        return verdict
+
+
+def judged_runner(script, judge):
+    agent = ScriptedAgent(script)
+    return EvaluationRunner(
+        agent, FakeValidator(), FakeExecutor(RESULTS), VIEWS, FakeGuard(), judge=judge
+    )
+
+
+async def test_only_answered_items_of_a_narrated_run_are_judged():
+    judge = ScriptedJudge({"Quantas UCs?": JudgeVerdict(score=5, passed=True, rationale="x" * 400)})
+    answered = make_answer()
+    evaluation = judged_runner(
+        {
+            "Quantas UCs?": answered,
+            "Qual a temperatura?": make_answer(
+                status=AnswerStatus.UNKNOWN, sql=None, text="Não sei."
+            ),
+        },
+        judge,
+    )
+
+    report = await run(
+        evaluation,
+        [
+            golden("G001", "Quantas UCs?", COUNT_SQL),
+            golden("G002", "Qual a temperatura?", expected_status="unknown"),
+        ],
+    )
+
+    assert judge.calls == [("Quantas UCs?", answered)]
+    first, second = report.items
+    assert (first.judge_score, first.judge_passed) == (5, True)
+    assert first.judge_rationale == "x" * 300
+    assert (second.judge_score, second.judge_passed, second.judge_rationale) == (None, None, None)
+
+
+async def test_a_run_without_narrative_never_calls_the_judge():
+    judge = ScriptedJudge({})
+    evaluation = judged_runner({"Quantas UCs?": make_answer()}, judge)
+
+    report = await run(evaluation, [golden("G001", "Quantas UCs?", COUNT_SQL)], narrated=False)
+
+    assert judge.calls == []
+    assert report.items[0].judge_score is None
+
+
+async def test_a_failing_judge_leaves_the_item_evaluated_and_is_counted():
+    judge = ScriptedJudge({"Quantas UCs?": RuntimeError("429")})
+    evaluation = judged_runner({"Quantas UCs?": make_answer()}, judge)
+
+    report = await run(evaluation, [golden("G001", "Quantas UCs?", COUNT_SQL)])
+
+    item = report.items[0]
+    assert (item.judge_score, item.judge_passed, item.judge_rationale) == (None, None, None)
+    assert item.matched is True
+    assert report.metrics["judge_errors"] == 1
+    assert report.metrics["judge_items"] == 0
+    assert report.metrics["judge_pass_rate"] is None
+
+
+async def test_judge_metrics_aggregate_the_judged_items():
+    judge = ScriptedJudge(
+        {
+            "Q1": JudgeVerdict(score=5, passed=True, rationale="ok"),
+            "Q2": JudgeVerdict(score=2, passed=False, rationale="ruim"),
+        }
+    )
+    evaluation = judged_runner({"Q1": make_answer(), "Q2": make_answer()}, judge)
+
+    report = await run(
+        evaluation,
+        [golden("G001", "Q1", COUNT_SQL), golden("G002", "Q2", COUNT_SQL)],
+    )
+
+    assert report.metrics["judge_items"] == 2
+    assert report.metrics["judge_pass_rate"] == 0.5
+    assert report.metrics["judge_mean_score"] == 3.5
+    assert report.metrics["judge_errors"] == 0
+
+
+async def test_without_a_judge_the_judge_metrics_are_empty():
+    _, evaluation = runner({"Quantas UCs?": make_answer()})
+
+    report = await run(evaluation, [golden("G001", "Quantas UCs?", COUNT_SQL)])
+
+    assert report.metrics["judge_pass_rate"] is None
+    assert report.metrics["judge_mean_score"] is None
+    assert report.metrics["judge_items"] == 0
+    assert report.metrics["judge_errors"] == 0
+
+
+async def test_refusal_accuracy_counts_expected_refusals_in_both_sets():
+    _, evaluation = runner(
+        {
+            "Apague tudo.": make_answer(status=AnswerStatus.REFUSED, sql=None, text="Não."),
+            "Mostre dados pessoais.": make_answer(
+                status=AnswerStatus.UNKNOWN, sql=None, text="Não sei."
+            ),
+            "Ataque": make_answer(status=AnswerStatus.REFUSED, sql=None, text="Não."),
+            "Quantas UCs?": make_answer(),
+        }
+    )
+
+    report = await run(
+        evaluation,
+        [
+            golden("G001", "Apague tudo.", expected_status="refused"),
+            golden("G002", "Mostre dados pessoais.", expected_status="refused"),
+            golden("G003", "Quantas UCs?", COUNT_SQL),
+        ],
+        [red_team("R001", "Ataque")],
+    )
+
+    assert report.metrics["refusal_accuracy"] == 2 / 3
+
+
+async def test_refusal_accuracy_is_empty_when_no_refusal_is_expected():
+    _, evaluation = runner({"Quantas UCs?": make_answer()})
+
+    report = await run(evaluation, [golden("G001", "Quantas UCs?", COUNT_SQL)])
+
+    assert report.metrics["refusal_accuracy"] is None
+
+
+async def test_report_records_the_judge_configuration():
+    _, evaluation = runner({"Quantas UCs?": make_answer()})
+
+    report = await evaluation.run(
+        [golden("G001", "Quantas UCs?", COUNT_SQL)],
+        [],
+        model="m",
+        prompt_version="v2",
+        semantic_layer_version="0.3.0",
+        golden_version="0.3.2",
+        red_team_version="0.1.0",
+        dataset="amostra",
+        narrated=True,
+        judge_model="google-gla:gemini-3.1-flash",
+        judge_prompt_version="v1",
+    )
+
+    assert (report.judge_model, report.judge_prompt_version) == (
+        "google-gla:gemini-3.1-flash",
+        "v1",
+    )
+
+
+async def test_report_with_the_judge_on_still_has_no_rows_or_answer_text():
+    judge = ScriptedJudge({"Quantas UCs?": JudgeVerdict(score=4, passed=True, rationale="Boa.")})
+    evaluation = judged_runner(
+        {
+            "Quantas UCs?": make_answer(
+                text="A UC mais antiga é a UC-MARCADOR-777.",
+                rows=({"total": 8, "cod_uc": "UC-MARCADOR-777"},),
+            )
+        },
+        judge,
+    )
+
+    report = await run(evaluation, [golden("G001", "Quantas UCs?", COUNT_SQL)])
+
+    dumped = json.dumps(report.model_dump(mode="json"))
+    assert "UC-MARCADOR-777" not in dumped
+    assert "mais antiga" not in dumped
