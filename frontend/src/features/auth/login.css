@@ -1,0 +1,58 @@
+.login-network-mask {
+	background: radial-gradient(
+		ellipse at 50% 42%,
+		var(--color-bg) 8%,
+		transparent 72%
+	);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	.login-brand {
+		animation: login-brand-lift 800ms cubic-bezier(0.22, 1, 0.36, 1) 200ms both;
+	}
+
+	.login-card,
+	.login-caption {
+		animation: login-reveal 500ms ease-out 650ms both;
+	}
+	.login-page[data-entered="true"] .login-brand,
+	.login-page[data-entered="true"] .login-card,
+	.login-page[data-entered="true"] .login-caption {
+		animation: none;
+	}
+
+	@keyframes login-brand-lift {
+		from {
+			transform: translateY(10rem) scale(1.2);
+		}
+		to {
+			transform: translateY(0) scale(1);
+		}
+	}
+
+	@keyframes login-reveal {
+		from {
+			opacity: 0;
+			transform: translateY(1rem);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0);
+		}
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.login-motion-control {
+		display: none;
+	}
+}
+
+@media (max-height: 700px) {
+	.login-stage {
+		padding-block: 1rem;
+	}
+	.login-brand {
+		margin-bottom: 1rem;
+	}
+}

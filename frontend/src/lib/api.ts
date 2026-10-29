@@ -12,7 +12,20 @@ export const API_URL = (import.meta.env.VITE_API_URL || "/api").replace(
  */
 export const api = createClient<paths>({
 	baseUrl: API_URL,
+	credentials: "include",
 	headers: { Accept: "application/json" },
+});
+
+api.use({
+	onResponse({ request, response }) {
+		if (
+			response.status === 401 &&
+			!new URL(request.url).pathname.match(/\/auth\/(login|me|logout)$/) &&
+			typeof window !== "undefined"
+		) {
+			window.dispatchEvent(new Event("venergy:session-expired"));
+		}
+	},
 });
 
 export class ApiError extends Error {

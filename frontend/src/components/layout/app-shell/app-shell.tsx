@@ -10,6 +10,7 @@ import { type ReactNode, useState } from "react";
 import {
 	AppSidebar,
 	GatilhoNavegacao,
+	type ItemNavegacao,
 	NAVEGACAO,
 	useItemAtivo,
 } from "#/components/layout/app-sidebar";
@@ -21,9 +22,13 @@ import { TooltipProvider } from "#/components/ui/tooltip";
 export function AppShell({
 	children,
 	onConsultarUc,
+	itens = NAVEGACAO,
+	conta,
 }: {
 	children: ReactNode;
 	onConsultarUc: () => void;
+	itens?: ItemNavegacao[];
+	conta?: ReactNode;
 }) {
 	const atual = useItemAtivo(NAVEGACAO);
 	const [trilha, setTrilha] = useState<HTMLDivElement | null>(null);
@@ -42,7 +47,11 @@ export function AppShell({
 					transition={{ duration: 0.2, ease: "linear" }}
 				>
 					<LayoutGroup>
-						<AppSidebar itens={NAVEGACAO} onConsultarUc={onConsultarUc} />
+						<AppSidebar
+							itens={itens}
+							onConsultarUc={onConsultarUc}
+							conta={conta}
+						/>
 						<SidebarInset className="min-h-0 overflow-hidden">
 							<Header
 								titulo={
