@@ -166,7 +166,10 @@ function BuscaUc({
 	const [texto, setTexto] = useState("");
 	const [selecionado, setSelecionado] = useState<string | null>(null);
 	const [pendente, setPendente] = useState<string | null>(null);
-	const [erro, setErro] = useState<{ mensagem: string; codigo?: string } | null>(null);
+	const [erro, setErro] = useState<{
+		mensagem: string;
+		codigo?: string;
+	} | null>(null);
 	const queryClient = useQueryClient();
 	const navigate = useNavigate();
 	const { registrar } = useConsultaUc();
