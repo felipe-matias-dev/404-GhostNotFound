@@ -51,6 +51,9 @@ async def perguntar(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail="Não foi possível verificar o limite de perguntas agora. Tente de novo.",
             ) from error
+        # Só a contagem usou a transação: solta a conexão antes da chamada ao modelo, que leva
+        # segundos e não deve segurar uma conexão do pool.
+        await run_in_threadpool(session.rollback)
         if feitas >= limite:
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,

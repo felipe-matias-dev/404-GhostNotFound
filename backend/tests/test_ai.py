@@ -33,6 +33,17 @@ class AgenteFalso:
         return self.answer
 
 
+class AgenteQueMedeConexoes(AgenteFalso):
+    def __init__(self, answer: AgentAnswer, engine: Engine) -> None:
+        super().__init__(answer)
+        self._engine = engine
+        self.conexoes_ao_responder: int | None = None
+
+    async def ask(self, question: str, session_id: str) -> AgentAnswer:
+        self.conexoes_ao_responder = self._engine.pool.checkedout()
+        return await super().ask(question, session_id)
+
+
 def answered_answer() -> AgentAnswer:
     return AgentAnswer(
         answer="A receita faturada de 2024-06 foi de R$ 1.234,50.",
@@ -425,3 +436,16 @@ def test_audit_does_not_expose_the_session_id(
 
     assert response.status_code == 200
     assert "session_id" not in response.json()
+
+
+def test_the_request_releases_its_connection_before_calling_the_model(
+    engine: Engine, client_for: Callable[..., TestClient]
+) -> None:
+    client = client_for(engine, ai_limite_perguntas=2, ai_janela_segundos=600)
+    agente = AgenteQueMedeConexoes(answered_answer(), engine)
+    client.app.dependency_overrides[get_agente] = lambda: agente
+
+    response = client.post("/ai/ask", json={"question": PERGUNTA, "session_id": SESSAO})
+
+    assert response.status_code == 200
+    assert agente.conexoes_ao_responder == 0
