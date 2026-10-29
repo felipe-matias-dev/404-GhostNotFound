@@ -538,6 +538,21 @@ async def test_a_month_in_the_sql_filter_must_be_named_when_the_rows_have_no_mon
     assert answer.answer.startswith("A consulta devolveu 1 linha(s).")
 
 
+async def test_the_fallback_names_the_months_of_the_sql_filter_when_the_rows_have_no_month(layer):
+    range_sql = (
+        "SELECT count(*) AS total FROM sem_faturamento_mensal "
+        "WHERE competencia BETWEEN '2025-01' AND '2025-12'"
+    )
+
+    answer = await use_case(
+        layer,
+        ScriptedGenerator(generation(sql=range_sql)),
+        executor=ScriptedExecutor(table(("total",), (3,))),
+    ).ask("quantas em 2025?", "s1")
+
+    assert answer.answer.startswith("A consulta devolveu 1 linha(s). Período: 2025-01 a 2025-12.")
+
+
 async def test_a_range_in_the_sql_filter_needs_both_ends_in_the_narrative(layer):
     writer = FixedWriter(text="Em dezembro de 2025 havia 3 UCs.")
     range_sql = (

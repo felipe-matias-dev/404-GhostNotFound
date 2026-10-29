@@ -328,7 +328,9 @@ class AskUseCase:
     ) -> AgentAnswer:
         sample = result.rows[: self._sample_rows]
         visible = result.model_copy(update={"rows": sample})
-        text = self._deterministic_text(result, draft, validated, _period(result))
+        text = self._deterministic_text(
+            result, draft, validated, _period(result) or _endpoints(validated.periods)
+        )
         text = await self._narrate(
             question, draft, visible, text, _period(visible), validated.periods
         )
