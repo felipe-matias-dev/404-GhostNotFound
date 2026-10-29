@@ -62,10 +62,10 @@
 #          partir de 2024. G062 vira pergunta de contagem: "teve falta de luz?" admite listar as ocorrências ou
 #          contá-las, e o gabarito só aceita uma forma; o revisado_por do G062 volta a null até Dados conferir a
 #          pergunta nova. Nenhuma referência dos outros itens mudou.
-#          Dados (29/10/2026): G095 a G097 são três números publicados do diagnóstico que dependiam da camada
+#   0.11.0 Dados (29/10/2026): G095 a G097 são três números publicados do diagnóstico que dependiam da camada
 #          0.4.0 (receita sem bandeiras, leituras estimadas e inadimplência), e G098 é o equivalente agregado do
 #          G062 na Gold real; revisado_por preenchido (Alisson Ramos) em G062, G068, G071, G072 e G094.
-versao: 0.10.0
+versao: 0.11.0
 status: rascunho
 
 itens:
