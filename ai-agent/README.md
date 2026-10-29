@@ -138,3 +138,13 @@ Cada integrante usa a própria chave, no próprio `ai-agent/.env` (fora do Git):
 No Free Tier, o Google pode usar o conteúdo enviado para melhorar os produtos dele. Por isso, o plano gratuito serve para a amostra sintética. Para a Gold real, a regra ainda não foi decidida pelo time: até decidir, não envie a Gold real pelo plano gratuito.
 
 O OpenRouter continua disponível pelo prefixo `openrouter:` (veja `.env.example`). Os testes não usam nenhuma chave: o modelo é simulado.
+
+### Modelo reserva
+
+Na API do `docker compose`, o agente sobe com um modelo reserva: `VENERGY_AGENT_FALLBACK_MODEL`, padrão `google-gla:gemini-3.5-flash` (troque por `GEMINI_FALLBACK_MODEL` no `.env` da raiz). Se o modelo principal falhar com 429 (cota) ou 503 (sobrecarga) depois das retentativas, a mesma pergunta vai para o reserva, com a mesma chave. No plano gratuito a cota é contada por modelo, então o reserva tem cota própria. O reserva precisa ser diferente do modelo do juiz (`VENERGY_AGENT_JUDGE_MODEL`, padrão `gemini-3.5-flash-lite`). Fora do compose (`python -m venergy_agent`, avaliação), o reserva só entra se a variável estiver no `ai-agent/.env`.
+
+### Dia da apresentação
+
+- Use a chave de quem não rodou nada no dia; a cota renova por volta das 4h (horário de Brasília). Leve a chave de outro integrante como segunda opção: trocar o `GOOGLE_API_KEY` no `.env` da raiz e reiniciar a API leva menos de um minuto.
+- Não rode avaliação no dia: uma rodada do golden set gasta de 90 a 140 chamadas. Uma pergunta ao agente gasta cerca de 2 (SQL e narração), e um insight de tela, 1 por combinação de filtros (fica em cache).
+- Antes de começar, faça uma pergunta de teste pelo portal ou pelo `POST /ai/ask`. A resposta mostra o `model` que respondeu: se for o reserva, o principal está sem cota.
