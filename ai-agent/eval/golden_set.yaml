@@ -56,7 +56,7 @@
 #          preenchido (Alisson Ramos) em G062, G067, G069, G070, G073, G074 e G075; G068, G071 e G072 esperam
 #          o ajuste pedido na revisão do PR #67.
 #   0.10.0 Ajustes pedidos por Dados na revisão do PR #67 (28/10/2026), escritos antes de qualquer rodada do
-#          modelo: G068 lista a nota de cada canal, porque na Gold real os canais ficam a menos de 0,01 ponto um
+#          modelo: G068 lista a nota de cada canal (com duas casas, como o G071), porque na Gold real os canais ficam a menos de 0,01 ponto um
 #          do outro; G071 pede o percentual de leituras estimadas, a medida da H5; G072 fica só na amostra, que
 #          só tem GD conectada até 2023, e o G094 é o equivalente de 2025 na Gold real, que só tem GD conectada a
 #          partir de 2024. G062 vira pergunta de contagem: "teve falta de luz?" admite listar as ocorrências ou
@@ -710,7 +710,7 @@ itens:
     expected_status: answered
     datasets: [amostra]
     follow_up_of: null
-    notes: "Pergunta da Camila (case p. 5; RESUMO §1.7). Ocorrências por UC (gold_interrupcoes_uc) não têm chave definida e não estão nas views. Pergunta aberta ao GenAI (Dados, 27/10/2026): o case (Camila) pede, na tela da UC, saber se a rua dele teve falta de luz, e o glossário define o alimentador como o circuito que abastece um conjunto de ruas e bairros. Se 'rua' for o alimentador da UC, o item é answered (a camada já permite responder, e a resposta deve dizer que é do alimentador). Se a pergunta for sobre a própria UC, o unknown vale até a camada v0.3 expor as interrupções por UC. Esperado mantido até a decisão. Mudança de 0.6.0 para 0.7.0 (28/10/2026, camada 0.4.0, antes de qualquer rodada do modelo): a camada expõe sem_interrupcoes_uc, e a decisão da issue #56 é responder pelas interrupções da própria UC; o DEC do alimentador não diz se a UC foi afetada. Só na amostra (código fictício); a Gold real ganha um equivalente agregado na conferência de Dados. Conferência de Dados (28/10/2026): bate com o case (a Camila pede, na tela da UC, as interrupções da UC), e a referência foi executada na amostra e bate linha a linha com as interrupções da UC. Revisado por Dados. Segue a decisão da issue #56. Mudança na 0.10.0 (GenAI, 28/10/2026): a pergunta era 'A UC 0003 teve falta de luz na rua em 2025?', que admite listar as ocorrências ou contá-las; na rodada de 28/10/2026 o agente listou as ocorrências, uma resposta certa que o gabarito recusava. A pergunta passa a pedir a contagem e as horas, como a referência; a referência não muda. revisado_por volta a null até Dados conferir a pergunta nova."
+    notes: "Pergunta da Camila (case p. 5; RESUMO §1.7): na tela da UC, saber se ela ficou sem luz. Decisão da issue #56: responde pelas interrupções da própria UC em sem_interrupcoes_uc (camada 0.4.0), e não pelo DEC do alimentador, que não diz se a UC foi afetada. Só na amostra (código fictício; na amostra a UC 0003 tem interrupções em 2025); a Gold real ganha um equivalente agregado na conferência de Dados. Até a 0.6.0 o esperado era unknown, porque as interrupções por UC não estavam nas views. Conferência de Dados (28/10/2026, pergunta anterior): a referência bate linha a linha com as interrupções da UC na amostra. Mudança na 0.10.0 (GenAI, 28/10/2026): a pergunta era 'A UC 0003 teve falta de luz na rua em 2025?', que admite listar as ocorrências ou contá-las; na rodada de 28/10/2026 o agente listou as ocorrências, uma resposta certa que o gabarito recusava. A pergunta passa a pedir a contagem e as horas, como a referência; a referência não muda. revisado_por volta a null até Dados conferir a pergunta nova."
     revisado_por: null
 
   - id: G063
@@ -770,7 +770,7 @@ itens:
   - id: G068
     question: "Qual foi a nota média de satisfação de cada canal de atendimento em 2025?"
     category: simples
-    reference_sql: "SELECT canal, avg(nota_satisfacao) AS satisfacao_media FROM sem_atendimentos_uc WHERE competencia BETWEEN '2025-01' AND '2025-12' GROUP BY canal"
+    reference_sql: "SELECT canal, round(avg(nota_satisfacao), 2) AS satisfacao_media FROM sem_atendimentos_uc WHERE competencia BETWEEN '2025-01' AND '2025-12' GROUP BY canal"
     expected_status: answered
     datasets: [amostra, gold_real]
     follow_up_of: null
@@ -800,7 +800,7 @@ itens:
   - id: G071
     question: "Qual município teve o maior percentual de leituras estimadas em 2025?"
     category: simples
-    reference_sql: "SELECT municipio, sum(n_leituras_estimadas) * 100.0 / sum(n_leituras) AS percentual_estimadas FROM sem_kpis_segmento_mensal WHERE competencia BETWEEN '2025-01' AND '2025-12' GROUP BY municipio ORDER BY percentual_estimadas DESC LIMIT 1"
+    reference_sql: "SELECT municipio, round(sum(n_leituras_estimadas) * 100.0 / sum(n_leituras), 2) AS percentual_estimadas FROM sem_kpis_segmento_mensal WHERE competencia BETWEEN '2025-01' AND '2025-12' GROUP BY municipio ORDER BY percentual_estimadas DESC LIMIT 1"
     expected_status: answered
     datasets: [amostra, gold_real]
     follow_up_of: null
