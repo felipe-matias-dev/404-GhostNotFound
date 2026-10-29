@@ -3,6 +3,7 @@ import logging
 import re
 import time
 from collections.abc import Mapping
+from dataclasses import dataclass
 from decimal import Decimal
 from uuid import uuid4
 
@@ -10,11 +11,14 @@ from pydantic import ValidationError
 
 from venergy_agent.application.ports import (
     AnswerWriter,
+    ConversationHistory,
     QueryExecutor,
+    SessionUsage,
     SqlGenerator,
     SqlValidator,
 )
 from venergy_agent.domain.answer import AgentAnswer, AnswerStatus, Confidence
+from venergy_agent.domain.conversation import ConversationTurn
 from venergy_agent.domain.errors import ErrorKind, QueryExecutionError, SqlRejected
 from venergy_agent.domain.numbers import unsupported_numbers
 from venergy_agent.domain.question import Question
@@ -42,6 +46,10 @@ UNKNOWN_REASON = (
 REFUSED_REASON = (
     "Esse pedido está fora do que o agente faz: ele só responde perguntas sobre consumo, "
     "faturamento, interrupções e atendimento da distribuidora, consultando os dados."
+)
+BUDGET_EXHAUSTED = (
+    "Esta conversa atingiu o limite de uso do assistente. "
+    "Abra uma nova conversa para continuar perguntando."
 )
 MODEL_FAILED = "Não consegui consultar o modelo de linguagem agora. Tente de novo em instantes."
 INTERNAL_FAILED = "Algo deu errado do nosso lado. Tente de novo em instantes."
@@ -77,6 +85,16 @@ EMPTY_RESULT = (
 )
 
 
+@dataclass
+class _Spent:
+    input_tokens: int = 0
+    output_tokens: int = 0
+
+    def add(self, generation: Generation) -> None:
+        self.input_tokens += generation.input_tokens
+        self.output_tokens += generation.output_tokens
+
+
 class AskUseCase:
     def __init__(
         self,
@@ -91,6 +109,10 @@ class AskUseCase:
         answer_sample_rows: int,
         prompt_version: str,
         configured_model: str,
+        history: ConversationHistory | None = None,
+        history_turns: int = 0,
+        usage: SessionUsage | None = None,
+        session_token_budget: int = 0,
     ) -> None:
         self._layer = layer
         self._generator = generator
@@ -102,6 +124,10 @@ class AskUseCase:
         self._sample_rows = answer_sample_rows
         self._prompt_version = prompt_version
         self._configured_model = configured_model
+        self._history = history
+        self._history_turns = history_turns
+        self._usage = usage
+        self._session_token_budget = session_token_budget
 
     async def ask(self, question: str, session_id: str) -> AgentAnswer:
         started = time.perf_counter()
@@ -143,11 +169,18 @@ class AskUseCase:
                 started,
             )
 
+        if await self._budget_exhausted(session_id, request_id):
+            return self._unanswered(
+                AnswerStatus.REFUSED, BUDGET_EXHAUSTED, request_id, session_id, started
+            )
+        history = await self._load_history(session_id, request_id)
+
+        spent = _Spent()
         feedback: AttemptFeedback | None = None
         last_sql: str | None = None
         last_model: str | None = None
         for attempt in range(1, self._max_attempts + 1):
-            generation = await self._generate(question, feedback, attempt)
+            generation = await self._generate(question, feedback, attempt, history)
             if generation is None:
                 return self._unanswered(
                     AnswerStatus.FAILED,
@@ -157,7 +190,9 @@ class AskUseCase:
                     started,
                     sql=last_sql,
                     model=last_model,
+                    spent=spent,
                 )
+            spent.add(generation)
             draft = generation.draft
             last_sql = draft.sql or last_sql
             last_model = generation.model
@@ -170,6 +205,7 @@ class AskUseCase:
                     session_id,
                     started,
                     model=generation.model,
+                    spent=spent,
                 )
             if draft.status is DraftStatus.REFUSE:
                 return self._unanswered(
@@ -179,6 +215,7 @@ class AskUseCase:
                     session_id,
                     started,
                     model=generation.model,
+                    spent=spent,
                 )
             if draft.status is DraftStatus.CLARIFY:
                 clarification = draft.clarification_question or ""
@@ -191,7 +228,9 @@ class AskUseCase:
                     )
                     clarification = GENERIC_CLARIFICATION
                 self._log(request_id, session_id, step="resposta", status="clarify")
-                return self._clarify(clarification, request_id, started, model=generation.model)
+                return self._clarify(
+                    clarification, request_id, started, model=generation.model, spent=spent
+                )
 
             began = time.perf_counter()
             try:
@@ -258,6 +297,7 @@ class AskUseCase:
                     started,
                     sql=validated.sql,
                     model=generation.model,
+                    spent=spent,
                 )
 
             self._log(
@@ -272,7 +312,7 @@ class AskUseCase:
                 latency_ms=_elapsed_ms(began),
             )
             return await self._answered(
-                question, draft, validated, result, generation, attempt, started
+                question, draft, validated, result, generation, attempt, started, spent
             )
 
         return self._unanswered(
@@ -283,14 +323,51 @@ class AskUseCase:
             started,
             sql=last_sql,
             model=last_model,
+            spent=spent,
         )
 
+    async def _budget_exhausted(self, session_id: str, request_id: str) -> bool:
+        if self._usage is None or self._session_token_budget <= 0:
+            return False
+        used = await self._usage.tokens_used(session_id)
+        self._log(
+            request_id,
+            session_id,
+            step="orcamento",
+            status="conferido",
+            tokens_usados=used,
+            orcamento=self._session_token_budget,
+        )
+        return used >= self._session_token_budget
+
+    async def _load_history(self, session_id: str, request_id: str) -> tuple[ConversationTurn, ...]:
+        if self._history is None or self._history_turns <= 0:
+            return ()
+        try:
+            turns = await self._history.recent(session_id, self._history_turns)
+        except Exception as error:
+            self._log(
+                request_id,
+                session_id,
+                step="historico",
+                status="historico_indisponivel",
+                error=type(error).__name__,
+            )
+            return ()
+        kept = tuple(turn for turn in turns if turn.status is not AnswerStatus.REFUSED)
+        self._log(request_id, session_id, step="historico", status="lido", turnos=len(kept))
+        return kept
+
     async def _generate(
-        self, question: Question, feedback: AttemptFeedback | None, attempt: int
+        self,
+        question: Question,
+        feedback: AttemptFeedback | None,
+        attempt: int,
+        history: tuple[ConversationTurn, ...],
     ) -> Generation | None:
         began = time.perf_counter()
         try:
-            generation = await self._generator.generate(question, self._layer, feedback)
+            generation = await self._generator.generate(question, self._layer, feedback, history)
         except Exception as error:
             self._log(
                 question.request_id,
@@ -325,6 +402,7 @@ class AskUseCase:
         generation: Generation,
         attempt: int,
         started: float,
+        spent: _Spent,
     ) -> AgentAnswer:
         sample = result.rows[: self._sample_rows]
         visible = result.model_copy(update={"rows": sample})
@@ -349,6 +427,8 @@ class AskUseCase:
             model=generation.model,
             prompt_version=self._prompt_version,
             latency_ms=_elapsed_ms(started),
+            input_tokens=spent.input_tokens,
+            output_tokens=spent.output_tokens,
         )
 
     async def _narrate(
@@ -453,7 +533,7 @@ class AskUseCase:
         return Confidence.HIGH
 
     def _clarify(
-        self, clarification: str, request_id: str, started: float, *, model: str
+        self, clarification: str, request_id: str, started: float, *, model: str, spent: _Spent
     ) -> AgentAnswer:
         return AgentAnswer(
             answer=CLARIFY_PREFIX + clarification,
@@ -471,6 +551,8 @@ class AskUseCase:
             model=model,
             prompt_version=self._prompt_version,
             latency_ms=_elapsed_ms(started),
+            input_tokens=spent.input_tokens,
+            output_tokens=spent.output_tokens,
         )
 
     def _unanswered(
@@ -483,7 +565,9 @@ class AskUseCase:
         *,
         sql: str | None = None,
         model: str | None = None,
+        spent: _Spent | None = None,
     ) -> AgentAnswer:
+        spent = spent or _Spent()
         self._log(
             request_id,
             session_id,
@@ -508,6 +592,8 @@ class AskUseCase:
             model=model or self._configured_model,
             prompt_version=self._prompt_version,
             latency_ms=_elapsed_ms(started),
+            input_tokens=spent.input_tokens,
+            output_tokens=spent.output_tokens,
         )
 
     def _log(

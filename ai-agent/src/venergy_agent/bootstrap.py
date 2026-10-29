@@ -1,5 +1,5 @@
 from venergy_agent.application.ask import AskUseCase
-from venergy_agent.application.ports import InsightWriter
+from venergy_agent.application.ports import ConversationHistory, InsightWriter, SessionUsage
 from venergy_agent.config import AgentSettings
 from venergy_agent.infrastructure.answer_writer import PydanticAiAnswerWriter
 from venergy_agent.infrastructure.insight_writer import PydanticAiInsightWriter
@@ -10,7 +10,12 @@ from venergy_agent.infrastructure.sql_generator import PydanticAiSqlGenerator
 from venergy_agent.infrastructure.sql_validator import SqlglotValidator
 
 
-async def build_agent(settings: AgentSettings, narrate: bool = True) -> AskUseCase:
+async def build_agent(
+    settings: AgentSettings,
+    narrate: bool = True,
+    history: ConversationHistory | None = None,
+    usage: SessionUsage | None = None,
+) -> AskUseCase:
     layer = await YamlSemanticLayerSource(
         settings.semantic_layer_path, settings.gold_contract_path
     ).load()
@@ -45,6 +50,10 @@ async def build_agent(settings: AgentSettings, narrate: bool = True) -> AskUseCa
         answer_sample_rows=settings.answer_sample_rows,
         prompt_version=settings.prompt_version,
         configured_model=settings.llm_model.partition(":")[2],
+        history=history,
+        history_turns=settings.history_turns,
+        usage=usage,
+        session_token_budget=settings.session_token_budget,
     )
 
 

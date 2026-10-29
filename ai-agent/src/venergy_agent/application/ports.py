@@ -2,6 +2,7 @@ from collections.abc import Mapping
 from typing import Protocol
 
 from venergy_agent.domain.answer import AgentAnswer, Insight
+from venergy_agent.domain.conversation import ConversationTurn
 from venergy_agent.domain.question import Question
 from venergy_agent.domain.semantic import SemanticLayer
 from venergy_agent.domain.sql import (
@@ -17,13 +18,25 @@ class TextToSqlAgent(Protocol):
     async def ask(self, question: str, session_id: str) -> AgentAnswer: ...
 
 
+class ConversationHistory(Protocol):
+    async def recent(self, session_id: str, limit: int) -> tuple[ConversationTurn, ...]: ...
+
+
+class SessionUsage(Protocol):
+    async def tokens_used(self, session_id: str) -> int: ...
+
+
 class SemanticLayerSource(Protocol):
     async def load(self) -> SemanticLayer: ...
 
 
 class SqlGenerator(Protocol):
     async def generate(
-        self, question: Question, layer: SemanticLayer, feedback: AttemptFeedback | None
+        self,
+        question: Question,
+        layer: SemanticLayer,
+        feedback: AttemptFeedback | None,
+        history: tuple[ConversationTurn, ...] = (),
     ) -> Generation: ...
 
 

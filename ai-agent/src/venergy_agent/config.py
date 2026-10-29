@@ -27,11 +27,13 @@ class AgentSettings(BaseSettings):
     max_rows: int = Field(200, gt=0)
     query_timeout_seconds: float = Field(10.0, gt=0)
     max_correction_attempts: int = Field(3, ge=1, le=3)
-    prompt_version: str = "v2"
+    prompt_version: str = "v3"
     prompts_dir: Path = AGENT_ROOT / "prompts"
     answer_prompt_version: str = "v3"
     insight_prompt_version: str = "v2"
     answer_sample_rows: int = Field(20, gt=0)
+    history_turns: int = Field(3, ge=0, le=10)
+    session_token_budget: int = Field(200_000, ge=0)
     semantic_layer_path: Path = AGENT_ROOT / "semantic" / "semantic_layer.yaml"
     gold_contract_path: Path = REPO_ROOT / "contracts" / "gold_schema.yaml"
 
