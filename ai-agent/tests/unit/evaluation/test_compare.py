@@ -97,7 +97,7 @@ def test_header_carries_the_configuration_of_both_runs():
         golden_version="0.10.0",
         prompt_version="v3",
         narrated=False,
-        judge_model="google-gla:gemini-3.1-flash",
+        judge_model="google-gla:gemini-3.5-flash-lite",
         judge_prompt_version="v1",
     )
 
@@ -106,7 +106,7 @@ def test_header_carries_the_configuration_of_both_runs():
     assert "| prompt_version | v2 | v3 |" in text
     assert "| golden_version | 0.9.0 | 0.10.0 |" in text
     assert "| narrada | sim | não |" in text
-    assert "| juiz | — | google-gla:gemini-3.1-flash (v1) |" in text
+    assert "| juiz | — | google-gla:gemini-3.5-flash-lite (v1) |" in text
     assert "| base | amostra | amostra |" in text
 
 

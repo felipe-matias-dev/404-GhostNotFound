@@ -70,7 +70,7 @@ def test_builds_the_judge_model_from_its_own_setting():
     model = build_judge_model(settings())
 
     assert isinstance(model, GoogleModel)
-    assert model.model_name == "gemini-3.1-flash"
+    assert model.model_name == "gemini-3.5-flash-lite"
 
 
 def test_judge_without_its_provider_key_names_the_variable_and_not_a_key():
@@ -90,8 +90,8 @@ def test_judge_without_its_provider_key_names_the_variable_and_not_a_key():
 @pytest.mark.parametrize(
     "overrides",
     [
-        {"llm_model": "google-gla:gemini-3.1-flash"},
-        {"fallback_model": "google-gla:gemini-3.1-flash"},
+        {"llm_model": "google-gla:gemini-3.5-flash-lite"},
+        {"fallback_model": "google-gla:gemini-3.5-flash-lite"},
         {
             "llm_model": "google-gla:gemini-3.1-flash-lite",
             "judge_model": "openrouter:google/gemini-3.1-flash-lite",

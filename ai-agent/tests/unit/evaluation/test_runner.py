@@ -695,12 +695,12 @@ async def test_report_records_the_judge_configuration():
         red_team_version="0.1.0",
         dataset="amostra",
         narrated=True,
-        judge_model="google-gla:gemini-3.1-flash",
+        judge_model="google-gla:gemini-3.5-flash-lite",
         judge_prompt_version="v1",
     )
 
     assert (report.judge_model, report.judge_prompt_version) == (
-        "google-gla:gemini-3.1-flash",
+        "google-gla:gemini-3.5-flash-lite",
         "v1",
     )
 

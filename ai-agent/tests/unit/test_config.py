@@ -126,8 +126,8 @@ def test_semantic_layer_and_contract_paths_resolve_inside_the_repository(require
 @pytest.mark.parametrize(
     "overrides",
     [
-        {"llm_model": "google-gla:gemini-3.1-flash"},
-        {"fallback_model": "google-gla:gemini-3.1-flash"},
+        {"llm_model": "google-gla:gemini-3.5-flash-lite"},
+        {"fallback_model": "google-gla:gemini-3.5-flash-lite"},
         {"judge_model": "anthropic:claude-x"},
     ],
 )
