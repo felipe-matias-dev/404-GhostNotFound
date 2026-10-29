@@ -540,7 +540,7 @@ Primeira execução: `eval/runs/2026-10-24T033727Z.json`. Configuração: `gemin
 | Erros de gabarito / referências vazias | 0 / 0 |
 
 - **Aceite da G1-05 cumprido:** pelo menos 80% de acerto no golden sobre a Gold real.
-- **Erros do agente, tratados na camada 0.4.1 (PR desta linha de base):**
+- **Erros do agente, que a camada 0.4.1 (PR #88) tenta corrigir; o efeito só vale depois da rodada da DEC-016 na Gold real:**
   - **G089:** usou o FEC das UCs do bairro, e não o do alimentador que atende o bairro, e dividiu contagens inteiras, o que dá 0;
   - **G097:** devolveu fração em vez de percentual;
   - **G095:** `unknown`, porque a camada não definia "receita sem bandeiras".
