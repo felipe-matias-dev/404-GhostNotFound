@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as PerdasRouteImport } from './routes/perdas'
 import { Route as ReceitaRouteImport } from './routes/receita'
 import { Route as RedeRouteImport } from './routes/rede'
@@ -18,6 +19,11 @@ import { Route as UcRouteImport } from './routes/uc'
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PerdasRoute = PerdasRouteImport.update({
@@ -43,6 +49,7 @@ const UcRoute = UcRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/login': typeof LoginRoute
   '/perdas': typeof PerdasRoute
   '/receita': typeof ReceitaRoute
   '/rede': typeof RedeRoute
@@ -50,6 +57,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/login': typeof LoginRoute
   '/perdas': typeof PerdasRoute
   '/receita': typeof ReceitaRoute
   '/rede': typeof RedeRoute
@@ -58,6 +66,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/login': typeof LoginRoute
   '/perdas': typeof PerdasRoute
   '/receita': typeof ReceitaRoute
   '/rede': typeof RedeRoute
@@ -65,14 +74,15 @@ export interface FileRoutesById {
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/perdas' | '/receita' | '/rede' | '/uc'
+  fullPaths: '/' | '/login' | '/perdas' | '/receita' | '/rede' | '/uc'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/perdas' | '/receita' | '/rede' | '/uc'
-  id: '__root__' | '/' | '/perdas' | '/receita' | '/rede' | '/uc'
+  to: '/' | '/login' | '/perdas' | '/receita' | '/rede' | '/uc'
+  id: '__root__' | '/' | '/login' | '/perdas' | '/receita' | '/rede' | '/uc'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  LoginRoute: typeof LoginRoute
   PerdasRoute: typeof PerdasRoute
   ReceitaRoute: typeof ReceitaRoute
   RedeRoute: typeof RedeRoute
@@ -86,6 +96,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/perdas': {
@@ -121,6 +138,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  LoginRoute: LoginRoute,
   PerdasRoute: PerdasRoute,
   ReceitaRoute: ReceitaRoute,
   RedeRoute: RedeRoute,
