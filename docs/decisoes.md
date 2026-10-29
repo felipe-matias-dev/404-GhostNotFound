@@ -55,6 +55,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | 29/10/2026 | DEC-047: avaliação comparativa sobre os itens em comum, aviso quando `failed` passa de 5%, e juiz (LLM as a judge) só em respostas `answered` narradas da amostra, com modelo diferente do gerador | Rodadas com versões diferentes do golden set só se comparam no que têm em comum, e o juiz não pode enviar linhas da Gold real a um modelo | Perylo |
 | 28/10/2026 | DEC-048: ordem de inspeção em campo pode voltar para gerada; a observação da volta fica só no histórico | Uma OI enviada a campo sem querer não precisa ser cancelada e gerada de novo, o que sujaria a métrica de visita desnecessária | Felipe |
 | 29/10/2026 | DEC-049: login com cookie httpOnly e cinco perfis; só `perdas` escreve nas ordens de inspeção e só `ti` lê a auditoria do agente | Esconder o menu não é segurança: a permissão é checada no backend, onde estão os dados; o agente já lê toda a Gold, então bloquear a leitura por tela daria falsa proteção | Felipe |
+| 29/10/2026 | DEC-050: os eventos das ordens de inspeção guardam o login de quem agiu (`autor_login`), e a carga acrescenta a coluna sem apagar o histórico | O gerente de perdas é o único que escreve, e a trilha precisa responder quem concluiu ou cancelou uma ordem; recriar a tabela para isso perderia o histórico de quem já usa o portal | Felipe |
 
 ## DEC-001 · Localização dos arquivos de origem (landing)
 
@@ -302,9 +303,9 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   para a escala de cerca de 200 inspeções por mês.
 - **Limitações:** a OI valida a UC contra `gold_dim_uc`, porque a fila de suspeitas
   (`gold_fila_suspeitas`) ainda não existe; quando existir, a tela da fila só passa a
-  enviar os `cod_uc` escolhidos, sem mudança no backend. Não há registro de quem fez
-  cada mudança, porque o portal ainda não tinha login (a autoria segue em aberto, DEC-049). Alterar colunas exige recriar as
-  tabelas do `app`, já que não há migrações.
+  enviar os `cod_uc` escolhidos, sem mudança no backend. Os eventos antigos não registram
+  quem agiu, porque o portal ainda não tinha login; a autoria entrou na DEC-050. Alterar colunas exige recriar as
+  tabelas do `app`, já que não há migrações (a DEC-050 acrescenta uma coluna sem recriar).
 
 ## DEC-010 · Energia e dinheiro como `numeric`, número na API
 
@@ -794,7 +795,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   - gerar OIs por códigos de UC digitados (repetidos ignorados, até 200 por pedido), enquanto não existe endpoint da fila de suspeitas;
   - Vitest no frontend só para funções puras (`src/**/__tests__/*.test.ts`, sem DOM).
 - **Motivo:** cobre o ciclo de vida da OI sem regra de negócio nova no frontend; o Kanban dá a visão do trabalho em andamento sem a lista de finalizadas crescer sem limite.
-- **Em aberto:** (1) gerar a partir da fila de suspeitas quando houver `GET` da `gold_fila_suspeitas`; (2) autoria das mudanças no histórico: o login existe (DEC-049), falta gravar quem agiu.
+- **Em aberto:** (1) gerar a partir da fila de suspeitas quando houver `GET` da `gold_fila_suspeitas`; (2) mostrar o autor de cada mudança no histórico da tela: o backend grava e devolve `autor_login` desde a DEC-050.
 
 ## DEC-027 · Contrato da Gold v0.3: UC 360, inspeções e recortes completos
 
@@ -1539,6 +1540,36 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   - sem limite de tentativas de login;
   - o cookie não tem `Secure`, porque o portal roda em http no ambiente local; quem publicar com https liga o flag;
   - o portal e a API têm de ficar na mesma origem (o proxy `/api` do Vite faz isso), porque o CORS não libera credenciais.
-- **Em aberto:** a autoria. `app.ordem_evento` e `app.ai_auditoria` ainda não guardam quem agiu, e a regra da auditoria poderia
-  virar "o próprio autor ou a TI". Mexer em tabela que já existe, sem migrações, quebra o banco local de quem não recriar as
-  tabelas; por isso fica para uma tarefa própria, com `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`.
+- **Em aberto:** a autoria. As ordens de inspeção passaram a guardá-la na DEC-050. Falta `app.ai_auditoria`, e a regra da
+  auditoria poderia virar "o próprio autor ou a TI". Mexer em tabela que já existe, sem migrações, quebra o banco local de quem
+  não recriar as tabelas; a DEC-050 resolveu isso com `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` na carga.
+
+## DEC-050 · Autoria nos eventos das ordens de inspeção
+
+- **Data:** 29/10/2026 · **Área:** Portal · **Autor:** Felipe
+- **Contexto:** a DEC-049 trouxe o login, mas `app.ordem_evento` seguia sem registrar quem gerou, enviou a campo, concluiu ou
+  cancelou cada ordem (DEC-009, DEC-026). O case não pede isso: é uma extensão do perfil por cargo. Vale porque só o gerente de
+  perdas escreve, e a trilha passa a responder "quem cancelou esta ordem?".
+- **Decisão:**
+  - `app.ordem_evento` ganha `autor_login` (texto, pode ser nulo), preenchido com o login de quem chamou
+    `POST /ordens-inspecao` ou `PATCH /ordens-inspecao/{id}`. `GET /ordens-inspecao/{id}` devolve `autor_login` em cada
+    evento. API 0.11.0;
+  - a rota recebe o usuário da mesma dependência (`exigir_perfil(Perfil.PERDAS)`) que já barra os outros perfis com 403: uma
+    checagem só, que também entrega o autor;
+  - a carga roda `ALTER TABLE app.ordem_evento ADD COLUMN IF NOT EXISTS autor_login text` logo depois do `create_all`, na mesma
+    transação. Num banco novo o `create_all` já cria a coluna e o comando não faz nada; num banco que já tem a tabela, é ele
+    que traz a coluna sem apagar o histórico. A carga continua sem apagar nem alterar linha do `app`: cria o que falta e
+    acrescenta colunas novas.
+- **Texto, sem chave estrangeira para `app.usuarios`:** um token vale até vencer mesmo que o usuário seja apagado (DEC-049). Com a
+  chave estrangeira, a ação daria erro e a trilha se perderia. Só o login, e não o nome: o nome vem de `GET /auth/me`.
+- **Alternativas descartadas:**
+  - Alembic: ferramenta nova a poucos dias da entrega, para uma coluna.
+  - `ALTER` na subida da API: mudança de schema escondida num efeito colateral de subir o servidor.
+  - `ALTER` no comando dos usuários de demonstração: o comando é só dos usuários, e quem não o rodasse ficaria sem a coluna.
+  - Recriar `app.ordem_evento` ou `docker compose down -v`: apagaria o histórico das ordens de quem já usa o portal.
+- **Limitações conhecidas:**
+  - os eventos de antes do login ficam com `autor_login` nulo: não se inventa autor;
+  - o valor é o do token, sem conferência contra `app.usuarios` no momento da gravação;
+  - o histórico da tela de perdas ainda não mostra o autor (tela do João).
+- **Em aberto:** a autoria da auditoria do agente (`app.ai_auditoria`). Fica para depois do PR #86 (memória de conversa), que
+  mexe nos mesmos arquivos. A leitura continua só da TI até o portal ter um painel de auditoria.

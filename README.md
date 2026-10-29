@@ -98,7 +98,7 @@ flowchart LR
 Três regras sustentam o desenho ([arquitetura e domínio](docs/arquitetura.md)):
 
 - **Contrato antes de implementação.** Portal e agente trabalham contra o contrato da Gold ([`contracts/gold_schema.yaml`](contracts/gold_schema.yaml), v0.3.0) e uma amostra sintética desde o primeiro dia, sem esperar o dado real nem expor o dataset ([DEC-003](docs/decisoes.md#dec-003--walking-skeleton-com-amostra-sintética)). O frontend gera o client a partir de [`contracts/openapi.json`](contracts/openapi.json) e quebra na compilação se a API mudar ([DEC-005](docs/decisoes.md#dec-005--contrato-openapi-entre-api-e-frontend)).
-- **A Gold é descartável; o trabalho do usuário, não.** A carga recria o schema `gold` a cada execução e nunca toca o `app`, onde ficam as ordens de inspeção e a auditoria do agente ([DEC-002](docs/decisoes.md#dec-002--banco-local-postgresql)).
+- **A Gold é descartável; o trabalho do usuário, não.** A carga recria o schema `gold` a cada execução e nunca apaga nem altera uma linha do `app`, onde ficam as ordens de inspeção e a auditoria do agente: ela só cria as tabelas que faltam e acrescenta colunas novas ([DEC-002](docs/decisoes.md#dec-002--banco-local-postgresql), [DEC-050](docs/decisoes.md#dec-050--autoria-nos-eventos-das-ordens-de-inspeção)).
 - **Um número, uma fonte.** Cálculos de negócio (PVM, DEC/FEC, score de suspeita) ficam na Gold e no backend. O frontend só exibe, e o agente lê as métricas prontas em vez de recalculá-las.
 
 | Camada | Tecnologia | Por que |
