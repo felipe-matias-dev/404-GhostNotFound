@@ -18,7 +18,7 @@ from pydantic import BaseModel, ValidationError
 from sqlalchemy import Connection, Engine, insert, text
 from sqlalchemy.exc import ProgrammingError
 
-from venergy_api.auditoria import garantir_colunas_de_tokens
+from venergy_api.auditoria import garantir_colunas_de_tokens, garantir_indice_da_sessao
 from venergy_api.config import get_settings
 from venergy_api.database import Base, get_engine
 from venergy_api.models import (
@@ -214,6 +214,7 @@ def load_gold(gold_dir: Path, engine: Engine, tamanho_lote: int = TAMANHO_LOTE) 
         Base.metadata.create_all(connection)
         # O app de um banco antigo ganha as colunas novas da auditoria, sem tocar nas linhas.
         garantir_colunas_de_tokens(connection)
+        garantir_indice_da_sessao(connection)
         for table, csv_path in csv_paths.items():
             rows = iter_rows(csv_path, table.schema)
             written = _inserir_em_lotes(connection, table.model, rows, tamanho_lote)

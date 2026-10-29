@@ -410,7 +410,7 @@ class AskUseCase:
             result, draft, validated, _period(result) or _endpoints(validated.periods)
         )
         text = await self._narrate(
-            question, draft, visible, text, _period(visible), validated.periods
+            question, draft, visible, text, _period(visible), validated.periods, spent
         )
 
         return AgentAnswer(
@@ -441,11 +441,12 @@ class AskUseCase:
         fallback: str,
         period: tuple[str, str] | None,
         filtered_periods: tuple[str, ...],
+        spent: _Spent,
     ) -> str:
         if self._answer_writer is None:
             return fallback
         try:
-            narrative = await self._answer_writer.write(question, draft, visible)
+            narration = await self._answer_writer.write(question, draft, visible)
         except Exception as error:
             self._log(
                 question.request_id,
@@ -456,6 +457,9 @@ class AskUseCase:
             )
             return fallback
 
+        spent.input_tokens += narration.input_tokens
+        spent.output_tokens += narration.output_tokens
+        narrative = narration.text
         if TECHNICAL_NAME.search(narrative):
             self._log(
                 question.request_id,

@@ -4,6 +4,7 @@ from typing import Protocol
 from venergy_agent.domain.answer import AgentAnswer, Insight
 from venergy_agent.domain.conversation import ConversationTurn
 from venergy_agent.domain.judge import JudgeVerdict
+from venergy_agent.domain.narration import Narration
 from venergy_agent.domain.question import Question
 from venergy_agent.domain.semantic import SemanticLayer
 from venergy_agent.domain.sql import (
@@ -50,7 +51,9 @@ class QueryExecutor(Protocol):
 
 
 class AnswerWriter(Protocol):
-    async def write(self, question: Question, draft: SqlDraft, result: QueryResult) -> str: ...
+    async def write(
+        self, question: Question, draft: SqlDraft, result: QueryResult
+    ) -> Narration: ...
 
 
 class InsightWriter(Protocol):
