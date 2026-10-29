@@ -51,6 +51,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | 28/10/2026 | DEC-043: Consulta de UC na sidebar e Ctrl/Cmd + K abrem a palette global; só os cinco códigos consultados com sucesso ficam nos recentes locais | Consulta rápida sem abandonar o contexto, sem persistir nomes ou valores e sem navegar antes de validar a UC | João Euclides |
 | 27/10/2026 | DEC-040: `GET /receita/insight` devolve o insight de IA da tela de receita; o backend monta o JSON de métricas a partir da ponte da Gold, com valores arredondados como a tela os mostra, e guarda o texto num cache em memória pelo conteúdo das métricas; sem a chave do Gemini a rota responde 503; API 0.9.0 | O agente só aceita texto cujos números sejam exatamente valores do JSON (DEC-019), e uma Gold recarregada precisa gerar um insight novo, nunca um velho | Felipe |
 | 27/10/2026 | DEC-044: a visão 360 da unidade consumidora sai de uma rota só, `GET /unidades-consumidoras/{cod_uc}/visao-360`; os 12 meses terminam na última competência da Gold e a "conta alta" é o último mês contra o mesmo mês do ano anterior, com faixa de ±10%; integrada à API 0.9.0 da main | O atendente está com o cliente na linha: uma chamada só à API e uma resposta pronta para "o consumo subiu?", sem a tela refazer conta de negócio | Felipe |
+| 29/10/2026 | DEC-045: tela de Rede usa período padrão de até 12 meses, aceita período válido da URL e apresenta histórico global do alimentador | Preserva o recorte escolhido e distingue o índice local do histórico do alimentador inteiro | João Euclides |
 
 ## DEC-001 · Localização dos arquivos de origem (landing)
 
@@ -1414,3 +1415,16 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   Registro de conversa, abertura de chamado e pagamento continuam fora deste fluxo.
 - **Arquitetura:** provider dentro da feature, montado pela rota raiz. Shell e sidebar
   recebem callback, sem importar regras ou dados de UC. Nenhuma dependência ou tabela nova.
+
+## DEC-045 · Período e histórico da tela de Rede
+
+- **Data:** 29/10/2026 · **Área:** Portal · **Autor:** João Euclides
+- **Período:** sem período válido na URL, os últimos 12 meses de calendário até a última
+  competência disponível, limitados pela primeira. Um período válido da URL prevalece,
+  mesmo fora do calendário da base; a API determina os dados disponíveis.
+- **Histórico:** o painel consulta o alimentador inteiro, sem os filtros geográficos da tabela.
+  O índice de um recorte pode diferir do histórico global; DEC e FEC são fornecidos pela API.
+- **Limite de apresentação:** o gráfico mensal exibe até 120 meses. Para períodos maiores,
+  mantém-se o período da consulta e informa-se que é preciso reduzi-lo para ver o gráfico.
+- **Navegação:** abrir e fechar o painel cria entradas no histórico, permitindo recuperar
+  os estados anteriores com Voltar e Avançar.
