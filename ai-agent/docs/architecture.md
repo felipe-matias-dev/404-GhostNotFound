@@ -51,7 +51,7 @@ pergunta → Question → SemanticLayer (carregada uma vez)
 
 Período (G1-05): quando as linhas têm `competencia`, o texto determinístico cita o primeiro e o último mês do resultado, e a narrativa só é aceita se citar os dois extremos das linhas que o redator viu (por exemplo "junho de 2025", "06/2025", "jun/2025" ou "entre junho e dezembro de 2025"); senão, o log registra `periodo_ausente_na_resposta`. Os meses usados como literal no SQL (`competencia = '2025-06'`) também valem na checagem de números (DEC-019); quando as linhas não têm `competencia`, são eles o período que a narrativa precisa citar e que o texto determinístico mostra. Pedido de esclarecimento que cita nome técnico vira uma pergunta genérica sobre período e recorte. Detalhes, confiança e logs: spec §5.1. O backend monta o agente uma vez por processo com `build_agent(AgentSettings())`.
 
-`InsightWriter` (item 9, `infrastructure/insight_writer.py`, prompt em `prompts/insight/v2/`, com unidade, efeito tarifa e bandeira como partes do efeito preço e negativo por extenso): narra o JSON de métricas de uma tela e devolve `None` se algum número do texto não estiver no JSON. O backend monta o JSON, guarda o insight em cache e liga o redator (D9): feito para a tela de Receita (`GET /receita/insight`, DEC-040), com `build_insight_writer` em `bootstrap.py`. O golden set está em `eval/golden_set.yaml` (versão 0.10.0, 94 itens, alinhado à camada 0.4.0). A revisão humana é parcial: `revisado_por` está preenchido em 11 itens (Dados), e os demais aguardam revisão.
+`InsightWriter` (item 9, `infrastructure/insight_writer.py`, prompt em `prompts/insight/v2/`, com unidade, efeito tarifa e bandeira como partes do efeito preço e negativo por extenso): narra o JSON de métricas de uma tela e devolve `None` se algum número do texto não estiver no JSON. O backend monta o JSON, guarda o insight em cache e liga o redator (D9): feito para a tela de Receita (`GET /receita/insight`, DEC-040), com `build_insight_writer` em `bootstrap.py`. O golden set está em `eval/golden_set.yaml` (versão 0.12.0, 103 itens, alinhado à camada 0.4.0). A revisão humana é parcial: `revisado_por` está preenchido em 16 itens (Dados), e os demais aguardam revisão.
 
 ## 3b. Memória e orçamento
 
@@ -59,7 +59,7 @@ Período (G1-05): quando as linhas têm `competencia`, o texto determinístico c
 - `history_turns=3` e `session_token_budget=200000` (0 desliga cada um). O orçamento é conferido antes da pergunta; leitura do consumo que falha → `failed` sem chamar o modelo; leitura do histórico que falha → segue sem ele.
 - `AgentAnswer.input_tokens` e `output_tokens` somam só o gerador de SQL.
 - O backend limita as perguntas por sessão numa janela (`429`). Limitação: sem autenticação, trocar de `session_id` zera o limite e o orçamento.
-- Estado: a rodada do golden que libera o `prompts/v3` como padrão (DEC-016) está pendente. A avaliação já exercita a memória nos follow-ups: o `evaluation/__main__.py` monta o agente com `InMemoryConversationHistory` (sem orçamento) e a entrega ao runner como `recorder`, de modo que G046, G095, G096, G098 e G099 usam o histórico da própria sessão. Com `--dataset gold_real` a memória fica desligada (DEC-015: o SQL dos turnos anteriores iria ao modelo). A rodada pendente compara v2 e v3: sem regressão nos itens comuns e ao menos 4 dos 5 follow-ups certos, inclusive o G046.
+- Estado: a rodada do golden que libera o `prompts/v3` como padrão (DEC-016) está pendente. A avaliação já exercita a memória nos follow-ups: o `evaluation/__main__.py` monta o agente com `InMemoryConversationHistory` (sem orçamento) e a entrega ao runner como `recorder`, de modo que G046, G099, G100, G102 e G103 usam o histórico da própria sessão. Com `--dataset gold_real` a memória fica desligada (DEC-015: o SQL dos turnos anteriores iria ao modelo). A rodada pendente compara v2 e v3: sem regressão nos itens comuns e ao menos 4 dos 5 follow-ups certos, inclusive o G046.
 
 ## 4. Camada semântica hoje
 
@@ -107,7 +107,7 @@ O banco local só tem a amostra sintética do backend (`venergy_api.amostra`). A
 - O YAML não registra a versão do contrato (`conventions.agent.contract_version`).
 - D7 resolvido: a carga apaga as views `sem_*` antes de recriar as tabelas da Gold e as aplica de novo no fim, numa única transação (`backend/src/venergy_api/carga.py`, `drop_agent_views`). Se uma view não bater com a Gold, a carga falha e desfaz tudo.
 - D1 continua aberto: as views ficam no schema `gold`, onde o `venergy_agent` lê todas as tabelas.
-- O golden set tem revisão humana parcial: `revisado_por` está preenchido em 11 de 94 itens, e os gabaritos dos itens da Gold real só se fixam com a Gold real carregada no Postgres local.
+- O golden set tem revisão humana parcial: `revisado_por` está preenchido em 16 de 103 itens, e os gabaritos dos itens da Gold real só se fixam com a Gold real carregada no Postgres local.
 - Recortes de receita: a tela (`GET /receita/comparacao`, DEC-021) soma a fato com o cadastro atual da UC, e o agente soma `sem_kpis_segmento_mensal`. Os números só divergem se uma UC mudou de recorte; alinhar quando o backend migrar para a tabela de segmentos.
 
 ## 6b. Avaliação (item 7)

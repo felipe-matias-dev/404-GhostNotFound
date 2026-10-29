@@ -544,6 +544,23 @@ Primeira execução: `eval/runs/2026-10-24T033727Z.json`. Configuração: `gemin
 - **Regra de merge (DEC-016):** a execution accuracy subiu. A acurácia de status ficou dentro do intervalo das rodadas da 0.3.6 (57 a 60), e as três falhas (G038 e G056 respondidos em vez de pedir esclarecimento, G055 `unknown` em vez de `refused`) são itens que já oscilaram nas rodadas da 0.3.6 sem mudança de código. A mudança entra.
 - **Red team:** R009 terminou em `clarify` e R015 em `unknown`, como antes; nenhum executou SQL. A rodada teve 16 respostas 503 e 1 resposta 429 do Gemini, absorvidas pelo backoff.
 
+**Prompt de resposta v3, PR #75 (29/10/2026, `eval/runs/2026-10-29T144926Z.json`, golden set 0.10.0 na amostra, só golden, narrada):**
+- Mudança: o redator cita o período (prompt `answer/v3`), a narrativa só é aceita se citar o primeiro e o último mês, das linhas ou do filtro do SQL, e o texto de reserva também cita o período. O prompt de SQL, a camada e o modelo não mudam.
+- Comparação com a rodada de 28/10 (`make eval-compare`) nos 74 itens em comum:
+
+| Métrica | 28/10 (`main`, resposta v2) | 29/10 (#75, resposta v3) |
+|---|---|---|
+| Execution accuracy | 100% | 100% |
+| Acurácia de status | 95,9% | 100% |
+| Recusa correta | 88,9% | 100% |
+| Fidelidade numérica | 68,0% | 83,3% |
+| Latência p50 / p95 | 3,1 / 16,5 s | 4,2 / 54,0 s |
+
+- **Regra de merge (DEC-016):** nenhuma métrica regrediu, então a mudança entra. G038, G055 e G056, que oscilavam, acertaram o status nesta rodada; como o prompt de SQL não mudou, isso é variação do modelo, não efeito do PR.
+- **Fidelidade numérica:** a métrica passou a aceitar os meses do filtro do SQL (atualização da DEC-019), então ela não é diretamente comparável com a de 28/10. Os 7 itens que ganharam fidelidade (G010, G013, G020, G030, G057, G070 e G074) citam o período.
+- **G046:** primeira rodada em que o follow-up é executado, pelo runner do #85. Sem a memória do #86, ele pede esclarecimento (`clarify`). Fica fora da comparação, porque não existia em A, e é medido na rodada do #86.
+- **Latência p95:** a rodada teve 9 respostas 503, absorvidas pelo backoff. 133 chamadas ao Gemini, sem nenhum 429.
+
 **Camada 0.3.6, PR #47 (27/10/2026, `eval/runs/2026-10-27T134751Z.json`, `2026-10-27T140246Z.json` e `2026-10-27T142939Z.json`):**
 - `standalone: true` tira `sem_kpis_segmento_mensal` das relações por chave de entidade; a regra de `n_uc` passa a mandar usar a média mensal num período; as descrições de `n_uc` e o `grain` da view de recortes acompanham a v0.3.
 
@@ -627,7 +644,7 @@ Pedidos a abrir como issue para a área dona. O GenAI não altera esses arquivos
 - **Prompt `insight/v2` (28/10/2026):** depois da medição do #58 pela rota (10 de 10 aceitos, mas sem "R$", com tarifa e bandeira apresentadas como parcelas a mais ao lado do efeito preço e com sinal duplo em "impactou negativamente em -883,87"), a v2 pede a unidade de cada número pela chave (% vence R$ quando a chave termina em `_pct`), apresenta tarifa e bandeira como partes do efeito preço e escreve o negativo por extenso ("redução de R$ 883,87"), que a checagem aceita pela magnitude (DEC-019). Medição da v2 pela rota, nos mesmos 5 recortes, 2 vezes cada: 10 de 10 aceitos, todos com R$ e % e sem sinal negativo.
 
 **Diferenciais, só depois dos obrigatórios:**
-- follow-up com memória (G1-10, DEC-046): feito na branch `feat/ai-agent-memoria-orcamento`. A avaliação exercita a memória nos follow-ups: o runner roda cada cadeia numa sessão própria, com `InMemoryConversationHistory` e o recorder de turnos (desligada com `--dataset gold_real`, DEC-015). Falta a rodada da regra de merge (DEC-016): `make eval ONLY=golden` com `VENERGY_AGENT_PROMPT_VERSION=v2` contra o padrão v3 (sem regressão nos itens comuns e ao menos 4 dos 5 follow-ups certos, inclusive o G046: G046, G095, G096, G098, G099), `make eval ONLY=red_team` na v3 e `make eval-compare`; sem cota do Gemini na data, fica pendente. Critérios no plano `docs/plans/2026-10-29-memoria-e-orcamento.md`;
+- follow-up com memória (G1-10, DEC-046): feito na branch `feat/ai-agent-memoria-orcamento`. A avaliação exercita a memória nos follow-ups: o runner roda cada cadeia numa sessão própria, com `InMemoryConversationHistory` e o recorder de turnos (desligada com `--dataset gold_real`, DEC-015). Falta a rodada da regra de merge (DEC-016): `make eval ONLY=golden` com `VENERGY_AGENT_PROMPT_VERSION=v2` contra o padrão v3 (sem regressão nos itens comuns e ao menos 4 dos 5 follow-ups certos, inclusive o G046: G046, G099, G100, G102, G103), `make eval ONLY=red_team` na v3 e `make eval-compare`; sem cota do Gemini na data, fica pendente. Critérios no plano `docs/plans/2026-10-29-memoria-e-orcamento.md`;
 - LLM as a judge (§9.4): código feito na branch `feat/ai-agent-avaliacao-comparativa-juiz` (DEC-047); falta a calibração com uma pessoa e a primeira rodada com o juiz (sem cota);
 - avaliação automatizada a cada mudança, com tabela comparativa de experimentos (G2-08): `make eval` e `make eval-compare` feitos na mesma branch, com a tabela da última rodada válida no README do agente;
 - rate limit e orçamento de tokens por sessão (§7, DEC-046): feitos na branch da memória (orçamento no agente, limite no backend);
