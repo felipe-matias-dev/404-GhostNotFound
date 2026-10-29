@@ -406,7 +406,9 @@ class AskUseCase:
     ) -> AgentAnswer:
         sample = result.rows[: self._sample_rows]
         visible = result.model_copy(update={"rows": sample})
-        text = self._deterministic_text(result, draft, validated, _period(result))
+        text = self._deterministic_text(
+            result, draft, validated, _period(result) or _endpoints(validated.periods)
+        )
         text = await self._narrate(
             question, draft, visible, text, _period(visible), validated.periods
         )
@@ -463,7 +465,8 @@ class AskUseCase:
             )
             return fallback
 
-        if period is not None and not all(_mentions(narrative, value) for value in period):
+        required = period if period is not None else _endpoints(filtered_periods)
+        if required is not None and not all(_mentions(narrative, value) for value in required):
             self._log(
                 question.request_id,
                 question.session_id,
@@ -650,6 +653,12 @@ def _period(result: QueryResult) -> tuple[str, str] | None:
     if not found:
         return None
     return found[0], found[-1]
+
+
+def _endpoints(periods: tuple[str, ...]) -> tuple[str, str] | None:
+    if not periods:
+        return None
+    return periods[0], periods[-1]
 
 
 def _period_sentence(period: tuple[str, str]) -> str:

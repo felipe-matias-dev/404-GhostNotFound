@@ -3,6 +3,7 @@ from typing import Protocol
 
 from venergy_agent.domain.answer import AgentAnswer, Insight
 from venergy_agent.domain.conversation import ConversationTurn
+from venergy_agent.domain.judge import JudgeVerdict
 from venergy_agent.domain.question import Question
 from venergy_agent.domain.semantic import SemanticLayer
 from venergy_agent.domain.sql import (
@@ -54,3 +55,7 @@ class AnswerWriter(Protocol):
 
 class InsightWriter(Protocol):
     async def narrate(self, screen: str, metrics: Mapping[str, object]) -> Insight | None: ...
+
+
+class AnswerJudge(Protocol):
+    async def judge(self, question: str, answer: AgentAnswer) -> JudgeVerdict: ...

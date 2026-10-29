@@ -138,13 +138,71 @@ export const Route = createFileRoute("/perdas")({
 
 `src/routes/__root.tsx` envolve todas as rotas no `AppShell` (`components/layout/app-shell`), montado sobre a Sidebar do shadcn (`components/ui/sidebar`, variante `inset`): a navegação recolhe para ícones pelo trigger, pelo rail ou com Ctrl/Cmd+B. Com a navegação aberta, o trigger fica ao lado da logo; recolhida, ele passa para o header. Abaixo de 768px a navegação vira um `Sheet` e o trigger fica sempre no header. O header traz o título da seção (o `<h1>` da página) e o painel de conteúdo rola sozinho e volta ao topo a cada tela. Rota sem match cai em `pages/nao-encontrado.tsx`, sem título no header nem item ativo na navegação.
 
-Tela nova na navegação: crie a rota e adicione o item em `NAVEGACAO` (`components/layout/app-sidebar/navegacao.ts`), com o ícone de **Fundamentos/Ícones**. O título do header e o item ativo da sidebar vêm de `useItemAtivo`; rotas filhas que existem (`/uc/$id`) herdam a seção. O conteúdo da página vai dentro de `Pagina` (`components/layout/pagina`), que fixa largura e respiro.
+Tela nova na navegação: crie a rota e adicione o item em `NAVEGACAO` (`components/layout/app-sidebar/navegacao.ts`), com grupo **Análise** ou **Operação** e o ícone de **Fundamentos/Ícones**. O título do header e o item ativo da sidebar vêm de `useItemAtivo`; rotas filhas que existem (`/uc/$id`) herdam a seção. **Consulta de UC** é uma ação que abre a palette, não um link para uma página de busca. O conteúdo da página vai dentro de `Pagina` (`components/layout/pagina`), que fixa largura e respiro.
 
 Recorte da tela no topo (ex.: `Receita › Recife ▾ › Boa Viagem ▾`): a página renderiza `<HeaderTrilha>` (`components/layout/header`) com um `Breadcrumb`, e o conteúdo aparece no header logo depois do título, que vira link para a seção sem recorte. Na Receita, cada nível é um `DropdownMenu` para trocar de município ou bairro: é a forma acessível de escolher o que o mapa também escolhe.
 
 ### Features previstas
 
 `visaoGeral` (KPIs), `receita` (preço × volume), `unidadeConsumidora` (visão 360), `perdas` (fila e ordens de inspeção), `operacao` (DEC/FEC), `agente` (chat e insights de IA), `auth` (perfis, quando entrar).
+
+### Visão 360 da unidade consumidora
+
+- **Consulta de UC** na sidebar abre a palette global, também disponível por Ctrl/Cmd + K.
+  A navegação se divide em **Análise** (Visão geral, Receita, Rede) e **Operação** (Consulta de UC, Perdas).
+- A palette consulta `GET /unidades-consumidoras/{cod_uc}/visao-360` antes de navegar para
+  `/uc?cod_uc=...`. A resposta preenche o cache da visão 360, sem uma segunda consulta.
+  O código continua textual e exato; filtrar recentes não é busca global nem resolução aproximada de identidade.
+- Os cinco códigos consultados com sucesso mais recentemente ficam em `localStorage`
+  (`venergy:ucs-recentes`), sem nomes ou dados financeiros. Reconsulta move o código ao topo.
+  **Limpar recentes** apaga a lista. Armazenamento bloqueado mantém a sessão funcional e informa a limitação.
+- Setas, Home/End e Enter selecionam/consultam; Esc fecha e o modal restaura o foco.
+  Alterar o texto ou fechar cancela o pedido pendente; 404 e falha técnica não navegam nem entram nos recentes.
+  Avisos usam os tokens `danger` e `danger-subtle` (texto, borda e fundo), mantendo mensagem explícita e retry neutro.
+- Links diretos continuam funcionando. `/uc` sem código só oferece **Buscar UC**; uma UC aberta
+  oferece **Trocar UC** e **Atualizar dados**. A página não conserva um segundo formulário de busca.
+- O provider da feature é montado na rota raiz; o shell recebe apenas o callback de abertura,
+  sem importar a feature. Sem código não há consulta automática; troca de UC não reaproveita dados da anterior.
+- O único tipo agregado é `Uc360Schema` do OpenAPI (alias `Uc360`); não há contrato antigo nem
+  adaptador. `consumo.meses` alimenta o `TrendChart`; `null` interrompe a linha e zero permanece.
+  A referência é `consumo.referencia`, global à Gold. `tendencia` e os dois percentuais vêm
+  prontos do backend; estável significa faixa inclusiva de ±10%, não ausência de aumento.
+  A variação de 12 meses informa `meses_comparados` e considera somente pares com fatura.
+- A conta do ano anterior, o tipo de leitura e a diferença absoluta em kWh foram removidos:
+  não existem no contrato aprovado. Valor, dias e bandeira exibidos são só do mês de referência.
+  Não há cálculo de negócio nem chamadas em cascata para reconstruir os campos antigos.
+- `faturas_nao_pagas.itens`, interrupções e `atendimentos` usam `DataTable`, cinco linhas por página.
+  Cadastro, equipamento e GD ficam visíveis sem abas. Só dados mascarados identificam o titular.
+- Refetch mantém os dados da mesma UC; uma falha os identifica como anteriores e oferece
+  repetição. 404 é distinto de falha técnica. Não há operação de pagamento nem abertura de chamado.
+- DS VE-360 preservado: grid operacional de duas colunas no desktop, uma no mobile,
+  tabelas responsivas em cards e motion somente dos componentes internos (V3 M2 D8).
+### Visão geral da diretoria
+
+- Resumo de 12 meses e faixa mensal: valores e variações de `GET /indicadores/comparacao`.
+- Tesoura: somas de `GET /indicadores/janelas?meses=12`, sem acumulação no frontend. A primeira
+  e a última janelas completas sem sobreposição definem o par do resumo; o gráfico só converte
+  as somas em variação sobre a primeira janela.
+- Competências das janelas vêm da empresa inteira: um mês sem linha no recorte vale zero,
+  enquanto uma lacuna global continua invalidando a janela.
+- O link do resumo para a ponte só aparece se o mesmo par existir em
+  `GET /receita/decomposicao/periodos`, sem fallback silencioso para outro período.
+- `GET /receita/mensal` permanece para as competências do seletor mensal e as sparklines.
+  DEC, FEC e satisfação da comparação são calculados no backend, não pela série mensal.
+- Comparação mensal, resumo e série de janelas têm estados de erro e repetição independentes.
+
+### Rede (DEC/FEC)
+
+- Rota fina `/rede` com `validateSearch: redeSearchSchema`; a página lê search e navegação por `getRouteApi("/rede")`. Campos opcionais (`inicio`, `fim`, `criterio`, `visao`, `municipio`, `bairro`, `alimentador`, `serie`) viram estado efetivo sem duplicar defaults na URL.
+- O conteúdo da Rede ocupa toda a largura disponível (`Pagina` com `max-w-none`), preservando o respiro lateral e a adaptação nativa da tabela em telas estreitas.
+- A URL bruta é comparada com a forma canônica: bairro órfão, série sem alimentador, mês inválido e geografia sob `visao=alimentadores` são removidos uma vez com `replace`. Período incompleto ou invertido volta ao padrão resolvido pelo calendário (`useCompetencias` de `visaoGeral`, mesma chave `["visaoGeral","mensal"]`), e uma URL válida completa prevalece mesmo fora do calendário. Sem competências e sem URL, a tabela não consulta e o seletor manual fica habilitado.
+- Padrão sem URL: últimos 12 meses de calendário até a competência mais recente, limitados à mais antiga da base. O calendário e a tabela têm estados de falha/vazio independentes; intervalo explícito continua consultando com calendário indisponível.
+- Toolbar compacta: visão `Alimentadores | Localidades`, intervalo em popover com dois meses nativos (`De`/`Até`, `Aplicar`, `Últimos 12 meses`, mensagens de validação próprias e `aria-invalid`) e critério `DEC | FEC`. Trocar período, visão ou recorte limpa o painel; trocar o critério não fecha o painel nem troca a métrica dele. A paginação nativa de 10 linhas reinicia por `resetKey` (visão, período, critério, município, bairro) e nunca por `alimentador`/`serie`.
+- Alimentadores usam o ranking global (`GET /continuidade/alimentadores/ranking`); Localidades começa nos municípios e desce para bairros e alimentadores por `GET /continuidade/recortes`. O nível exibido e as ações da linha vêm de `response.nivel`, nunca de uma resposta anterior; o título contextual deriva do recorte na URL. A ordem é a da API.
+- Tabela: identificador do nível, DEC (`formatHoras`), FEC (`formatIndice`) e UCs (`formatNumero`); o cabeçalho do critério ativo ganha ênfase tipográfica. Sem números coloridos como alerta. `n_meses` aparece na legenda com singular.
+- Painel do alimentador: Sheet à direita, aberto só por clique/teclado na linha ou deep link `alimentador`. Título `Alimentador {codigo}`, descrição do histórico global, aviso quando veio de bairro e período formatado. Um `TrendChart` de 300px, uma métrica por vez (`serie ?? criterio ?? "dec"`), série global pedida com `cod_alimentador` explícito, meses ausentes como `null`, zero como zero; o toggle não consulta nem reordena a tabela. O gráfico aceita até 120 meses; para períodos maiores, pede a redução do intervalo sem alterar a consulta. Fechar remove só `alimentador`/`serie`, preservando tabela, recorte, período e página e criando uma entrada no histórico ([DEC-045](../docs/decisoes.md)).
+- Consultas: hooks em ordem fixa com `skipToken` para a visão inativa e para série sem código; `AbortSignal` propagado às três chamadas; cache global de 5 min sem `keepPreviousData`. Troca de chave mostra o molde nativo; recarga da mesma chave mantém os dados com `aria-busy`/`Atualizando…` e erro de refetch em aviso externo com retry, sem esconder as linhas. Erro inicial aparece no estado nativo, nunca como vazio.
+- Acessibilidade: foco retorna à linha que abriu o painel (ou ao título `tabIndex={-1}` em deep link), `Sheet` prende o foco e `Esc`/X/backdrop fecham; Back/Forward reabrem pelo histórico. O gráfico expõe a tabela `sr-only` com todas as competências, inclusive as lacunas.
 
 ## Design system
 
@@ -169,7 +227,8 @@ carrega `src/styles.css`.
   tamanho, peso, cor e acessibilidade em **Fundamentos/Ícones**.
 - Gráficos: SVG próprio com `motion`; `d3-scale` e `d3-shape` só para escalas e curvas
   (DEC-037). Cores das séries pelos tokens `chart-1` a `chart-6` e `chart-muted`. Tendência
-  ao longo do tempo: `TrendChart`; ponte de efeitos: `WaterfallChart`.
+  ao longo do tempo: `TrendChart` (área só com eixo a partir do zero, DEC-041); forma da série
+  ao lado de um número: `Sparkline`; ponte de efeitos: `WaterfallChart`.
 
 Regras e modelo de story na página **Introdução** do Storybook
 (`.storybook/docs/introducao.mdx`).

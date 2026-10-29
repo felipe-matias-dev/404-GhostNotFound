@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
-	compararMeses,
-	marcadores,
+	efeitosDaReceita,
+	janelasDaBase,
+	leitura,
 	parDoMes,
 	parEscolhido,
 	parPadrao,
-	tendencia,
-	variacaoNoPonto,
+	tesoura,
 } from "../conversions";
-import type { KpisMensais, ParPeriodos } from "../types";
+import type { JanelaIndicadores, ParPeriodos } from "../types";
 
 const par = (base: string, atual: string): ParPeriodos => ({
 	periodo_base: `${base}/${base}`,
@@ -80,148 +80,119 @@ describe("parEscolhido", () => {
 	});
 });
 
-describe("compararMeses", () => {
-	const linha = (
-		competencia: string,
-		valores: Partial<KpisMensais>,
-	): KpisMensais => ({
-		competencia,
-		kwh_faturado: 1000,
-		receita_faturada: 800,
-		receita_energia: 700,
-		dec: 2,
-		fec: 0.5,
-		n_chamados: 10,
-		satisfacao_media: 4,
-		...valores,
+const janela = (
+	inicio: string,
+	fim: string,
+	receita: number,
+	kwh: number,
+): JanelaIndicadores => ({
+	inicio,
+	fim,
+	receita_faturada: receita,
+	receita_energia: receita,
+	kwh_faturado: kwh,
+	n_uc_medio: 10,
+	tarifa_media: receita / kwh,
+	tarifa_base_media: receita / kwh,
+});
+
+describe("janelasDaBase", () => {
+	it("compara a primeira e a última janela completa retornadas pelo backend", () => {
+		expect(
+			janelasDaBase([
+				janela("2022-01", "2022-12", 120, 1200),
+				janela("2022-02", "2023-01", 130, 1250),
+				janela("2025-01", "2025-12", 150, 1400),
+			]),
+		).toEqual({
+			base: "2022-01/2022-12",
+			atual: "2025-01/2025-12",
+		});
 	});
 
-	it("dá a variação em fração e respeita os valores da Gold", () => {
-		const resultado = compararMeses(
-			[
-				linha("2024-03", {}),
-				linha("2025-03", { receita_faturada: 840, dec: 1.5 }),
-			],
-			par("2024-03", "2025-03"),
-		);
-		expect(resultado.atual.valores.receita_faturada).toBe(840);
-		expect(resultado.variacao.receita_faturada).toBeCloseTo(0.05);
-		expect(resultado.variacao.dec).toBeCloseTo(-0.25);
-		expect(resultado.variacao.kwh_faturado).toBe(0);
-	});
-
-	it("deixa a variação vazia sem valor num dos lados ou com base zero", () => {
-		const resultado = compararMeses(
-			[
-				linha("2024-03", { satisfacao_media: null, n_chamados: 0 }),
-				linha("2025-03", { dec: null }),
-			],
-			par("2024-03", "2025-03"),
-		);
-		expect(resultado.atual.valores.dec).toBeNull();
-		expect(resultado.variacao.dec).toBeNull();
-		expect(resultado.variacao.satisfacao_media).toBeNull();
-		expect(resultado.variacao.n_chamados).toBeNull();
+	it("não compara janelas sobrepostas nem série sem janela completa", () => {
+		expect(janelasDaBase([])).toBeUndefined();
+		expect(
+			janelasDaBase([
+				janela("2024-01", "2024-12", 120, 1200),
+				janela("2024-12", "2025-11", 150, 1400),
+			]),
+		).toBeUndefined();
 	});
 });
 
-describe("tendencia", () => {
-	const linha = (competencia: string, receita: number): KpisMensais => ({
-		competencia,
-		kwh_faturado: 1000,
-		receita_faturada: receita,
-		receita_energia: 700,
-		dec: null,
-		fec: 0.5,
-		n_chamados: 10,
-		satisfacao_media: 4,
-	});
-	const linhas = [
-		linha("2023-12", 90),
-		linha("2024-01", 100),
-		linha("2024-02", 110),
-		linha("2025-01", 120),
-	];
-
-	it("mês a mês mantém o id da série ao trocar de indicador", () => {
-		const receita = tendencia(linhas, "receita_faturada", "mes", "Receita");
-		const dec = tendencia(linhas, "dec", "mes", "DEC");
-		expect(receita.series[0]?.id).toBe(dec.series[0]?.id);
-		expect(receita.series[0]?.values).toEqual([90, 100, 110, 120]);
-		expect(dec.series[0]?.values).toEqual([null, null, null, null]);
+describe("tesoura", () => {
+	it("mede a variação das somas recebidas sem acumular novamente as janelas", () => {
+		const t = tesoura([
+			janela("2024-01", "2024-12", 120, 1200),
+			janela("2024-02", "2025-01", 132, 1176),
+		]);
+		expect(t.categories.map((c) => c.key)).toEqual(["2024-12", "2025-01"]);
+		expect(t.series[0].values).toEqual([0, expect.closeTo(0.1)]);
+		expect(t.series[1].values).toEqual([0, expect.closeTo(-0.02)]);
+		expect(t.somas[1]).toEqual({ receita: 132, kwh: 1176 });
 	});
 
-	it("ano a ano põe cada ano em jan–dez, com lacuna onde falta o mês", () => {
-		const { series, categories } = tendencia(
-			linhas,
-			"receita_faturada",
-			"ano",
-			"Receita",
+	it("mantém os meses retornados mesmo quando há um intervalo sem janelas", () => {
+		expect(
+			tesoura([
+				janela("2024-01", "2024-12", 120, 1200),
+				janela("2024-04", "2025-03", 132, 1176),
+			]).categories.map((c) => c.key),
+		).toEqual(["2024-12", "2025-03"]);
+		expect(tesoura([janela("2024-01", "2024-12", 120, 1200)]).series).toEqual(
+			[],
 		);
-		expect(categories).toHaveLength(12);
-		expect(series.map((s) => s.id)).toEqual(["2023", "2024", "2025"]);
-		const s2024 = series[1]?.values ?? [];
-		expect(s2024.slice(0, 3)).toEqual([100, 110, null]);
-		expect(series[0]?.values[11]).toBe(90);
 	});
 
-	it("destaca o ano mais recente e compara com o anterior", () => {
-		const { series } = tendencia(linhas, "receita_faturada", "ano", "Receita");
-		expect(series.map((s) => [s.color, s.emphasis])).toEqual([
-			["muted", false],
-			[2, false],
-			[1, true],
+	it("não inventa variação para uma série cuja primeira soma é zero", () => {
+		const t = tesoura([
+			janela("2024-01", "2024-12", 0, 1200),
+			janela("2024-02", "2025-01", 132, 1176),
+		]);
+		expect(t.series[0].values).toEqual([null, null]);
+		expect(t.series[1].values[1]).toBeCloseTo(-0.02);
+	});
+});
+
+describe("leitura", () => {
+	it("descreve a tesoura pela direção das duas variações", () => {
+		expect(leitura(8, -4)).toBe(
+			"A receita cresceu com menos energia faturada.",
+		);
+		expect(leitura(3, 5)).toBe(
+			"A receita cresceu menos que a energia faturada.",
+		);
+		expect(leitura(-5, -2)).toBe("A receita caiu mais que a energia faturada.");
+	});
+
+	it("trata como estável a variação que arredonda para 0,0%", () => {
+		expect(leitura(0.04, -3)).toBe(
+			"A receita ficou estável com menos energia faturada.",
+		);
+		expect(leitura(null, 2)).toBeNull();
+	});
+});
+
+describe("efeitosDaReceita", () => {
+	it("dá o peso de cada efeito sobre a receita base, sem os totais", () => {
+		const efeitos = efeitosDaReceita([
+			{ id: "base", label: "Receita base", value: 200, kind: "total" },
+			{ id: "tarifa", label: "Preço · tarifa", value: 16, kind: "delta" },
+			{ id: "volume", label: "Volume", value: -6, kind: "delta" },
+			{ id: "atual", label: "Receita atual", value: 210, kind: "total" },
+		]);
+		expect(efeitos.map((e) => [e.id, e.pct])).toEqual([
+			["tarifa", 0.08],
+			["volume", -0.03],
 		]);
 	});
-});
 
-describe("variacaoNoPonto", () => {
-	const linha = (competencia: string, receita: number): KpisMensais => ({
-		competencia,
-		kwh_faturado: 1000,
-		receita_faturada: receita,
-		receita_energia: 700,
-		dec: 1,
-		fec: 0.5,
-		n_chamados: 10,
-		satisfacao_media: 4,
-	});
-	const linhas = [
-		linha("2024-01", 100),
-		linha("2024-02", 110),
-		linha("2025-01", 120),
-	];
-
-	it("mês a mês compara com o mês anterior do calendário", () => {
-		const t = tendencia(linhas, "receita_faturada", "mes", "Receita");
-		expect(variacaoNoPonto(t, 0)).toBeUndefined();
-		const ponto = variacaoNoPonto(t, 1);
-		expect(ponto?.valor).toBeCloseTo(0.1);
-		expect(ponto?.base).toBe("jan/2024");
-	});
-
-	it("mês a mês não mostra variação quando o mês anterior falta na série", () => {
-		const t = tendencia(linhas, "receita_faturada", "mes", "Receita");
-		expect(variacaoNoPonto(t, 2)).toBeUndefined();
-	});
-
-	it("ano a ano compara o ano em destaque com o mesmo mês do anterior", () => {
-		const t = tendencia(linhas, "receita_faturada", "ano", "Receita");
-		const ponto = variacaoNoPonto(t, 0);
-		expect(ponto?.valor).toBeCloseTo(0.2);
-		expect(ponto?.base).toBe("jan/2024");
-		expect(variacaoNoPonto(t, 1)).toBeUndefined();
-	});
-});
-
-describe("marcadores", () => {
-	it("marca base e atual no mês a mês e só o mês no ano a ano", () => {
-		const comparado = par("2024-09", "2025-09");
-		expect(marcadores(comparado, "mes").map((m) => m.at)).toEqual([
-			"2024-09",
-			"2025-09",
+	it("não dá peso sem receita base", () => {
+		const [efeito] = efeitosDaReceita([
+			{ id: "base", label: "Receita base", value: 0, kind: "total" },
+			{ id: "tarifa", label: "Preço · tarifa", value: 5, kind: "delta" },
 		]);
-		expect(marcadores(comparado, "ano").map((m) => m.at)).toEqual(["09"]);
-		expect(marcadores(undefined, "mes")).toEqual([]);
+		expect(efeito?.pct).toBeNull();
 	});
 });

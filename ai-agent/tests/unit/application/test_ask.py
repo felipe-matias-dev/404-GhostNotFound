@@ -559,6 +559,62 @@ async def test_a_month_outside_the_sql_filter_still_drops_the_narrative(layer):
     assert answer.answer.startswith("A consulta devolveu 1 linha(s).")
 
 
+async def test_a_month_in_the_sql_filter_must_be_named_when_the_rows_have_no_month(layer):
+    writer = FixedWriter(text="Havia 3 UCs.")
+
+    answer = await use_case(
+        layer,
+        ScriptedGenerator(generation(sql=FILTERED_SQL)),
+        executor=ScriptedExecutor(table(("total",), (3,))),
+        writer=writer,
+    ).ask("quantas em junho de 2025?", "s1")
+
+    assert answer.answer.startswith("A consulta devolveu 1 linha(s).")
+
+
+async def test_the_fallback_names_the_months_of_the_sql_filter_when_the_rows_have_no_month(layer):
+    range_sql = (
+        "SELECT count(*) AS total FROM sem_faturamento_mensal "
+        "WHERE competencia BETWEEN '2025-01' AND '2025-12'"
+    )
+
+    answer = await use_case(
+        layer,
+        ScriptedGenerator(generation(sql=range_sql)),
+        executor=ScriptedExecutor(table(("total",), (3,))),
+    ).ask("quantas em 2025?", "s1")
+
+    assert answer.answer.startswith("A consulta devolveu 1 linha(s). Período: 2025-01 a 2025-12.")
+
+
+async def test_a_range_in_the_sql_filter_needs_both_ends_in_the_narrative(layer):
+    writer = FixedWriter(text="Em dezembro de 2025 havia 3 UCs.")
+    range_sql = (
+        "SELECT count(*) AS total FROM sem_faturamento_mensal "
+        "WHERE competencia BETWEEN '2025-01' AND '2025-12'"
+    )
+
+    answer = await use_case(
+        layer,
+        ScriptedGenerator(generation(sql=range_sql)),
+        executor=ScriptedExecutor(table(("total",), (3,))),
+        writer=writer,
+    ).ask("quantas em 2025?", "s1")
+
+    assert answer.answer.startswith("A consulta devolveu 1 linha(s).")
+
+
+async def test_a_year_from_another_month_is_not_taken_as_the_period(layer):
+    writer = FixedWriter(text="Entre dezembro de 2024 e janeiro de 2025 havia 3 UCs.")
+    executor = ScriptedExecutor(table(("competencia", "total"), ("2025-01", 3), ("2025-12", 3)))
+
+    answer = await use_case(
+        layer, ScriptedGenerator(generation()), executor=executor, writer=writer
+    ).ask("quantas?", "s1")
+
+    assert answer.answer.startswith("A consulta devolveu 2 linha(s).")
+
+
 def table(columns, *rows):
     return QueryResult(
         columns=columns,

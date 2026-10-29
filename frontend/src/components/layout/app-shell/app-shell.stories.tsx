@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { fn } from "storybook/test";
 import { Pagina } from "#/components/layout/pagina";
 import { AppShell } from "./app-shell";
 
@@ -10,6 +11,7 @@ const meta = {
 	tags: ["autodocs"],
 	parameters: { layout: "fullscreen", rota: "/receita" },
 	args: {
+		onConsultarUc: fn(),
 		children: (
 			<Pagina descricao="Ponte de receita entre dois períodos, separada em efeito preço, volume e mix." />
 		),

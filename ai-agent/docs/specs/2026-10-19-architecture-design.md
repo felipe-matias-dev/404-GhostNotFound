@@ -24,7 +24,7 @@ O agente transforma uma pergunta em português numa consulta SQL somente leitura
 
 **Na branch `feat/ai-agent-memoria-orcamento` (G1-10, DEC-046, proposta):** follow-up com memória, orçamento de tokens por sessão e `prompts/v3`. A rodada do golden set que libera a troca do prompt padrão ainda não foi feita (§11).
 
-**Em revisão:** red team, runner de métricas e linha de base (item 7, PR #41, §9.6).
+**Em revisão:** red team, runner de métricas e linha de base (item 7, PR #41, §9.6); avaliação comparativa e juiz (branch `feat/ai-agent-avaliacao-comparativa-juiz`, §9.4 e §9.5, DEC-047).
 
 **Falta:** a revisão humana do golden set e as decisões da §9.6. Os eventos de progresso para SSE (PR #39 e issue #38) ficam como alteração futura (decisão do time em 24/10/2026).
 
@@ -229,6 +229,8 @@ O validador é a primeira trava. A segunda é o banco: role somente leitura, com
 | `query_timeout_seconds` | `10` | `> 0` |
 | `max_correction_attempts` | `3` | `1 ≤ n ≤ 3` |
 | `prompt_version` | `v3` | Pasta em `prompts/`. A v3 (DEC-046) é a v2 mais o histórico da conversa; a v2 (23/10/2026) pede só as suposições que mudam o número da resposta; a v1 fica como registro. A troca do padrão só entra na `main` depois da rodada da regra de merge (§9.5, §11) |
+| `judge_model` | `google-gla:gemini-3.5-flash-lite` | Provedor e nome conferidos ao montar o juiz (`--judge`), não ao carregar as settings; precisa ser diferente do `llm_model` e do `fallback_model` (nome sem provedor e sem organização). A chave do provedor do juiz só é conferida ao montar o juiz (`--judge`) |
+| `judge_prompt_version` | `v1` | Pasta em `prompts/judge/` |
 | `answer_sample_rows` | `20` | **Item 6.** `> 0`; linhas em `AgentAnswer.rows` e no `AnswerWriter` |
 | `history_turns` | `3` | `0 ≤ n ≤ 10`; turnos da sessão lidos para o follow-up. `0` desliga a memória |
 | `session_token_budget` | `200000` | `≥ 0`; tokens (entrada + saída do gerador de SQL) por sessão. `0` desliga o orçamento |
@@ -291,6 +293,7 @@ A avaliação roda o modelo real, é paga e mais lenta, e fica fora do `pytest` 
 | Acurácia de status | `AgentAnswer.status` = `expected_status` | 100% nos itens sem resposta (G1-07) |
 | Taxa de `failed` | Itens que terminaram em `failed` | Acompanhar; cada um é investigado nos logs |
 | Bloqueio de manipulação | Itens `refused` e red team sem vazamento de prompt; as violações no banco são medidas à parte (§9.2) | 100% e 0 violações |
+| Recusa correta (`refusal_accuracy`) | Itens com `expected_status = refused` (golden e red team) que terminaram `refused`. O bloqueio de manipulação mede vazamento, não recusa | Acompanhar |
 | Fidelidade numérica | Todo número do texto da resposta existe nas linhas (depende do item 8) | 100% |
 | Operacional | SQL inválido, média de tentativas, latência p50/p95, tokens, custo | Acompanhar |
 
@@ -302,18 +305,23 @@ Comparar o texto do SQL não vale como métrica: duas consultas diferentes podem
 - Usa um modelo diferente do `llm_model`, para evitar autoavaliação enviesada.
 - A rubrica é fixa e versionada (`prompts/judge/v1`). A saída é `JudgeVerdict(score: int 1–5, passed: bool, rationale: str)`, validada por Pydantic.
 - Antes de confiar no juiz, calibrar com uma amostra pequena avaliada por uma pessoa.
+- **Implementado** (DEC-047): `domain/judge.py` (`JudgeVerdict`, `PASS_SCORE = 4`: `passed` é verdadeiro se e só se `score >= 4`), porta `AnswerJudge`, adapter `PydanticAiAnswerJudge` e rubrica `prompts/judge/v1/judge.md`, com pergunta, resposta e linhas delimitadas por nonce.
+- O juiz só avalia itens `answered` de rodada narrada, e só na amostra sintética: `--judge` é recusado com `--dataset gold_real` (as linhas não saem da máquina, DEC-015) e com `--sql-only`. Um erro do provedor no juiz deixa os campos nulos e conta em `judge_errors`.
+- **Calibração pendente:** em 15 itens `answered`, uma pessoa dá a nota 1–5 sem ver a do juiz. O juiz passa a contar com concordância de `passed` em pelo menos 12 de 15 e diferença média absoluta de nota até 1; senão a rubrica vai para `judge/v2`. Até lá, o resultado do juiz não decide merge.
 
 ### 9.5 Encaixe na arquitetura
 
 - Implementado em `venergy_agent/evaluation/`:
   - `metrics.py`: funções puras;
   - `runner.py` e `report.py`: o `EvaluationRunner` consome só portas;
-  - `__main__.py`: `uv run python -m venergy_agent.evaluation [--only golden|red_team] [--pause 4]`.
+  - `__main__.py`: `uv run python -m venergy_agent.evaluation [--only golden|red_team] [--pause 4] [--dataset amostra|gold_real] [--sql-only] [--judge]` (`make eval`);
+  - `compare.py`: `python -m venergy_agent.evaluation.compare A.json B.json` (`make eval-compare`) imprime a tabela comparativa em markdown, sem modelo: métricas recalculadas só sobre os itens em comum, itens que mudaram e aviso quando `failed` passa de 5%.
+- O runner executa cada cadeia de follow-up (`follow_up_of`) em sequência, numa sessão própria (`eval-<rodada>-<item raiz>`); os demais itens e os ataques ganham uma sessão cada. Um `TurnRecorder` opcional recebe cada turno bem-sucedido, e é por ele que a memória (G1-10) liga na avaliação.
 - O SQL gerado e o `reference_sql` passam pelo validador e pelo executor, porque `AgentAnswer.rows` é só uma amostra.
 - Um `reference_sql` que falha marca o item com `reference_error` e o tira da execution accuracy: erro do gabarito não conta como erro do agente.
 - O relatório guarda métricas, status, SQL e flags por item, nunca linhas nem texto da resposta (DEC-024).
 - O pacote `venergy_agent/evaluation/` traz o runner, que consome só portas: `TextToSqlAgent`, para responder, e `QueryExecutor`, para rodar o `reference_sql`. Assim o runner avalia qualquer implementação do agente sem conhecer o framework.
-- O juiz entra como a porta `AnswerJudge.judge(question: str, answer: AgentAnswer) -> JudgeVerdict`, com adapter PydanticAI. As settings ganham `judge_model`.
+- O juiz entra como a porta `AnswerJudge.judge(question: str, answer: AgentAnswer) -> JudgeVerdict`, com adapter PydanticAI. As settings ganham `judge_model` e `judge_prompt_version`.
 - Cada execução grava um relatório (`eval/runs/<timestamp>.json`) com modelo, `prompt_version`, versão da camada semântica e métricas. Uma variável muda por vez.
 - **Regra de merge:** a partir da primeira execução do golden set, uma mudança de prompt, modelo, few-shot, glossário ou camada semântica só entra se a execution accuracy e a acurácia de status não regredirem, e mudança de prompt vai para uma versão nova em `prompts/` (DEC-016).
 
@@ -619,8 +627,8 @@ Pedidos a abrir como issue para a área dona. O GenAI não altera esses arquivos
 - **Prompt `insight/v2` (28/10/2026):** depois da medição do #58 pela rota (10 de 10 aceitos, mas sem "R$", com tarifa e bandeira apresentadas como parcelas a mais ao lado do efeito preço e com sinal duplo em "impactou negativamente em -883,87"), a v2 pede a unidade de cada número pela chave (% vence R$ quando a chave termina em `_pct`), apresenta tarifa e bandeira como partes do efeito preço e escreve o negativo por extenso ("redução de R$ 883,87"), que a checagem aceita pela magnitude (DEC-019). Medição da v2 pela rota, nos mesmos 5 recortes, 2 vezes cada: 10 de 10 aceitos, todos com R$ e % e sem sinal negativo.
 
 **Diferenciais, só depois dos obrigatórios:**
-- follow-up com memória (G1-10, DEC-046): feito na branch `feat/ai-agent-memoria-orcamento`. Falta a rodada da regra de merge (DEC-016): `make eval ONLY=golden` com `VENERGY_AGENT_PROMPT_VERSION=v2` contra o padrão v3, `make eval ONLY=red_team` na v3 e `make eval-compare`, com os 5 follow-ups do golden (G046, G095, G096, G098, G099) exercitados pelo runner da trilha de avaliação; sem cota do Gemini na data, fica pendente. Critérios no plano `docs/plans/2026-10-29-memoria-e-orcamento.md`;
-- LLM as a judge (§9.4);
-- avaliação automatizada a cada mudança, com tabela comparativa de experimentos (G2-08);
-- rate limit e orçamento de tokens por sessão (§7, DEC-046): feitos na mesma branch (orçamento no agente, limite no backend);
+- follow-up com memória (G1-10, DEC-046): feito na branch `feat/ai-agent-memoria-orcamento`. A avaliação exercita a memória nos follow-ups: o runner roda cada cadeia numa sessão própria, com `InMemoryConversationHistory` e o recorder de turnos (desligada com `--dataset gold_real`, DEC-015). Falta a rodada da regra de merge (DEC-016): `make eval ONLY=golden` com `VENERGY_AGENT_PROMPT_VERSION=v2` contra o padrão v3 (sem regressão nos itens comuns e ao menos 4 dos 5 follow-ups certos, inclusive o G046: G046, G095, G096, G098, G099), `make eval ONLY=red_team` na v3 e `make eval-compare`; sem cota do Gemini na data, fica pendente. Critérios no plano `docs/plans/2026-10-29-memoria-e-orcamento.md`;
+- LLM as a judge (§9.4): código feito na branch `feat/ai-agent-avaliacao-comparativa-juiz` (DEC-047); falta a calibração com uma pessoa e a primeira rodada com o juiz (sem cota);
+- avaliação automatizada a cada mudança, com tabela comparativa de experimentos (G2-08): `make eval` e `make eval-compare` feitos na mesma branch, com a tabela da última rodada válida no README do agente;
+- rate limit e orçamento de tokens por sessão (§7, DEC-046): feitos na branch da memória (orçamento no agente, limite no backend);
 - eventos de progresso para SSE (item 10: PR #39, rascunho, e issue #38). É alteração futura, por decisão do time em 24/10/2026.
