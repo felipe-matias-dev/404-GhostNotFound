@@ -16,6 +16,7 @@ from venergy_api.database import Base, create_db_engine, get_session
 from venergy_api.main import create_app
 
 FRONTEND_ORIGIN = "http://localhost:3000"
+JWT_SECRET = "segredo-dos-testes-com-tamanho-suficiente-para-hs256"
 
 # O padrão bate com o .env.example da raiz; quem mudou senha ou porta define a variável.
 TEST_DATABASE_URL = os.environ.get(
@@ -65,6 +66,7 @@ def client_for(tmp_path: Path) -> Callable[[Engine], TestClient]:
             _env_file=None,
             database_url=engine.url.render_as_string(),
             gold_dir=tmp_path / "gold",
+            jwt_secret=JWT_SECRET,
             cors_origins=[FRONTEND_ORIGIN],
         )
         app = create_app(settings)
