@@ -101,6 +101,21 @@ describe("mesesDoPeriodo", () => {
 			"2025-02",
 		]);
 	});
+
+	it("termina em dezembro de 9999 sem ultrapassar o calendário", () => {
+		expect(mesesDoPeriodo({ inicio: "9999-11", fim: "9999-12" })).toEqual([
+			"9999-11",
+			"9999-12",
+		]);
+	});
+
+	it("não cria uma série para períodos maiores que 120 meses", () => {
+		expect(mesesDoPeriodo({ inicio: "0001-01", fim: "9999-12" })).toEqual([]);
+		expect(mesesDoPeriodo({ inicio: "2015-01", fim: "2024-12" })).toHaveLength(
+			120,
+		);
+		expect(mesesDoPeriodo({ inicio: "2015-01", fim: "2025-01" })).toEqual([]);
+	});
 });
 
 describe("serieDoAlimentador", () => {

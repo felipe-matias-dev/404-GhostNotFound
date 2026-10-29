@@ -40,11 +40,29 @@ export function resolverPeriodo(
 	return { inicio: candidato > primeira ? candidato : primeira, fim: ultima };
 }
 
-/** Todos os meses do período, inclusive, cruzando anos; vazio se o período está invertido. */
+export const MAX_MESES_GRAFICO = 120;
+
+export function periodoExcedeGrafico({ inicio, fim }: Periodo): boolean {
+	const [anoInicio, mesInicio] = inicio.split("-").map(Number);
+	const [anoFim, mesFim] = fim.split("-").map(Number);
+	return (anoFim - anoInicio) * 12 + mesFim - mesInicio + 1 > MAX_MESES_GRAFICO;
+}
+
+/** Todos os meses do período, inclusive, dentro do limite de apresentação do gráfico. */
 export function mesesDoPeriodo(periodo: Periodo): string[] {
+	if (
+		!MES.test(periodo.inicio) ||
+		!MES.test(periodo.fim) ||
+		periodo.inicio > periodo.fim ||
+		periodoExcedeGrafico(periodo)
+	)
+		return [];
 	const meses: string[] = [];
-	for (let mes = periodo.inicio; mes <= periodo.fim; mes = deslocar(mes, 1)) {
+	let mes = periodo.inicio;
+	while (true) {
 		meses.push(mes);
+		if (mes === periodo.fim) break;
+		mes = deslocar(mes, 1);
 	}
 	return meses;
 }

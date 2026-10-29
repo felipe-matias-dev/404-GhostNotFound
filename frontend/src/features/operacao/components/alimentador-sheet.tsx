@@ -19,7 +19,11 @@ import {
 } from "#/components/ui/tooltip";
 import { TrendChart } from "#/components/ui/trend-chart";
 import { formatHoras, formatIndice, formatPeriodoCurto } from "#/lib/format";
-import { serieDoAlimentador } from "../conversions";
+import {
+	MAX_MESES_GRAFICO,
+	periodoExcedeGrafico,
+	serieDoAlimentador,
+} from "../conversions";
 import type { AlimentadorMensal, Criterio, Periodo } from "../types";
 
 const INDICES: readonly SegmentedOption<Criterio>[] = [
@@ -60,8 +64,9 @@ export function AlimentadorSheet({
 }: AlimentadorSheetProps): ReactElement {
 	// Sem dados ainda, a série fica `undefined` para o gráfico mostrar o molde; converter as
 	// linhas ausentes em período todo nulo faria um vazio falso antes da resposta.
+	const periodoLongo = periodo !== undefined && periodoExcedeGrafico(periodo);
 	const serie =
-		periodo && alimentador && linhas !== undefined
+		periodo && !periodoLongo && alimentador && linhas !== undefined
 			? serieDoAlimentador(linhas, periodo, alimentador, criterio)
 			: undefined;
 	// Com o histórico na tela, a falha de atualização vira aviso; o erro nativo só sem série.
@@ -120,52 +125,59 @@ export function AlimentadorSheet({
 						</div>
 					)}
 
-					<TrendChart
-						label={`Histórico de ${nomeIndice} do alimentador ${codigo}`}
-						categories={serie?.categories}
-						series={serie?.series}
-						formatValue={formatar}
-						categoryLabel="Competência"
-						height={300}
-						loading={Boolean(periodo) && loading}
-						error={serie === undefined ? error : null}
-						onRetry={onRetry}
-						emptyMessage={
-							periodo
-								? "Sem histórico deste alimentador no período."
-								: "Escolha um período para ver o histórico."
-						}
-						toolbar={
-							<>
-								{refreshing && (
-									<output className="text-small text-text-muted">
-										Atualizando…
-									</output>
-								)}
-								<SegmentedControl
-									label="Índice do histórico"
-									value={criterio}
-									onValueChange={onCriterioChange}
-									options={INDICES}
-								/>
-								<Tooltip>
-									<TooltipTrigger
-										delay={0}
-										render={
-											<button
-												type="button"
-												aria-label="Sobre os índices DEC e FEC"
-												className="grid size-6 shrink-0 place-items-center rounded-sm text-text-muted outline-none transition-colors hover:text-text focus-visible:ring-3 focus-visible:ring-focus-ring/50"
-											/>
-										}
-									>
-										<InfoIcon aria-hidden className="size-3.5" />
-									</TooltipTrigger>
-									<TooltipContent>{AJUDA}</TooltipContent>
-								</Tooltip>
-							</>
-						}
-					/>
+					{periodoLongo ? (
+						<output className="text-body text-text-muted">
+							O gráfico comporta até {MAX_MESES_GRAFICO} meses. Escolha um
+							período menor para ver o histórico.
+						</output>
+					) : (
+						<TrendChart
+							label={`Histórico de ${nomeIndice} do alimentador ${codigo}`}
+							categories={serie?.categories}
+							series={serie?.series}
+							formatValue={formatar}
+							categoryLabel="Competência"
+							height={300}
+							loading={Boolean(periodo) && loading}
+							error={serie === undefined ? error : null}
+							onRetry={onRetry}
+							emptyMessage={
+								periodo
+									? "Sem histórico deste alimentador no período."
+									: "Escolha um período para ver o histórico."
+							}
+							toolbar={
+								<>
+									{refreshing && (
+										<output className="text-small text-text-muted">
+											Atualizando…
+										</output>
+									)}
+									<SegmentedControl
+										label="Índice do histórico"
+										value={criterio}
+										onValueChange={onCriterioChange}
+										options={INDICES}
+									/>
+									<Tooltip>
+										<TooltipTrigger
+											delay={0}
+											render={
+												<button
+													type="button"
+													aria-label="Sobre os índices DEC e FEC"
+													className="grid size-6 shrink-0 place-items-center rounded-sm text-text-muted outline-none transition-colors hover:text-text focus-visible:ring-3 focus-visible:ring-focus-ring/50"
+												/>
+											}
+										>
+											<InfoIcon aria-hidden className="size-3.5" />
+										</TooltipTrigger>
+										<TooltipContent>{AJUDA}</TooltipContent>
+									</Tooltip>
+								</>
+							}
+						/>
+					)}
 				</div>
 			</SheetContent>
 		</Sheet>

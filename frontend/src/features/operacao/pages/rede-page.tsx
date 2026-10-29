@@ -232,7 +232,7 @@ export function RedePage() {
 
 	// Fechar remove só o alimentador e a métrica do painel; tabela, recorte, período e página ficam.
 	const fecharPainel = () =>
-		void ir({ alimentador: undefined, serie: undefined }, true);
+		void ir({ alimentador: undefined, serie: undefined });
 
 	// O kit devolve o foco a quem abriu; sem ele (deep link, card desmontado), vai ao título.
 	useEffect(() => {
