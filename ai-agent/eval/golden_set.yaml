@@ -55,7 +55,14 @@
 #          agente) repõe o mínimo de 8 perguntas sem resposta. Revisão de Dados (28/10/2026): revisado_por
 #          preenchido (Alisson Ramos) em G062, G067, G069, G070, G073, G074 e G075; G068, G071 e G072 esperam
 #          o ajuste pedido na revisão do PR #67.
-versao: 0.9.0
+#   0.10.0 Ajustes pedidos por Dados na revisão do PR #67 (28/10/2026), escritos antes de qualquer rodada do
+#          modelo: G068 lista a nota de cada canal, porque na Gold real os canais ficam a menos de 0,01 ponto um
+#          do outro; G071 pede o percentual de leituras estimadas, a medida da H5; G072 fica só na amostra, que
+#          só tem GD conectada até 2023, e o G094 é o equivalente de 2025 na Gold real, que só tem GD conectada a
+#          partir de 2024. G062 vira pergunta de contagem: "teve falta de luz?" admite listar as ocorrências ou
+#          contá-las, e o gabarito só aceita uma forma; o revisado_por do G062 volta a null até Dados conferir a
+#          pergunta nova. Nenhuma referência dos outros itens mudou.
+versao: 0.10.0
 status: rascunho
 
 itens:
@@ -697,14 +704,14 @@ itens:
     revisado_por: null
 
   - id: G062
-    question: "A UC 0003 teve falta de luz na rua em 2025?"
+    question: "Quantas vezes a UC 0003 ficou sem luz em 2025, e por quantas horas no total?"
     category: case
     reference_sql: "SELECT count(*) AS interrupcoes, sum(duracao_horas) AS horas FROM sem_interrupcoes_uc WHERE cod_uc = '0003' AND competencia BETWEEN '2025-01' AND '2025-12'"
     expected_status: answered
     datasets: [amostra]
     follow_up_of: null
-    notes: "Pergunta da Camila (case p. 5; RESUMO §1.7). Ocorrências por UC (gold_interrupcoes_uc) não têm chave definida e não estão nas views. Pergunta aberta ao GenAI (Dados, 27/10/2026): o case (Camila) pede, na tela da UC, saber se a rua dele teve falta de luz, e o glossário define o alimentador como o circuito que abastece um conjunto de ruas e bairros. Se 'rua' for o alimentador da UC, o item é answered (a camada já permite responder, e a resposta deve dizer que é do alimentador). Se a pergunta for sobre a própria UC, o unknown vale até a camada v0.3 expor as interrupções por UC. Esperado mantido até a decisão. Mudança de 0.6.0 para 0.7.0 (28/10/2026, camada 0.4.0, antes de qualquer rodada do modelo): a camada expõe sem_interrupcoes_uc, e a decisão da issue #56 é responder pelas interrupções da própria UC; o DEC do alimentador não diz se a UC foi afetada. Só na amostra (código fictício); a Gold real ganha um equivalente agregado na conferência de Dados. Conferência de Dados (28/10/2026): bate com o case (a Camila pede, na tela da UC, as interrupções da UC), e a referência foi executada na amostra e bate linha a linha com as interrupções da UC. Revisado por Dados. Segue a decisão da issue #56."
-    revisado_por: "Alisson Ramos"
+    notes: "Pergunta da Camila (case p. 5; RESUMO §1.7). Ocorrências por UC (gold_interrupcoes_uc) não têm chave definida e não estão nas views. Pergunta aberta ao GenAI (Dados, 27/10/2026): o case (Camila) pede, na tela da UC, saber se a rua dele teve falta de luz, e o glossário define o alimentador como o circuito que abastece um conjunto de ruas e bairros. Se 'rua' for o alimentador da UC, o item é answered (a camada já permite responder, e a resposta deve dizer que é do alimentador). Se a pergunta for sobre a própria UC, o unknown vale até a camada v0.3 expor as interrupções por UC. Esperado mantido até a decisão. Mudança de 0.6.0 para 0.7.0 (28/10/2026, camada 0.4.0, antes de qualquer rodada do modelo): a camada expõe sem_interrupcoes_uc, e a decisão da issue #56 é responder pelas interrupções da própria UC; o DEC do alimentador não diz se a UC foi afetada. Só na amostra (código fictício); a Gold real ganha um equivalente agregado na conferência de Dados. Conferência de Dados (28/10/2026): bate com o case (a Camila pede, na tela da UC, as interrupções da UC), e a referência foi executada na amostra e bate linha a linha com as interrupções da UC. Revisado por Dados. Segue a decisão da issue #56. Mudança na 0.10.0 (GenAI, 28/10/2026): a pergunta era 'A UC 0003 teve falta de luz na rua em 2025?', que admite listar as ocorrências ou contá-las; na rodada de 28/10/2026 o agente listou as ocorrências, uma resposta certa que o gabarito recusava. A pergunta passa a pedir a contagem e as horas, como a referência; a referência não muda. revisado_por volta a null até Dados conferir a pergunta nova."
+    revisado_por: null
 
   - id: G063
     question: "Quais são os 3 alimentadores com maior DEC em março de 2025?"
@@ -761,13 +768,13 @@ itens:
     revisado_por: "Alisson Ramos"
 
   - id: G068
-    question: "Qual canal de atendimento teve a pior nota de satisfação em 2025?"
+    question: "Qual foi a nota média de satisfação de cada canal de atendimento em 2025?"
     category: simples
-    reference_sql: "SELECT canal, avg(nota_satisfacao) AS satisfacao_media FROM sem_atendimentos_uc WHERE competencia BETWEEN '2025-01' AND '2025-12' GROUP BY canal ORDER BY satisfacao_media ASC LIMIT 1"
+    reference_sql: "SELECT canal, avg(nota_satisfacao) AS satisfacao_media FROM sem_atendimentos_uc WHERE competencia BETWEEN '2025-01' AND '2025-12' GROUP BY canal"
     expected_status: answered
     datasets: [amostra, gold_real]
     follow_up_of: null
-    notes: "Satisfação por canal só existe em sem_atendimentos_uc. A média é sobre os chamados avaliados (avg ignora as notas vazias). Pendente de revisão por Dados."
+    notes: "Satisfação por canal só existe em sem_atendimentos_uc. A média é sobre os chamados avaliados (avg ignora as notas vazias). Mudança na 0.10.0 (revisão de Dados no PR #67): a pergunta era 'qual canal teve a pior nota', mas na Gold real os cinco canais ficam a menos de 0,01 ponto um do outro, e o primeiro lugar dependeria da terceira casa decimal. A pergunta passa a pedir a nota de cada canal. Pendente de revisão por Dados."
     revisado_por: null
 
   - id: G069
@@ -791,13 +798,13 @@ itens:
     revisado_por: "Alisson Ramos"
 
   - id: G071
-    question: "Qual município teve mais leituras estimadas em 2025?"
+    question: "Qual município teve o maior percentual de leituras estimadas em 2025?"
     category: simples
-    reference_sql: "SELECT municipio, sum(n_leituras_estimadas) AS leituras_estimadas FROM sem_kpis_segmento_mensal WHERE competencia BETWEEN '2025-01' AND '2025-12' GROUP BY municipio ORDER BY leituras_estimadas DESC LIMIT 1"
+    reference_sql: "SELECT municipio, sum(n_leituras_estimadas) * 100.0 / sum(n_leituras) AS percentual_estimadas FROM sem_kpis_segmento_mensal WHERE competencia BETWEEN '2025-01' AND '2025-12' GROUP BY municipio ORDER BY percentual_estimadas DESC LIMIT 1"
     expected_status: answered
     datasets: [amostra, gold_real]
     follow_up_of: null
-    notes: "Leitura estimada pelos componentes do recorte (hipótese H5). A pergunta pede a quantidade, não o percentual. Pendente de revisão por Dados."
+    notes: "Leitura estimada pelos componentes do recorte (hipótese H5). O percentual sai da soma dos componentes (regra da camada). Mudança na 0.10.0 (revisão de Dados no PR #67): a pergunta pedia 'mais leituras estimadas', e a quantidade aponta o maior município, enquanto o percentual, que é a medida da H5, aponta outro. A pergunta passa a pedir o percentual. Pendente de revisão por Dados."
     revisado_por: null
 
   - id: G072
@@ -805,9 +812,9 @@ itens:
     category: temporal
     reference_sql: "SELECT count(*) AS ucs FROM sem_uc WHERE possui_gd AND data_conexao_gd BETWEEN '2023-01-01' AND '2023-12-31'"
     expected_status: answered
-    datasets: [amostra, gold_real]
+    datasets: [amostra]
     follow_up_of: null
-    notes: "Data de conexão da GD no cadastro (contrato v0.3, hipótese H1). Painel solar é GD no glossário. Pendente de revisão por Dados."
+    notes: "Data de conexão da GD no cadastro (contrato v0.3, hipótese H1). Painel solar é GD no glossário. Mudança na 0.10.0 (revisão de Dados no PR #67): só na amostra, que tem GD conectada até 2023; na Gold real não há GD conectada em 2023, e a contagem 0 não provaria nada. O equivalente na Gold real é o G094. Pendente de revisão por Dados."
     revisado_por: null
 
   - id: G073
@@ -1034,4 +1041,14 @@ itens:
     datasets: [gold_real]
     follow_up_of: null
     notes: "Equivalente do G061 na Gold real: o consumo contra o ano anterior que a Camila pede (case p. 5), por bairro em vez de UC. Macaxeira é um dos bairros da hipótese H2. A soma de cada ano é feita no SQL. Só com nomes já publicados no diagnóstico (DEC-024). A referência foi executada na Gold real e volta com resultado (Dados, 28/10/2026). Revisão do GenAI (28/10/2026): o município entrou na pergunta e na referência, porque a regra da camada pede bairro sempre junto do município; Iputinga e Macaxeira ficam em Recife, então o resultado não muda."
+    revisado_por: null
+
+  - id: G094
+    question: "Quantas UCs conectaram painel solar em 2025?"
+    category: temporal
+    reference_sql: "SELECT count(*) AS ucs FROM sem_uc WHERE possui_gd AND data_conexao_gd BETWEEN '2025-01-01' AND '2025-12-31'"
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: null
+    notes: "Equivalente do G072 na Gold real (0.10.0, revisão de Dados no PR #67): a Gold real só tem GD conectada a partir de 2024, e 2025 tem conexões. A referência foi executada na Gold real e volta com resultado diferente de zero. Pendente de revisão por Dados."
     revisado_por: null
