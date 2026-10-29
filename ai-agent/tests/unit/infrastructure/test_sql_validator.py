@@ -103,6 +103,17 @@ def test_only_the_configured_schema_is_allowed():
         validator.validate("SELECT 1 FROM gold.sem_uc", ALLOWED)
 
 
+def test_months_used_as_literals_in_the_query_are_reported(validator):
+    query = validator.validate(
+        "SELECT sum(receita_faturada) FROM sem_faturamento_mensal "
+        "WHERE competencia BETWEEN '2025-06' AND '2025-01' AND bandeira = 'verde' "
+        "AND competencia <> '2025-13'",
+        ALLOWED,
+    )
+
+    assert query.periods == ("2025-01", "2025-06")
+
+
 def test_accepts_single_select_on_allowed_view(validator):
     query = validator.validate("SELECT municipio FROM sem_uc", ALLOWED)
 

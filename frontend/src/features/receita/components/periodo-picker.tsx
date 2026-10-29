@@ -95,7 +95,7 @@ export function PeriodoPicker({
 			<PopoverTrigger
 				aria-label={`Períodos comparados: ${atual}. Trocar`}
 				disabled={!par}
-				className="flex h-7 min-w-0 cursor-pointer items-center gap-1.5 rounded-md border border-border px-2 text-small text-text-muted outline-none transition-colors hover:bg-hover hover:text-text focus-visible:ring-3 focus-visible:ring-focus-ring/50 data-popup-open:bg-hover data-popup-open:text-text"
+				className="flex h-7 min-w-0 cursor-pointer items-center gap-1.5 rounded-md border border-border-strong px-2 text-small text-text-muted outline-none transition-colors hover:bg-hover hover:text-text focus-visible:border-focus-ring focus-visible:ring-3 focus-visible:ring-focus-ring/50 data-popup-open:bg-hover data-popup-open:text-text"
 			>
 				<CalendarBlankIcon aria-hidden className="size-3.5 shrink-0" />
 				<span className="truncate">{atual}</span>
@@ -130,10 +130,7 @@ export function PeriodoPicker({
 												</span>
 											</span>
 											{ativo && (
-												<CheckIcon
-													aria-hidden
-													className="size-3.5 shrink-0 text-accent-text"
-												/>
+												<CheckIcon aria-hidden className="size-3.5 shrink-0" />
 											)}
 										</button>
 									</li>
@@ -232,10 +229,10 @@ export function PeriodoPicker({
 									aria-pressed={b === par.periodo_base}
 									onClick={() => aplicar(par.periodo_atual, b)}
 									className={cn(
-										"cursor-pointer rounded-sm border px-1.5 py-0.5 outline-none focus-visible:ring-3 focus-visible:ring-focus-ring/50",
+										"cursor-pointer rounded-sm border px-1.5 py-0.5 outline-none focus-visible:border-focus-ring focus-visible:ring-3 focus-visible:ring-focus-ring/50",
 										b === par.periodo_base
-											? "border-accent bg-accent-subtle text-accent-text"
-											: "border-border-strong text-text-muted hover:bg-hover hover:text-text",
+											? "border-border-strong bg-pressed text-text"
+											: "border-transparent text-text-muted hover:bg-hover hover:text-text",
 									)}
 								>
 									{formatPeriodoCurto(b)}

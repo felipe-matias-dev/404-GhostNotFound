@@ -43,6 +43,30 @@ async def test_returns_the_text_the_model_wrote_without_surrounding_spaces():
     assert text == "Há 3 UCs em Olinda."
 
 
+async def test_shipped_prompt_v3_asks_to_name_the_period_of_the_rows():
+    model, calls = narrating_model("Em junho de 2025 havia 3.")
+    result = QueryResult(
+        columns=("competencia", "total"),
+        rows=({"competencia": "2025-06", "total": 3},),
+        row_count=1,
+        truncated=False,
+    )
+    v3 = PydanticAiAnswerWriter(
+        model=model,
+        prompts_dir=SHIPPED_PROMPTS,
+        prompt_version="v3",
+        temperature=0.0,
+        nonce=NONCE,
+        units={},
+    )
+
+    await v3.write(QUESTION, DRAFT, result)
+
+    system = next(p.content for p in calls[0][0].parts if isinstance(p, SystemPromptPart))
+    assert "período" in system
+    assert "junho de 2025" in system
+
+
 async def test_request_delimits_the_rows_as_data_with_the_label():
     model, calls = narrating_model("Há 3.")
     result = QueryResult(columns=("total",), rows=({"total": 3},), row_count=1, truncated=False)

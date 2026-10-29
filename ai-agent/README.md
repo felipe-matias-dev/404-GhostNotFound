@@ -59,16 +59,73 @@ As configurações são lidas de variáveis com prefixo `VENERGY_AGENT_` (ou do 
 
 O golden set (`eval/golden_set.yaml`) e o red team (`eval/red_team.yaml`) rodam com o modelo real. A avaliação é paga e lenta, e fica fora do `pytest`. Precisa do banco com a amostra carregada e das views `sem_*`, aplicadas pela carga do backend.
 
+Da raiz do repositório:
+
 ```bash
-uv run python -m venergy_agent.evaluation                       # os dois conjuntos, na amostra
-uv run python -m venergy_agent.evaluation --only red_team        # só o red team
-uv run python -m venergy_agent.evaluation --sql-only             # sem o redator: menos cota
-uv run python -m venergy_agent.evaluation --dataset gold_real    # Gold real (sempre só SQL)
+make eval                                  # os dois conjuntos, na amostra
+make eval ONLY=red_team                    # só o red team
+make eval SQL_ONLY=1                       # sem o redator: menos cota
+make eval DATASET=gold_real                # Gold real (sempre só SQL)
+make eval JUDGE=1                          # com o juiz, só na amostra narrada
+make eval-compare A=eval/runs/a.json B=eval/runs/b.json
 ```
+
+O `make eval` chama `python -m venergy_agent.evaluation` com `--dataset`, `--only`, `--judge` e `--sql-only`. Os caminhos do `eval-compare` são relativos a `ai-agent/`. Sem o `make`, rode os dois módulos com `uv run python -m` dentro de `ai-agent/`.
 
 Antes de chamar o modelo, a avaliação confere que o banco carregado é a base declarada em `--dataset` (pelo número de UCs em `sem_uc`) e para se não for. Com `--sql-only` o agente não monta o redator: nenhuma linha do banco vai ao modelo, e a fidelidade numérica fica fora. A Gold real roda sempre assim, e o relatório vai para `eval/runs_gold/`, fora do Git (issue #56, DEC-015). Na correção de SQL, a mensagem de erro de dado volta ao modelo só com o tipo do erro, sem o valor.
 
-Cada execução grava `eval/runs/<data>.json`, com as métricas da spec §9.3, e imprime a tabela. A linha de base e os achados estão na spec §9.6. Mudanças de prompt, modelo, few-shot ou camada semântica só entram se a execution accuracy e a acurácia de status não regredirem (DEC-016).
+Cada execução grava `eval/runs/<data>.json`, com as métricas da spec §9.3 (execution accuracy, acurácia de status, taxa de recusa correta, violações de segurança e latência), e imprime a tabela. A linha de base e os achados estão na spec §9.6. Mudanças de prompt, modelo, few-shot ou camada semântica só entram se a execution accuracy e a acurácia de status não regredirem (DEC-016).
+
+Os itens de follow-up (`follow_up_of`) rodam logo depois da pergunta de origem, em sequência, numa sessão por cadeia (`eval-<rodada>-<item raiz>`); os demais itens e os ataques do red team ganham uma sessão cada. Um follow-up sem a pergunta de origem na rodada (outra base, ou `--only red_team`) não roda e conta em `follow_up_skipped`.
+
+### Comparar rodadas
+
+`make eval-compare` não chama o modelo. Imprime em markdown a configuração das duas rodadas (modelo, `prompt_version`, camada semântica, versões dos conjuntos, base, narrada e juiz), as métricas lado a lado com a diferença (taxas em pontos percentuais, contagens e latência em valor absoluto) e os itens em comum que mudaram de `matched`, `status`, `numeric_fidelity` ou `judge_passed`. As métricas são recalculadas só sobre os itens em comum, para que uma versão nova do golden set não distorça a comparação; a tabela diz quantos itens existem só em A e só em B. Se uma rodada tem mais de 5% de itens `failed`, a saída avisa que a comparação provavelmente não vale (erro do provedor, abaixo).
+
+Última rodada válida, comparada com a linha de base (nenhuma das duas teve `failed`):
+
+| Métrica (82 itens em comum) | 24/10/2026 (linha de base) | 28/10/2026 | Diferença |
+|---|---|---|---|
+| execution_accuracy | 72.2% | 100.0% | +27.8 pp |
+| status_accuracy | 86.2% | 95.4% | +9.2 pp |
+| status_accuracy_unknown | 72.7% | 100.0% | +27.3 pp |
+| refusal_accuracy | 92.0% | 88.0% | -4.0 pp |
+| manipulation_block_rate | 100.0% | 100.0% | +0.0 pp |
+| numeric_fidelity | 66.7% | 69.0% | +2.4 pp |
+| latency_p50_ms | 1014 | 2935 | +1921 |
+| latency_p95_ms | 9585 | 11392 | +1807 |
+
+Configuração: `google-gla:gemini-3.1-flash-lite`, `prompt_version` v2, narrada, base `amostra`. A linha de base usou a camada 0.2.0 e a de 28/10, a 0.4.0 e o golden set 0.9.0 (a de 24/10 não registrou a versão do golden set).
+
+### Juiz (`--judge`)
+
+Avalia clareza e fidelidade da resposta em português (spec §9.4), com a rubrica `prompts/judge/v1/judge.md` e o modelo `VENERGY_AGENT_JUDGE_MODEL`, que precisa ser diferente do `LLM_MODEL` e do `FALLBACK_MODEL` e usa a chave do próprio provedor. Só julga itens `answered` de rodada narrada, na amostra sintética: `--judge` com `--dataset gold_real` ou com `--sql-only` é recusado. O relatório ganha `judge_score`, `judge_passed` e `judge_rationale` (até 300 caracteres) por item e `judge_pass_rate`, `judge_mean_score`, `judge_items` e `judge_errors` nas métricas. O juiz ainda não foi calibrado com uma pessoa: o resultado dele não decide merge (spec §9.4).
+
+### Antes de rodar a avaliação na amostra
+
+Carregue a amostra sintética no banco local, a partir de `backend/` (com `VENERGY_API_DATABASE_URL` apontando para o banco e `VENERGY_API_GOLD_DIR` para `data/gold`):
+
+```bash
+uv run python -m venergy_api.amostra --force
+uv run python -m venergy_api.carga
+```
+
+A carga recria as tabelas `gold_*` e aplica as views `sem_*` do arquivo `semantic/views.sql`, numa única transação.
+
+### Erros do provedor (503 e 429)
+
+O Gemini responde 503 (sobrecarga) ou 429 (limite de taxa) com frequência. Uma rodada só vale para a decisão se **não tiver nenhum** desses erros. Se tiver, descarte-a, guarde o log e rode de novo quando o serviço estiver estável. Um erro de provedor não é erro do agente, e não deve entrar nas métricas como se fosse.
+
+### Gold real
+
+Não está no Git. Os 12 CSVs ficam no Volume do Databricks (`/Volumes/v_energy/gold/csv`). Para a rodada da Gold real:
+
+1. Baixe os CSVs para `data/gold/` na raiz do projeto (a pasta está no `.gitignore`).
+2. Rode a carga com `VENERGY_API_GOLD_DIR` apontando para essa pasta, a partir de `backend/`: `uv run python -m venergy_api.carga`. Isso substitui a amostra no banco local.
+3. Confirme que o banco é a Gold real: `sem_uc` tem bem mais de 1000 UCs.
+4. Rode `uv run python -m venergy_agent.evaluation --dataset gold_real`.
+
+Para voltar à amostra, rode de novo `venergy_api.amostra --force` e `venergy_api.carga`.
 
 ## Chave do modelo
 

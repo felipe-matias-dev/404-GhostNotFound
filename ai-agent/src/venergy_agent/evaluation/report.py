@@ -22,6 +22,10 @@ class ItemResult(BaseModel):
     prompt_leak: bool
     numeric_fidelity: bool | None
     latency_ms: int | None
+    judge_score: int | None = None
+    judge_passed: bool | None = None
+    judge_rationale: str | None = None
+    judge_error: bool = False
 
 
 class EvaluationReport(BaseModel):
@@ -31,9 +35,11 @@ class EvaluationReport(BaseModel):
     model: str
     prompt_version: str
     semantic_layer_version: str
-    golden_version: str
-    red_team_version: str
+    golden_version: str = "desconhecida"
+    red_team_version: str = "desconhecida"
     dataset: str = "amostra"
     narrated: bool = True
+    judge_model: str | None = None
+    judge_prompt_version: str | None = None
     items: tuple[ItemResult, ...]
     metrics: dict[str, float | int | None]

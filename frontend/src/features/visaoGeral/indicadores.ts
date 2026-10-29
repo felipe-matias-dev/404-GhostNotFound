@@ -10,8 +10,8 @@ import type { Indicador } from "./types";
 export type DefinicaoIndicador = {
 	label: string;
 	format: (valor: number) => string;
-	/** Direção que é melhora: define o verde e o vermelho da variação. */
-	favorable: "up" | "down";
+	/** Direção que é melhora: define o verde e o vermelho da variação; "none" só informa. */
+	favorable: "up" | "down" | "none";
 	hint: string;
 };
 
@@ -26,7 +26,7 @@ export const DEFINICOES: Record<Indicador, DefinicaoIndicador> = {
 	kwh_faturado: {
 		label: "Energia faturada",
 		format: (valor) => formatKWh(valor, { compacto: true }),
-		favorable: "up",
+		favorable: "none",
 		hint: "kWh faturados no período, somados de todas as unidades consumidoras.",
 	},
 	dec: {
@@ -54,22 +54,3 @@ export const DEFINICOES: Record<Indicador, DefinicaoIndicador> = {
 		hint: "Média das notas de 1 a 5 dos chamados avaliados no período; chamado sem nota fica fora.",
 	},
 };
-
-/** Os seis indicadores em três grupos, na ordem da tela. */
-export const GRUPOS: {
-	id: string;
-	titulo: string;
-	indicadores: Indicador[];
-}[] = [
-	{
-		id: "comercial",
-		titulo: "Comercial",
-		indicadores: ["receita_faturada", "kwh_faturado"],
-	},
-	{ id: "rede", titulo: "Rede", indicadores: ["dec", "fec"] },
-	{
-		id: "atendimento",
-		titulo: "Atendimento",
-		indicadores: ["n_chamados", "satisfacao_media"],
-	},
-];

@@ -121,3 +121,15 @@ def test_semantic_layer_and_contract_paths_resolve_inside_the_repository(require
     assert (
         settings.prompts_dir / "insight" / settings.insight_prompt_version / "insight.md"
     ).exists()
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"llm_model": "google-gla:gemini-3.5-flash-lite"},
+        {"fallback_model": "google-gla:gemini-3.5-flash-lite"},
+        {"judge_model": "anthropic:claude-x"},
+    ],
+)
+def test_settings_load_without_judging_whatever_the_judge_model_is(required_env, overrides):
+    assert AgentSettings(_env_file=None, **overrides).judge_model

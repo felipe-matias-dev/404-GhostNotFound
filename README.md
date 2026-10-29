@@ -159,6 +159,32 @@ A segurança mora no banco e no validador, nunca no prompt:
 - **12 dos 93 itens do golden set têm revisão humana registrada.**
 - **A fidelidade numérica do texto ficou em 68%, contra a meta de 100%.** Parte das falhas vem das suposições, que citam o período pedido e não um número das linhas ([spec §9.6](ai-agent/docs/specs/2026-10-19-architecture-design.md)).
 
+### Atendimento: visão 360 da UC
+
+Use **Consulta de UC** na sidebar ou Ctrl/Cmd + K para abrir a palette. Busque pelo código
+exatamente como aparece na conta, preservando zeros iniciais, ou selecione uma consulta recente.
+A sidebar separa **Análise** (Visão geral, Receita, Rede) de **Operação** (Consulta de UC, Perdas).
+Somente os cinco códigos consultados com sucesso mais recentemente ficam salvos neste navegador,
+sem titular ou valores; a ação **Limpar recentes** remove a lista.
+O link `/uc?cod_uc=0001` continua abrindo a visão 360 diretamente. Sem código, `/uc` tem uma
+entrada compacta para abrir a busca. A palette valida a consulta antes de navegar e a tela
+reúne cadastro mascarado, consumo, contas pendentes, medidor/GD, interrupções e chamados em
+uma única consulta: `GET /unidades-consumidoras/{cod_uc}/visao-360`. A rota antiga de cadastro
+permanece disponível. O fluxo de entrada e os limites do histórico local estão na DEC-043.
+
+O diagnóstico segue a DEC-044 e o `Uc360Schema` aprovado no PR #55: a referência é a última
+competência **de toda a Gold**, não a última fatura da UC. A tendência vem do backend:
+alta acima de +10%, queda abaixo de −10% e estabilidade na faixa inclusiva de ±10%.
+Estabilidade pode incluir uma alta de 5%; a tela mostra os percentuais fornecidos pela API.
+A variação de 12 meses considera somente pares com fatura e informa `meses_comparados`.
+Lacunas são desconhecidas, não zero; base zero não tem percentual. Não há explicação causal
+do valor da conta. Faturas pendentes não têm corte por período e os históricos são paginados
+somente na apresentação. A Gold é histórica, não indica falta de energia em tempo real.
+Diferenças da apresentação e limites em
+[DEC-042](docs/decisoes.md#dec-042--visão-360-da-uc-e-comparação-sazonal-do-consumo).
+A comparação monetária com o ano anterior, o tipo de leitura e a diferença absoluta em kWh
+saíram da tela porque não estão no contrato aprovado; não são simulados por outras chamadas.
+
 ## Decisões que defendemos
 
 O registro completo, com 38 decisões numeradas e as suposições, está em [`docs/decisoes.md`](docs/decisoes.md). Estas são as que mais mudam o produto.
@@ -170,7 +196,7 @@ O registro completo, com 38 decisões numeradas e as suposições, está em [`do
 - **Efeito:** o somente leitura do agente é garantido pelo banco, e as ordens de inspeção do Rafael sobrevivem a cada recarga.
 
 **Ordens de inspeção como máquina de estados garantida no banco** · [DEC-009](docs/decisoes.md#dec-009--modelo-das-ordens-de-inspeção)
-- **Decisão:** status `GERADA → EM_CAMPO → CONCLUIDA` ou `CANCELADA` (com volta de `EM_CAMPO` para `GERADA`, [DEC-045](docs/decisoes.md#dec-045--ordem-em-campo-pode-voltar-para-gerada)), histórico em `app.ordem_evento` e no máximo uma ordem ativa por unidade consumidora, garantida por índice único parcial.
+- **Decisão:** status `GERADA → EM_CAMPO → CONCLUIDA` ou `CANCELADA` (com volta de `EM_CAMPO` para `GERADA`, [DEC-048](docs/decisoes.md#dec-048--ordem-em-campo-pode-voltar-para-gerada)), histórico em `app.ordem_evento` e no máximo uma ordem ativa por unidade consumidora, garantida por índice único parcial.
 - **Por que no banco:** uma checagem só no Python deixaria passar duas requisições simultâneas.
 - **Sem FK para a Gold:** a carga apagaria as ordens ou falharia.
 - **Descartado:** rotas por ação (`/concluir`, `/cancelar`), que espalham a validação.

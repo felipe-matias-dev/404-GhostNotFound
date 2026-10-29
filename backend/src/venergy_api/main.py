@@ -16,7 +16,16 @@ from venergy_api.agente import (
 )
 from venergy_api.config import Settings, get_settings
 from venergy_api.insights import CacheInsights
-from venergy_api.routers import ai, continuidade, fila, health, ordens, receita, unidades
+from venergy_api.routers import (
+    ai,
+    continuidade,
+    fila,
+    health,
+    indicadores,
+    ordens,
+    receita,
+    unidades,
+)
 
 
 @asynccontextmanager
@@ -36,7 +45,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # com as suas próprias, sem depender de um .env na máquina.
     settings = settings or get_settings()
 
-    app = FastAPI(title="V-Energy Grid 360 API", version="0.9.0", lifespan=lifespan)
+    app = FastAPI(title="V-Energy Grid 360 API", version="0.10.0", lifespan=lifespan)
     # Criado com o app, e não no lifespan: o cache não depende de nada externo, e o app dos
     # testes (sem lifespan) também precisa dele.
     app.state.cache_insights = CacheInsights()
@@ -50,6 +59,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(unidades.router)
     app.include_router(receita.router)
     app.include_router(continuidade.router)
+    app.include_router(indicadores.router)
     app.include_router(fila.router)
     app.include_router(ordens.router)
     app.include_router(ai.router)

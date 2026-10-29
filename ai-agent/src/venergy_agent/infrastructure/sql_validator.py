@@ -10,6 +10,7 @@ from venergy_agent.domain.errors import SqlRejected
 from venergy_agent.domain.sql import ValidatedQuery
 
 TERMINAL_ESCAPE = re.compile(r"\x1b\[[0-9;]*m")
+MONTH_LITERAL = re.compile(r"\d{4}-(0[1-9]|1[0-2])")
 FORBIDDEN_NODES = (exp.DML, exp.DDL, exp.Command, exp.Set, exp.Copy, exp.Into, exp.Lock)
 FORBIDDEN_FUNCTIONS = (
     exp.Anonymous,
@@ -28,6 +29,18 @@ class SqlglotValidator:
         self._max_rows = max_rows
         self._allowed_schema = allowed_schema
 
+    @staticmethod
+    def _month_literals(root: exp.Expression) -> tuple[str, ...]:
+        return tuple(
+            sorted(
+                {
+                    literal.this
+                    for literal in root.find_all(exp.Literal)
+                    if literal.is_string and MONTH_LITERAL.fullmatch(literal.this)
+                }
+            )
+        )
+
     def validate(self, sql: str, allowed_views: frozenset[str]) -> ValidatedQuery:
         root = self._parse(sql)
         self._reject_forbidden_nodes(root)
@@ -38,6 +51,7 @@ class SqlglotValidator:
             views=views,
             applied_limit=applied_limit,
             limit_imposed=limit_imposed,
+            periods=self._month_literals(root),
         )
 
     def _parse(self, sql: str) -> exp.Query:
