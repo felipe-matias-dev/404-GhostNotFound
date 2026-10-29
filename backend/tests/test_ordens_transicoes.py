@@ -5,6 +5,7 @@ from venergy_api.ordens import TRANSICOES, StatusOrdem, TransicaoInvalidaError, 
 VALID_TRANSITIONS = [
     (StatusOrdem.GERADA, StatusOrdem.EM_CAMPO),
     (StatusOrdem.GERADA, StatusOrdem.CANCELADA),
+    (StatusOrdem.EM_CAMPO, StatusOrdem.GERADA),
     (StatusOrdem.EM_CAMPO, StatusOrdem.CONCLUIDA),
     (StatusOrdem.EM_CAMPO, StatusOrdem.CANCELADA),
 ]
