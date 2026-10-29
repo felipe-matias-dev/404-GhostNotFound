@@ -13,7 +13,7 @@
 # As linhas de exemplo são sintéticas, escritas à mão. Nenhum valor real da Gold entra aqui.
 # Depois de cada mudança, gere o views.sql (ver a seção Camada semântica em ai-agent/README.md).
 
-version: "0.4.0"
+version: "0.4.1"
 
 views:
   - name: sem_uc
@@ -396,6 +396,9 @@ glossary:
   - term: "leitura estimada"
     synonyms: ["conta pela média", "leitura pela média", "sem leitura"]
     maps_to: "tipo_leitura = 'estimada' em sem_faturamento_mensal; n_leituras_estimadas e n_leituras em sem_kpis_segmento_mensal"
+  - term: "receita sem bandeiras"
+    synonyms: ["receita sem o acréscimo das bandeiras", "receita só da tarifa"]
+    maps_to: "sum(receita_energia) - sum(receita_bandeira) em sem_faturamento_mensal ou sem_kpis_segmento_mensal: a receita de energia sem o acréscimo das bandeiras"
   - term: "efeito preço"
     synonyms: ["reajuste", "aumento de tarifa"]
     maps_to: "efeito_preco (efeito_tarifa + efeito_bandeira) em sem_receita_decomposicao"
@@ -432,14 +435,17 @@ rules:
   - text: "Totais da empresa por mês (energia, receita, DEC, FEC, chamados e satisfação) vêm prontos de sem_kpis_mensais."
   - text: "DEC e FEC por alimentador vêm prontos de sem_continuidade_alimentador_mensal; da empresa, de sem_kpis_mensais. Leia; não recalcule."
   - text: "DEC e FEC de um período de vários meses (semestre, ano) são a soma dos valores mensais prontos, porque são indicadores acumulados: sum(dec) e sum(fec) sobre as competências do período. Nunca use a média (avg) dos meses (DEC-032). Por recorte de sem_kpis_segmento_mensal, use a fórmula dos componentes da regra de recortes."
-  - text: "Por município, bairro, classe ou GD, use sem_kpis_segmento_mensal e some os componentes antes de dividir; nunca faça média de índices. Num mês: DEC = sum(horas_interrompidas) / sum(n_uc) e FEC = sum(n_interrupcoes) / sum(n_uc). Num período de vários meses, divida pela média mensal de UCs: sum(n_uc) dividido pelo número de meses do período pedido (3 num trimestre), e não pelos meses que aparecem no resultado. Satisfação = sum(soma_notas) / sum(n_notas), com NULLIF no divisor."
+  - text: "Por município, bairro, classe ou GD, use sem_kpis_segmento_mensal e some os componentes antes de dividir; nunca faça média de índices. Num mês: DEC = sum(horas_interrompidas) / sum(n_uc) e FEC = 1.0 * sum(n_interrupcoes) / sum(n_uc). Num período de vários meses, divida pela média mensal de UCs: sum(n_uc) dividido pelo número de meses do período pedido (3 num trimestre), e não pelos meses que aparecem no resultado. Satisfação = sum(soma_notas) / sum(n_notas), com NULLIF no divisor."
   - text: "Efeitos de preço, tarifa, bandeira, volume e mix são lidos de sem_receita_decomposicao e somados sobre o recorte; não recalcule. receita_base e receita_atual são receita de energia, sem tributos."
   - text: "Em sem_receita_decomposicao, periodo_base e periodo_atual são faixas AAAA-MM/AAAA-MM. Filtre pelo par exato de períodos. Se a pergunta não disser os dois períodos, peça esclarecimento (clarify)."
   - text: "Score de suspeita e perda não técnica não estão nas views: pergunta sobre eles é unknown."
   - text: "Por UC: interrupções em sem_interrupcoes_uc, chamados em sem_atendimentos_uc e medidor em sem_medidor_uc, todas ligadas a sem_uc por cod_uc. sem_faturamento_mensal, sem_interrupcoes_uc e sem_atendimentos_uc têm várias linhas por UC: nunca junte duas delas direto, porque a junção multiplica as somas. Agregue cada uma por cod_uc numa CTE antes de juntar."
   - text: "Falta de luz na rua ou na região de uma UC: responda com as interrupções da própria UC em sem_interrupcoes_uc. O DEC e o FEC do alimentador dela, em sem_continuidade_alimentador_mensal, complementam, mas não dizem se a UC foi afetada."
-  - text: "Percentual de faturas não pagas de um recorte = sum(n_faturas_nao_pagas) / NULLIF(sum(n_faturas), 0); percentual de leituras estimadas = sum(n_leituras_estimadas) / NULLIF(sum(n_leituras), 0). Some os componentes antes de dividir."
+  - text: "Percentual de faturas não pagas de um recorte = 100.0 * sum(n_faturas_nao_pagas) / NULLIF(sum(n_faturas), 0); percentual do valor faturado sem pagamento = 100.0 * sum(valor_nao_pago) / NULLIF(sum(receita_faturada), 0); percentual de leituras estimadas = 100.0 * sum(n_leituras_estimadas) / NULLIF(sum(n_leituras), 0). Some os componentes antes de dividir."
+  - text: "Quando a pergunta pede percentual, devolva o valor em pontos percentuais: multiplique por 100.0 no SQL (5,6 e não 0,056)."
+  - text: "Divisão entre contagens inteiras (n_interrupcoes, n_uc, n_faturas, n_leituras, count(*)) é divisão inteira no Postgres e devolve 0: multiplique o numerador por 1.0 ou 100.0 antes de dividir."
   - text: "Para ligar uma UC ao alimentador use sem_uc.cod_alimentador = sem_continuidade_alimentador_mensal.cod_alimentador."
+  - text: "DEC ou FEC do alimentador que atende um bairro, município ou UC: pegue os cod_alimentador de sem_uc filtrados pelo recorte (subconsulta com IN) e leia sem_continuidade_alimentador_mensal; com mais de um alimentador, some os componentes (horas_interrompidas, n_interrupcoes e n_uc) antes de dividir. Isso é diferente do DEC ou FEC das UCs do recorte, que sai de sem_kpis_segmento_mensal."
   - text: "Períodos relativos à base ('primeiro ano da base', 'últimos 12 meses') saem das competências que existem. Numere as competências distintas com row_number() OVER (ORDER BY competencia) para o início e OVER (ORDER BY competencia DESC) para o fim, filtre por ordem <= 12 e declare os períodos usados como suposição. Nesse caso, não peça esclarecimento. A regra vale só para essas duas expressões. 'Último ano', 'ano passado' e 'último trimestre' são ambíguos (ano civil ou 12 meses móveis): peça esclarecimento, e nunca escreva anos ou meses fixos que a pergunta não trouxe."
   - text: "Quando a pergunta compara dois períodos e não diz quais são, peça esclarecimento (clarify). Não escolha os períodos sozinho. Períodos relativos à base, como 'primeiro ano da base' e 'últimos 12 meses', contam como ditos."
   - text: "n_uc é o número de UCs faturadas na competência (PRODIST). Para a quantidade de UCs num período, use a média mensal (soma dividida pelo número de meses), nunca a soma sozinha."

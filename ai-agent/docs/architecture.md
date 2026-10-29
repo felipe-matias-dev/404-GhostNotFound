@@ -51,7 +51,7 @@ Período (G1-05): quando as linhas têm `competencia`, o texto determinístico c
 
 ## 4. Camada semântica hoje
 
-`semantic/semantic_layer.yaml` (versão 0.4.0 do arquivo, contrato da Gold v0.3) tem nove views:
+`semantic/semantic_layer.yaml` (versão 0.4.1 do arquivo, contrato da Gold v0.3) tem nove views:
 
 | View | Tabela da Gold | Responde sobre |
 |---|---|---|
