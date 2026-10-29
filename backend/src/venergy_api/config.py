@@ -3,6 +3,7 @@
 from functools import lru_cache
 from pathlib import Path
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -16,6 +17,11 @@ class Settings(BaseSettings):
     gold_dir: Path
     # Endereços do frontend que o navegador deixa chamar a API. O padrão é o do `npm run dev`.
     cors_origins: list[str] = ["http://localhost:3000"]
+    # Limite de perguntas por sessão numa janela de tempo no POST /ai/ask (429 ao passar).
+    # 0 desliga o limite. Sem autenticação, o session_id é escolhido pelo cliente: é uma trava
+    # de custo e de abuso acidental, não de segurança (DEC-046).
+    ai_limite_perguntas: int = Field(20, ge=0)
+    ai_janela_segundos: int = Field(600, gt=0)
 
 
 @lru_cache

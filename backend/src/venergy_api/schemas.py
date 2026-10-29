@@ -666,6 +666,9 @@ class RespostaIaSchema(BaseModel):
     model: str
     prompt_version: str
     latency_ms: int
+    # Tokens do gerador de SQL neste pedido (todas as tentativas); 0 quando o modelo não rodou.
+    input_tokens: int
+    output_tokens: int
 
 
 class AuditoriaIaSchema(RespostaIaSchema):

@@ -6,10 +6,14 @@ from typing import Annotated
 
 from fastapi import Depends, HTTPException, Request, status
 from pydantic import ValidationError
+from sqlalchemy import Engine
 from venergy_agent.application.ports import InsightWriter, TextToSqlAgent
 from venergy_agent.bootstrap import build_agent, build_insight_writer
 from venergy_agent.config import AgentSettings
 from venergy_agent.infrastructure.semantic_source import SemanticLayerError
+
+from venergy_api.database import get_engine
+from venergy_api.historico_ia import HistoricoAuditoria
 
 logger = logging.getLogger(__name__)
 
@@ -49,15 +53,21 @@ def _carregar_configuracao(
 
 async def montar_agente(
     carregar_config: Callable[[], AgentSettings] = AgentSettings,
+    obter_engine: Callable[[], Engine] = get_engine,
 ) -> TextToSqlAgent | None:
-    """Monta o agente, ou devolve None se a configuração ou a camada semântica forem inválidas."""
+    """Monta o agente, ou devolve None se a configuração ou a camada semântica forem inválidas.
+
+    O histórico e o consumo de tokens vêm da auditoria do backend: o usuário do agente nunca lê
+    o schema `app`, então quem implementa as portas dele é o backend.
+    """
     settings = _carregar_configuracao(
         carregar_config, "Agente de IA desativado, o /ai responde 503"
     )
     if settings is None:
         return None
     try:
-        return await build_agent(settings)
+        historico = HistoricoAuditoria(obter_engine())
+        return await build_agent(settings, history=historico, usage=historico)
     except SemanticLayerError as error:
         # Uma mudança no contrato da Gold pode deixar a camada semântica do agente inválida
         # antes de o GenAI regerá-la. É problema do /ai, e não pode derrubar o resto da API.

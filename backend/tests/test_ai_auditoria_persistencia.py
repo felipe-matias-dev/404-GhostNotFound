@@ -1,7 +1,7 @@
 from pathlib import Path
 
 import pytest
-from sqlalchemy import Engine, select
+from sqlalchemy import Engine, select, text
 from sqlalchemy.orm import Session
 
 from venergy_api.amostra import write_sample
@@ -50,3 +50,28 @@ def test_audit_records_survive_a_gold_reload(gold_dir: Path, engine: Engine) -> 
         assert stored.rows == [{"receita_faturada": 10.0}]
         assert stored.sources == ["sem_kpis_mensais"]
         assert stored.criado_em is not None
+
+
+def test_reload_adds_the_token_columns_to_an_older_audit_table(
+    gold_dir: Path, engine: Engine
+) -> None:
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "INSERT INTO app.ai_auditoria (session_id, pergunta, answer, status, rows, "
+                "row_count, truncated, confidence, sources, assumptions, request_id, model, "
+                "prompt_version, latency_ms) VALUES ('s', 'p', 'a', 'answered', '[]', 0, false, "
+                "'high', '[]', '[]', 'r', 'm', 'v2', 1)"
+            )
+        )
+        connection.execute(
+            text("ALTER TABLE app.ai_auditoria DROP COLUMN input_tokens, DROP COLUMN output_tokens")
+        )
+
+    load_gold(gold_dir, engine)
+    load_gold(gold_dir, engine)
+
+    with Session(engine) as session:
+        stored = session.scalars(select(AiAuditoria)).one()
+        assert stored.pergunta == "p"
+        assert (stored.input_tokens, stored.output_tokens) == (0, 0)

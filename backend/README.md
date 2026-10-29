@@ -73,7 +73,7 @@ a UC `0003` em `GET /unidades-consumidoras/{cod_uc}`.
 | `GET /ordens-inspecao?status=` | Lista as ordens, das mais recentes para as mais antigas, opcionalmente por status |
 | `GET /ordens-inspecao/{id}` | Uma ordem com o histórico de mudanças de status |
 | `PATCH /ordens-inspecao/{id}` | Muda o status (`EM_CAMPO`, `CONCLUIDA` com `resultado`, `CANCELADA`), com `observacao` opcional: `409` se a mudança não for permitida |
-| `POST /ai/ask` | Pergunta ao agente de IA (`{"question": "...", "session_id": "..."}`) e devolve a resposta com o `audit_id` do registro gravado em `app.ai_auditoria`. Todo status é gravado, e se a gravação falhar a resposta não sai (`500`). Sem a chave do Gemini, `503` ([DEC-034](../docs/decisoes.md)) |
+| `POST /ai/ask` | Pergunta ao agente de IA (`{"question": "...", "session_id": "..."}`) e devolve a resposta com o `audit_id` do registro gravado em `app.ai_auditoria`. Todo status é gravado, e se a gravação falhar a resposta não sai (`500`). Sem a chave do Gemini, `503` ([DEC-034](../docs/decisoes.md)). Com a sessão no limite de perguntas da janela, `429` com `Retry-After`, sem chamar o agente ([DEC-046](../docs/decisoes.md)) |
 | `GET /ai/audit/{id}` | A auditoria de uma resposta: pergunta, SQL executado, views, linhas, modelo, versão do prompt, latência e horário. `404` se não existir |
 | `GET /receita/insight?periodo_base=&periodo_atual=&municipio=&bairro=&classe=` | Um insight de IA sobre a ponte de receita do recorte da tela (2 a 4 frases), com as `metricas` que sustentam cada número do texto. Os filtros são os de `/receita/decomposicao`. `texto` vem vazio quando o agente descarta a narração (número fora das métricas) ou o provedor falha: a tela aparece sem insight. O mesmo recorte não paga o modelo duas vezes (cache em memória pelo conteúdo das métricas). `503` sem a chave do Gemini ([DEC-040](../docs/decisoes.md)) |
 
@@ -175,8 +175,12 @@ Variáveis lidas do `.env` (veja `.env.example`):
 | `VENERGY_API_DATABASE_URL` | Endereço do banco. Obrigatória |
 | `VENERGY_API_GOLD_DIR` | Pasta dos CSVs da Gold. Obrigatória |
 | `VENERGY_API_CORS_ORIGINS` | Endereços do frontend autorizados a chamar a API pelo navegador. Padrão: `["http://localhost:3000"]` |
+| `VENERGY_API_AI_LIMITE_PERGUNTAS` | Máximo de perguntas por sessão na janela, no `POST /ai/ask` (`429` ao passar). `0` desliga. Padrão: `20` |
+| `VENERGY_API_AI_JANELA_SEGUNDOS` | Janela do limite acima, em segundos. Padrão: `600` |
 
 Os caminhos são relativos à pasta `backend/`, de onde os comandos rodam.
+
+A auditoria (`app.ai_auditoria`) ganhou as colunas `input_tokens` e `output_tokens`. A carga da Gold as acrescenta sozinha a um banco antigo (`ALTER TABLE ... ADD COLUMN IF NOT EXISTS`, sem tocar nas linhas): rode a carga uma vez antes de subir a API nova, ou aplique o `ALTER TABLE` à mão (DEC-046).
 
 ## Testes e qualidade
 

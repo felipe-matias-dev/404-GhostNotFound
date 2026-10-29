@@ -1,5 +1,5 @@
 from collections.abc import Callable
-from datetime import date
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 
 import pytest
@@ -53,6 +53,8 @@ def answered_answer() -> AgentAnswer:
         model="google-gla:gemini-3.1-flash-lite",
         prompt_version="v2",
         latency_ms=850,
+        input_tokens=1200,
+        output_tokens=80,
     )
 
 
@@ -115,6 +117,7 @@ def test_answers_and_returns_the_audit_id(
     assert corpo["sources"] == ["sem_kpis_mensais"]
     assert corpo["confidence"] == "high"
     assert corpo["request_id"] == "req-answered"
+    assert (corpo["input_tokens"], corpo["output_tokens"]) == (1200, 80)
     assert agente.chamadas == [(PERGUNTA, "sessao-1")]
 
 
@@ -142,6 +145,7 @@ def test_stores_every_field_of_the_answer_with_exact_values(
     assert auditoria.model == "google-gla:gemini-3.1-flash-lite"
     assert auditoria.prompt_version == "v2"
     assert auditoria.latency_ms == 850
+    assert (auditoria.input_tokens, auditoria.output_tokens) == (1200, 80)
 
 
 def test_stores_a_refused_answer_with_its_reason(
@@ -292,3 +296,65 @@ def test_each_question_gets_its_own_audit_record(
     assert primeira["audit_id"] != segunda["audit_id"]
     with Session(engine) as session:
         assert session.scalar(select(func.count()).select_from(AiAuditoria)) == 2
+
+
+def gravar_perguntas(engine: Engine, session_id: str, quantas: int, minutos_atras: int = 0) -> None:
+    with Session(engine) as session:
+        for _ in range(quantas):
+            auditoria = gravar_auditoria(session, PERGUNTA, session_id, answered_answer())
+            auditoria.criado_em = datetime.now(UTC) - timedelta(minutes=minutos_atras)
+            session.commit()
+
+
+@pytest.fixture
+def client_with_limit(
+    engine: Engine, client_for: Callable[..., TestClient]
+) -> Callable[[int], tuple[TestClient, AgenteFalso]]:
+    def build(limite: int) -> tuple[TestClient, AgenteFalso]:
+        client = client_for(engine, ai_limite_perguntas=limite, ai_janela_segundos=600)
+        agente = AgenteFalso(answered_answer())
+        client.app.dependency_overrides[get_agente] = lambda: agente
+        return client, agente
+
+    return build
+
+
+def test_answers_429_when_the_session_reached_the_limit_in_the_window(
+    engine: Engine, client_with_limit: Callable[[int], tuple[TestClient, AgenteFalso]]
+) -> None:
+    client, agente = client_with_limit(2)
+    gravar_perguntas(engine, "sessao-1", 2)
+
+    response = client.post("/ai/ask", json={"question": PERGUNTA, "session_id": "sessao-1"})
+
+    assert response.status_code == 429
+    assert response.headers["Retry-After"] == "600"
+    assert "limite" in response.json()["detail"].lower()
+    assert agente.chamadas == []
+    assert len(stored_audits(engine)) == 2
+
+
+def test_questions_older_than_the_window_and_other_sessions_do_not_count(
+    engine: Engine, client_with_limit: Callable[[int], tuple[TestClient, AgenteFalso]]
+) -> None:
+    client, agente = client_with_limit(2)
+    gravar_perguntas(engine, "sessao-1", 1)
+    gravar_perguntas(engine, "sessao-1", 5, minutos_atras=60)
+    gravar_perguntas(engine, "outra", 5)
+
+    response = client.post("/ai/ask", json={"question": PERGUNTA, "session_id": "sessao-1"})
+
+    assert response.status_code == 200, response.text
+    assert len(agente.chamadas) == 1
+
+
+def test_limit_zero_turns_the_check_off(
+    engine: Engine, client_with_limit: Callable[[int], tuple[TestClient, AgenteFalso]]
+) -> None:
+    client, agente = client_with_limit(0)
+    gravar_perguntas(engine, "sessao-1", 30)
+
+    response = client.post("/ai/ask", json={"question": PERGUNTA, "session_id": "sessao-1"})
+
+    assert response.status_code == 200, response.text
+    assert len(agente.chamadas) == 1

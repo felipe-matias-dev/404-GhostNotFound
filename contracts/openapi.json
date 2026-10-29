@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "V-Energy Grid 360 API",
-    "version": "0.9.0"
+    "version": "0.10.0"
   },
   "paths": {
     "/health": {
@@ -1188,7 +1188,7 @@
           "agente de IA"
         ],
         "summary": "Perguntar",
-        "description": "Pergunta ao agente e grava a resposta, qualquer que seja o status, na auditoria.",
+        "description": "Pergunta ao agente e grava a resposta, qualquer que seja o status, na auditoria.\n\nResponde 429, sem chamar o agente, se a sessão já fez o máximo de perguntas na janela.",
         "operationId": "perguntar_ai_ask_post",
         "requestBody": {
           "content": {
@@ -1207,6 +1207,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/RespostaIaSchema"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErroSchema"
                 }
               }
             }
@@ -1512,6 +1522,14 @@
             "type": "integer",
             "title": "Latency Ms"
           },
+          "input_tokens": {
+            "type": "integer",
+            "title": "Input Tokens"
+          },
+          "output_tokens": {
+            "type": "integer",
+            "title": "Output Tokens"
+          },
           "pergunta": {
             "type": "string",
             "title": "Pergunta"
@@ -1544,6 +1562,8 @@
           "model",
           "prompt_version",
           "latency_ms",
+          "input_tokens",
+          "output_tokens",
           "pergunta",
           "session_id",
           "criado_em"
@@ -3113,6 +3133,14 @@
           "latency_ms": {
             "type": "integer",
             "title": "Latency Ms"
+          },
+          "input_tokens": {
+            "type": "integer",
+            "title": "Input Tokens"
+          },
+          "output_tokens": {
+            "type": "integer",
+            "title": "Output Tokens"
           }
         },
         "type": "object",
@@ -3132,7 +3160,9 @@
           "request_id",
           "model",
           "prompt_version",
-          "latency_ms"
+          "latency_ms",
+          "input_tokens",
+          "output_tokens"
         ],
         "title": "RespostaIaSchema",
         "description": "A resposta do agente (AgentAnswer) mais o id do registro de auditoria dela."

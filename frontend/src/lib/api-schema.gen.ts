@@ -297,6 +297,8 @@ export interface paths {
         /**
          * Perguntar
          * @description Pergunta ao agente e grava a resposta, qualquer que seja o status, na auditoria.
+         *
+         *     Responde 429, sem chamar o agente, se a sessão já fez o máximo de perguntas na janela.
          */
         post: operations["perguntar_ai_ask_post"];
         delete?: never;
@@ -411,6 +413,10 @@ export interface components {
             prompt_version: string;
             /** Latency Ms */
             latency_ms: number;
+            /** Input Tokens */
+            input_tokens: number;
+            /** Output Tokens */
+            output_tokens: number;
             /** Pergunta */
             pergunta: string;
             /** Session Id */
@@ -980,6 +986,10 @@ export interface components {
             prompt_version: string;
             /** Latency Ms */
             latency_ms: number;
+            /** Input Tokens */
+            input_tokens: number;
+            /** Output Tokens */
+            output_tokens: number;
         };
         /**
          * ResultadoOrdem
@@ -1652,6 +1662,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErroSchema"];
                 };
             };
             /** @description Service Unavailable */

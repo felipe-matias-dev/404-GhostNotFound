@@ -3,6 +3,7 @@
 import os
 from collections.abc import Callable, Iterator
 from pathlib import Path
+from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
@@ -56,16 +57,20 @@ def drop_test_database(engine: Engine) -> None:
 
 
 @pytest.fixture
-def client_for(tmp_path: Path) -> Callable[[Engine], TestClient]:
-    """Monta um cliente de teste cuja API usa a engine recebida no lugar da real."""
+def client_for(tmp_path: Path) -> Callable[..., TestClient]:
+    """Monta um cliente de teste cuja API usa a engine recebida no lugar da real.
 
-    def build(engine: Engine) -> TestClient:
+    Campos extras (`ai_limite_perguntas=2`, por exemplo) vão para as configurações da API.
+    """
+
+    def build(engine: Engine, **extras: Any) -> TestClient:
         # _env_file=None: os testes nunca leem o .env de quem está rodando.
         settings = Settings(
             _env_file=None,
             database_url=engine.url.render_as_string(),
             gold_dir=tmp_path / "gold",
             cors_origins=[FRONTEND_ORIGIN],
+            **extras,
         )
         app = create_app(settings)
 

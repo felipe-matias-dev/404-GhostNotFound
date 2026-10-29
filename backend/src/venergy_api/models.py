@@ -417,3 +417,7 @@ class AiAuditoria(Base):
     model: Mapped[str]
     prompt_version: Mapped[str]
     latency_ms: Mapped[int]
+    # Tokens do gerador de SQL neste pedido. server_default: as linhas de antes dos campos
+    # existirem valem 0, e a coluna acrescentada por ALTER TABLE preenche o mesmo valor.
+    input_tokens: Mapped[int] = mapped_column(server_default="0")
+    output_tokens: Mapped[int] = mapped_column(server_default="0")

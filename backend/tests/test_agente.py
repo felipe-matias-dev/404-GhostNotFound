@@ -16,6 +16,7 @@ from venergy_api.agente import (
     montar_agente,
     montar_redator_insights,
 )
+from venergy_api.historico_ia import HistoricoAuditoria
 
 DATABASE_URL = "postgresql://agente@127.0.0.1/venergy"
 
@@ -77,8 +78,8 @@ def test_builds_the_agent_once_with_a_valid_configuration(
 ) -> None:
     montados = []
 
-    async def build_agent_falso(settings: AgentSettings) -> AgenteFalso:
-        montados.append(settings)
+    async def build_agent_falso(settings: AgentSettings, **portas: object) -> AgenteFalso:
+        montados.append((settings, portas))
         return AgenteFalso()
 
     monkeypatch.setattr("venergy_api.agente.build_agent", build_agent_falso)
@@ -86,16 +87,41 @@ def test_builds_the_agent_once_with_a_valid_configuration(
     def valid_settings() -> AgentSettings:
         return AgentSettings(_env_file=None, database_url=DATABASE_URL, google_api_key="chave")
 
-    agente = asyncio.run(montar_agente(valid_settings))
+    agente = asyncio.run(montar_agente(valid_settings, lambda: object()))
 
     assert isinstance(agente, AgenteFalso)
     assert len(montados) == 1
 
 
+def test_wires_the_audit_history_into_both_agent_ports(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    montados = []
+
+    async def build_agent_falso(settings: AgentSettings, **portas: object) -> AgenteFalso:
+        montados.append(portas)
+        return AgenteFalso()
+
+    monkeypatch.setattr("venergy_api.agente.build_agent", build_agent_falso)
+    engine = object()
+
+    def valid_settings() -> AgentSettings:
+        return AgentSettings(_env_file=None, database_url=DATABASE_URL, google_api_key="chave")
+
+    asyncio.run(montar_agente(valid_settings, lambda: engine))
+
+    [portas] = montados
+    assert isinstance(portas["history"], HistoricoAuditoria)
+    assert portas["usage"] is portas["history"]
+    assert portas["history"]._engine is engine
+
+
 def test_returns_none_and_logs_the_problems_when_the_semantic_layer_is_invalid(
     monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
-    async def build_agent_com_camada_invalida(settings: AgentSettings) -> AgenteFalso:
+    async def build_agent_com_camada_invalida(
+        settings: AgentSettings, **portas: object
+    ) -> AgenteFalso:
         raise SemanticLayerError(["view 'sem_uc': coluna 'bairro' não existe em gold_dim_uc"])
 
     monkeypatch.setattr("venergy_api.agente.build_agent", build_agent_com_camada_invalida)
@@ -104,7 +130,7 @@ def test_returns_none_and_logs_the_problems_when_the_semantic_layer_is_invalid(
         return AgentSettings(_env_file=None, database_url=DATABASE_URL, google_api_key="chave")
 
     with caplog.at_level(logging.WARNING):
-        agente = asyncio.run(montar_agente(valid_settings))
+        agente = asyncio.run(montar_agente(valid_settings, lambda: object()))
 
     assert agente is None
     assert "coluna 'bairro' não existe em gold_dim_uc" in caplog.text
