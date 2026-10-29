@@ -120,7 +120,7 @@ Estes termos são usados com o mesmo significado no código, no banco, no portal
 | Motivo da suspeita | Regra ou feature que mais contribui para o score, em texto legível | `motivos[]` |
 | Energia recuperável | kWh/mês estimados a recuperar se a irregularidade for confirmada | `kwh_recuperavel_est` |
 | Ordem de Inspeção (OI) | Pedido de vistoria em campo para uma UC | `ordem_inspecao` |
-| Status da OI | `GERADA → EM_CAMPO → CONCLUIDA`, ou `CANCELADA` | `status` |
+| Status da OI | `GERADA → EM_CAMPO → CONCLUIDA`, ou `CANCELADA`; `EM_CAMPO` pode voltar para `GERADA` | `status` |
 | Resultado da OI | `IRREGULAR_CONFIRMADA`, `REGULAR` ou `NAO_REALIZADA` | `resultado` |
 | DEC / FEC | Duração e frequência equivalentes de interrupção por UC (definição simplificada do case) | `dec`, `fec` |
 | GD | UC com geração própria (solar); a potência é a de pico, em kWp | `possui_gd`, `potencia_kwp` |

@@ -22,10 +22,14 @@ class ResultadoOrdem(StrEnum):
 
 
 # Para onde cada status pode ir. CONCLUIDA e CANCELADA são finais: reabrir uma OI
-# apagaria o registro do que aconteceu em campo; o certo é gerar uma nova.
+# apagaria o registro do que aconteceu em campo; o certo é gerar uma nova. EM_CAMPO ainda
+# não tem resultado, então pode voltar para GERADA (envio por engano): a volta fica no
+# histórico e a OI segue ativa, ocupando a UC.
 TRANSICOES: dict[StatusOrdem, frozenset[StatusOrdem]] = {
     StatusOrdem.GERADA: frozenset({StatusOrdem.EM_CAMPO, StatusOrdem.CANCELADA}),
-    StatusOrdem.EM_CAMPO: frozenset({StatusOrdem.CONCLUIDA, StatusOrdem.CANCELADA}),
+    StatusOrdem.EM_CAMPO: frozenset(
+        {StatusOrdem.GERADA, StatusOrdem.CONCLUIDA, StatusOrdem.CANCELADA}
+    ),
     StatusOrdem.CONCLUIDA: frozenset(),
     StatusOrdem.CANCELADA: frozenset(),
 }

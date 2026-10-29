@@ -196,7 +196,7 @@ O registro completo, com 38 decisões numeradas e as suposições, está em [`do
 - **Efeito:** o somente leitura do agente é garantido pelo banco, e as ordens de inspeção do Rafael sobrevivem a cada recarga.
 
 **Ordens de inspeção como máquina de estados garantida no banco** · [DEC-009](docs/decisoes.md#dec-009--modelo-das-ordens-de-inspeção)
-- **Decisão:** status `GERADA → EM_CAMPO → CONCLUIDA` ou `CANCELADA`, histórico em `app.ordem_evento` e no máximo uma ordem ativa por unidade consumidora, garantida por índice único parcial.
+- **Decisão:** status `GERADA → EM_CAMPO → CONCLUIDA` ou `CANCELADA` (com volta de `EM_CAMPO` para `GERADA`, [DEC-048](docs/decisoes.md#dec-048--ordem-em-campo-pode-voltar-para-gerada)), histórico em `app.ordem_evento` e no máximo uma ordem ativa por unidade consumidora, garantida por índice único parcial.
 - **Por que no banco:** uma checagem só no Python deixaria passar duas requisições simultâneas.
 - **Sem FK para a Gold:** a carga apagaria as ordens ou falharia.
 - **Descartado:** rotas por ação (`/concluir`, `/cancelar`), que espalham a validação.
