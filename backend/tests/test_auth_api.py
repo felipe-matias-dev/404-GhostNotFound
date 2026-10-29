@@ -2,6 +2,7 @@
 
 import base64
 import json
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -13,6 +14,12 @@ from venergy_api.usuarios import criar_usuarios_demo
 
 SENHA = "senha-de-demonstracao"
 COOKIE = "venergy_sessao"
+
+
+@pytest.fixture
+def client(engine: Engine, client_for: Callable[..., TestClient]) -> TestClient:
+    # Sem o usuário de mentira dos outros testes: aqui o login é o de verdade.
+    return client_for(engine, sem_login=True)
 
 
 @pytest.fixture

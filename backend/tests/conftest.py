@@ -10,10 +10,12 @@ from sqlalchemy import Engine, text
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
+from venergy_api.auth import Perfil, UsuarioLogado
 from venergy_api.carga import drop_agent_views
 from venergy_api.config import Settings
 from venergy_api.database import Base, create_db_engine, get_session
 from venergy_api.main import create_app
+from venergy_api.sessao import usuario_atual
 
 FRONTEND_ORIGIN = "http://localhost:3000"
 JWT_SECRET = "segredo-dos-testes-com-tamanho-suficiente-para-hs256"
@@ -62,10 +64,20 @@ def drop_test_database(engine: Engine) -> None:
 
 
 @pytest.fixture
-def client_for(tmp_path: Path) -> Callable[[Engine], TestClient]:
-    """Monta um cliente de teste cuja API usa a engine recebida no lugar da real."""
+def perfil() -> Perfil:
+    """Perfil do usuário que os clientes de teste fingem ser. Perdas é quem escreve nas ordens."""
+    return Perfil.PERDAS
 
-    def build(engine: Engine) -> TestClient:
+
+@pytest.fixture
+def client_for(tmp_path: Path, perfil: Perfil) -> Callable[..., TestClient]:
+    """Monta um cliente de teste cuja API usa a engine recebida no lugar da real.
+
+    O cliente já nasce logado com o `perfil` da fixture, para os testes de cada rota não
+    repetirem o login. `sem_login=True` devolve a API como ela é, para testar o login de verdade.
+    """
+
+    def build(engine: Engine, *, sem_login: bool = False) -> TestClient:
         # _env_file=None: os testes nunca leem o .env de quem está rodando.
         settings = Settings(
             _env_file=None,
@@ -81,11 +93,14 @@ def client_for(tmp_path: Path) -> Callable[[Engine], TestClient]:
                 yield session
 
         app.dependency_overrides[get_session] = override_get_session
+        if not sem_login:
+            usuario = UsuarioLogado(login="teste", nome="Teste", perfil=perfil)
+            app.dependency_overrides[usuario_atual] = lambda: usuario
         return TestClient(app)
 
     return build
 
 
 @pytest.fixture
-def client(engine: Engine, client_for: Callable[[Engine], TestClient]) -> TestClient:
+def client(engine: Engine, client_for: Callable[..., TestClient]) -> TestClient:
     return client_for(engine)

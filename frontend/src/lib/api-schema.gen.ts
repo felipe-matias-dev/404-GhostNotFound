@@ -1887,6 +1887,15 @@ export interface operations {
                     "application/json": components["schemas"]["OrdemSchema"][];
                 };
             };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErroSchema"];
+                };
+            };
             /** @description Not Found */
             404: {
                 headers: {
@@ -1980,6 +1989,15 @@ export interface operations {
                     "application/json": components["schemas"]["OrdemDetalheSchema"];
                 };
             };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErroSchema"];
+                };
+            };
             /** @description Not Found */
             404: {
                 headers: {
@@ -2069,6 +2087,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AuditoriaIaSchema"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErroSchema"];
                 };
             };
             /** @description Not Found */
