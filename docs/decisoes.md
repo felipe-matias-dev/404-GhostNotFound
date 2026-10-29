@@ -54,6 +54,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | 29/10/2026 | DEC-045: tela de Rede usa período padrão de até 12 meses, aceita período válido da URL e apresenta histórico global do alimentador | Preserva o recorte escolhido e distingue o índice local do histórico do alimentador inteiro | João Euclides |
 | 29/10/2026 | DEC-047: avaliação comparativa sobre os itens em comum, aviso quando `failed` passa de 5%, e juiz (LLM as a judge) só em respostas `answered` narradas da amostra, com modelo diferente do gerador | Rodadas com versões diferentes do golden set só se comparam no que têm em comum, e o juiz não pode enviar linhas da Gold real a um modelo | Perylo |
 | 28/10/2026 | DEC-048: ordem de inspeção em campo pode voltar para gerada; a observação da volta fica só no histórico | Uma OI enviada a campo sem querer não precisa ser cancelada e gerada de novo, o que sujaria a métrica de visita desnecessária | Felipe |
+| 29/10/2026 | DEC-049: login com cookie httpOnly e cinco perfis; só `perdas` escreve nas ordens de inspeção e só `ti` lê a auditoria do agente | Esconder o menu não é segurança: a permissão é checada no backend, onde estão os dados; o agente já lê toda a Gold, então bloquear a leitura por tela daria falsa proteção | Felipe |
 
 ## DEC-001 · Localização dos arquivos de origem (landing)
 
@@ -302,7 +303,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Limitações:** a OI valida a UC contra `gold_dim_uc`, porque a fila de suspeitas
   (`gold_fila_suspeitas`) ainda não existe; quando existir, a tela da fila só passa a
   enviar os `cod_uc` escolhidos, sem mudança no backend. Não há registro de quem fez
-  cada mudança, porque o portal ainda não tem login. Alterar colunas exige recriar as
+  cada mudança, porque o portal ainda não tinha login (a autoria segue em aberto, DEC-049). Alterar colunas exige recriar as
   tabelas do `app`, já que não há migrações.
 
 ## DEC-010 · Energia e dinheiro como `numeric`, número na API
@@ -793,7 +794,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   - gerar OIs por códigos de UC digitados (repetidos ignorados, até 200 por pedido), enquanto não existe endpoint da fila de suspeitas;
   - Vitest no frontend só para funções puras (`src/**/__tests__/*.test.ts`, sem DOM).
 - **Motivo:** cobre o ciclo de vida da OI sem regra de negócio nova no frontend; o Kanban dá a visão do trabalho em andamento sem a lista de finalizadas crescer sem limite.
-- **Em aberto:** (1) gerar a partir da fila de suspeitas quando houver `GET` da `gold_fila_suspeitas`; (2) autoria das mudanças no histórico quando houver autenticação.
+- **Em aberto:** (1) gerar a partir da fila de suspeitas quando houver `GET` da `gold_fila_suspeitas`; (2) autoria das mudanças no histórico: o login existe (DEC-049), falta gravar quem agiu.
 
 ## DEC-027 · Contrato da Gold v0.3: UC 360, inspeções e recortes completos
 
@@ -1080,8 +1081,8 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Limitações conhecidas:**
   - Sem expurgo: a tabela só cresce. A pergunta e as linhas ficam guardadas como o agente as devolveu, e podem conter dados de UC.
     A `pergunta` é o texto livre que o usuário digitou (até 2000 caracteres): se alguém digitar um CPF ou um nome, ele fica em `app`.
-    Expurgo e mascaramento ficam para quando houver autenticação.
-  - Sem autenticação: nenhuma rota da API tem hoje, então quem alcança a API lê qualquer auditoria.
+    Expurgo e mascaramento ficam em aberto.
+  - Leitura da auditoria: desde a DEC-049 só o perfil `ti` lê `GET /ai/audit/{id}`. A pergunta e as linhas continuam sem expurgo.
   - Sem migrações, mudar uma coluna da tabela exige apagá-la e recriá-la à mão, como nas ordens de inspeção.
 
 ## DEC-035 · Soma dos efeitos e percentual sobre a base na tela de receita
@@ -1481,3 +1482,51 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   para a coluna "Gerada" também passa a valer, porque o arrastar usa o mesmo mapa.
   A decisão foi renumerada de DEC-045 para DEC-048 na resolução do PR #79: DEC-045 já identifica a tela de Rede
   na `main`, DEC-046 está reservada no PR #86 e DEC-047 é a avaliação comparativa.
+
+## DEC-049 · Login com cookie httpOnly e perfis por cargo
+
+- **Data:** 29/10/2026 · **Área:** Portal · **Autor:** Felipe
+- **Contexto:** o card V1-13 pede login com perfil por cargo e menu filtrado. A decisão de 19/10 já pôs autenticação e perfis no
+  FastAPI, e duas decisões deixaram lacunas à espera de login: as ordens de inspeção não registram quem agiu (DEC-009, DEC-026) e
+  qualquer pessoa que alcança a API lê a auditoria do agente (DEC-034).
+- **Decisão:**
+  - `POST /auth/login` confere a senha (hash Argon2, `pwdlib`) e grava um JWT HS256 num cookie `venergy_sessao` com `HttpOnly`,
+    `SameSite=Lax` e validade de 8 horas; `GET /auth/me` devolve `{login, nome, perfil}` e `POST /auth/logout` apaga o cookie;
+  - usuários em `app.usuarios` (login, nome, perfil, hash), criados por `uv run python -m venergy_api.usuarios` (ou `make users`),
+    um por persona, todos com a senha de demonstração `VENERGY_API_SENHA_DEMO`. O comando é idempotente e só cria essa tabela;
+  - o segredo do token (`VENERGY_API_JWT_SECRET`, mínimo 32 caracteres) é obrigatório e não tem valor padrão no código;
+  - cinco perfis: `diretoria` (henrique), `atendimento` (camila), `perdas` (rafael), `operacao` (beatriz) e `ti` (patricia). O backlog
+    previa quatro; a TI entra porque a auditoria do agente precisa de um dono, e dá-la à diretoria faria o diretor comercial ler as
+    perguntas do atendimento.
+- **Regras de acesso:**
+
+  | Rota | Quem |
+  |---|---|
+  | `GET /health`, `POST /auth/login`, `POST /auth/logout` | sem login |
+  | demais `GET` de dados, `POST /ai/ask`, `GET /auth/me` | qualquer usuário logado |
+  | `POST /ordens-inspecao`, `PATCH /ordens-inspecao/{id}` | só `perdas` |
+  | `GET /ai/audit/{id}` | só `ti` |
+
+  Sem login a resposta é 401; com o perfil errado, 403. O login é exigido ao incluir cada router em `create_app`, e um teste percorre
+  o OpenAPI e aponta pelo nome qualquer rota nova sem login.
+- **Menu dá foco, backend dá segurança:** o menu por cargo é do frontend e serve para a Camila não se perder em tela de DEC. A
+  permissão vale para quem chama a API direto. A leitura dos indicadores não é restrita por tela porque o agente consulta toda a
+  Gold: bloquear `GET /receita/*` para o atendimento não impediria a pergunta ao chat.
+- **Por que a diretoria não escreve nas ordens:** segregação de funções. Quem vê tudo não opera a inspeção, e uma conta da diretoria
+  vazada fica limitada a leitura. Dar `diretoria` à escrita é uma linha em `ordens.py` se o time quiser.
+- **Alternativas descartadas:**
+  - Seletor de perfil sem senha: o menu esconde, mas a API devolve tudo a quem a chama direto.
+  - `Authorization: Bearer` com o token no `localStorage`: um XSS lê o token; só na memória, o F5 derruba o login; e o frontend
+    teria de anexar o cabeçalho em toda chamada. O cookie `HttpOnly` dispensa o frontend de guardar token.
+  - Sessão guardada no banco: permitiria derrubar uma sessão na hora, mas é mais uma tabela sem migração e o case não pede.
+  - Provedor externo (OAuth, Keycloak): um serviço a mais a poucos dias da entrega.
+  - Matriz rígida de `GET` por perfil: o agente fura a regra e triplica os testes de 403 sem ganho real.
+- **Limitações conhecidas:**
+  - a senha de demonstração é a mesma para todos e serve só para rodar localmente;
+  - o logout apaga o cookie, mas um token já copiado vale até expirar (8 horas), e um usuário apagado do banco também;
+  - sem limite de tentativas de login;
+  - o cookie não tem `Secure`, porque o portal roda em http no ambiente local; quem publicar com https liga o flag;
+  - o portal e a API têm de ficar na mesma origem (o proxy `/api` do Vite faz isso), porque o CORS não libera credenciais.
+- **Em aberto:** a autoria. `app.ordem_evento` e `app.ai_auditoria` ainda não guardam quem agiu, e a regra da auditoria poderia
+  virar "o próprio autor ou a TI". Mexer em tabela que já existe, sem migrações, quebra o banco local de quem não recriar as
+  tabelas; por isso fica para uma tarefa própria, com `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`.

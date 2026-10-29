@@ -29,7 +29,7 @@ O case define o objetivo: "A plataforma é o meio. A resposta é o que o cliente
 | Ordens de Inspeção | Supporting | Gerar, atualizar status, registrar resultado e cancelar OIs; único modelo de escrita do sistema | Rafael (Perdas) |
 | Consulta em Linguagem Natural e Insights | Supporting | Text-to-SQL e insights embutidos nas telas | Patrícia (Dir. TI) |
 | Ingestão e Qualidade de Dados | Generic | Arquitetura Medalhão (Bronze/Silver/Gold) | Patrícia (Dir. TI) |
-| Identidade e Acesso | Generic | Perfis por cargo | — |
+| Identidade e Acesso | Generic | Login com cookie httpOnly e cinco perfis por cargo ([DEC-049](decisoes.md#dec-049--login-com-cookie-httponly-e-perfis-por-cargo)) | — |
 
 Esforço de modelagem e validação vai para os subdomínios Core. Nos Generic, usa-se a solução mais simples que atenda.
 

@@ -195,6 +195,12 @@ O registro completo, com 38 decisões numeradas e as suposições, está em [`do
 - **Descartado:** SQLite, que dispensa instalação mas não tem usuários nem schemas.
 - **Efeito:** o somente leitura do agente é garantido pelo banco, e as ordens de inspeção do Rafael sobrevivem a cada recarga.
 
+**Login com cookie httpOnly e perfil checado no backend** · [DEC-049](docs/decisoes.md#dec-049--login-com-cookie-httponly-e-perfis-por-cargo)
+- **Problema:** esconder um item do menu não impede quem chama a API direto, e a auditoria do agente guarda a pergunta de todo mundo.
+- **Decisão:** `POST /auth/login` grava um JWT de 8 horas num cookie `HttpOnly` com `SameSite=Lax`; cinco perfis, com a escrita nas ordens só para `perdas` e a auditoria só para `ti`. O menu por cargo dá foco, e a permissão mora no backend.
+- **Descartado:** token no `localStorage`, que um XSS lê; e bloquear a leitura por tela, porque o agente já lê toda a Gold.
+- **Efeito:** sem login a API responde 401 e com o perfil errado, 403; o Rafael é o único que mexe nas ordens de inspeção.
+
 **Ordens de inspeção como máquina de estados garantida no banco** · [DEC-009](docs/decisoes.md#dec-009--modelo-das-ordens-de-inspeção)
 - **Decisão:** status `GERADA → EM_CAMPO → CONCLUIDA` ou `CANCELADA` (com volta de `EM_CAMPO` para `GERADA`, [DEC-048](docs/decisoes.md#dec-048--ordem-em-campo-pode-voltar-para-gerada)), histórico em `app.ordem_evento` e no máximo uma ordem ativa por unidade consumidora, garantida por índice único parcial.
 - **Por que no banco:** uma checagem só no Python deixaria passar duas requisições simultâneas.
@@ -238,6 +244,9 @@ docker compose up -d --wait
 # 3. Gera a amostra sintética da Gold e carrega no banco
 docker compose run --rm api python -m venergy_api.amostra
 docker compose run --rm api python -m venergy_api.carga
+
+# 4. Cria os 5 usuários de demonstração do login (ou: make users)
+docker compose run --rm api python -m venergy_api.usuarios
 ```
 
 | O quê | Onde |
@@ -245,6 +254,18 @@ docker compose run --rm api python -m venergy_api.carga
 | Portal | http://localhost:3000 |
 | API e documentação interativa | http://127.0.0.1:8000/docs |
 | Banco | `127.0.0.1:5433`, usuário `venergy` |
+
+Para entrar no portal, use um destes logins com a senha `SENHA_DEMO` do `.env` (a mesma para todos, só para rodar
+localmente). Quem já tinha um `.env` antes do login precisa acrescentar `JWT_SECRET` e `SENHA_DEMO`: o `.env.example`
+mostra como, e sem `JWT_SECRET` o `docker compose` para com essa mensagem.
+
+| Login | Perfil | Além de ler os dados |
+|---|---|---|
+| `henrique` | diretoria | só leitura |
+| `camila` | atendimento | só leitura |
+| `rafael` | perdas | gera e atualiza ordens de inspeção |
+| `beatriz` | operação | só leitura |
+| `patricia` | TI | lê a auditoria do agente |
 
 O agente de IA precisa de `GOOGLE_API_KEY` no `.env` (chave do Gemini, uma por pessoa). Sem ela,
 tudo sobe, mas `POST /ai/ask` responde `503`. Cada resposta fica em `app.ai_auditoria` e se lê em
