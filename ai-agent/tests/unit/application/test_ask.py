@@ -9,9 +9,11 @@ from venergy_agent.application.ask import (
     CLARIFY_PREFIX,
     DATABASE_FAILED,
     EMPTY_RESULT,
+    GENERIC_CLARIFICATION,
     INTERNAL_FAILED,
     MODEL_FAILED,
     REFUSED_REASON,
+    TECHNICAL_NAME,
     TOO_LONG_QUESTION,
     UNKNOWN_REASON,
     AskUseCase,
@@ -565,3 +567,32 @@ async def test_without_an_answer_writer_the_answer_is_the_deterministic_text(lay
     assert answer.status is AnswerStatus.ANSWERED
     assert answer.answer.startswith("A consulta devolveu 1 linha(s).")
     assert "narrativa_falhou" not in caplog.text
+
+
+async def test_fallback_text_labels_columns_in_plain_words_with_their_unit(layer):
+    query_result = table(
+        ("receita_faturada", "kwh_faturado", "n_chamados", "dias_sem_unidade"),
+        (Decimal("35482.79"), Decimal("1200"), 85, 3),
+    )
+
+    text = await fallback_text(layer, query_result)
+
+    assert text.endswith(
+        "Resultado: receita faturada = R$ 35.482,79, kwh faturado = 1.200 kWh, "
+        "n chamados = 85, dias sem unidade = 3."
+    )
+    assert not TECHNICAL_NAME.search(text)
+
+
+async def test_clarification_naming_a_technical_name_becomes_a_generic_question(layer, caplog):
+    caplog.set_level(logging.INFO, logger="venergy_agent.ask")
+    question = "Você quer os dados de sem_kpis_mensais ou de sem_faturamento_mensal?"
+
+    answer = await use_case(
+        layer, ScriptedGenerator(generation("clarify", clarification=question))
+    ).ask("receita?", "s1")
+
+    assert answer.status is AnswerStatus.CLARIFY
+    assert answer.clarification == GENERIC_CLARIFICATION
+    assert not TECHNICAL_NAME.search(answer.answer)
+    assert "nome_tecnico_no_esclarecimento" in caplog.text

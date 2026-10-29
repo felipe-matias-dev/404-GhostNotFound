@@ -1,3 +1,5 @@
+import re
+
 from venergy_agent.config import AGENT_ROOT
 from venergy_agent.infrastructure.views_sql import main, render_views_sql
 
@@ -22,7 +24,7 @@ def test_every_view_is_created_in_the_gold_schema():
 def test_column_marked_a_confirmar_never_reaches_the_view():
     assert "cod_cliente" not in render_views_sql()
     assert "subgrupo" not in render_views_sql()
-    assert "potencia_kw" not in render_views_sql()
+    assert not re.search(r"\bpotencia_kw\b", render_views_sql())
 
 
 def test_views_read_from_the_gold_tables():

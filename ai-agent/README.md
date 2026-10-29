@@ -70,6 +70,32 @@ Antes de chamar o modelo, a avaliação confere que o banco carregado é a base 
 
 Cada execução grava `eval/runs/<data>.json`, com as métricas da spec §9.3, e imprime a tabela. A linha de base e os achados estão na spec §9.6. Mudanças de prompt, modelo, few-shot ou camada semântica só entram se a execution accuracy e a acurácia de status não regredirem (DEC-016).
 
+### Antes de rodar a avaliação na amostra
+
+Carregue a amostra sintética no banco local, a partir de `backend/` (com `VENERGY_API_DATABASE_URL` apontando para o banco e `VENERGY_API_GOLD_DIR` para `data/gold`):
+
+```bash
+uv run python -m venergy_api.amostra --force
+uv run python -m venergy_api.carga
+```
+
+A carga recria as tabelas `gold_*` e aplica as views `sem_*` do arquivo `semantic/views.sql`, numa única transação.
+
+### Erros do provedor (503 e 429)
+
+O Gemini responde 503 (sobrecarga) ou 429 (limite de taxa) com frequência. Uma rodada só vale para a decisão se **não tiver nenhum** desses erros. Se tiver, descarte-a, guarde o log e rode de novo quando o serviço estiver estável. Um erro de provedor não é erro do agente, e não deve entrar nas métricas como se fosse.
+
+### Gold real
+
+Não está no Git. Os 12 CSVs ficam no Volume do Databricks (`/Volumes/v_energy/gold/csv`). Para a rodada da Gold real:
+
+1. Baixe os CSVs para `data/gold/` na raiz do projeto (a pasta está no `.gitignore`).
+2. Rode a carga com `VENERGY_API_GOLD_DIR` apontando para essa pasta, a partir de `backend/`: `uv run python -m venergy_api.carga`. Isso substitui a amostra no banco local.
+3. Confirme que o banco é a Gold real: `sem_uc` tem bem mais de 1000 UCs.
+4. Rode `uv run python -m venergy_agent.evaluation --dataset gold_real`.
+
+Para voltar à amostra, rode de novo `venergy_api.amostra --force` e `venergy_api.carga`.
+
 ## Chave do modelo
 
 Cada integrante usa a própria chave, no próprio `ai-agent/.env` (fora do Git):

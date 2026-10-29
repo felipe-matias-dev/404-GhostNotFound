@@ -2,7 +2,7 @@ import json
 import logging
 from pathlib import Path
 
-from pydantic_ai.messages import ModelResponse, TextPart
+from pydantic_ai.messages import ModelResponse, SystemPromptPart, TextPart
 from pydantic_ai.models.function import FunctionModel
 
 from venergy_agent.infrastructure.insight_writer import PydanticAiInsightWriter
@@ -33,7 +33,7 @@ def writer(model):
     return PydanticAiInsightWriter(
         model=model,
         prompts_dir=SHIPPED_PROMPTS,
-        prompt_version="v1",
+        prompt_version="v2",
         temperature=0.0,
         nonce=NONCE,
     )
@@ -145,3 +145,22 @@ async def test_blank_text_is_logged_as_empty(caplog):
 
     assert await writer(model).narrate("Receita", METRICS) is None
     assert logged(caplog) == [{"step": "insight", "screen": "Receita", "status": "texto_vazio"}]
+
+
+async def test_shipped_prompt_asks_for_units_effect_parts_and_no_negative_sign():
+    model, calls = narrating_model("A receita faturada foi de R$ 1.234,5.")
+
+    await writer(model).narrate("Receita", METRICS)
+
+    system = next(part.content for part in calls[0][0].parts if isinstance(part, SystemPromptPart))
+    assert "R$" in system
+    assert "efeito_tarifa" in system and "efeito_bandeira" in system and "efeito_preco" in system
+    assert "redução de" in system
+
+
+async def test_a_negative_metric_written_as_a_reduction_keeps_the_insight():
+    model, _ = narrating_model("O efeito volume trouxe uma redução de R$ 883,87.")
+
+    insight = await writer(model).narrate("Receita", {"efeito_volume": -883.87})
+
+    assert insight is not None

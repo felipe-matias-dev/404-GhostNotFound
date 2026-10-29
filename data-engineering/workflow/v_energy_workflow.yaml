@@ -4,6 +4,8 @@
 # Landing -> Bronze -> Silver -> Gold + export dos 12 CSVs da Gold (/Volumes/v_energy/gold/csv, DEC-004).
 # - Notebooks lidos do GitHub (branch main): o Job roda o código revisado, não uma cópia do workspace.
 # - Compute serverless. Os widgets têm "gravar = nao" como padrão; o Job passa "sim" em cada task.
+# - exigir_idempotencia = nao: a Bronze continua conferida contra a origem; só a comparação por time travel com a gravação
+#   anterior é pulada (expira em 7 dias e não se aplica a dado novo). Ver DEC-039.
 # - Uma falha numa task interrompe as seguintes: o Resumo de cada notebook dá erro se alguma tabela falhar.
 # - Reprocessa tudo a cada run (full refresh), em vez da carga incremental da ADR-07: ver DEC-039.
 # - Agendamento mensal, dia 6 às 03h (D+5 do fechamento do faturamento, suposição), pausado: o dataset do case é uma extração única.
@@ -23,6 +25,7 @@ resources:
             base_parameters:
               gravar: sim
               landing_path: /Volumes/v_energy/default/landing
+              exigir_idempotencia: nao
             source: GIT
           environment_key: Default
         - task_key: bronze_to_silver
