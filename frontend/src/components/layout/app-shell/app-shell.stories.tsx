@@ -1,7 +1,7 @@
 import { SignOutIcon } from "@phosphor-icons/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { fn } from "storybook/test";
-import { NAVEGACAO } from "#/components/layout/app-sidebar";
+import { NAVEGACAO, organizarNavegacao } from "#/components/layout/app-sidebar";
 import { Pagina } from "#/components/layout/pagina";
 import { Button } from "#/components/ui/button";
 import { AppShell } from "./app-shell";
@@ -29,7 +29,7 @@ export const Padrao: Story = {};
 export const Atendimento: Story = {
 	parameters: { rota: "/uc" },
 	args: {
-		itens: NAVEGACAO.filter((item) => item.to === "/uc"),
+		itens: organizarNavegacao(NAVEGACAO, ["/uc"]),
 		conta: (
 			<div className="flex items-center gap-2 border-t border-border px-1 pt-3">
 				<div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">

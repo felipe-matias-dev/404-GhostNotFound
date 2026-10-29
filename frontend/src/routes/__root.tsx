@@ -11,7 +11,7 @@ import {
 } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { AppShell } from "#/components/layout/app-shell";
-import { NAVEGACAO } from "#/components/layout/app-sidebar";
+import { NAVEGACAO, organizarNavegacao } from "#/components/layout/app-sidebar";
 import { Logo } from "#/components/layout/logo";
 import { Button } from "#/components/ui/button";
 import {
@@ -143,16 +143,13 @@ function RootLayout() {
 function Portal() {
 	const { abrir } = useConsultaUc();
 	const { data: user } = useSession();
-	const routes: readonly string[] = user
-		? PROFILES[user.perfil].primaryRoutes
-		: [];
+	const itens = organizarNavegacao(
+		NAVEGACAO,
+		user ? PROFILES[user.perfil].primaryRoutes : [],
+	);
 	return (
 		<>
-			<AppShell
-				onConsultarUc={abrir}
-				itens={NAVEGACAO.filter((item) => routes.includes(item.to))}
-				conta={<SessionControls />}
-			>
+			<AppShell onConsultarUc={abrir} itens={itens} conta={<SessionControls />}>
 				<Outlet />
 			</AppShell>
 			<TanStackDevtools
