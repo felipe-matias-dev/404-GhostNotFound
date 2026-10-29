@@ -163,7 +163,7 @@ A segurança mora no banco e no validador, nunca no prompt:
 
 Use **Consulta de UC** na sidebar ou Ctrl/Cmd + K para abrir a palette. Busque pelo código
 exatamente como aparece na conta, preservando zeros iniciais, ou selecione uma consulta recente.
-A sidebar separa **Análise** (Visão geral, Receita, Rede) de **Operação** (Consulta de UC, Perdas).
+A sidebar destaca as telas do cargo em **Minha área** e mantém as demais em **Outras consultas**, sem duplicações (DEC-049).
 Somente os cinco códigos consultados com sucesso mais recentemente ficam salvos neste navegador,
 sem titular ou valores; a ação **Limpar recentes** remove a lista.
 O link `/uc?cod_uc=0001` continua abrindo a visão 360 diretamente. Sem código, `/uc` tem uma
@@ -200,6 +200,7 @@ O registro completo, com 38 decisões numeradas e as suposições, está em [`do
 - **Decisão:** `POST /auth/login` grava um JWT de 8 horas num cookie `HttpOnly` com `SameSite=Lax`; cinco perfis, com a escrita nas ordens só para `perdas` e a auditoria só para `ti`. O menu por cargo dá foco, e a permissão mora no backend.
 - **Descartado:** token no `localStorage`, que um XSS lê; e bloquear a leitura por tela, porque o agente já lê toda a Gold.
 - **Efeito:** sem login a API responde 401 e com o perfil errado, 403; o Rafael é o único que mexe nas ordens de inspeção.
+- **Portal:** `/login` integrado ao cookie, menu e entrada por cargo, retorno a links de dados após autenticar e saída com limpeza do cache. A entrada usa a marca animada e uma rede elétrica ilustrativa, com pausa e movimento reduzido; detalhes em [Login e perfis](frontend/README.md#login-e-perfis).
 
 **Ordens de inspeção como máquina de estados garantida no banco** · [DEC-009](docs/decisoes.md#dec-009--modelo-das-ordens-de-inspeção)
 - **Decisão:** status `GERADA → EM_CAMPO → CONCLUIDA` ou `CANCELADA` (com volta de `EM_CAMPO` para `GERADA`, [DEC-048](docs/decisoes.md#dec-048--ordem-em-campo-pode-voltar-para-gerada)), histórico em `app.ordem_evento` e no máximo uma ordem ativa por unidade consumidora, garantida por índice único parcial.

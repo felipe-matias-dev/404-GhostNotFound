@@ -1412,9 +1412,9 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   documento ou valores. A lista é deste navegador, não é um histórico de atendimentos nem
   uma lista compartilhada entre operadores. Há ação de limpar. Conteúdo inválido é descartado;
   armazenamento bloqueado não impede consultar, mas limita os recentes à sessão e informa isso.
-- **Sidebar:** dois grupos discretos, sem submenus ou equipes fictícias: **Análise**
-  (Visão geral, Receita, Rede) e **Operação** (Consulta de UC, Perdas). Preserva o recolhimento
-  para ícones e o Sheet no mobile, sem duplicar a lista de recentes na navegação.
+- **Sidebar:** o agrupamento inicial em Análise e Operação foi substituído pela navegação por cargo
+  da DEC-049: **Minha área** e **Outras consultas**, sem submenus ou exclusão de telas.
+  Preserva o recolhimento para ícones e o Sheet no mobile, sem duplicar recentes na navegação.
 - **Página:** `/uc?cod_uc=...` segue sendo a visão 360. Sem código, entrada compacta com
   **Buscar UC**; com código, **Trocar UC** abre a mesma palette e **Atualizar dados** faz refetch.
   Registro de conversa, abertura de chamado e pagamento continuam fora deste fluxo.
@@ -1512,6 +1512,18 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Menu dá foco, backend dá segurança:** o menu por cargo é do frontend e serve para a Camila não se perder em tela de DEC. A
   permissão vale para quem chama a API direto. A leitura dos indicadores não é restrita por tela porque o agente consulta toda a
   Gold: bloquear `GET /receita/*` para o atendimento não impediria a pergunta ao chat.
+  - A entrada segue o cargo e **Minha área** destaca suas telas prioritárias: diretoria → Visão geral (Visão geral, Receita, Rede, UC);
+    atendimento → UC (UC); perdas → Perdas (UC, Perdas); operação → Rede (Rede, UC); TI → Visão geral (todas as telas existentes).
+    **Outras consultas** reúne todas as demais telas, sem exclusão nem duplicação. Minha área vem primeiro; grupos vazios
+    não aparecem. `PROFILES.primaryRoutes` é prioridade de navegação, não allowlist de acesso.
+    A decisão torna descobríveis as leituras já permitidas por link direto, sem mudar login, entrada por cargo ou permissões
+    do backend. Os demais perfis continuam consultando as OIs em tabela, sem geração ou ações de escrita.
+  - `/login` consulta a sessão antes de montar o portal; um link local de dados é retomado depois de entrar. `401` encerra a
+    visualização da sessão; indisponibilidade permite tentar novamente e `403` não é tratado como logout. Consultas em memória
+    são descartadas na troca de sessão, e as UCs recentes do navegador passam a ser separadas pelo login.
+  - A identidade da entrada preserva os tokens e componentes do design system: marca VE-360 sobe e revela o formulário,
+    sobre uma malha ilustrativa de conexões elétricas e UCs em Canvas 2D. Sem dependência 3D/CDN; pausa manual, suspensão em
+    aba oculta e movimento reduzido respeitado. Não há cadastro, recuperação de senha ou OAuth sem suporte no backend.
 - **Por que a diretoria não escreve nas ordens:** segregação de funções. Quem vê tudo não opera a inspeção, e uma conta da diretoria
   vazada fica limitada a leitura. Dar `diretoria` à escrita é uma linha em `ordens.py` se o time quiser.
 - **Alternativas descartadas:**

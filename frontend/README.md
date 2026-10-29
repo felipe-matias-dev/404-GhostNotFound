@@ -24,6 +24,41 @@ cp .env.example .env.local   # ajuste se o backend não estiver em localhost:800
 npm run dev                  # http://localhost:3000
 ```
 
+### Login e perfis
+
+O portal abre em `/login` quando não há sessão. A feature `auth` usa o contrato do
+FastAPI (`/auth/login`, `/auth/me`, `/auth/logout`), via proxy `/api` e cookie
+`HttpOnly`; nenhum token é guardado pelo JavaScript. Crie os usuários pelo comando
+`make users` na raiz e use a senha `SENHA_DEMO` do seu `.env` (ver o README da raiz).
+Não há cadastro público, recuperação de senha ou login social no backend.
+
+| Perfil | Entrada | Minha área | Outras consultas |
+|---|---|---|---|
+| Diretoria | Visão geral | Visão geral, Receita, Rede, Consulta de UC | Perdas |
+| Atendimento | Consulta de UC | Consulta de UC | Visão geral, Receita, Rede, Perdas |
+| Perdas | Perdas | Consulta de UC, Perdas | Visão geral, Receita, Rede |
+| Operação | Rede | Rede, Consulta de UC | Visão geral, Receita, Perdas |
+| TI | Visão geral | Todas as telas existentes | Não aparece, pois todas estão em Minha área |
+
+Todos os perfis encontram todas as telas existentes na sidebar, sem duplicações:
+**Minha área** vem primeiro e **Outras consultas** reúne as demais telas. Grupos
+vazios não aparecem. `PROFILES.primaryRoutes` define prioridade, não permissão.
+O menu dá foco, não restringe leituras (DEC-049). Só Perdas vê a geração e as
+ações das ordens; os demais consultam a tabela e o histórico.
+Um link de dados aberto sem sessão é retomado após o login. Retornos externos,
+desconhecidos ou para o próprio login são descartados. Um `401` durante o uso
+volta à entrada; `403` não encerra a sessão. Falha ao verificar a sessão mostra
+uma opção de tentar novamente, sem confundir indisponibilidade com credencial inválida.
+Sair ou trocar de usuário limpa as consultas em memória; as UCs recentes ficam
+separadas por login no navegador, sem migrar o histórico compartilhado anterior.
+
+A entrada reaproveita `Logo`, `Button`, `FloatingLabelInput` e os tokens de
+`src/styles.css`, inclusive o tema salvo. A marca sobe antes de revelar o formulário;
+o fundo em Canvas 2D representa conexões de distribuição e UCs, não dados ao vivo.
+Não usa biblioteca 3D nem recursos externos. A animação pode ser pausada, para
+quando a aba fica oculta e é estática com `prefers-reduced-motion: reduce`.
+
+
 ## Variáveis de ambiente
 
 | Variável | Padrão | Uso |
@@ -138,7 +173,7 @@ export const Route = createFileRoute("/perdas")({
 
 `src/routes/__root.tsx` envolve todas as rotas no `AppShell` (`components/layout/app-shell`), montado sobre a Sidebar do shadcn (`components/ui/sidebar`, variante `inset`): a navegação recolhe para ícones pelo trigger, pelo rail ou com Ctrl/Cmd+B. Com a navegação aberta, o trigger fica ao lado da logo; recolhida, ele passa para o header. Abaixo de 768px a navegação vira um `Sheet` e o trigger fica sempre no header. O header traz o título da seção (o `<h1>` da página) e o painel de conteúdo rola sozinho e volta ao topo a cada tela. Rota sem match cai em `pages/nao-encontrado.tsx`, sem título no header nem item ativo na navegação.
 
-Tela nova na navegação: crie a rota e adicione o item em `NAVEGACAO` (`components/layout/app-sidebar/navegacao.ts`), com grupo **Análise** ou **Operação** e o ícone de **Fundamentos/Ícones**. O título do header e o item ativo da sidebar vêm de `useItemAtivo`; rotas filhas que existem (`/uc/$id`) herdam a seção. **Consulta de UC** é uma ação que abre a palette, não um link para uma página de busca. O conteúdo da página vai dentro de `Pagina` (`components/layout/pagina`), que fixa largura e respiro.
+Tela nova na navegação: crie a rota e adicione o item em `NAVEGACAO` (`components/layout/app-sidebar/navegacao.ts`), com o ícone de **Fundamentos/Ícones**. Atualize `PROFILES.primaryRoutes` (`features/auth/profiles.ts`) para os cargos que a têm como prioridade. `organizarNavegacao` põe essas telas em **Minha área** e todas as demais em **Outras consultas**, sem exclusão nem duplicação. O título do header e o item ativo da sidebar vêm de `useItemAtivo`; rotas filhas que existem (`/uc/$id`) herdam a seção. **Consulta de UC** é uma ação que abre a palette, não um link para uma página de busca. O conteúdo da página vai dentro de `Pagina` (`components/layout/pagina`), que fixa largura e respiro.
 
 Recorte da tela no topo (ex.: `Receita › Recife ▾ › Boa Viagem ▾`): a página renderiza `<HeaderTrilha>` (`components/layout/header`) com um `Breadcrumb`, e o conteúdo aparece no header logo depois do título, que vira link para a seção sem recorte. Na Receita, cada nível é um `DropdownMenu` para trocar de município ou bairro: é a forma acessível de escolher o que o mapa também escolhe.
 
@@ -149,7 +184,7 @@ Recorte da tela no topo (ex.: `Receita › Recife ▾ › Boa Viagem ▾`): a p�
 ### Visão 360 da unidade consumidora
 
 - **Consulta de UC** na sidebar abre a palette global, também disponível por Ctrl/Cmd + K.
-  A navegação se divide em **Análise** (Visão geral, Receita, Rede) e **Operação** (Consulta de UC, Perdas).
+  A navegação se divide em **Minha área** e **Outras consultas**, conforme as prioridades do cargo, mantendo todas as telas acessíveis.
 - A palette consulta `GET /unidades-consumidoras/{cod_uc}/visao-360` antes de navegar para
   `/uc?cod_uc=...`. A resposta preenche o cache da visão 360, sem uma segunda consulta.
   O código continua textual e exato; filtrar recentes não é busca global nem resolução aproximada de identidade.
