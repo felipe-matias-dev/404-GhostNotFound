@@ -3,10 +3,12 @@
 // O item ativo vem de `useItemAtivo`, o mesmo do título do Header.
 import { Link } from "@tanstack/react-router";
 import { motion } from "motion/react";
+import type { ReactNode } from "react";
 import { Logo } from "#/components/layout/logo";
 import {
 	Sidebar,
 	SidebarContent,
+	SidebarFooter,
 	SidebarGroup,
 	SidebarGroupLabel,
 	SidebarHeader,
@@ -22,9 +24,11 @@ import { type ItemNavegacao, useItemAtivo } from "./navegacao";
 export function AppSidebar({
 	itens,
 	onConsultarUc,
+	conta,
 }: {
 	itens: ItemNavegacao[];
 	onConsultarUc: () => void;
+	conta?: ReactNode;
 }) {
 	const ativoAtual = useItemAtivo(itens);
 	const { setOpenMobile, isMobile } = useSidebar();
@@ -95,6 +99,7 @@ export function AppSidebar({
 					</SidebarGroup>
 				))}
 			</SidebarContent>
+			{conta && <SidebarFooter>{conta}</SidebarFooter>}
 			<SidebarRail />
 		</Sidebar>
 	);

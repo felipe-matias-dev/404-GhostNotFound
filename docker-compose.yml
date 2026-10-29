@@ -34,6 +34,10 @@ services:
       # Na rede do compose, o banco é o serviço db na porta padrão do PostgreSQL.
       VENERGY_API_DATABASE_URL: postgresql+psycopg://venergy:${POSTGRES_PASSWORD}@db:5432/venergy
       VENERGY_API_GOLD_DIR: /data/gold
+      # Assina o token de sessão do login. Sem ele a API não sobe: o compose para com a mensagem.
+      VENERGY_API_JWT_SECRET: ${JWT_SECRET:?defina JWT_SECRET no .env (veja o .env.example)}
+      # Senha dos usuários de demonstração: lida só por `python -m venergy_api.usuarios`.
+      VENERGY_API_SENHA_DEMO: ${SENHA_DEMO:-}
       # Agente de IA: usuário somente leitura e chave do Gemini de cada integrante (.env da raiz).
       VENERGY_AGENT_DATABASE_URL: postgresql://venergy_agent:${AGENT_DB_PASSWORD}@db:5432/venergy
       VENERGY_AGENT_GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}

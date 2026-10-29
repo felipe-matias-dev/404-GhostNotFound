@@ -2,11 +2,12 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from venergy_api.auth import Perfil
 from venergy_api.database import SessionDep
 from venergy_api.models import DimUc, OrdemEvento, OrdemInspecao
 from venergy_api.ordens import STATUS_ATIVOS, StatusOrdem, TransicaoInvalidaError, validar_transicao
@@ -17,10 +18,15 @@ from venergy_api.schemas import (
     OrdemDetalheSchema,
     OrdemSchema,
 )
+from venergy_api.sessao import exigir_perfil
 
 router = APIRouter(prefix="/ordens-inspecao", tags=["ordens de inspeção"])
 
 INDICE_UC_ATIVA = "uq_ordem_inspecao_uc_ativa"
+
+# Gerar e mudar ordem é a única escrita do sistema, e é trabalho do gerente de perdas. Os
+# outros perfis só consultam; o menu esconde os botões, e esta barreira vale para quem chama a API.
+SOMENTE_PERDAS = Depends(exigir_perfil(Perfil.PERDAS))
 
 
 def _erro_ja_ativas(cod_ucs: list[str]) -> HTTPException:
@@ -33,7 +39,9 @@ def _erro_ja_ativas(cod_ucs: list[str]) -> HTTPException:
 @router.post(
     "",
     status_code=status.HTTP_201_CREATED,
+    dependencies=[SOMENTE_PERDAS],
     responses={
+        status.HTTP_403_FORBIDDEN: {"model": ErroSchema},
         status.HTTP_404_NOT_FOUND: {"model": ErroSchema},
         status.HTTP_409_CONFLICT: {"model": ErroSchema},
     },
@@ -109,7 +117,9 @@ def obter_ordem(ordem_id: int, session: SessionDep) -> OrdemDetalheSchema:
 
 @router.patch(
     "/{ordem_id}",
+    dependencies=[SOMENTE_PERDAS],
     responses={
+        status.HTTP_403_FORBIDDEN: {"model": ErroSchema},
         status.HTTP_404_NOT_FOUND: {"model": ErroSchema},
         status.HTTP_409_CONFLICT: {"model": ErroSchema},
     },

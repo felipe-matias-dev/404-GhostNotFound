@@ -9,6 +9,7 @@ help:
 	@echo make db - sobe so o banco
 	@echo make sample - gera a amostra sintetica da Gold
 	@echo make load - carrega a Gold no banco
+	@echo make users - cria os 5 usuarios de demonstracao do login
 	@echo make test - testes do backend e do agente, sobe o banco antes
 	@echo make test-backend - testes do backend
 	@echo make test-agent - testes do agente de IA
@@ -41,6 +42,9 @@ sample: env
 
 load: env
 	docker compose run --rm api python -m venergy_api.carga
+
+users: env
+	docker compose run --rm api python -m venergy_api.usuarios
 
 test: test-backend test-agent
 

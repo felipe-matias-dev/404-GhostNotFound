@@ -16,7 +16,9 @@ CONTRACT_PATH = Path(__file__).resolve().parents[3] / "contracts" / "openapi.jso
 def build_contract() -> str:
     # O contrato só descreve rotas e schemas: o banco nunca é acessado, então as configurações
     # obrigatórias recebem valores fixos e o export roda sem .env, em qualquer máquina e no CI.
-    settings = Settings(_env_file=None, database_url="postgresql+psycopg://", gold_dir=Path())
+    settings = Settings(
+        _env_file=None, database_url="postgresql+psycopg://", gold_dir=Path(), jwt_secret="x" * 32
+    )
     schema = create_app(settings).openapi()
     return json.dumps(schema, ensure_ascii=False, indent=2) + "\n"
 
