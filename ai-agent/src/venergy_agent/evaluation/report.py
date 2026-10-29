@@ -35,8 +35,8 @@ class EvaluationReport(BaseModel):
     model: str
     prompt_version: str
     semantic_layer_version: str
-    golden_version: str
-    red_team_version: str
+    golden_version: str = "desconhecida"
+    red_team_version: str = "desconhecida"
     dataset: str = "amostra"
     narrated: bool = True
     judge_model: str | None = None
