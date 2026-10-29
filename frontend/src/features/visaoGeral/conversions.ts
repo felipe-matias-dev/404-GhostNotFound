@@ -1,29 +1,7 @@
-import type {
-	TrendCategory,
-	TrendMarker,
-	TrendSeries,
-} from "#/components/ui/trend-chart";
-import {
-	formatCompetencia,
-	formatCompetenciaCurta,
-	formatMes,
-} from "#/lib/format";
-import type {
-	ComparacaoIndicadores,
-	Indicador,
-	IndicadoresPeriodo,
-	KpisMensais,
-	ParPeriodos,
-} from "./types";
-
-export const INDICADORES = [
-	"receita_faturada",
-	"kwh_faturado",
-	"dec",
-	"fec",
-	"n_chamados",
-	"satisfacao_media",
-] as const satisfies readonly Indicador[];
+import type { TrendCategory, TrendSeries } from "#/components/ui/trend-chart";
+import type { WaterfallStep } from "#/components/ui/waterfall-chart";
+import { formatCompetencia, formatCompetenciaCurta } from "#/lib/format";
+import type { JanelaIndicadores, ParPeriodos } from "./types";
 
 /** "2025-03" → "2025-03/2025-03": um mês no formato de período da URL e da API. */
 export const periodoDoMes = (competencia: string) =>
@@ -100,7 +78,7 @@ export function parPadrao(competencias: string[]): ParPeriodos | undefined {
 
 /**
  * O par da URL, se é mês contra mês, com os dois meses na série e a base antes do atual;
- * senão o padrão. Trechos de vários meses esperam a rota de comparação do backend (DEC-036).
+ * senão o padrão. O seletor da faixa continua mensal.
  */
 export function parEscolhido(
 	competencias: string[],
@@ -125,168 +103,125 @@ export function parEscolhido(
 	return parPadrao(competencias);
 }
 
-/** Variação do atual sobre a base, em fração; nula sem um dos lados ou com base zero. */
-export function variacao(
-	base: number | null,
-	atual: number | null,
-): number | null {
-	if (base == null || atual == null || base === 0) return null;
-	return (atual - base) / base;
-}
+/** Janelas de 12 meses no formato de período da URL e da API: "2024-01/2024-12". */
+export type Janelas = { base: string; atual: string };
 
-function indicadoresDoMes(
-	linhas: KpisMensais[],
-	periodo: string,
-): IndicadoresPeriodo {
-	const linha = linhas.find((l) => l.competencia === mesDoPeriodo(periodo));
-	const valores = Object.fromEntries(
-		INDICADORES.map((indicador) => [indicador, linha?.[indicador] ?? null]),
-	) as Record<Indicador, number | null>;
-	return { periodo, valores };
-}
-
-/**
- * Comparação mês contra mês a partir da série mensal: os valores são os da Gold, sem conta, e
- * a tela só calcula a variação percentual, como na tela de receita (DEC-035).
- */
-export function compararMeses(
-	linhas: KpisMensais[],
-	par: ParPeriodos,
-): ComparacaoIndicadores {
-	const base = indicadoresDoMes(linhas, par.periodo_base);
-	const atual = indicadoresDoMes(linhas, par.periodo_atual);
+/** Primeira e última janelas completas de 12 meses, sem sobreposição. */
+export function janelasDaBase(
+	janelas: JanelaIndicadores[],
+): Janelas | undefined {
+	const base = janelas[0];
+	const atual = janelas.at(-1);
+	if (!base || !atual || atual.inicio <= base.fim) return undefined;
 	return {
-		base,
-		atual,
-		variacao: Object.fromEntries(
-			INDICADORES.map((indicador) => [
-				indicador,
-				variacao(base.valores[indicador], atual.valores[indicador]),
-			]),
-		) as Record<Indicador, number | null>,
+		base: `${base.inicio}/${base.fim}`,
+		atual: `${atual.inicio}/${atual.fim}`,
 	};
 }
 
-/** Mês a mês: a série corrida; ano a ano: uma linha por ano sobre jan–dez. */
-export const VISOES_TENDENCIA = ["mes", "ano"] as const;
-export type VisaoTendencia = (typeof VISOES_TENDENCIA)[number];
-
-export type Tendencia = {
-	visao: VisaoTendencia;
+export type Tesoura = {
 	categories: TrendCategory[];
 	series: TrendSeries[];
+	/** As somas de 12 meses por trás de cada ponto, para o tooltip. */
+	somas: { receita: number; kwh: number }[];
 };
 
-const MESES_DO_ANO = Array.from({ length: 12 }, (_, i) =>
-	String(i + 1).padStart(2, "0"),
-);
-
-/**
- * O indicador ao longo da série da Gold, sem conta. O `id` da série mensal não muda com o
- * indicador, para o gráfico trocar a forma da linha em vez de redesenhá-la.
- */
-export function tendencia(
-	linhas: KpisMensais[],
-	indicador: Indicador,
-	visao: VisaoTendencia,
-	rotulo: string,
-): Tendencia {
-	if (visao === "mes") {
-		return {
-			visao,
-			categories: linhas.map((linha) => ({
-				key: linha.competencia,
-				label: formatCompetenciaCurta(linha.competencia),
-				title: formatCompetencia(linha.competencia),
-			})),
-			series: [
-				{
-					id: "mensal",
-					label: rotulo,
-					values: linhas.map((linha) => linha[indicador] ?? null),
-				},
-			],
-		};
-	}
-	const porCompetencia = new Map(
-		linhas.map((linha) => [linha.competencia, linha[indicador] ?? null]),
-	);
-	const anos = [
-		...new Set(linhas.map((linha) => linha.competencia.slice(0, 4))),
-	].sort();
+/** Variação das somas calculadas pelo backend sobre a primeira janela. */
+export function tesoura(pontos: JanelaIndicadores[]): Tesoura {
+	const base = pontos[0];
+	if (!base || pontos.length < 2)
+		return { categories: [], series: [], somas: [] };
 	return {
-		visao,
-		categories: MESES_DO_ANO.map((mes) => ({
-			key: mes,
-			label: formatMes(Number(mes)),
+		categories: pontos.map((p) => ({
+			key: p.fim,
+			label: formatCompetenciaCurta(p.fim),
+			title: `12 meses até ${formatCompetencia(p.fim)}`,
 		})),
-		// O ano mais recente é o destaque; o anterior, a comparação; os demais, contexto.
-		series: anos.map((ano, i) => {
-			const recencia = anos.length - 1 - i;
-			return {
-				id: ano,
-				label: ano,
-				values: MESES_DO_ANO.map(
-					(mes) => porCompetencia.get(`${ano}-${mes}`) ?? null,
+		series: [
+			{
+				id: "receita",
+				label: "Receita faturada",
+				shortLabel: "receita",
+				values: pontos.map((p) =>
+					base.receita_faturada === 0
+						? null
+						: p.receita_faturada / base.receita_faturada - 1,
 				),
-				color: recencia === 0 ? 1 : recencia === 1 ? 2 : "muted",
-				emphasis: recencia === 0,
-			};
-		}),
+				color: 1,
+				emphasis: true,
+			},
+			{
+				id: "kwh",
+				label: "Energia faturada",
+				shortLabel: "energia",
+				values: pontos.map((p) =>
+					base.kwh_faturado === 0
+						? null
+						: p.kwh_faturado / base.kwh_faturado - 1,
+				),
+				color: 2,
+				emphasis: true,
+			},
+		],
+		somas: pontos.map((p) => ({
+			receita: p.receita_faturada,
+			kwh: p.kwh_faturado,
+		})),
 	};
 }
 
+// Direção da variação já arredondada a uma casa, como a seta do KpiDelta: 0,04% é estável.
+const direcao = (pct: number) => Math.sign(Math.round(pct * 10));
+
 /**
- * Variação no ponto sob o cursor: contra o mês anterior (mês a mês) ou contra o mesmo mês do
- * ano anterior (ano a ano, sobre a linha em destaque). `undefined` sem base para comparar.
+ * A frase do topo da tela, só pela direção e pelo tamanho relativo das duas variações (em %,
+ * como vêm da API). Os números ficam nos indicadores logo abaixo, e não se repetem aqui.
  */
-export function variacaoNoPonto(
-	t: Tendencia,
-	indice: number,
-): { valor: number; base: string } | undefined {
-	if (t.visao === "mes") {
-		const atual = t.categories[indice];
-		if (!atual) return undefined;
-		const valores = t.series[0]?.values ?? [];
-		// O mês anterior é o do calendário, não a posição anterior da série: com um mês
-		// faltando na Gold, o ponto anterior não é o mês anterior e não serve de base.
-		const indiceBase = t.categories.findIndex(
-			(c) => c.key === deslocar(atual.key, -1),
-		);
-		const base = t.categories[indiceBase];
-		const valor = variacao(
-			valores[indiceBase] ?? null,
-			valores[indice] ?? null,
-		);
-		return base && valor !== null
-			? { valor, base: base.title ?? base.label }
-			: undefined;
+export function leitura(
+	receitaPct: number | null | undefined,
+	kwhPct: number | null | undefined,
+): string | null {
+	if (receitaPct == null || kwhPct == null) return null;
+	const r = direcao(receitaPct);
+	const k = direcao(kwhPct);
+	const ritmo = direcao(receitaPct - kwhPct);
+	if (r > 0) {
+		if (k < 0) return "A receita cresceu com menos energia faturada.";
+		if (k === 0) return "A receita cresceu com a mesma energia faturada.";
+		if (ritmo > 0) return "A receita cresceu mais que a energia faturada.";
+		if (ritmo < 0) return "A receita cresceu menos que a energia faturada.";
+		return "Receita e energia faturada cresceram no mesmo ritmo.";
 	}
-	const destaque = t.series.findIndex((s) => s.emphasis);
-	const atual = t.series[destaque];
-	const anterior = t.series[destaque - 1];
-	const mes = t.categories[indice];
-	if (!atual || !anterior || !mes) return undefined;
-	const valor = variacao(
-		anterior.values[indice] ?? null,
-		atual.values[indice] ?? null,
-	);
-	return valor === null
-		? undefined
-		: { valor, base: `${mes.label}/${anterior.label}` };
+	if (r === 0) {
+		if (k > 0) return "A receita ficou estável com mais energia faturada.";
+		if (k < 0) return "A receita ficou estável com menos energia faturada.";
+		return "Receita e energia faturada ficaram estáveis.";
+	}
+	if (k > 0) return "A receita caiu mesmo com mais energia faturada.";
+	if (k === 0) return "A receita caiu com a mesma energia faturada.";
+	if (ritmo < 0) return "A receita caiu mais que a energia faturada.";
+	if (ritmo > 0) return "A receita caiu menos que a energia faturada.";
+	return "Receita e energia faturada caíram no mesmo ritmo.";
 }
 
-/** Os meses do par comparado nos cards, marcados no gráfico. */
-export function marcadores(
-	par: ParPeriodos | undefined,
-	visao: VisaoTendencia,
-): TrendMarker[] {
-	const atual = mesDoPeriodo(par?.periodo_atual);
-	const base = mesDoPeriodo(par?.periodo_base);
-	if (!atual) return [];
-	if (visao === "ano") return [{ at: atual.slice(5), label: "Mês comparado" }];
-	return [
-		...(base ? [{ at: base, label: "Base" }] : []),
-		{ at: atual, label: "Atual" },
-	];
+export type EfeitoDaReceita = {
+	id: string;
+	rotulo: string;
+	pct: number | null;
+};
+
+/**
+ * Os efeitos da ponte de receita como peso sobre a receita base, como a tela de Receita mostra
+ * em % (DEC-035). Em % e não em R$: a ponte é sobre a receita de energia e o resumo, sobre a
+ * faturada; o peso de cada efeito é o mesmo nas duas medidas, o valor em reais não.
+ */
+export function efeitosDaReceita(passos: WaterfallStep[]): EfeitoDaReceita[] {
+	const base = passos.find((p) => p.kind === "total")?.value ?? 0;
+	return passos
+		.filter((p) => p.kind === "delta")
+		.map((p) => ({
+			id: p.id,
+			rotulo: p.label,
+			pct: base > 0 ? p.value / base : null,
+		}));
 }

@@ -15,13 +15,5 @@ export type Indicador = Extract<
 	| "satisfacao_media"
 >;
 
-export type IndicadoresPeriodo = {
-	periodo: string;
-	valores: Record<Indicador, number | null>;
-};
-
-export type ComparacaoIndicadores = {
-	base: IndicadoresPeriodo;
-	atual: IndicadoresPeriodo;
-	variacao: Record<Indicador, number | null>;
-};
+export type JanelaIndicadores =
+	components["schemas"]["IndicadoresJanelaSchema"];

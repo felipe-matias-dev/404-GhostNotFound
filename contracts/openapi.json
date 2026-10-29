@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "V-Energy Grid 360 API",
-    "version": "0.9.0"
+    "version": "0.10.0"
   },
   "paths": {
     "/health": {
@@ -874,6 +874,242 @@
         }
       }
     },
+    "/indicadores/comparacao": {
+      "get": {
+        "tags": [
+          "indicadores"
+        ],
+        "summary": "Get Comparacao",
+        "description": "Os indicadores da diretoria em dois períodos, da empresa inteira ou de um recorte.",
+        "operationId": "get_comparacao_indicadores_comparacao_get",
+        "parameters": [
+          {
+            "name": "base_inicio",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+              "title": "Base Inicio"
+            }
+          },
+          {
+            "name": "base_fim",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+              "title": "Base Fim"
+            }
+          },
+          {
+            "name": "atual_inicio",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+              "title": "Atual Inicio"
+            }
+          },
+          {
+            "name": "atual_fim",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+              "title": "Atual Fim"
+            }
+          },
+          {
+            "name": "municipio",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Municipio"
+            }
+          },
+          {
+            "name": "bairro",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Bairro"
+            }
+          },
+          {
+            "name": "classe",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "B1",
+                    "B2",
+                    "B3",
+                    "A4"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Classe"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ComparacaoIndicadoresSchema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/indicadores/janelas": {
+      "get": {
+        "tags": [
+          "indicadores"
+        ],
+        "summary": "Get Janelas",
+        "description": "Janelas corridas de `meses` competências, da mais antiga para a mais recente.",
+        "operationId": "get_janelas_indicadores_janelas_get",
+        "parameters": [
+          {
+            "name": "meses",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 24,
+              "minimum": 1,
+              "default": 12,
+              "title": "Meses"
+            }
+          },
+          {
+            "name": "municipio",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Municipio"
+            }
+          },
+          {
+            "name": "bairro",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Bairro"
+            }
+          },
+          {
+            "name": "classe",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "B1",
+                    "B2",
+                    "B3",
+                    "A4"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Classe"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/IndicadoresJanelaSchema"
+                  },
+                  "title": "Response Get Janelas Indicadores Janelas Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/fila-suspeitas": {
       "get": {
         "tags": [
@@ -1550,6 +1786,26 @@
         ],
         "title": "AuditoriaIaSchema",
         "description": "O registro completo da auditoria: a resposta com a pergunta e o momento em que veio."
+      },
+      "ComparacaoIndicadoresSchema": {
+        "properties": {
+          "base": {
+            "$ref": "#/components/schemas/IndicadoresPeriodoSchema"
+          },
+          "atual": {
+            "$ref": "#/components/schemas/IndicadoresPeriodoSchema"
+          },
+          "variacao_pct": {
+            "$ref": "#/components/schemas/VariacaoIndicadoresSchema"
+          }
+        },
+        "type": "object",
+        "required": [
+          "base",
+          "atual",
+          "variacao_pct"
+        ],
+        "title": "ComparacaoIndicadoresSchema"
       },
       "ComparacaoReceitaSchema": {
         "properties": {
@@ -2300,6 +2556,221 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "IndicadoresJanelaSchema": {
+        "properties": {
+          "inicio": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+            "title": "Inicio"
+          },
+          "fim": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+            "title": "Fim"
+          },
+          "receita_faturada": {
+            "type": "number",
+            "title": "Receita Faturada"
+          },
+          "receita_energia": {
+            "type": "number",
+            "title": "Receita Energia"
+          },
+          "kwh_faturado": {
+            "type": "number",
+            "title": "Kwh Faturado"
+          },
+          "n_uc_medio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "N Uc Medio"
+          },
+          "tarifa_media": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tarifa Media"
+          },
+          "tarifa_base_media": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tarifa Base Media"
+          }
+        },
+        "type": "object",
+        "required": [
+          "inicio",
+          "fim",
+          "receita_faturada",
+          "receita_energia",
+          "kwh_faturado",
+          "n_uc_medio",
+          "tarifa_media",
+          "tarifa_base_media"
+        ],
+        "title": "IndicadoresJanelaSchema",
+        "description": "Uma janela corrida completa: `meses` competências seguidas, todas com dado."
+      },
+      "IndicadoresPeriodoSchema": {
+        "properties": {
+          "inicio": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+            "title": "Inicio"
+          },
+          "fim": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+            "title": "Fim"
+          },
+          "n_meses": {
+            "type": "integer",
+            "title": "N Meses"
+          },
+          "receita_faturada": {
+            "type": "number",
+            "title": "Receita Faturada"
+          },
+          "receita_energia": {
+            "type": "number",
+            "title": "Receita Energia"
+          },
+          "tributos": {
+            "type": "number",
+            "title": "Tributos"
+          },
+          "kwh_faturado": {
+            "type": "number",
+            "title": "Kwh Faturado"
+          },
+          "n_uc_medio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "N Uc Medio"
+          },
+          "n_uc_fim": {
+            "type": "integer",
+            "title": "N Uc Fim"
+          },
+          "tarifa_media": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tarifa Media"
+          },
+          "tarifa_base_media": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tarifa Base Media"
+          },
+          "horas_interrompidas": {
+            "type": "number",
+            "title": "Horas Interrompidas"
+          },
+          "n_interrupcoes": {
+            "type": "integer",
+            "title": "N Interrupcoes"
+          },
+          "dec": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dec"
+          },
+          "fec": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fec"
+          },
+          "n_chamados": {
+            "type": "integer",
+            "title": "N Chamados"
+          },
+          "n_notas": {
+            "type": "integer",
+            "title": "N Notas"
+          },
+          "satisfacao_media": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Satisfacao Media"
+          }
+        },
+        "type": "object",
+        "required": [
+          "inicio",
+          "fim",
+          "n_meses",
+          "receita_faturada",
+          "receita_energia",
+          "tributos",
+          "kwh_faturado",
+          "n_uc_medio",
+          "n_uc_fim",
+          "tarifa_media",
+          "tarifa_base_media",
+          "horas_interrompidas",
+          "n_interrupcoes",
+          "dec",
+          "fec",
+          "n_chamados",
+          "n_notas",
+          "satisfacao_media"
+        ],
+        "title": "IndicadoresPeriodoSchema",
+        "description": "Os indicadores da diretoria somados num período, todos calculados no banco."
       },
       "InsightReceitaSchema": {
         "properties": {
@@ -3282,6 +3753,195 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "VariacaoIndicadoresSchema": {
+        "properties": {
+          "receita_faturada": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receita Faturada"
+          },
+          "receita_energia": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receita Energia"
+          },
+          "tributos": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tributos"
+          },
+          "kwh_faturado": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kwh Faturado"
+          },
+          "n_uc_medio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "N Uc Medio"
+          },
+          "n_uc_fim": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "N Uc Fim"
+          },
+          "tarifa_media": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tarifa Media"
+          },
+          "tarifa_base_media": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tarifa Base Media"
+          },
+          "horas_interrompidas": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Horas Interrompidas"
+          },
+          "n_interrupcoes": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "N Interrupcoes"
+          },
+          "dec": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dec"
+          },
+          "fec": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fec"
+          },
+          "n_chamados": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "N Chamados"
+          },
+          "n_notas": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "N Notas"
+          },
+          "satisfacao_media": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Satisfacao Media"
+          }
+        },
+        "type": "object",
+        "required": [
+          "receita_faturada",
+          "receita_energia",
+          "tributos",
+          "kwh_faturado",
+          "n_uc_medio",
+          "n_uc_fim",
+          "tarifa_media",
+          "tarifa_base_media",
+          "horas_interrompidas",
+          "n_interrupcoes",
+          "dec",
+          "fec",
+          "n_chamados",
+          "n_notas",
+          "satisfacao_media"
+        ],
+        "title": "VariacaoIndicadoresSchema",
+        "description": "Variação em % de cada indicador (8.0 = +8,0%); nula sem base ou com base zero."
       }
     }
   }
