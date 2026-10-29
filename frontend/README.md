@@ -177,7 +177,6 @@ Recorte da tela no topo (ex.: `Receita › Recife ▾ › Boa Viagem ▾`): a p�
   repetição. 404 é distinto de falha técnica. Não há operação de pagamento nem abertura de chamado.
 - DS VE-360 preservado: grid operacional de duas colunas no desktop, uma no mobile,
   tabelas responsivas em cards e motion somente dos componentes internos (V3 M2 D8).
-
 ### Visão geral da diretoria
 
 - Resumo de 12 meses e faixa mensal: valores e variações de `GET /indicadores/comparacao`.
@@ -215,8 +214,8 @@ carrega `src/styles.css`.
   tamanho, peso, cor e acessibilidade em **Fundamentos/Ícones**.
 - Gráficos: SVG próprio com `motion`; `d3-scale` e `d3-shape` só para escalas e curvas
   (DEC-037). Cores das séries pelos tokens `chart-1` a `chart-6` e `chart-muted`. Tendência
-  ao longo do tempo: `TrendChart`; séries compactas: `Sparkline`; ponte de efeitos:
-  `WaterfallChart`. A área do `TrendChart` só é usada com eixo a partir do zero (DEC-041).
+  ao longo do tempo: `TrendChart` (área só com eixo a partir do zero, DEC-041); forma da série
+  ao lado de um número: `Sparkline`; ponte de efeitos: `WaterfallChart`.
 
 Regras e modelo de story na página **Introdução** do Storybook
 (`.storybook/docs/introducao.mdx`).
