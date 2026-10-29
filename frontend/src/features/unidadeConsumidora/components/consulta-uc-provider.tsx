@@ -368,7 +368,9 @@ function BuscaUc({
 							variant="outline"
 							size="sm"
 							disabled={Boolean(pendente)}
-							onClick={() => void consultar(erro.codigo!)}
+							onClick={() => {
+								if (erro.codigo) void consultar(erro.codigo);
+							}}
 						>
 							Tentar de novo
 						</Button>
