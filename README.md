@@ -151,10 +151,10 @@ A segurança mora no banco e no validador, nunca no prompt:
 |---|---|---|
 | SQL com o resultado certo (execution accuracy) | 92,1% (58 de 63) | 100% (48 de 48) |
 | Status certo (respondeu, não sei, esclarecer, recusar) | 94,4% | 100% (74 de 74) |
-| Fidelidade numérica do texto | — (rodada só SQL) | 83,3% |
+| Fidelidade numérica do texto | — (rodada só SQL, sem narração) | 83,3% |
 | Red team: escritas aceitas, views alteradas, vazamentos de prompt | — | 0, 0, 0 (rodada de 28/10) |
 
-A meta do case para o agente sobre os dados reais (G1-05, pelo menos 80%) está cumprida. Os relatórios da Gold real ficam fora do Git ([DEC-024](docs/decisoes.md)), e o da amostra está em [`eval/runs/2026-10-29T144926Z.json`](ai-agent/eval/runs/2026-10-29T144926Z.json). Detalhes e comparações: [spec §9.6](ai-agent/docs/specs/2026-10-19-architecture-design.md).
+As duas colunas não são a mesma rodada: a da Gold real foi **só SQL** (mede o SQL e o status, sem o texto), e a da amostra foi **narrada** (mede também o texto). Com a DEC-015 aceita, a próxima rodada na Gold real pode ser narrada. A meta do case para o agente sobre os dados reais (G1-05, pelo menos 80%) está cumprida. Os relatórios da Gold real ficam fora do Git ([DEC-024](docs/decisoes.md)), e o da amostra está em [`eval/runs/2026-10-29T144926Z.json`](ai-agent/eval/runs/2026-10-29T144926Z.json). Detalhes e comparações: [spec §9.6](ai-agent/docs/specs/2026-10-19-architecture-design.md).
 
 **Limitações conhecidas:**
 - **16 dos 98 itens do golden set têm revisão humana registrada.**

@@ -426,7 +426,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 
 ## DEC-015 · Gold real e plano gratuito do Gemini (aceita)
 
-- **Data:** 21/10/2026 · **Área:** GenAI e Dados · **Autor:** GenAI · **Decidida:** 29/10/2026, Luis Felipe (GenAI)
+- **Data:** 21/10/2026 · **Área:** GenAI e Dados · **Autor:** GenAI · **Decidida:** 29/10/2026, Luis Felipe (GenAI), com aprovação de Dados (Alisson, PR #89)
 - **Status:** aceita em 29/10/2026. Ver **Decisão final** no fim desta seção.
 - **Decisão proposta:** o plano gratuito do Gemini (Free Tier) recebe só a amostra sintética. A Gold real só é enviada com chave paga ou fornecida pela organização.
 - **Motivo:** no Free Tier, o Google pode usar o conteúdo enviado para melhorar os produtos dele. O dataset é confidencial e nunca vai para o repositório.
@@ -437,12 +437,14 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   - **avaliação na Gold real só no modo "só SQL"** (`--dataset gold_real` liga `--sql-only`): o agente não monta o redator, então só a pergunta e o esquema (com linhas de exemplo sintéticas) chegam ao modelo, e nenhuma linha da Gold sai da máquina. O relatório vai para `eval/runs_gold/`, fora do Git. Feito no PR da issue #56. Na correção de SQL, a mensagem de erro do banco volta ao modelo; nos erros de dado (SQLSTATE da classe 22, como `invalid input syntax`), tudo o que vem depois do primeiro `:` da mensagem, que pode ser um código de UC, vira `<valor>` antes, e o contexto `LINE` sai (revisão do Lucas no #65). Nos erros de sintaxe e de coluna (classe 42), o que fica entre aspas é o nome que o próprio modelo escreveu, e a mensagem fica inteira;
   - **demonstração ao vivo com a Gold real:** só perguntas agregadas, que não devolvem `cod_uc` linha a linha;
   - **o que ainda manda dado da Gold ao modelo e precisa de decisão:** a narrativa do `/ai/ask` (as linhas da amostra da resposta) e o insight da tela de receita (#58, as métricas agregadas do recorte). Opções: aceitar o envio de agregados no plano gratuito, desligar a narrativa e o insight com a Gold real (o texto determinístico continua), ou usar uma chave da organização.
-- **Decisão final (29/10/2026, Luis Felipe):** a Gold real pode ir ao Gemini pelo plano gratuito, inclusive as linhas da narrativa, o insight, o histórico da memória e o juiz. O risco do Free Tier (uso do conteúdo pelo Google) é aceito, porque o dataset é do case. O que continua proibido é **subir o dataset ao Git**, ou qualquer saída com dados dele (DEC-024).
+- **Decisão final (29/10/2026, Luis Felipe; aprovada por Dados, Alisson, no PR #89):** a Gold real pode ir ao Gemini pelo plano gratuito, inclusive as linhas da narrativa, o insight, o histórico da memória e o juiz. O risco do Free Tier (uso do conteúdo pelo Google) é aceito, porque o dataset é do case. O que continua proibido é **subir o dataset ao Git**, ou qualquer saída com dados dele (DEC-024).
 - **Consequências:**
   - a avaliação na Gold real deixa de ligar `--sql-only` por conta própria: narração e juiz rodam nas duas bases, e `--sql-only` vira só economia de cota;
   - os relatórios da Gold real continuam em `eval/runs_gold/`, fora do Git, porque o SQL e a justificativa do juiz podem trazer valores do dataset;
   - a demonstração ao vivo pode usar a Gold real sem restringir as perguntas;
-  - a amostra continua sendo a base do CI, que não pode ter o dataset (DEC-024), e dos itens com código fictício.
+  - a amostra continua sendo a base do CI, que não pode ter o dataset (DEC-024), e dos itens com código fictício;
+  - **memória:** a memória de conversa (G1-10, PR #86) ainda não está na `main`. Quando entrar, ela vale nas duas bases, como esta decisão diz: o #86 não desliga mais a memória na Gold real;
+  - **rodadas com e sem narração não se comparam diretamente:** uma rodada só SQL mede o SQL e o status, e uma rodada narrada mede também o texto. A linha de base 2 (29/10/2026) foi só SQL.
 
 ## DEC-016 · Exceção de versionamento do prompt v1 (proposta)
 
