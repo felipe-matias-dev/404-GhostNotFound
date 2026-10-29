@@ -7,7 +7,7 @@ from sqlalchemy import Engine, update
 from sqlalchemy.orm import Session
 
 from venergy_api.database import Base
-from venergy_api.models import DimUc, OrdemInspecao
+from venergy_api.models import DimUc, OrdemEvento, OrdemInspecao
 from venergy_api.ordens import StatusOrdem
 from venergy_api.schemas import MAX_ORDENS_POR_PEDIDO
 
@@ -278,3 +278,23 @@ def test_changing_an_unknown_order_returns_404(client: TestClient) -> None:
     response = change(client, 999, status="EM_CAMPO")
 
     assert response.status_code == 404
+
+
+def test_every_event_of_an_order_records_who_acted(client: TestClient) -> None:
+    [ordem] = create_orders(client, "0001")
+    change(client, ordem["id"], status="EM_CAMPO")
+    change(client, ordem["id"], status="CANCELADA", observacao="Gerada por engano")
+
+    eventos = client.get(f"/ordens-inspecao/{ordem['id']}").json()["eventos"]
+
+    assert [e["autor_login"] for e in eventos] == ["teste", "teste", "teste"]
+
+
+def test_an_event_from_before_the_login_has_no_author(client: TestClient, engine: Engine) -> None:
+    [ordem] = create_orders(client, "0001")
+    with Session(engine) as session, session.begin():
+        session.execute(update(OrdemEvento).values(autor_login=None))
+
+    [evento] = client.get(f"/ordens-inspecao/{ordem['id']}").json()["eventos"]
+
+    assert evento["autor_login"] is None

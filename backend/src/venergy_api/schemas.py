@@ -616,6 +616,8 @@ class EventoSchema(BaseModel):
     status_anterior: StatusOrdem | None
     status_novo: StatusOrdem
     observacao: str | None
+    # Login de quem agiu; vazio nos eventos de antes do login (DEC-050).
+    autor_login: str | None
     ocorrido_em: datetime
 
 
