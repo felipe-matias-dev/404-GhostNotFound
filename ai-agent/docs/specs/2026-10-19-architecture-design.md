@@ -292,7 +292,7 @@ Comparar o texto do SQL não vale como métrica: duas consultas diferentes podem
 - A rubrica é fixa e versionada (`prompts/judge/v1`). A saída é `JudgeVerdict(score: int 1–5, passed: bool, rationale: str)`, validada por Pydantic.
 - Antes de confiar no juiz, calibrar com uma amostra pequena avaliada por uma pessoa.
 - **Implementado** (DEC-047): `domain/judge.py` (`JudgeVerdict`, `PASS_SCORE = 4`: `passed` é verdadeiro se e só se `score >= 4`), porta `AnswerJudge`, adapter `PydanticAiAnswerJudge` e rubrica `prompts/judge/v1/judge.md`, com pergunta, resposta e linhas delimitadas por nonce.
-- O juiz só avalia itens `answered` de rodada narrada, e só na amostra sintética: `--judge` é recusado com `--dataset gold_real` (as linhas não saem da máquina, DEC-015) e com `--sql-only`. Um erro do provedor no juiz deixa os campos nulos e conta em `judge_errors`.
+- O juiz só avalia itens `answered` de rodada narrada, na amostra ou na Gold real (DEC-015, aceita em 29/10/2026): `--judge` é recusado com `--sql-only`. Um erro do provedor no juiz deixa os campos nulos e conta em `judge_errors`.
 - **Calibração pendente:** em 15 itens `answered`, uma pessoa dá a nota 1–5 sem ver a do juiz. O juiz passa a contar com concordância de `passed` em pelo menos 12 de 15 e diferença média absoluta de nota até 1; senão a rubrica vai para `judge/v2`. Até lá, o resultado do juiz não decide merge.
 
 ### 9.5 Encaixe na arquitetura
