@@ -5,7 +5,7 @@ from pydantic_ai.models.openrouter import OpenRouterModel
 
 from venergy_agent.config import AgentSettings
 from venergy_agent.infrastructure import llm
-from venergy_agent.infrastructure.llm import build_model
+from venergy_agent.infrastructure.llm import build_judge_model, build_model
 
 
 def settings(**overrides):
@@ -64,3 +64,24 @@ def test_gemini_client_retries_transient_errors_with_backoff(monkeypatch):
     assert options.attempts == 4
     assert options.initial_delay == 0.5
     assert sorted(options.http_status_codes) == [429, 503]
+
+
+def test_builds_the_judge_model_from_its_own_setting():
+    model = build_judge_model(settings())
+
+    assert isinstance(model, GoogleModel)
+    assert model.model_name == "gemini-3.1-flash"
+
+
+def test_judge_without_its_provider_key_names_the_variable_and_not_a_key():
+    only_openrouter = AgentSettings(
+        _env_file=None,
+        llm_model="openrouter:google/gemma-4-31b-it:free",
+        openrouter_api_key="sk-secret-999",
+        database_url="postgresql://x@localhost/db",
+    )
+
+    with pytest.raises(ValueError, match="VENERGY_AGENT_GOOGLE_API_KEY") as error:
+        build_judge_model(only_openrouter)
+
+    assert "sk-secret-999" not in str(error.value)

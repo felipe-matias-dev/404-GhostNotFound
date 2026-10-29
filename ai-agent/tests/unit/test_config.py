@@ -121,3 +121,42 @@ def test_semantic_layer_and_contract_paths_resolve_inside_the_repository(require
     assert (
         settings.prompts_dir / "insight" / settings.insight_prompt_version / "insight.md"
     ).exists()
+
+
+def judge_settings(monkeypatch, **overrides):
+    monkeypatch.setenv("VENERGY_AGENT_GOOGLE_API_KEY", "gk-test-123")
+    monkeypatch.setenv("VENERGY_AGENT_OPENROUTER_API_KEY", "sk-test-123")
+    return AgentSettings(_env_file=None, **overrides)
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"llm_model": "google-gla:gemini-3.1-flash", "judge_model": "google-gla:gemini-3.1-flash"},
+        {
+            "fallback_model": "google-gla:gemini-3.1-flash",
+            "judge_model": "google-gla:gemini-3.1-flash",
+        },
+        {
+            "llm_model": "google-gla:gemini-3.1-flash-lite",
+            "judge_model": "openrouter:google/gemini-3.1-flash-lite",
+        },
+    ],
+)
+def test_judge_model_must_differ_from_the_generator(monkeypatch, overrides):
+    with pytest.raises(ValidationError, match="judge_model"):
+        judge_settings(monkeypatch, **overrides)
+
+
+@pytest.mark.parametrize("judge_model", ["anthropic:claude-x", "google-gla:", ""])
+def test_judge_model_needs_a_known_provider_and_a_name(monkeypatch, judge_model):
+    with pytest.raises(ValidationError, match="judge_model"):
+        judge_settings(monkeypatch, judge_model=judge_model)
+
+
+def test_judge_key_is_not_required_to_load_the_settings(monkeypatch):
+    monkeypatch.setenv("VENERGY_AGENT_OPENROUTER_API_KEY", "sk-test-123")
+
+    settings = AgentSettings(_env_file=None, llm_model="openrouter:google/gemma-4-31b-it:free")
+
+    assert settings.judge_model == "google-gla:gemini-3.1-flash"

@@ -6,7 +6,7 @@ from pydantic_ai.models.openrouter import OpenRouterModel
 from pydantic_ai.providers.google import GoogleProvider
 from pydantic_ai.providers.openrouter import OpenRouterProvider
 
-from venergy_agent.config import AgentSettings
+from venergy_agent.config import PROVIDER_KEYS, AgentSettings
 
 TRANSIENT_STATUS_CODES = [429, 503]
 
@@ -16,6 +16,15 @@ def build_model(settings: AgentSettings) -> Model:
     if settings.fallback_model is None:
         return primary
     return FallbackModel(primary, _build(settings.fallback_model, settings))
+
+
+def build_judge_model(settings: AgentSettings) -> Model:
+    provider, _, _ = settings.judge_model.partition(":")
+    variable = PROVIDER_KEYS[provider]
+    secret = getattr(settings, variable)
+    if secret is None or not secret.get_secret_value().strip():
+        raise ValueError(f"the judge requires VENERGY_AGENT_{variable.upper()}")
+    return _build(settings.judge_model, settings)
 
 
 def _build(configured: str, settings: AgentSettings) -> Model:
