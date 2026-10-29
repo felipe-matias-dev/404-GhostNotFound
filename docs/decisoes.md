@@ -1399,8 +1399,8 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   simultâneas da mesma sessão podem passar um pouco do limite. O orçamento não conta a narrativa. O padrão de
   200000 tokens é uma suposição a medir nos logs (`input_tokens` da etapa `geracao`).
 - **Pendente (regra de merge, DEC-016):** a troca do prompt padrão para a v3 só entra na `main` depois de `make eval ONLY=golden`
-  na v2 e na v3 e `make eval ONLY=red_team` na v3, sem regressão fora dos follow-ups e com pelo menos 4 dos 5 follow-ups do golden
-  (G046, G095, G096, G098, G099) certos. Sem cota do Gemini na data, a rodada não foi feita; os números entram aqui e na spec §9.6.
+  na v2 e na v3 e `make eval ONLY=red_team` na v3, sem regressão nos itens comuns (os que não são follow-up) e com pelo menos 4 dos 5 follow-ups do golden
+  (G046, G095, G096, G098, G099) certos, inclusive o G046, com a memória ligada no runner da avaliação (amostra). Sem cota do Gemini na data, a rodada não foi feita; os números entram aqui e na spec §9.6.
 
 ## DEC-042 · Visão 360 da UC e comparação sazonal do consumo
 

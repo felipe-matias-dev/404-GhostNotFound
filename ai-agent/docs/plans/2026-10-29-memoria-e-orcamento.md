@@ -203,7 +203,7 @@ Mudança no `AgentAnswer` (`ai-agent/src/venergy_agent/domain/answer.py`), compa
 - `docs/decisoes.md`: **DEC-046 · Memória de conversa, orçamento de tokens e limite de perguntas por sessão** (proposta até o aceite do V1), no formato das DEC vizinhas: as regras, o contrato acima, as alternativas descartadas e as limitações. Antes de commitar, confira que a DEC-046 continua livre (`git grep -n "DEC-046" origin/main` e PRs abertos; o PR #79 usa a DEC-045; a DEC-047 está reservada para a trilha A).
 - Se o README da raiz listar variáveis do backend, acrescentar as duas novas.
 
-## Depois do merge da trilha A (fora desta implementação paralela)
+## Depois do merge da trilha A (feito na revisão do PR #86)
 
 A avaliação só exercita a memória quando o runner da trilha A (que executa cada cadeia de follow-up numa sessão e aceita um `recorder`) estiver na `main`. Depois disso, numa atualização desta branch (ou num PR curto):
 
@@ -214,7 +214,7 @@ A avaliação só exercita a memória quando o runner da trilha A (que executa c
 
 A troca de padrão para `prompts/v3` é mudança de prompt e só entra na `main` depois desta rodada:
 
-1. Pré-requisitos: tarefa pós-merge feita; amostra carregada; mesma camada semântica, mesmo modelo e mesmo golden set nos dois lados.
+1. Pré-requisitos: tarefa pós-merge feita (memória ligada na avaliação, desligada com `--dataset gold_real`); amostra carregada; mesma camada semântica, mesmo modelo e mesmo golden set nos dois lados.
 2. Linha de base: `make eval ONLY=golden` com `VENERGY_AGENT_PROMPT_VERSION=v2` (ou a última rodada v2 com o mesmo `golden_version`).
 3. Candidata: `make eval ONLY=golden` com o padrão (v3), e `make eval ONLY=red_team`.
 4. `make eval-compare A=<v2>.json B=<v3>.json`.

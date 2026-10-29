@@ -59,7 +59,7 @@ Período (G1-05): quando as linhas têm `competencia`, o texto determinístico c
 - `history_turns=3` e `session_token_budget=200000` (0 desliga cada um). O orçamento é conferido antes da pergunta; leitura do consumo que falha → `failed` sem chamar o modelo; leitura do histórico que falha → segue sem ele.
 - `AgentAnswer.input_tokens` e `output_tokens` somam só o gerador de SQL.
 - O backend limita as perguntas por sessão numa janela (`429`). Limitação: sem autenticação, trocar de `session_id` zera o limite e o orçamento.
-- Estado: a rodada do golden que libera o `prompts/v3` como padrão (DEC-016) está pendente. O runner da avaliação ainda não liga a memória (tarefa pós-merge do plano).
+- Estado: a rodada do golden que libera o `prompts/v3` como padrão (DEC-016) está pendente. A avaliação já exercita a memória nos follow-ups: o `evaluation/__main__.py` monta o agente com `InMemoryConversationHistory` (sem orçamento) e a entrega ao runner como `recorder`, de modo que G046, G095, G096, G098 e G099 usam o histórico da própria sessão. Com `--dataset gold_real` a memória fica desligada (DEC-015: o SQL dos turnos anteriores iria ao modelo). A rodada pendente compara v2 e v3: sem regressão nos itens comuns e ao menos 4 dos 5 follow-ups certos, inclusive o G046.
 
 ## 4. Camada semântica hoje
 
@@ -117,7 +117,7 @@ O banco local só tem a amostra sintética do backend (`venergy_api.amostra`). A
 - `evaluation/database_guard.py`: `PostgresDatabaseGuard` mede a violação no banco: impressão digital das views antes e depois da rodada e escritas reais com o usuário do agente, sempre com rollback (spec §9.2).
 - `evaluation/__main__.py`: CLI que grava `eval/runs/<data>.json`; `--dataset amostra|gold_real` confere a base carregada, e `--sql-only` (sempre ligado na Gold real) monta o agente sem o redator. Os relatórios da Gold real vão para `eval/runs_gold/`, fora do Git (issue #56).
 - `evaluation/compare.py` (`make eval-compare A=... B=...`): tabela markdown de duas rodadas, sem chamar modelo; as métricas são recalculadas só sobre os itens em comum, lista os itens que mudaram e avisa quando `failed` passa de 5%.
-- O runner roda cada cadeia de follow-up em sequência, numa sessão própria, e entrega cada turno a um `TurnRecorder` opcional (ponto de ligação da memória, G1-10). `--judge` liga o juiz (porta `AnswerJudge`) só na amostra narrada; as métricas ganham `refusal_accuracy` e `judge_*`.
+- O runner roda cada cadeia de follow-up em sequência, numa sessão própria, e entrega cada turno a um `TurnRecorder` opcional (ponto de ligação da memória, G1-10, ligado ao adapter em memória no CLI da avaliação, exceto na Gold real). `--judge` liga o juiz (porta `AnswerJudge`) só na amostra narrada; as métricas ganham `refusal_accuracy` e `judge_*`.
 - Linha de base e achados: spec §9.6.
 
 ## 7. Onde está cada coisa
