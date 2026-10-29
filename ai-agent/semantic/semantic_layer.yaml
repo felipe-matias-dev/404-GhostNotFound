@@ -13,7 +13,7 @@
 # As linhas de exemplo são sintéticas, escritas à mão. Nenhum valor real da Gold entra aqui.
 # Depois de cada mudança, gere o views.sql (ver a seção Camada semântica em ai-agent/README.md).
 
-version: "0.3.6"
+version: "0.4.0"
 
 views:
   - name: sem_uc
@@ -38,9 +38,21 @@ views:
       - name: consumo_medio_kwh_12m
         unit: "kWh"
         description: "consumo médio da UC nos últimos 12 meses, em kWh; vazio quando a UC não tem nenhuma leitura"
+      - name: data_ligacao
+        description: "data em que a UC foi ligada (cliente desde)"
+      - name: data_conexao_gd
+        description: "data em que a geração própria foi conectada; vazia sem GD"
+      - name: modalidade_gd
+        description: "modalidade da geração própria: geracao_propria_uc, autoconsumo_remoto ou geracao_compartilhada; vazia sem GD"
+      - name: energia_injetada_kwh_mes
+        unit: "kWh/mês"
+        description: "energia média injetada na rede por mês pela geração própria; vazia sem GD"
+      - name: potencia_kwp
+        unit: "kWp"
+        description: "potência de pico instalada da geração própria; só para UCs com GD"
     sample_rows:
-      - {cod_uc: "0001", municipio: "Município Exemplo A", bairro: "Bairro exemplo 1", classe: "B1", classe_cadastro: "Residencial", cod_alimentador: "AL-01", possui_gd: false, consumo_medio_kwh_12m: 250.5}
-      - {cod_uc: "0002", municipio: "Município Exemplo B", bairro: "Bairro exemplo 2", classe: "A4", classe_cadastro: "Industrial", cod_alimentador: "AL-02", possui_gd: true, consumo_medio_kwh_12m: 18000.0}
+      - {cod_uc: "0001", municipio: "Município Exemplo A", bairro: "Bairro exemplo 1", classe: "B1", classe_cadastro: "Residencial", cod_alimentador: "AL-01", possui_gd: false, consumo_medio_kwh_12m: 250.5, data_ligacao: "2015-06-01", data_conexao_gd: null, modalidade_gd: null, energia_injetada_kwh_mes: null, potencia_kwp: null}
+      - {cod_uc: "0002", municipio: "Município Exemplo B", bairro: "Bairro exemplo 2", classe: "A4", classe_cadastro: "Industrial", cod_alimentador: "AL-02", possui_gd: true, consumo_medio_kwh_12m: 18000.0, data_ligacao: "2010-03-15", data_conexao_gd: "2023-08-01", modalidade_gd: "geracao_propria_uc", energia_injetada_kwh_mes: 900.0, potencia_kwp: 7.5}
 
   - name: sem_faturamento_mensal
     source: gold_fato_faturamento_mensal
@@ -71,9 +83,28 @@ views:
         description: "tarifa de uma UC numa competência: receita de energia dividida pela energia faturada, sem tributos; vazia quando a energia é zero. Não some nem faça média desta coluna entre UCs ou meses"
       - name: bandeira
         description: "bandeira tarifária da competência"
+      - name: receita_bandeira
+        unit: "R$"
+        description: "parte da receita de energia que é acréscimo da bandeira do mês; zero na bandeira verde"
+      - name: data_vencimento
+        description: "data de vencimento da fatura"
+      - name: data_pagamento
+        description: "data em que a fatura foi paga; vazia quando não foi paga"
+      - name: status_pagamento
+        description: "situação da fatura: paga, paga_com_atraso, em_aberto ou em_atraso (inadimplente)"
+      - name: dias_em_atraso
+        unit: "dias"
+        description: "dias de atraso da fatura paga com atraso ou em atraso; vazio nos demais casos"
+      - name: tipo_leitura
+        description: "real quando a leitura foi feita no medidor, estimada quando não foi"
+      - name: tipo_medidor
+        description: "tipo do medidor que fez a leitura do mês: eletromecanico, eletronico ou smart"
+      - name: dias_faturados
+        unit: "dias"
+        description: "dias entre a leitura do mês e a anterior; explica parte da variação da conta; vazio na primeira leitura"
     sample_rows:
-      - {cod_uc: "0001", competencia: "2025-03", kwh_faturado: 230.0, receita_faturada: 180.4, receita_energia: 160.0, tributos: 20.4, receita_arrecadada: 180.4, tarifa_media: 0.70, bandeira: "verde"}
-      - {cod_uc: "0002", competencia: "2025-03", kwh_faturado: 0.0, receita_faturada: 0.0, receita_energia: 0.0, tributos: 0.0, receita_arrecadada: 0.0, tarifa_media: null, bandeira: "amarela"}
+      - {cod_uc: "0001", competencia: "2025-03", kwh_faturado: 230.0, receita_faturada: 180.4, receita_energia: 160.0, tributos: 20.4, receita_arrecadada: 180.4, tarifa_media: 0.70, bandeira: "verde", receita_bandeira: 0.0, data_vencimento: "2025-04-10", data_pagamento: "2025-04-08", status_pagamento: "paga", dias_em_atraso: null, tipo_leitura: "real", tipo_medidor: "eletronico", dias_faturados: 31}
+      - {cod_uc: "0002", competencia: "2025-03", kwh_faturado: 0.0, receita_faturada: 0.0, receita_energia: 0.0, tributos: 0.0, receita_arrecadada: 0.0, tarifa_media: null, bandeira: "amarela", receita_bandeira: 0.0, data_vencimento: "2025-04-10", data_pagamento: null, status_pagamento: "em_atraso", dias_em_atraso: 12, tipo_leitura: "estimada", tipo_medidor: "smart", dias_faturados: 30}
 
   - name: sem_continuidade_alimentador_mensal
     source: gold_continuidade_alimentador_mensal
@@ -186,9 +217,33 @@ views:
       - name: n_notas
         unit: "contagem"
         description: "chamados que receberam nota de satisfação; componente da satisfação média"
+      - name: receita_bandeira
+        unit: "R$"
+        description: "parte da receita de energia do recorte que é acréscimo de bandeira"
+      - name: n_faturas
+        unit: "contagem"
+        description: "faturas emitidas para as UCs do recorte na competência"
+      - name: n_faturas_nao_pagas
+        unit: "contagem"
+        description: "faturas da competência ainda não pagas (em aberto ou em atraso); componente da inadimplência"
+      - name: valor_nao_pago
+        unit: "R$"
+        description: "valor das faturas da competência ainda não pagas"
+      - name: n_faturas_pagas_com_atraso
+        unit: "contagem"
+        description: "faturas da competência pagas depois do vencimento"
+      - name: soma_dias_em_atraso
+        unit: "dias"
+        description: "soma dos dias de atraso das faturas com atraso; componente do atraso médio"
+      - name: n_leituras
+        unit: "contagem"
+        description: "leituras das UCs do recorte na competência"
+      - name: n_leituras_estimadas
+        unit: "contagem"
+        description: "leituras estimadas (não feitas no medidor); componente do percentual de leitura estimada"
     sample_rows:
-      - {competencia: "2025-03", municipio: "Município Exemplo A", bairro: "Bairro exemplo 1", classe_cadastro: "Residencial", classe: "B1", cod_alimentador: "AL-01", tipo_medidor: "smart", possui_gd: false, n_uc: 1200, kwh_faturado: 300000.0, receita_faturada: 240000.0, receita_energia: 210000.0, tributos: 30000.0, receita_arrecadada: 228000.0, horas_interrompidas: 1800.0, n_interrupcoes: 950, n_chamados: 85, soma_notas: 280.0, n_notas: 70}
-      - {competencia: "2025-03", municipio: "Município Exemplo A", bairro: "Bairro exemplo 1", classe_cadastro: "Poder Público", classe: "B3", cod_alimentador: "AL-02", tipo_medidor: "sem_medidor", possui_gd: true, n_uc: 4, kwh_faturado: 0.0, receita_faturada: 0.0, receita_energia: 0.0, tributos: 0.0, receita_arrecadada: null, horas_interrompidas: 0.0, n_interrupcoes: 0, n_chamados: 0, soma_notas: null, n_notas: 0}
+      - {competencia: "2025-03", municipio: "Município Exemplo A", bairro: "Bairro exemplo 1", classe_cadastro: "Residencial", classe: "B1", cod_alimentador: "AL-01", tipo_medidor: "smart", possui_gd: false, n_uc: 1200, kwh_faturado: 300000.0, receita_faturada: 240000.0, receita_energia: 210000.0, tributos: 30000.0, receita_arrecadada: 228000.0, horas_interrompidas: 1800.0, n_interrupcoes: 950, n_chamados: 85, soma_notas: 280.0, n_notas: 70, receita_bandeira: 6000.0, n_faturas: 1200, n_faturas_nao_pagas: 60, valor_nao_pago: 12000.0, n_faturas_pagas_com_atraso: 90, soma_dias_em_atraso: 1350, n_leituras: 1200, n_leituras_estimadas: 36}
+      - {competencia: "2025-03", municipio: "Município Exemplo A", bairro: "Bairro exemplo 1", classe_cadastro: "Poder Público", classe: "B3", cod_alimentador: "AL-02", tipo_medidor: "sem_medidor", possui_gd: true, n_uc: 4, kwh_faturado: 0.0, receita_faturada: 0.0, receita_energia: 0.0, tributos: 0.0, receita_arrecadada: null, horas_interrompidas: 0.0, n_interrupcoes: 0, n_chamados: 0, soma_notas: null, n_notas: 0, receita_bandeira: 0.0, n_faturas: 4, n_faturas_nao_pagas: 0, valor_nao_pago: 0.0, n_faturas_pagas_com_atraso: 0, soma_dias_em_atraso: 0, n_leituras: 0, n_leituras_estimadas: 0}
 
   - name: sem_receita_decomposicao
     source: gold_receita_decomposicao
@@ -232,6 +287,87 @@ views:
       - {periodo_base: "2024-01/2024-12", periodo_atual: "2025-01/2025-12", municipio: "Município Exemplo A", bairro: "Bairro exemplo 1", classe: "B1", possui_gd: false, receita_base: 1000.0, receita_atual: 1100.0, efeito_preco: 80.0, efeito_tarifa: 60.0, efeito_bandeira: 20.0, efeito_volume: 30.0, efeito_mix: -10.0}
       - {periodo_base: "2024-01/2024-12", periodo_atual: "2025-01/2025-12", municipio: "Município Exemplo A", bairro: "Bairro exemplo 1", classe: "B1", possui_gd: true, receita_base: 500.0, receita_atual: 420.0, efeito_preco: 40.0, efeito_tarifa: 30.0, efeito_bandeira: 10.0, efeito_volume: -115.0, efeito_mix: -5.0}
 
+  - name: sem_interrupcoes_uc
+    source: gold_interrupcoes_uc
+    description: "Ocorrências de interrupção (falta de luz) de cada UC, uma por linha"
+    grain: "uma linha por ocorrência de rede de uma UC"
+    columns:
+      - name: cod_ocorrencia
+        description: "código da ocorrência de rede"
+      - name: cod_uc
+        description: "código da UC interrompida; para o alimentador, ligue a sem_uc por cod_uc"
+      - name: competencia
+        description: "mês de abertura da ocorrência, no formato AAAA-MM"
+      - name: data_abertura
+        description: "início da interrupção"
+      - name: data_encerramento
+        description: "fim da interrupção"
+      - name: duracao_horas
+        unit: "h"
+        description: "duração da interrupção em horas"
+      - name: tipo
+        description: "tipo da ocorrência, por exemplo FALTA DE ENERGIA ou OSCILACAO"
+      - name: causa
+        description: "causa registrada, por exemplo CLIMATICA ou VEGETACAO; vazia quando não foi registrada"
+    sample_rows:
+      - {cod_ocorrencia: "OC-0001", cod_uc: "0001", competencia: "2025-03", data_abertura: "2025-03-04 14:10:00", data_encerramento: "2025-03-04 16:40:00", duracao_horas: 2.5, tipo: "FALTA DE ENERGIA", causa: "CLIMATICA"}
+      - {cod_ocorrencia: "OC-0002", cod_uc: "0001", competencia: "2025-03", data_abertura: "2025-03-20 08:00:00", data_encerramento: "2025-03-20 08:30:00", duracao_horas: 0.5, tipo: "OSCILACAO", causa: null}
+
+  - name: sem_atendimentos_uc
+    source: gold_atendimentos_uc
+    description: "Chamados de atendimento de cada UC, um por linha, com canal, assunto e nota"
+    grain: "uma linha por chamado (protocolo)"
+    columns:
+      - name: protocolo
+        description: "protocolo do chamado"
+      - name: cod_uc
+        description: "código da UC que abriu o chamado"
+      - name: competencia
+        description: "mês de abertura do chamado, no formato AAAA-MM"
+      - name: data_abertura
+        description: "abertura do chamado"
+      - name: data_fechamento
+        description: "fechamento do chamado"
+      - name: canal
+        description: "canal de entrada, por exemplo TELEFONE, APP ou WHATSAPP"
+      - name: assunto
+        description: "assunto do chamado, por exemplo FALTA DE ENERGIA ou FATURA"
+      - name: subassunto
+        description: "detalhe do assunto"
+      - name: nota_satisfacao
+        unit: "nota"
+        description: "nota de satisfação de 1 a 5; vazia quando o cliente não avaliou. A satisfação média é avg(nota_satisfacao) só sobre os avaliados"
+    sample_rows:
+      - {protocolo: "AT-0001", cod_uc: "0001", competencia: "2025-03", data_abertura: "2025-03-04 15:00:00", data_fechamento: "2025-03-04 15:20:00", canal: "TELEFONE", assunto: "FALTA DE ENERGIA", subassunto: "SEM ENERGIA NA RUA", nota_satisfacao: 4.0}
+      - {protocolo: "AT-0002", cod_uc: "0002", competencia: "2025-03", data_abertura: "2025-03-12 10:00:00", data_fechamento: "2025-03-13 09:00:00", canal: "APP", assunto: "FATURA", subassunto: "SEGUNDA VIA", nota_satisfacao: null}
+
+  - name: sem_medidor_uc
+    source: gold_medidor_uc
+    description: "Medidor vigente de cada UC: tipo, modelo, idade e trocas"
+    grain: "uma linha por UC com medidor"
+    columns:
+      - name: cod_uc
+        description: "código da UC"
+      - name: cod_medidor
+        description: "código do medidor vigente"
+      - name: tipo_medidor
+        description: "tipo do medidor vigente: eletromecanico, eletronico ou smart"
+      - name: modelo
+        description: "modelo do medidor vigente"
+      - name: data_instalacao
+        description: "instalação do medidor vigente"
+      - name: idade_anos
+        unit: "anos"
+        description: "idade do medidor vigente no fim da última competência dos dados"
+      - name: n_trocas
+        unit: "contagem"
+        description: "medidores já retirados da UC"
+      - name: data_ultima_troca
+        description: "retirada do medidor anterior; vazia se nunca houve troca"
+    sample_rows:
+      - {cod_uc: "0001", cod_medidor: "MD-0001", tipo_medidor: "eletronico", modelo: "Modelo exemplo X", data_instalacao: "2019-05-10", idade_anos: 6.6, n_trocas: 1, data_ultima_troca: "2019-05-10"}
+      - {cod_uc: "0002", cod_medidor: "MD-0002", tipo_medidor: "smart", modelo: "Modelo exemplo Y", data_instalacao: "2024-02-01", idade_anos: 1.9, n_trocas: 0, data_ultima_troca: null}
+
 glossary:
   - term: "conta de luz"
     synonyms: ["conta", "fatura", "cobrança"]
@@ -240,17 +376,26 @@ glossary:
     synonyms: ["energia cobrada", "kWh faturados"]
     maps_to: "kwh_faturado"
   - term: "falta de luz"
-    synonyms: ["apagão", "queda de energia", "interrupção"]
-    maps_to: "horas_interrompidas, n_interrupcoes, dec e fec"
+    synonyms: ["apagão", "queda de energia", "interrupção", "ocorrência"]
+    maps_to: "de uma UC: as linhas de sem_interrupcoes_uc (count(*) e sum(duracao_horas)); de um alimentador, recorte ou da empresa: dec, fec, horas_interrompidas e n_interrupcoes"
   - term: "painel solar"
     synonyms: ["energia solar", "geração distribuída", "GD"]
     maps_to: "possui_gd"
   - term: "chamado"
     synonyms: ["atendimento", "reclamação", "ligação para o call center"]
-    maps_to: "n_chamados em sem_kpis_mensais ou sem_kpis_segmento_mensal"
+    maps_to: "n_chamados em sem_kpis_mensais ou sem_kpis_segmento_mensal; de uma UC, por canal ou por assunto: as linhas de sem_atendimentos_uc"
   - term: "satisfação"
     synonyms: ["nota do atendimento", "avaliação do atendimento"]
-    maps_to: "satisfacao_media em sem_kpis_mensais; soma_notas e n_notas em sem_kpis_segmento_mensal"
+    maps_to: "satisfacao_media em sem_kpis_mensais; soma_notas e n_notas em sem_kpis_segmento_mensal; por canal ou assunto, avg(nota_satisfacao) em sem_atendimentos_uc"
+  - term: "medidor"
+    synonyms: ["relógio de luz", "relógio"]
+    maps_to: "sem_medidor_uc (medidor vigente da UC); tipo_medidor da leitura em sem_faturamento_mensal"
+  - term: "inadimplência"
+    synonyms: ["conta atrasada", "fatura em atraso", "conta não paga", "calote"]
+    maps_to: "status_pagamento e dias_em_atraso em sem_faturamento_mensal; n_faturas_nao_pagas, n_faturas e valor_nao_pago em sem_kpis_segmento_mensal"
+  - term: "leitura estimada"
+    synonyms: ["conta pela média", "leitura pela média", "sem leitura"]
+    maps_to: "tipo_leitura = 'estimada' em sem_faturamento_mensal; n_leituras_estimadas e n_leituras em sem_kpis_segmento_mensal"
   - term: "efeito preço"
     synonyms: ["reajuste", "aumento de tarifa"]
     maps_to: "efeito_preco (efeito_tarifa + efeito_bandeira) em sem_receita_decomposicao"
@@ -286,16 +431,28 @@ rules:
   - text: "Bairro só identifica um lugar junto com o município: filtre e agrupe sempre por municipio e bairro."
   - text: "Totais da empresa por mês (energia, receita, DEC, FEC, chamados e satisfação) vêm prontos de sem_kpis_mensais."
   - text: "DEC e FEC por alimentador vêm prontos de sem_continuidade_alimentador_mensal; da empresa, de sem_kpis_mensais. Leia; não recalcule."
-  - text: "DEC e FEC de um período de vários meses (semestre, ano) são a soma dos valores mensais prontos, porque são indicadores acumulados: sum(dec) e sum(fec) sobre as competências do período. Nunca use a média (avg) dos meses (DEC-032, proposta). Por recorte de sem_kpis_segmento_mensal, use a fórmula dos componentes da regra de recortes."
+  - text: "DEC e FEC de um período de vários meses (semestre, ano) são a soma dos valores mensais prontos, porque são indicadores acumulados: sum(dec) e sum(fec) sobre as competências do período. Nunca use a média (avg) dos meses (DEC-032). Por recorte de sem_kpis_segmento_mensal, use a fórmula dos componentes da regra de recortes."
   - text: "Por município, bairro, classe ou GD, use sem_kpis_segmento_mensal e some os componentes antes de dividir; nunca faça média de índices. Num mês: DEC = sum(horas_interrompidas) / sum(n_uc) e FEC = sum(n_interrupcoes) / sum(n_uc). Num período de vários meses, divida pela média mensal de UCs: sum(n_uc) dividido pelo número de meses do período pedido (3 num trimestre), e não pelos meses que aparecem no resultado. Satisfação = sum(soma_notas) / sum(n_notas), com NULLIF no divisor."
   - text: "Efeitos de preço, tarifa, bandeira, volume e mix são lidos de sem_receita_decomposicao e somados sobre o recorte; não recalcule. receita_base e receita_atual são receita de energia, sem tributos."
   - text: "Em sem_receita_decomposicao, periodo_base e periodo_atual são faixas AAAA-MM/AAAA-MM. Filtre pelo par exato de períodos. Se a pergunta não disser os dois períodos, peça esclarecimento (clarify)."
-  - text: "Score de suspeita, perda não técnica, atendimento por UC, interrupções por UC e medidor não estão nas views: pergunta sobre eles é unknown."
+  - text: "Score de suspeita e perda não técnica não estão nas views: pergunta sobre eles é unknown."
+  - text: "Por UC: interrupções em sem_interrupcoes_uc, chamados em sem_atendimentos_uc e medidor em sem_medidor_uc, todas ligadas a sem_uc por cod_uc. sem_faturamento_mensal, sem_interrupcoes_uc e sem_atendimentos_uc têm várias linhas por UC: nunca junte duas delas direto, porque a junção multiplica as somas. Agregue cada uma por cod_uc numa CTE antes de juntar."
+  - text: "Falta de luz na rua ou na região de uma UC: responda com as interrupções da própria UC em sem_interrupcoes_uc. O DEC e o FEC do alimentador dela, em sem_continuidade_alimentador_mensal, complementam, mas não dizem se a UC foi afetada."
+  - text: "Percentual de faturas não pagas de um recorte = sum(n_faturas_nao_pagas) / NULLIF(sum(n_faturas), 0); percentual de leituras estimadas = sum(n_leituras_estimadas) / NULLIF(sum(n_leituras), 0). Some os componentes antes de dividir."
   - text: "Para ligar uma UC ao alimentador use sem_uc.cod_alimentador = sem_continuidade_alimentador_mensal.cod_alimentador."
   - text: "Períodos relativos à base ('primeiro ano da base', 'últimos 12 meses') saem das competências que existem. Numere as competências distintas com row_number() OVER (ORDER BY competencia) para o início e OVER (ORDER BY competencia DESC) para o fim, filtre por ordem <= 12 e declare os períodos usados como suposição. Nesse caso, não peça esclarecimento. A regra vale só para essas duas expressões. 'Último ano', 'ano passado' e 'último trimestre' são ambíguos (ano civil ou 12 meses móveis): peça esclarecimento, e nunca escreva anos ou meses fixos que a pergunta não trouxe."
   - text: "Quando a pergunta compara dois períodos e não diz quais são, peça esclarecimento (clarify). Não escolha os períodos sozinho. Períodos relativos à base, como 'primeiro ano da base' e 'últimos 12 meses', contam como ditos."
   - text: "n_uc é o número de UCs faturadas na competência (PRODIST). Para a quantidade de UCs num período, use a média mensal (soma dividida pelo número de meses), nunca a soma sozinha."
 examples:
+  - question: "Quantas interrupções a UC 0001 teve em 2025 e por quantas horas?"
+    sql: "SELECT count(*) AS interrupcoes, sum(duracao_horas) AS horas FROM sem_interrupcoes_uc WHERE cod_uc = '0001' AND competencia BETWEEN '2025-01' AND '2025-12'"
+    expected_status: ok
+  - question: "Qual canal de atendimento teve a pior satisfação em 2025?"
+    sql: "SELECT canal, avg(nota_satisfacao) AS satisfacao_media, count(nota_satisfacao) AS avaliados FROM sem_atendimentos_uc WHERE competencia BETWEEN '2025-01' AND '2025-12' GROUP BY canal ORDER BY satisfacao_media ASC"
+    expected_status: ok
+  - question: "Quantas UCs têm medidor com mais de 10 anos, por tipo?"
+    sql: "SELECT tipo_medidor, count(*) AS ucs FROM sem_medidor_uc WHERE idade_anos > 10 GROUP BY tipo_medidor ORDER BY ucs DESC"
+    expected_status: ok
   - question: "Quantas UCs existem em cada classe de consumo?"
     sql: "SELECT classe, count(*) AS total FROM sem_uc GROUP BY classe ORDER BY classe"
     expected_status: ok

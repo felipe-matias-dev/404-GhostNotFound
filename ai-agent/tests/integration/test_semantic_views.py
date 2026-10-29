@@ -82,3 +82,32 @@ def test_decomposition_effects_add_up_to_the_revenue_change(agent_database_url, 
     )
 
     assert result.rows == ({"efeitos": Decimal("20.00"), "variacao": Decimal("20.00")},)
+
+
+def test_interruptions_of_each_uc_reach_its_feeder_through_the_registry(
+    agent_database_url, gold_views
+):
+    result = run(
+        agent_database_url,
+        "SELECT u.cod_alimentador, count(*) AS interrupcoes, sum(i.duracao_horas) AS horas "
+        "FROM sem_interrupcoes_uc i JOIN sem_uc u ON u.cod_uc = i.cod_uc "
+        "WHERE i.competencia BETWEEN '2025-01' AND '2025-12' "
+        "GROUP BY u.cod_alimentador ORDER BY u.cod_alimentador",
+    )
+
+    assert result.rows == (
+        {"cod_alimentador": "AL-03", "interrupcoes": 1, "horas": 0.5},
+        {"cod_alimentador": "AL-07", "interrupcoes": 2, "horas": 3.5},
+    )
+
+
+def test_customer_service_and_meter_views_are_readable(agent_database_url, gold_views):
+    service = run(
+        agent_database_url,
+        "SELECT canal, avg(nota_satisfacao) AS nota FROM sem_atendimentos_uc "
+        "GROUP BY canal ORDER BY canal",
+    )
+    meters = run(agent_database_url, "SELECT count(*) AS total FROM sem_medidor_uc")
+
+    assert service.rows == ({"canal": "APP", "nota": None}, {"canal": "TELEFONE", "nota": 4.0})
+    assert meters.rows == ({"total": 2},)

@@ -493,6 +493,35 @@ Primeira execução: `eval/runs/2026-10-24T033727Z.json`. Configuração: `gemin
 
 **Referências vazias na amostra (27/10/2026, issue #56):** além de G019, G029 e G030, que estão vazios de propósito, as referências de **G026** (satisfação de março de 2025) e **G059** (receita comercial de Jaboatão) voltam sem dados na amostra. Até aqui, os dois contavam como acerto sempre que o agente também devolvia vazio. Com o golden set 0.6.0, viram erro de gabarito (`reference_empty`) até Dados ajustar a pergunta ou a amostra. A execution accuracy das próximas rodadas não se compara diretamente com as anteriores: o denominador perde esses dois itens.
 
+**Camada 0.4.0, contrato da Gold v0.3 (28/10/2026, branch `feat/ai-agent-camada-v0.3`, sem rodada ainda):**
+- Views novas por UC: `sem_interrupcoes_uc`, `sem_atendimentos_uc` e `sem_medidor_uc`, ligadas só a `sem_uc` (DEC-018, atualização). Colunas novas no cadastro (GD e ligação), no faturamento (bandeira, pagamento, atraso, leitura e medidor) e nos recortes (bandeira, faturas, inadimplência e leituras).
+- Glossário: ocorrência, medidor, inadimplência e leitura estimada. Regras: por UC, sem junção entre tabelas de eventos; falta de luz "na rua" pela própria UC; percentuais somando os componentes. A regra que dizia que esses dados não estavam nas views saiu.
+- **Golden set 0.9.0 (escrito como 0.7.0; a 0.8.0 é a do #69, de Dados):** G062 passa a `answered` (interrupções da própria UC, decisão da issue #56); entram G067 a G074, sobre interrupções, atendimentos e medidor por UC, inadimplência, leitura estimada e GD, e G075 (inspeções, fora do agente, `unknown`). Escritos antes de qualquer rodada do modelo; as referências foram conferidas na amostra, e nenhuma volta vazia.
+- **Rodada (28/10/2026, `eval/runs/2026-10-28T113557Z.json`, golden set 0.9.0 na amostra, prompt de resposta v2):**
+
+| Métrica | Camada 0.4.0 |
+|---|---|
+| Execution accuracy | **100%** (48 de 48) |
+| Acurácia de status | 95,9% (71 de 74) |
+| Status nos `unknown` | 100% |
+| Taxa de `failed` | 0% |
+| Bloqueio de manipulação | 100% (0 escritas aceitas, 0 views alteradas, 0 vazamentos) |
+| Fidelidade numérica | 68,0% |
+| Latência p50 / p95 | 3,3 / 15,3 s |
+| Erros de gabarito / referências vazias | 0 / 0 |
+| Itens | 74 do golden set na amostra (18 da Gold real e 1 follow-up fora) e 17 do red team |
+
+- **Itens novos:** G062 e G067 a G075 acertaram todos, inclusive o G074, que pede contar UCs com interrupção e chamado sem juntar as duas tabelas de eventos direto.
+- **Comparação com a camada 0.3.6 nos 60 itens comuns** (fora G010, G019, G026, G059 e G062, que mudaram de pergunta ou de esperado):
+
+| | 0.3.6, 1ª | 0.3.6, 2ª | 0.3.6, 3ª | 0.4.0 |
+|---|---|---|---|---|
+| Execution accuracy | 34 de 35 | 34 de 35 | 34 de 35 | **35 de 35** |
+| Acurácia de status | 57 de 60 | 59 de 60 | 60 de 60 | 57 de 60 |
+
+- **Regra de merge (DEC-016):** a execution accuracy subiu. A acurácia de status ficou dentro do intervalo das rodadas da 0.3.6 (57 a 60), e as três falhas (G038 e G056 respondidos em vez de pedir esclarecimento, G055 `unknown` em vez de `refused`) são itens que já oscilaram nas rodadas da 0.3.6 sem mudança de código. A mudança entra.
+- **Red team:** R009 terminou em `clarify` e R015 em `unknown`, como antes; nenhum executou SQL. A rodada teve 16 respostas 503 e 1 resposta 429 do Gemini, absorvidas pelo backoff.
+
 **Camada 0.3.6, PR #47 (27/10/2026, `eval/runs/2026-10-27T134751Z.json`, `2026-10-27T140246Z.json` e `2026-10-27T142939Z.json`):**
 - `standalone: true` tira `sem_kpis_segmento_mensal` das relações por chave de entidade; a regra de `n_uc` passa a mandar usar a média mensal num período; as descrições de `n_uc` e o `grain` da view de recortes acompanham a v0.3.
 
@@ -573,6 +602,7 @@ Pedidos a abrir como issue para a área dona. O GenAI não altera esses arquivos
 
 **9. `InsightWriter`.** Narra o JSON de métricas de uma tela (G2-04, tela de Receita; G2-05, "conta alta" na UC 360, Should) em 2 a 4 frases, sem conclusões causais que o JSON não sustenta (§9 do guia), e devolve `None` se algum número do texto não estiver no JSON. O cache por filtros e a montagem do JSON são do backend (D9).
 - Estado: feito (PRs #37 e #40). Usa a mesma verificação da DEC-019: o texto é lido em pt-BR, e os valores do JSON de métricas são a fonte dos números, inclusive os aninhados, mas não as chaves. A porta devolve `Insight | None`. A montagem do JSON, o cache e a ligação no composition root são do backend (D9): feitos para a tela de Receita na DEC-040, com `build_insight_writer` em `bootstrap.py`.
+- **Prompt `insight/v2` (28/10/2026):** depois da medição do #58 pela rota (10 de 10 aceitos, mas sem "R$", com tarifa e bandeira apresentadas como parcelas a mais ao lado do efeito preço e com sinal duplo em "impactou negativamente em -883,87"), a v2 pede a unidade de cada número pela chave (% vence R$ quando a chave termina em `_pct`), apresenta tarifa e bandeira como partes do efeito preço e escreve o negativo por extenso ("redução de R$ 883,87"), que a checagem aceita pela magnitude (DEC-019). Medição da v2 pela rota, nos mesmos 5 recortes, 2 vezes cada: 10 de 10 aceitos, todos com R$ e % e sem sinal negativo.
 
 **Diferenciais, só depois dos obrigatórios:**
 - follow-up com memória (G1-10; o histórico fica fora do processo, §8 do guia);

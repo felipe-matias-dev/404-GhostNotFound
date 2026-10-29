@@ -225,7 +225,10 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   o notebook só valida e confere tabelas existentes. Uma fonte com falha é marcada e não
   é gravada, e o resumo final falha se houver fonte com falha, pendente ou sem
   idempotência comprovada. As opções de leitura ficam no código da fonte, versionadas,
-  e são impressas a cada execução.
+  e são impressas a cada execução. O widget `exigir_idempotencia` (padrão `sim`) pode ser
+  `nao` no Workflow: a conferência contra a origem continua, e só a comparação entre as duas
+  últimas gravações é pulada, porque depende de time travel (7 dias de retenção) e não se
+  aplica a cargas mensais com dados novos ([DEC-039](#dec-039--workflow-do-databricks-e-agendamento-mensal)).
 - **Formatos:** CSV com `FAILFAST` e tudo string. Uma pasta com vários CSVs (`leituras/`)
   vira uma tabela só se todos os arquivos tiverem o mesmo conjunto de colunas, unidos por
   nome. JSON preserva structs e arrays, com valores primitivos como string
@@ -483,6 +486,8 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Consequência:** `sem_faturamento_mensal` liga a `sem_uc` por `cod_uc`, e `sem_uc` liga a `sem_continuidade_alimentador_mensal` por `cod_alimentador`.
 - **Decomposição (23/10/2026):** `sem_receita_decomposicao` entra sem relação com outras views. A junção composta com `gold_dim_uc` (município, bairro, classe e GD) continua `a_confirmar` no contrato e repetiria cada efeito uma vez por UC do recorte. As perguntas de recorte se respondem filtrando a própria view.
 - **Atualização (26/10/2026):** views de recorte agregado, marcadas com `standalone: true` no `semantic_layer.yaml` (hoje `sem_kpis_segmento_mensal`), não entram nas relações por chave de entidade. Motivo: elas já trazem `cod_alimentador` como recorte, e o join com `sem_uc` ou com a continuidade repete e multiplica somas (pedido da Dados no #43).
+- **Atualização (28/10/2026, camada 0.4.0):** uma chave coberta por chave estrangeira do contrato para uma view da camada liga só por essa chave estrangeira. A ligação por chave compartilhada (`ENTITY_KEYS`) fica para as chaves sem chave estrangeira, como `cod_alimentador`. Motivo: com as tabelas por UC da v0.3 (interrupções, atendimentos, medidor), toda view com `cod_uc` passaria a ligar com as outras, e uma junção entre duas tabelas de eventos (faturamento × interrupções × atendimentos) multiplica as somas. Agora as três ligam só a `sem_uc`.
+- **Consequência para tabelas futuras (28/10/2026):** a regra é por nome de coluna, não por tabela. Se uma view da camada tiver chave estrangeira em `cod_uc` (ou em `cod_alimentador`), a ligação por essa chave deixa de existir para todas as views que não têm FK nela, inclusive as novas. Uma tabela nova com `cod_uc` só entra na ligação se a chave estrangeira estiver declarada no contrato. Caso contrário, esta decisão precisa ser revista antes da camada ser ampliada.
 
 ## DEC-019 · Verificação numérica da narrativa
 
@@ -1195,14 +1200,14 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   única.
 - **Falhas:** o Resumo de cada notebook dá erro se alguma tabela falhar, e o Job para na primeira task com erro, sem gravar as
   camadas seguintes.
-- **Limitação conhecida:** a conferência pós-gravação da Bronze (DEC-008) compara as duas últimas gravações de cada tabela por
-  time travel. O VACUUM automático do Databricks (predictive optimization) apaga os arquivos antigos depois de 7 dias
-  (`deletedFileRetentionDuration`). Se a última gravação tiver mais de 7 dias, a task `landing_to_bronze` grava a Bronze e falha
-  nessa comparação; o run seguinte passa, porque compara duas gravações recentes. Com dado novo, as duas gravações nem deveriam
-  ser iguais, então essa checagem falharia em todo run mensal.
-- **Para produção:** despausar o agendamento depende de tornar essa comparação opcional no Job (por exemplo, um widget
-  `exigir_idempotencia = nao`), mantendo a conferência contra a origem. Fica para um PR próprio, combinado com o autor do
-  `Landing_to_Bronze`.
+- **Idempotência da Bronze no Job (atualizado em 28/10):** a conferência pós-gravação da Bronze (DEC-008) compara as duas
+  últimas gravações de cada tabela por time travel. O VACUUM automático do Databricks (predictive optimization) apaga os arquivos
+  antigos depois de 7 dias (`deletedFileRetentionDuration`), e com dado novo as duas gravações nem deveriam ser iguais: no Job
+  mensal essa comparação falharia em todo run. Por isso o Job passa `exigir_idempotencia = nao` ao `Landing_to_Bronze`: a
+  conferência contra a origem (schema, contagem e conteúdo) continua, e só a comparação entre gravações é pulada. Na execução
+  manual o padrão continua `sim`.
+- **Para produção:** basta despausar o agendamento. A carga incremental por competência continua como evolução, se o volume
+  mensal justificar.
 
 ## DEC-041 · Redesign da tela da diretoria: a tesoura primeiro, e indicadores por período no backend
 

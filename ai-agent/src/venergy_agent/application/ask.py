@@ -2,6 +2,7 @@ import json
 import logging
 import re
 import time
+from collections.abc import Mapping
 from decimal import Decimal
 from uuid import uuid4
 
@@ -47,6 +48,10 @@ INTERNAL_FAILED = "Algo deu errado do nosso lado. Tente de novo em instantes."
 ATTEMPTS_FAILED = "Não consegui montar uma consulta válida depois de {attempts} tentativas."
 DATABASE_FAILED = "Não consegui consultar o banco agora. Tente de novo em instantes."
 CLARIFY_PREFIX = "Preciso de um esclarecimento antes de consultar: "
+UNITS_WITHOUT_SUFFIX = frozenset({"contagem", "nota"})
+GENERIC_CLARIFICATION = (
+    "Pode dizer o período e o recorte (município, bairro ou classe) que você quer consultar?"
+)
 FALLBACK_MAX_ROWS = 5
 FALLBACK_MAX_COLUMNS = 4
 MISSING_VALUE = "sem valor"
@@ -161,10 +166,17 @@ class AskUseCase:
                     model=generation.model,
                 )
             if draft.status is DraftStatus.CLARIFY:
+                clarification = draft.clarification_question or ""
+                if TECHNICAL_NAME.search(clarification):
+                    self._log(
+                        request_id,
+                        session_id,
+                        step="resposta",
+                        status="nome_tecnico_no_esclarecimento",
+                    )
+                    clarification = GENERIC_CLARIFICATION
                 self._log(request_id, session_id, step="resposta", status="clarify")
-                return self._clarify(
-                    draft.clarification_question or "", request_id, started, model=generation.model
-                )
+                return self._clarify(clarification, request_id, started, model=generation.model)
 
             began = time.perf_counter()
             try:
@@ -379,7 +391,10 @@ class AskUseCase:
             ):
                 text += (
                     " Resultado: "
-                    + "; ".join(_row_text(result.columns, row) for row in result.rows)
+                    + "; ".join(
+                        _row_text(result.columns, row, self._layer.column_units)
+                        for row in result.rows
+                    )
                     + "."
                 )
         if result.truncated:
@@ -465,8 +480,18 @@ class AskUseCase:
         logger.info(json.dumps(line, ensure_ascii=False, default=str))
 
 
-def _row_text(columns: tuple[str, ...], row: dict[str, object]) -> str:
-    return ", ".join(f"{column} = {_pt_br(row.get(column))}" for column in columns)
+def _row_text(columns: tuple[str, ...], row: dict[str, object], units: Mapping[str, str]) -> str:
+    return ", ".join(
+        f"{column.replace('_', ' ')} = {_with_unit(row.get(column), units.get(column))}"
+        for column in columns
+    )
+
+
+def _with_unit(value: object, unit: str | None) -> str:
+    text = _pt_br(value)
+    if value is None or unit is None or unit in UNITS_WITHOUT_SUFFIX:
+        return text
+    return f"R$ {text}" if unit == "R$" else f"{text} {unit}"
 
 
 def _pt_br(value: object) -> str:
