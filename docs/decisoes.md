@@ -488,7 +488,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 
 ## DEC-019 · Verificação numérica da narrativa
 
-- **Data:** 22/10/2026 · **Área:** GenAI · **Autor:** Lucas · **Atualizada:** 23/10/2026, Luis Felipe
+- **Data:** 22/10/2026 · **Área:** GenAI · **Autor:** Lucas · **Atualizada:** 23/10/2026 e 28/10/2026, Luis Felipe
 - **Status:** aceita.
 - **Decisão:** a narrativa em linguagem natural só é aceita se cada número dela existir nas linhas que o redator recebeu ou no total de linhas. Números que aparecem só na pergunta ou nas suposições não contam. Se a verificação falhar, ou o redator der erro, a resposta volta ao texto determinístico.
 - **Leitura dos números (decidido em 23/10/2026, PR #36):**
@@ -498,6 +498,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   - **Consequência aceita:** um número no formato en é rejeitado mesmo que exista nas linhas. `152.4` no texto é lido como 1524 e derruba a narrativa, ainda que `152.4` esteja no resultado. É o lado seguro: o usuário vê o texto determinístico, nunca um número mal lido.
   - Um trecho que não forma número em pt-BR (por exemplo `1,2,3` ou `01,02,03`) conta como número não verificado. A narrativa cai no texto determinístico, e a resposta continua `answered`: a verificação nunca levanta erro.
 - **Insight (item 9):** o `InsightWriter` usa a mesma verificação. A fonte dos números são os valores do JSON de métricas da tela, inclusive os aninhados, e não as chaves: um número que só aparece numa chave (`receita_2024`) não valida o texto. Um insight com número fora do JSON, em formato en (por exemplo `1234.5` copiado do JSON) ou ilegível vira `None`, e a tela aparece sem insight. O prompt `prompts/insight/v1` pede o formato brasileiro. O período da tela vai dentro do JSON como valor (por exemplo `"periodo": "2025-01/2025-03"`), e não só no título: no teste com o modelo real (24/10/2026), o texto que citava "2025" a partir do título caía na verificação.
+- **Meses do filtro do SQL (28/10/2026, PR #75):** os meses `AAAA-MM` que aparecem como literal no SQL executado (`WHERE competencia = '2025-06'`) também valem como fonte de número da narrativa. O SQL foi validado e executado, então o mês do filtro é um fato da consulta, e não um número só da pergunta. Sem isso, "a receita de junho de 2025 foi de R$ 39.913,02" caía sempre no texto determinístico, porque a linha devolvida só tem a receita, e a resposta deixava de citar o período que a G1-05 pede. Os meses do filtro servem só para aceitar o número: o período que a narrativa precisa citar continua vindo das linhas, para que um filtro aberto (`competencia >= '2025-01'`) não vire um período inventado. Os literais são lidos pelo validador, com o sqlglot (`ValidatedQuery.periods`).
 - **Motivo:** o `CLAUDE.md` do agente diz que todo número da resposta vem das linhas retornadas, e a spec (§8, item 8) exige que um número inexistente nas linhas derrube a narrativa.
 - **Consequência:** uma narrativa que cite um ano ou um limite da pergunta ("acima de 300 kWh") cai no texto determinístico quando o número não está nas linhas. O prompt do redator (`prompts/answer/v1`) pede para não repetir esses números e para escrever no formato brasileiro. A verificação fica em `domain/numbers.py` (`unsupported_numbers`) e serve à narrativa e ao insight.
 

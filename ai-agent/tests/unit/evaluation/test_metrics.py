@@ -115,6 +115,14 @@ def test_numeric_fidelity_reads_the_answer_against_its_rows():
     assert not numeric_fidelity(answered("Olinda tem 9 UCs.", rows, 1))
 
 
+def test_numeric_fidelity_accepts_the_months_of_the_sql_filter():
+    rows = ({"total": 8},)
+    answer = answered("Em junho de 2025, Olinda tinha 8 UCs.", rows, 1)
+
+    assert numeric_fidelity(answer, periods=("2025-06",))
+    assert not numeric_fidelity(answer)
+
+
 def test_rate_and_percentile_return_none_when_empty():
     assert rate(0, 0) is None
     assert rate(3, 4) == 0.75

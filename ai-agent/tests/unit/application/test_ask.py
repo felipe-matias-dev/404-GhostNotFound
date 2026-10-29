@@ -460,6 +460,71 @@ async def test_a_range_needs_both_ends_in_the_narrative(layer):
     assert answer.answer.startswith("A consulta devolveu 2 linha(s). Período: 2025-01 a 2025-12.")
 
 
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Entre junho e dezembro de 2025 havia 3 UCs.",
+        "De jun/2025 a dez/2025 havia 3 UCs.",
+        "De junho/2025 a dezembro/2025 havia 3 UCs.",
+    ],
+)
+async def test_common_ways_to_name_a_range_keep_the_narrative(layer, text):
+    writer = FixedWriter(text=text)
+    executor = ScriptedExecutor(table(("competencia", "total"), ("2025-06", 3), ("2025-12", 3)))
+
+    answer = await use_case(
+        layer, ScriptedGenerator(generation()), executor=executor, writer=writer
+    ).ask("quantas?", "s1")
+
+    assert answer.answer == text
+
+
+async def test_the_narrative_period_is_the_one_in_the_rows_the_writer_saw(layer):
+    writer = FixedWriter(text="Entre janeiro e fevereiro de 2025 havia 3 UCs.")
+    executor = ScriptedExecutor(
+        table(("competencia", "total"), ("2025-01", 3), ("2025-02", 3), ("2025-03", 3))
+    )
+
+    answer = await use_case(
+        layer,
+        ScriptedGenerator(generation()),
+        executor=executor,
+        writer=writer,
+        answer_sample_rows=2,
+    ).ask("quantas?", "s1")
+
+    assert answer.answer == "Entre janeiro e fevereiro de 2025 havia 3 UCs."
+
+
+FILTERED_SQL = "SELECT count(*) AS total FROM sem_faturamento_mensal WHERE competencia = '2025-06'"
+
+
+async def test_a_month_in_the_sql_filter_can_be_named_when_the_rows_have_no_month(layer):
+    writer = FixedWriter(text="Em junho de 2025 havia 3 UCs.")
+
+    answer = await use_case(
+        layer,
+        ScriptedGenerator(generation(sql=FILTERED_SQL)),
+        executor=ScriptedExecutor(table(("total",), (3,))),
+        writer=writer,
+    ).ask("quantas em junho de 2025?", "s1")
+
+    assert answer.answer == "Em junho de 2025 havia 3 UCs."
+
+
+async def test_a_month_outside_the_sql_filter_still_drops_the_narrative(layer):
+    writer = FixedWriter(text="Em junho de 2024 havia 3 UCs.")
+
+    answer = await use_case(
+        layer,
+        ScriptedGenerator(generation(sql=FILTERED_SQL)),
+        executor=ScriptedExecutor(table(("total",), (3,))),
+        writer=writer,
+    ).ask("quantas em junho de 2025?", "s1")
+
+    assert answer.answer.startswith("A consulta devolveu 1 linha(s).")
+
+
 def table(columns, *rows):
     return QueryResult(
         columns=columns,

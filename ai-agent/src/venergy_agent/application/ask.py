@@ -328,9 +328,10 @@ class AskUseCase:
     ) -> AgentAnswer:
         sample = result.rows[: self._sample_rows]
         visible = result.model_copy(update={"rows": sample})
-        period = _period(result)
-        text = self._deterministic_text(result, draft, validated)
-        text = await self._narrate(question, draft, visible, text, period)
+        text = self._deterministic_text(result, draft, validated, _period(result))
+        text = await self._narrate(
+            question, draft, visible, text, _period(visible), validated.periods
+        )
 
         return AgentAnswer(
             answer=text,
@@ -357,6 +358,7 @@ class AskUseCase:
         visible: QueryResult,
         fallback: str,
         period: tuple[str, str] | None,
+        filtered_periods: tuple[str, ...],
     ) -> str:
         if self._answer_writer is None:
             return fallback
@@ -390,7 +392,11 @@ class AskUseCase:
             )
             return fallback
 
-        values = [visible.row_count, *(value for row in visible.rows for value in row.values())]
+        values = [
+            visible.row_count,
+            *filtered_periods,
+            *(value for row in visible.rows for value in row.values()),
+        ]
         unsupported = unsupported_numbers(narrative, values)
         if unsupported:
             self._log(
@@ -405,13 +411,17 @@ class AskUseCase:
         return narrative
 
     def _deterministic_text(
-        self, result: QueryResult, draft: SqlDraft, validated: ValidatedQuery
+        self,
+        result: QueryResult,
+        draft: SqlDraft,
+        validated: ValidatedQuery,
+        period: tuple[str, str] | None,
     ) -> str:
         if result.row_count == 0:
             text = EMPTY_RESULT
         else:
             text = f"A consulta devolveu {result.row_count} linha(s)."
-            if period := _period(result):
+            if period is not None:
                 text += _period_sentence(period)
             if (
                 len(result.rows) <= FALLBACK_MAX_ROWS
@@ -567,5 +577,6 @@ def _mentions(text: str, competencia: str) -> bool:
     year, month = competencia.split("-")
     name = MONTH_NAMES[int(month) - 1]
     lowered = text.lower()
-    forms = (competencia, f"{month}/{year}", f"{name} de {year}")
-    return any(form in lowered for form in forms)
+    if any(form in lowered for form in (competencia, f"{month}/{year}", f"{name[:3]}/{year}")):
+        return True
+    return re.search(rf"\b{name}(?:/|\b[^.;]{{0,40}}?\b){year}\b", lowered) is not None

@@ -597,7 +597,7 @@ Pedidos a abrir como issue para a área dona. O GenAI não altera esses arquivos
 - A revisão humana de cada item é do GenAI (Perylo), e a dos SQLs contra a amostra, dos Dados. O gabarito só se fixa com a Gold real.
 
 **8. `AnswerWriter` + verificação numérica.** Narrativa a partir das linhas, com o conteúdo do banco delimitado como dado (§5.2) e volta ao texto determinístico quando a verificação falha. A mesma verificação numérica serve ao item 9.
-- Estado: feito (PR #36). O `AnswerWriter` entra pelo `build_agent`, e o prompt fica em `prompts/answer/v2/`. A v2 (revisão do PR #52) recebe a unidade de cada coluna da camada semântica (`receita_faturada (R$)`) e escreve a unidade junto do número; uma coluna renomeada no SQL (alias) fica sem unidade.
+- Estado: feito (PR #36). O `AnswerWriter` entra pelo `build_agent`, e o prompt fica em `prompts/answer/v2/`. A v2 (revisão do PR #52) recebe a unidade de cada coluna da camada semântica (`receita_faturada (R$)`) e escreve a unidade junto do número; uma coluna renomeada no SQL (alias) fica sem unidade. A v3 (PR #75) pede o período: quando as linhas têm `competencia`, a narrativa cita o primeiro e o último mês das linhas que recebeu, e só é aceita se citar os dois.
 - DEC-019 aceita. Cada número da narrativa precisa existir nas linhas ou no total de linhas; números só da pergunta não contam. O texto é lido só em pt-BR, e os valores do banco são lidos no próprio tipo.
 
 **9. `InsightWriter`.** Narra o JSON de métricas de uma tela (G2-04, tela de Receita; G2-05, "conta alta" na UC 360, Should) em 2 a 4 frases, sem conclusões causais que o JSON não sustenta (§9 do guia), e devolve `None` se algum número do texto não estiver no JSON. O cache por filtros e a montagem do JSON são do backend (D9).
