@@ -14,7 +14,6 @@ from venergy_agent.evaluation.__main__ import (
     load_set,
     main,
     narrates,
-    remembers,
     report_path,
     runs_dir,
     write_report,
@@ -136,8 +135,3 @@ def test_judge_mean_score_is_a_number_and_not_a_percentage():
 def test_judge_flag_is_refused_before_any_connection_on_the_real_gold(capsys):
     assert main(["--dataset", "gold_real", "--judge"]) == 1
     assert "juiz" in capsys.readouterr().err
-
-
-def test_conversation_memory_is_on_for_the_sample_and_off_for_the_real_gold():
-    assert remembers("amostra") is True
-    assert remembers("gold_real") is False

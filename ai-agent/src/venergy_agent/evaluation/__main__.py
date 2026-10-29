@@ -49,10 +49,6 @@ def narrates(dataset: str, sql_only: bool) -> bool:
     return dataset != "gold_real" and not sql_only
 
 
-def remembers(dataset: str) -> bool:
-    return dataset != "gold_real"
-
-
 def judges(dataset: str, judge: bool, sql_only: bool) -> bool:
     if not judge:
         return False
@@ -144,7 +140,7 @@ async def _evaluate(
     counted = await executor.execute(validator.validate(UC_COUNT_SQL, layer.allowed_views))
     check_dataset(dataset, int(counted.rows[0]["total"]))
     narrate = narrates(dataset, sql_only)
-    memory = InMemoryConversationHistory() if remembers(dataset) else None
+    memory = InMemoryConversationHistory()
     agent = await build_agent(settings, narrate=narrate, history=memory)
     answer_judge = _build_judge(settings) if with_judge else None
     runner = EvaluationRunner(

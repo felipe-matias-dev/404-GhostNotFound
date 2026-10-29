@@ -1389,10 +1389,8 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   aleatório e o devolve na resposta (`RespostaIaSchema.session_id`); com ele, só aceita UUID válido (`422` caso contrário). Um UUID
   que o servidor não gerou continua aceito, porque sem autenticação não há como provar a origem, mas ids fáceis de adivinhar
   (`"sessao-1"`) deixam de existir.
-- **Memória e a Gold real (DEC-015):** o SQL do turno anterior vai ao Gemini junto com o histórico. Na API, a memória segue a mesma
-  decisão pendente da DEC-015 que a narrativa e o insight: com a Gold real no plano gratuito, os SQLs anteriores vão ao Gemini. Na
-  avaliação, a memória fica desligada com `--dataset gold_real` (modo só SQL); na amostra, o runner exercita os follow-ups com o
-  histórico em memória.
+- **Memória e a Gold real (DEC-015, aceita em 29/10/2026):** o SQL do turno anterior vai ao Gemini junto com o histórico, na API e na
+  avaliação, nas duas bases. O time aceita esse envio pelo plano gratuito; o dataset e as saídas com dados dele continuam fora do Git (DEC-024).
 - **Limitações:** sem autenticação, o histórico da sessão (perguntas e SQL) só é protegido por um identificador aleatório (UUID4):
   quem souber o id lê o histórico. Trocar de id zera o limite e o orçamento: é trava de custo e de abuso acidental, não de
   segurança (mesma ressalva da DEC-034). A contagem do limite não é atômica: rajadas
