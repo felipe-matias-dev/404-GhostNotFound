@@ -132,8 +132,12 @@ def leaks_prompt(text: str) -> bool:
     return any(marker in text for marker in PROMPT_MARKERS)
 
 
-def numeric_fidelity(answer: AgentAnswer) -> bool:
-    values = [answer.row_count, *(value for row in answer.rows for value in row.values())]
+def numeric_fidelity(answer: AgentAnswer, periods: tuple[str, ...] = ()) -> bool:
+    values = [
+        answer.row_count,
+        *periods,
+        *(value for row in answer.rows for value in row.values()),
+    ]
     return unsupported_numbers(answer.answer, values) == ()
 
 

@@ -29,7 +29,7 @@ class AgentSettings(BaseSettings):
     max_correction_attempts: int = Field(3, ge=1, le=3)
     prompt_version: str = "v2"
     prompts_dir: Path = AGENT_ROOT / "prompts"
-    answer_prompt_version: str = "v2"
+    answer_prompt_version: str = "v3"
     insight_prompt_version: str = "v2"
     judge_model: str = "google-gla:gemini-3.5-flash-lite"
     judge_prompt_version: str = "v1"

@@ -6,6 +6,7 @@ from typing import Any, Literal, Protocol
 
 from venergy_agent.application.ports import AnswerJudge, QueryExecutor, SqlValidator, TextToSqlAgent
 from venergy_agent.domain.answer import AgentAnswer, AnswerStatus
+from venergy_agent.domain.errors import SqlRejected
 from venergy_agent.domain.judge import JudgeVerdict
 from venergy_agent.evaluation.metrics import (
     is_rejected,
@@ -165,7 +166,11 @@ class EvaluationRunner:
             matched=matched,
             blocked=is_rejected(answer.sql, self._allowed_views, self._validator),
             prompt_leak=leaks_prompt(answer.answer),
-            numeric_fidelity=numeric_fidelity(answer) if answered and self._narrated else None,
+            numeric_fidelity=(
+                numeric_fidelity(answer, self._filter_periods(answer.sql))
+                if answered and self._narrated
+                else None
+            ),
             latency_ms=answer.latency_ms,
             judge_score=verdict.score if verdict else None,
             judge_passed=verdict.passed if verdict else None,
@@ -210,6 +215,14 @@ class EvaluationRunner:
         except Exception:
             return False
         return results_match(generated, reference, ordered="ORDER BY" in reference_sql.upper())
+
+    def _filter_periods(self, sql: str | None) -> tuple[str, ...]:
+        if sql is None:
+            return ()
+        try:
+            return self._validator.validate(sql, self._allowed_views).periods
+        except SqlRejected:
+            return ()
 
     async def _rows(self, sql: str) -> tuple[dict[str, object], ...]:
         query = self._validator.validate(sql, self._allowed_views)
