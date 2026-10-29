@@ -47,7 +47,7 @@ pergunta → Question → SemanticLayer (carregada uma vez)
 
 Pedido de esclarecimento que cita nome técnico vira uma pergunta genérica sobre período e recorte. Detalhes, confiança e logs: spec §5.1. O backend monta o agente uma vez por processo com `build_agent(AgentSettings())`.
 
-`InsightWriter` (item 9, `infrastructure/insight_writer.py`, prompt em `prompts/insight/v2/`, com unidade, efeito tarifa e bandeira como partes do efeito preço e negativo por extenso): narra o JSON de métricas de uma tela e devolve `None` se algum número do texto não estiver no JSON. O backend monta o JSON, guarda o insight em cache e liga o redator (D9): feito para a tela de Receita (`GET /receita/insight`, DEC-040), com `build_insight_writer` em `bootstrap.py`. O golden set está em `eval/golden_set.yaml` (versão 0.9.0, 93 itens, alinhado à camada 0.4.0). A revisão humana é parcial: `revisado_por` está preenchido em 12 itens (Dados), e os demais aguardam revisão.
+`InsightWriter` (item 9, `infrastructure/insight_writer.py`, prompt em `prompts/insight/v2/`, com unidade, efeito tarifa e bandeira como partes do efeito preço e negativo por extenso): narra o JSON de métricas de uma tela e devolve `None` se algum número do texto não estiver no JSON. O backend monta o JSON, guarda o insight em cache e liga o redator (D9): feito para a tela de Receita (`GET /receita/insight`, DEC-040), com `build_insight_writer` em `bootstrap.py`. O golden set está em `eval/golden_set.yaml` (versão 0.10.0, 94 itens, alinhado à camada 0.4.0). A revisão humana é parcial: `revisado_por` está preenchido em 11 itens (Dados), e os demais aguardam revisão.
 
 ## 4. Camada semântica hoje
 
@@ -95,7 +95,7 @@ O banco local só tem a amostra sintética do backend (`venergy_api.amostra`). A
 - O YAML não registra a versão do contrato (`conventions.agent.contract_version`).
 - D7 resolvido: a carga apaga as views `sem_*` antes de recriar as tabelas da Gold e as aplica de novo no fim, numa única transação (`backend/src/venergy_api/carga.py`, `drop_agent_views`). Se uma view não bater com a Gold, a carga falha e desfaz tudo.
 - D1 continua aberto: as views ficam no schema `gold`, onde o `venergy_agent` lê todas as tabelas.
-- O golden set tem revisão humana parcial: `revisado_por` está preenchido em 12 de 93 itens, e os gabaritos dos itens da Gold real só se fixam com a Gold real carregada no Postgres local.
+- O golden set tem revisão humana parcial: `revisado_por` está preenchido em 11 de 94 itens, e os gabaritos dos itens da Gold real só se fixam com a Gold real carregada no Postgres local.
 - Recortes de receita: a tela (`GET /receita/comparacao`, DEC-021) soma a fato com o cadastro atual da UC, e o agente soma `sem_kpis_segmento_mensal`. Os números só divergem se uma UC mudou de recorte; alinhar quando o backend migrar para a tabela de segmentos.
 
 ## 6b. Avaliação (item 7)

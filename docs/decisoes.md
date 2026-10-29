@@ -46,8 +46,12 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | 27/10/2026 | DEC-034: cada resposta do agente de IA é gravada em `app.ai_auditoria` (qualquer status) por `POST /ai/ask`, e lida por `GET /ai/audit/{id}`; sem a chave do Gemini a API sobe e o `/ai` responde 503; API 0.7.0 | A auditoria só serve se ninguém recebe uma resposta que não dá para conferir depois; e a chave ausente não pode derrubar o `/health` nem as telas | Felipe |
 | 27/10/2026 | DEC-038: a carga da Gold lê cada CSV aos poucos e grava em lotes de 10 mil linhas, depois de uma primeira rodada que só confere os arquivos; a memória deixa de crescer com o tamanho da Gold | A carga antiga guardava os 12 CSVs inteiros na memória e derrubou o WSL de 8 GB com os ~4 milhões de linhas da Gold real; a conferência antes de gravar continua garantindo que um arquivo fora do contrato não altera o banco | Felipe |
 | 27/10/2026 | DEC-039: Workflow do Databricks com os notebooks lidos do GitHub (`main`), serverless, Landing → Bronze → Silver → Gold + export, reprocessando tudo (diverge da ADR-07); agendamento mensal no dia 6, pausado | Roda o código revisado e mantém o tudo ou nada de cada camada numa extração única; a origem fecha o faturamento uma vez por mês | Arthur |
+| 27/10/2026 | DEC-041: redesign da tela da diretoria: frase de leitura, receita e energia de 12 meses contra os 12 primeiros da base, tesoura em variação de 12 meses corridos e faixa mês contra mês com sparklines; área do `TrendChart` só com eixo a partir do zero; rotas `GET /indicadores/comparacao` e `GET /indicadores/janelas`; API 0.10.0 | A tela responde à pergunta da diretoria (receita sobe, volume cai) em vez de listar seis números de mesmo peso; a área sobre eixo truncado exagerava a variação; DEC, FEC, satisfação, base de UCs e tarifa de um período são contas de backend | João Euclides |
+| 28/10/2026 | DEC-042: a interface de UC consome exclusivamente `Uc360Schema` e as regras da DEC-044; a referência é global à Gold, e estabilidade não significa ausência de alta | Elimina o backend duplicado e mantém a apresentação fiel ao contrato aprovado do PR #55 | João Euclides |
+| 28/10/2026 | DEC-043: Consulta de UC na sidebar e Ctrl/Cmd + K abrem a palette global; só os cinco códigos consultados com sucesso ficam nos recentes locais | Consulta rápida sem abandonar o contexto, sem persistir nomes ou valores e sem navegar antes de validar a UC | João Euclides |
 | 27/10/2026 | DEC-040: `GET /receita/insight` devolve o insight de IA da tela de receita; o backend monta o JSON de métricas a partir da ponte da Gold, com valores arredondados como a tela os mostra, e guarda o texto num cache em memória pelo conteúdo das métricas; sem a chave do Gemini a rota responde 503; API 0.9.0 | O agente só aceita texto cujos números sejam exatamente valores do JSON (DEC-019), e uma Gold recarregada precisa gerar um insight novo, nunca um velho | Felipe |
 | 27/10/2026 | DEC-044: a visão 360 da unidade consumidora sai de uma rota só, `GET /unidades-consumidoras/{cod_uc}/visao-360`; os 12 meses terminam na última competência da Gold e a "conta alta" é o último mês contra o mesmo mês do ano anterior, com faixa de ±10%; integrada à API 0.9.0 da main | O atendente está com o cliente na linha: uma chamada só à API e uma resposta pronta para "o consumo subiu?", sem a tela refazer conta de negócio | Felipe |
+| 29/10/2026 | DEC-045: tela de Rede usa período padrão de até 12 meses, aceita período válido da URL e apresenta histórico global do alimentador | Preserva o recorte escolhido e distingue o índice local do histórico do alimentador inteiro | João Euclides |
 | 29/10/2026 | DEC-047: avaliação comparativa sobre os itens em comum, aviso quando `failed` passa de 5%, e juiz (LLM as a judge) só em respostas `answered` narradas da amostra, com modelo diferente do gerador | Rodadas com versões diferentes do golden set só se comparam no que têm em comum, e o juiz não pode enviar linhas da Gold real a um modelo | Perylo |
 
 ## DEC-001 · Localização dos arquivos de origem (landing)
@@ -1207,6 +1211,64 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Para produção:** basta despausar o agendamento. A carga incremental por competência continua como evolução, se o volume
   mensal justificar.
 
+## DEC-041 · Redesign da tela da diretoria: a tesoura primeiro, e indicadores por período no backend
+
+- **Data:** 27/10/2026 · **Área:** Portal · **Autor:** João Euclides · **Revisa:** DEC-036 (comparação só mês contra mês) e
+  DEC-037 (gráfico de um indicador por vez)
+- **Contexto:** a tela da DEC-036 mostrava seis cards de mesmo peso e um gráfico de um indicador por vez. A pergunta da diretoria
+  ("a receita subiu 8% e o volume caiu 4%: por quê?", `docs/diagnostico-receita.md`) liga receita e energia, que a tela separava.
+- **Decisão (tela):**
+  - **Frase de leitura no topo:** montada no frontend só pela direção e pelo tamanho relativo das duas variações de 12 meses
+    ("A receita cresceu com menos energia faturada."), sem número. Os números ficam logo abaixo. Quando a tela tiver insight de IA
+    (D9, como o `GET /receita/insight` da DEC-040), ele ocupa o lugar da frase; com `texto` vazio (narração descartada ou falha do
+    provedor), a frase determinística continua, e a tela nunca fica sem leitura.
+  - **Receita e energia de 12 meses:** primeira e última janelas completas de `GET /indicadores/janelas?meses=12`, sem
+    sobreposição, comparadas por `GET /indicadores/comparacao`. Sem duas janelas não sobrepostas, a tela diz que não há
+    comparação. O botão "Abrir a ponte de receita" só aparece quando esse mesmo par existe em
+    `GET /receita/decomposicao/periodos`, sem abrir outro período por fallback.
+  - **Tesoura:** receita e energia faturadas em 12 meses corridos, como variação sobre a primeira janela (0%), na mesma escala.
+    As somas vêm prontas de `GET /indicadores/janelas?meses=12`, sobre `gold_kpis_segmento_mensal`; o frontend só normaliza
+    cada série sobre a primeira soma para exibir a variação. O backend exclui janelas incompletas. O tooltip mostra as somas em R$
+    e kWh por trás da variação. A linha do 0% é mais forte que a grade, cada linha tem o rótulo no fim ("+7,8% receita") no
+    lugar da legenda, e a faixa entre as duas é preenchida em `chart-muted`: a distância entre elas é o dado do gráfico. O eixo
+    é em variação, e não em índice (base 100): o número do fim da linha é o mesmo da variação ao lado, sem conta de cabeça.
+  - **Layout:** três cards empilhados, na largura toda da área: o resumo (números à esquerda, gráfico com altura fixa de
+    240px à direita), o porquê e a faixa de rede e atendimento. Preencher a altura da tela com o gráfico deixava a tesoura
+    com metade da tela; a altura fixa vale em qualquer monitor.
+  - **Por que a receita mudou:** os quatro efeitos da ponte (tarifa, bandeira, volume e mix) do mesmo par de 12 meses, de
+    `GET /receita/decomposicao`, somados como a tela de Receita soma (`passosDaPonte`, DEC-035), em duas colunas a partir de
+    768px. Em % da receita base, e não em R$: a ponte é sobre a receita de energia, e o resumo, sobre a faturada; o peso de cada
+    efeito é o mesmo nas duas medidas, o valor em reais não. Barras divergentes a partir de um eixo central, em `success` e
+    `danger` com sinal; cada linha abre a ponte com aquele efeito escolhido. Sem o par gravado na Gold, o bloco não aparece.
+  - **Rede e atendimento no mês:** DEC, FEC, chamados e satisfação numa faixa só, mês contra mês como na DEC-036, com valores
+    e `variacao_pct` de `GET /indicadores/comparacao`. A tela só converte o percentual em fração para o formatador.
+    Receita e energia ficam só no resumo de 12 meses. Cada card tem uma `Sparkline` (`components/ui/sparkline`) da série
+    mensal de `GET /receita/mensal`, que também alimenta as competências do seletor: linha em
+    `chart-muted`, mês atual em `chart-1`, mês base em anel neutro; trecho de um ou dois meses entre buracos vira ponto, e série
+    com mais de um quarto dos meses vazios não é desenhada. Os cards de DEC e FEC são links inteiros para a tela de rede, com
+    fundo no hover.
+  - **`TrendChart`:** a área em degradê só aparece com `zeroBaseline`. Num eixo que não começa no zero, a área sugeria uma queda
+    maior do que a real. Ganha `reference`, `endLabels` e `band` para a tesoura. A visão ano a ano e os parâmetros `indicador`
+    e `tendencia` da URL saem da tela.
+- **Decisão (backend):** a rota de comparação que a DEC-036 pedia, mais a série de janelas para a tesoura, ambas sobre a
+  `gold_kpis_segmento_mensal` e numa ida ao banco cada.
+  - `GET /indicadores/comparacao`: dois períodos quaisquer e o recorte (`municipio`, `bairro`, `classe`). Por período: receita
+    faturada, de energia e tributos, kWh, `n_uc_medio` (Σ `n_uc` ÷ meses com dado) e `n_uc_fim` (último mês), `tarifa_media`
+    (Σ receita de energia ÷ Σ kWh) e `tarifa_base_media` (sem o acréscimo da bandeira, DEC-029), DEC e FEC pelo helper da DEC-033
+    (agora em `venergy_api/indices.py`), chamados e satisfação (Σ notas ÷ notas dadas). `variacao_pct` de cada indicador.
+  - `GET /indicadores/janelas`: janelas corridas de 1 a 24 meses (padrão 12), só as completas, com receita, kWh, base de UCs e
+    tarifas. As competências vêm da tabela inteira, antes do recorte: mês existente na empresa
+    sem linha no recorte contribui com zero, inclusive para a média de UCs. Mês ausente na
+    empresa inteira continua invalidando as janelas que o atravessam.
+  - Versão da API 0.10.0, incorporando a API 0.9.0 da main com agente, auditoria, insights e UC (DEC-044).
+- **Limites:**
+  - A tarifa das rotas é a **realizada** (com mix de classes). O reajuste homologado da B1 (+10,52%, medido na Silver pelo
+    diagnóstico) não tem tabela na Gold.
+  - A "Receita faturada" da tela inclui tributos, e a ponte de receita usa a receita de energia (DEC-023). Os valores absolutos
+    das duas telas diferem até a ponte ganhar o degrau de tributos.
+  - O seletor de rede e atendimento continua mensal; a comparação e a tesoura já consomem `/indicadores/*`.
+    `/receita/mensal` permanece para as competências e sparklines porque a rota de janelas não retorna DEC, FEC nem satisfação.
+
 ## DEC-040 · Insight de IA na tela de Receita: métricas montadas no backend, cache pelo conteúdo
 
 - **Data:** 27/10/2026 · **Área:** Portal e IA · **Autor:** Felipe
@@ -1291,6 +1353,83 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   A decisão foi renumerada de DEC-036 para DEC-044 na resolução do PR #55: DEC-036 já identifica a tela
   da diretoria na `main`, e DEC-041 a DEC-043 estão reservadas nas branches do portal.
 
+## DEC-042 · Visão 360 da UC e comparação sazonal do consumo
+
+- **Data:** 28/10/2026 · **Área:** Portal · **Revisada após o PR #55:** a DEC-044 é a autoridade
+  para endpoint, schemas, janela e cálculos. Esta decisão trata somente da apresentação.
+- **Contrato único:** `/uc` consome `Uc360Schema`, gerado do OpenAPI, em uma única chamada a
+  `GET /unidades-consumidoras/{cod_uc}/visao-360`. Não há implementação ou schema concorrente
+  nem adaptação de compatibilidade com o contrato anterior.
+- **Consumo:** `consumo.meses` cobre os 12 meses até `consumo.referencia`, a última competência
+  de toda a Gold, mesmo se a UC parou de faturar antes. Lacunas são `null`, não zero.
+  `tendencia` vem pronta: `subiu` acima de +10%, `caiu` abaixo de −10%, `estavel` entre os
+  limites inclusive, `sem_comparacao` sem par ou com base zero. Estável pode ser uma alta de 5%:
+  a tela descreve a faixa e mostra `variacao_ultimo_mes_pct`, sem classificar por conta própria.
+  `variacao_12m_pct` e `meses_comparados` vêm do backend e consideram somente pares com fatura.
+  Os totais de kWh do payload somam tudo faturado, não apenas os pares; não são recalculados.
+- **Diferenças funcionais:** deixam de existir a diferença absoluta em kWh, a conta monetária
+  do ano anterior e o tipo de leitura na tela, pois o contrato aprovado não os fornece.
+  Permanecem consumo dos dois anos, valor/dias/bandeira do mês de referência e percentuais
+  calculados pelo backend. Sem fatura na referência global, não se promove uma conta antiga
+  a atual. Não há chamadas em cascata para recuperar o formato removido.
+- **Limite de interpretação:** consumo faturado não explica sozinho o valor da conta.
+  Com GD, energia faturada não representa necessariamente todo o consumo do imóvel.
+- **Históricos:** `faturas_nao_pagas.itens` não tem corte de período, e `atendimentos` alimenta
+  os chamados. Situação e dias em atraso vêm da Gold. A API não trunca listas; paginação de
+  cinco registros ocorre na apresentação. Falha é erro, não lista vazia. Inspeções continuam
+  no contrato, sem criar uma funcionalidade nova na interface.
+- **Interface:** shell e DS VE-360 preservados, sem dependências novas. Consumo e faturas na
+  coluna principal, cadastro/equipamento/GD na auxiliar, históricos em largura total. No mobile,
+  tabelas viram cards. Avisos usam `danger`/`danger-subtle`, com retry neutro.
+- **Atualização:** troca de UC não mostra dados da anterior; refetch da mesma UC mantém o
+  conteúdo e identifica dados anteriores em caso de falha. Busca textual exata, sem normalizar zeros.
+- **Segurança operacional:** sem carga ou migration na base de desenvolvimento. Fixtures
+  destrutivas só em `venergy_test`, na porta publicada pelo compose. Sem estado de rede
+  em tempo real, pagamento ou abertura de chamado.
+
+## DEC-043 · Palette global de UCs e navegação por contexto
+
+- **Data:** 28/10/2026 · **Área:** Portal · **Complementa:** DEC-042
+- **Problema:** uma página inicial dedicada a um único campo de busca interrompia o fluxo
+  de quem já estava analisando outra tela. A sidebar plana não distinguia análise de operação.
+- **Decisão:** **Consulta de UC** abre uma palette global, acessível também por Ctrl/Cmd + K.
+  Seleção por teclado (setas, Home/End, Enter), ponteiro ou toque. Esc/fundo/fechar dispensam
+  o modal. Reutiliza `Modal`, incluindo foco preso, restauração de foco, `inert` e scroll lock,
+  e o feedback de seleção/reordenação do Interior como referência, com tokens VE-360 e reduced-motion.
+- **Busca:** o código continua textual e exato. Não existe autocomplete global por nome nem
+  normalização arbitrária de zeros. O filtro é somente sobre os códigos recentes. A palette
+  consulta o endpoint agregado e só navega após sucesso, preenchendo o cache da página com
+  essa resposta. Falhas permanecem na palette; alterar o texto ou fechar aborta o pedido.
+  O fechamento aborta sincronamente, antes da animação de saída; não depende do cleanup de
+  desmontagem para impedir navegação tardia. Toda consulta bem-sucedida na palette registra o
+  código, inclusive reconsulta da UC atual após limpar recentes, sem depender de mudança no cache.
+- **Recentes:** até cinco códigos únicos em ordem de consulta bem-sucedida, incluindo acesso
+  por link direto. Reconsultar move ao topo. `localStorage` guarda só códigos, nunca titular,
+  documento ou valores. A lista é deste navegador, não é um histórico de atendimentos nem
+  uma lista compartilhada entre operadores. Há ação de limpar. Conteúdo inválido é descartado;
+  armazenamento bloqueado não impede consultar, mas limita os recentes à sessão e informa isso.
+- **Sidebar:** dois grupos discretos, sem submenus ou equipes fictícias: **Análise**
+  (Visão geral, Receita, Rede) e **Operação** (Consulta de UC, Perdas). Preserva o recolhimento
+  para ícones e o Sheet no mobile, sem duplicar a lista de recentes na navegação.
+- **Página:** `/uc?cod_uc=...` segue sendo a visão 360. Sem código, entrada compacta com
+  **Buscar UC**; com código, **Trocar UC** abre a mesma palette e **Atualizar dados** faz refetch.
+  Registro de conversa, abertura de chamado e pagamento continuam fora deste fluxo.
+- **Arquitetura:** provider dentro da feature, montado pela rota raiz. Shell e sidebar
+  recebem callback, sem importar regras ou dados de UC. Nenhuma dependência ou tabela nova.
+
+## DEC-045 · Período e histórico da tela de Rede
+
+- **Data:** 29/10/2026 · **Área:** Portal · **Autor:** João Euclides
+- **Período:** sem período válido na URL, os últimos 12 meses de calendário até a última
+  competência disponível, limitados pela primeira. Um período válido da URL prevalece,
+  mesmo fora do calendário da base; a API determina os dados disponíveis.
+- **Histórico:** o painel consulta o alimentador inteiro, sem os filtros geográficos da tabela.
+  O índice de um recorte pode diferir do histórico global; DEC e FEC são fornecidos pela API.
+- **Limite de apresentação:** o gráfico mensal exibe até 120 meses. Para períodos maiores,
+  mantém-se o período da consulta e informa-se que é preciso reduzi-lo para ver o gráfico.
+- **Navegação:** abrir e fechar o painel cria entradas no histórico, permitindo recuperar
+  os estados anteriores com Voltar e Avançar.
+
 ## DEC-047 · Avaliação comparativa e LLM as a judge
 
 - **Data:** 29/10/2026 · **Área:** GenAI · **Autor:** Perylo
@@ -1301,7 +1440,9 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   - **Nova métrica `refusal_accuracy`:** itens com `expected_status = refused` (golden e red team) que terminaram `refused`. O `manipulation_block_rate` mede vazamento, não recusa.
   - **Sessão por cadeia de follow-up:** o runner passa a rodar os follow-ups em sequência, numa sessão `eval-<rodada>-<raiz>`, e os demais itens numa sessão cada, para que a memória do agente (G1-10) não contamine um item com o anterior. O `TurnRecorder` recebe cada turno.
   - **Juiz só em `answered` narrados da amostra:** `unknown`, `refused` e `failed` são textos fixos sem LLM, e sem narrativa não há o que julgar. `--judge` com `--dataset gold_real` ou `--sql-only` é erro, porque as linhas da Gold real não saem da máquina (DEC-015, issue #56).
-  - **Modelo do juiz diferente do gerador:** `judge_model` (padrão `google-gla:gemini-3.1-flash`) é comparado com o `llm_model` e o `fallback_model` pelo nome sem provedor e sem organização, e montar o juiz com o mesmo modelo é recusado (`--judge` sai com erro). A regra roda ao montar o juiz, e não em `AgentSettings`, para que o backend, que não usa juiz, carregue qualquer `llm_model` válido. A chave do juiz também só é exigida ao montar o juiz.
+  - **Modelo do juiz diferente do gerador:** `judge_model` (padrão `google-gla:gemini-3.5-flash-lite`) é comparado com o `llm_model` e o `fallback_model` pelo nome sem provedor e sem organização, e montar o juiz com o mesmo modelo é recusado (`--judge` sai com erro). A regra roda ao montar o juiz, e não em `AgentSettings`, para que o backend, que não usa juiz, carregue qualquer `llm_model` válido. A chave do juiz também só é exigida ao montar o juiz.
+  - **Modelo padrão trocado (29/10/2026, revisão do PR #85):** o `gemini-3.1-flash` do plano não existe na API do Gemini (404), e o `gemini-2.5-flash` foi retirado para usuários novos. O `gemini-3.5-flash-lite` responde e não é versão de prévia. A independência em relação ao gerador (`gemini-3.1-flash-lite`) é só nominal: são da mesma família.
+  - **Calibração inicial (Lucas, 29/10/2026, amostra):** 18 respostas com nota humana. 17 ficaram a até 1 ponto da nota do juiz (94%), 5 tiveram nota igual (28%) e 14 tiveram o mesmo passa ou não passa (78%). O juiz é um pouco mais severo, sobretudo quando falta o período. Até uma calibração maior, com mais itens, uma segunda pessoa e um critério de aceite escrito, a nota do juiz é **apoio, não métrica de decisão** da DEC-016.
   - **`passed` coerente com a nota:** verdadeiro se e só se `score >= 4`.
   - **`rationale` no relatório**, cortado em 300 caracteres, porque o juiz só roda na amostra sintética. O relatório continua sem linhas e sem o texto da resposta (DEC-024).
   - **Calibração antes de valer:** em 15 itens `answered` da amostra, uma pessoa dá a nota com a mesma rubrica, sem ver a do juiz. O juiz passa a contar com concordância de `passed` em pelo menos 12 de 15 e diferença média absoluta de nota até 1; se não passar, a rubrica vai para `judge/v2`. Até lá o juiz não decide merge.

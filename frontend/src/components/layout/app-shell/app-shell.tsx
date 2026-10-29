@@ -18,7 +18,13 @@ import { SidebarInset, SidebarProvider } from "#/components/ui/sidebar";
 import { ThemeToggle } from "#/components/ui/theme-toggle";
 import { TooltipProvider } from "#/components/ui/tooltip";
 
-export function AppShell({ children }: { children: ReactNode }) {
+export function AppShell({
+	children,
+	onConsultarUc,
+}: {
+	children: ReactNode;
+	onConsultarUc: () => void;
+}) {
 	const atual = useItemAtivo(NAVEGACAO);
 	const [trilha, setTrilha] = useState<HTMLDivElement | null>(null);
 
@@ -36,7 +42,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 					transition={{ duration: 0.2, ease: "linear" }}
 				>
 					<LayoutGroup>
-						<AppSidebar itens={NAVEGACAO} />
+						<AppSidebar itens={NAVEGACAO} onConsultarUc={onConsultarUc} />
 						<SidebarInset className="min-h-0 overflow-hidden">
 							<Header
 								titulo={
