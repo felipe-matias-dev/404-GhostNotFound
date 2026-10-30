@@ -990,3 +990,40 @@ async def test_narration_tokens_count_toward_the_answer_usage(layer):
 
     assert answer.answer == "Há 3 UCs."
     assert answer.input_tokens == generation().input_tokens + 500
+
+
+@pytest.mark.parametrize("turns", [(), None])
+async def test_followup_without_a_previous_turn_asks_back_without_calling_the_model(layer, turns):
+    generator = ScriptedGenerator(generation())
+    history = None if turns is None else FakeHistory(turns)
+
+    answer = await use_case(layer, generator, history=history, history_turns=3).ask(
+        "Agora faça o mesmo para Olinda.", "s1"
+    )
+
+    assert answer.status is AnswerStatus.CLARIFY
+    assert answer.sql is None
+    assert answer.input_tokens == 0
+    assert generator.histories == []
+
+
+async def test_followup_with_a_previous_turn_goes_to_the_model(layer):
+    generator = ScriptedGenerator(generation())
+    history = FakeHistory((turn("Quantas UCs existem em Recife?"),))
+
+    answer = await use_case(
+        layer, generator, ScriptedExecutor(result()), history=history, history_turns=3
+    ).ask("E em Olinda?", "s1")
+
+    assert answer.status is AnswerStatus.ANSWERED
+    assert len(generator.histories) == 1
+
+
+async def test_standalone_question_without_history_goes_to_the_model(layer):
+    generator = ScriptedGenerator(generation())
+
+    await use_case(
+        layer, generator, ScriptedExecutor(result()), history=FakeHistory(()), history_turns=3
+    ).ask("Quantas UCs existem em Olinda?", "s1")
+
+    assert len(generator.histories) == 1

@@ -25,6 +25,7 @@ from venergy_agent.domain.errors import (
     QueryExecutionError,
     SqlRejected,
 )
+from venergy_agent.domain.followup import depends_on_previous_turn
 from venergy_agent.domain.numbers import unsupported_numbers
 from venergy_agent.domain.question import Question
 from venergy_agent.domain.semantic import SemanticLayer
@@ -44,6 +45,10 @@ TECHNICAL_NAME = re.compile(r"\b[a-zA-Z]+_\w+")
 EMPTY_QUESTION = "A pergunta está vazia. Escreva o que você quer saber sobre a distribuidora."
 TOO_LONG_QUESTION = (
     "A pergunta passou do limite de {limit} caracteres. Escreva uma pergunta mais curta."
+)
+FOLLOWUP_WITHOUT_REFERENCE = (
+    "Não tenho uma pergunta anterior nesta conversa para usar como referência. "
+    "O que você quer saber, sobre qual recorte e em qual período?"
 )
 UNKNOWN_REASON = (
     "Não tenho essa informação nas tabelas que consulto, então não vou inventar uma resposta."
@@ -194,6 +199,21 @@ class AskUseCase:
         history = await self._load_history(session_id, request_id)
 
         spent = _Spent()
+        if not history and depends_on_previous_turn(question.text):
+            self._log(
+                request_id,
+                session_id,
+                step="resposta",
+                status=AnswerStatus.CLARIFY.value,
+                reason="followup_sem_referencia",
+            )
+            return self._clarify(
+                FOLLOWUP_WITHOUT_REFERENCE,
+                request_id,
+                started,
+                model=self._configured_model,
+                spent=spent,
+            )
         feedback: AttemptFeedback | None = None
         last_sql: str | None = None
         last_model: str | None = None
