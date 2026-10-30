@@ -45,18 +45,13 @@ def runs_dir(dataset: str) -> Path:
     return RUNS_GOLD_DIR if dataset == "gold_real" else RUNS_DIR
 
 
-def narrates(dataset: str, sql_only: bool) -> bool:
-    return dataset != "gold_real" and not sql_only
+def narrates(sql_only: bool) -> bool:
+    return not sql_only
 
 
-def judges(dataset: str, judge: bool, sql_only: bool) -> bool:
+def judges(judge: bool, sql_only: bool) -> bool:
     if not judge:
         return False
-    if dataset == "gold_real":
-        raise JudgeNotAllowed(
-            "o juiz envia as linhas ao modelo e as linhas da Gold real não saem da máquina "
-            "(DEC-015, issue #56): rode --judge só com --dataset amostra"
-        )
     if sql_only:
         raise JudgeNotAllowed("--judge precisa da narrativa: não use junto com --sql-only")
     return True
@@ -126,7 +121,7 @@ def _build_judge(settings: AgentSettings) -> PydanticAiAnswerJudge:
 async def _evaluate(
     only: str | None, pause_seconds: float, dataset: str, sql_only: bool, judge: bool
 ) -> tuple[Path, list[str]]:
-    with_judge = judges(dataset, judge, sql_only)
+    with_judge = judges(judge, sql_only)
     settings = AgentSettings()
     layer = await YamlSemanticLayerSource(
         settings.semantic_layer_path, settings.gold_contract_path
@@ -139,7 +134,7 @@ async def _evaluate(
     executor = PostgresQueryExecutor(settings.database_url, settings.query_timeout_seconds)
     counted = await executor.execute(validator.validate(UC_COUNT_SQL, layer.allowed_views))
     check_dataset(dataset, int(counted.rows[0]["total"]))
-    narrate = narrates(dataset, sql_only)
+    narrate = narrates(sql_only)
     memory = InMemoryConversationHistory()
     agent = await build_agent(settings, narrate=narrate, history=memory)
     answer_judge = _build_judge(settings) if with_judge else None

@@ -65,14 +65,14 @@ Da raiz do repositório:
 make eval                                  # os dois conjuntos, na amostra
 make eval ONLY=red_team                    # só o red team
 make eval SQL_ONLY=1                       # sem o redator: menos cota
-make eval DATASET=gold_real                # Gold real (sempre só SQL)
+make eval DATASET=gold_real                # Gold real, com redator (relatório fora do Git)
 make eval JUDGE=1                          # com o juiz, só na amostra narrada
 make eval-compare A=eval/runs/a.json B=eval/runs/b.json
 ```
 
 O `make eval` chama `python -m venergy_agent.evaluation` com `--dataset`, `--only`, `--judge` e `--sql-only`. Os caminhos do `eval-compare` são relativos a `ai-agent/`. Sem o `make`, rode os dois módulos com `uv run python -m` dentro de `ai-agent/`.
 
-Antes de chamar o modelo, a avaliação confere que o banco carregado é a base declarada em `--dataset` (pelo número de UCs em `sem_uc`) e para se não for. Com `--sql-only` o agente não monta o redator: nenhuma linha do banco vai ao modelo, e a fidelidade numérica fica fora. A Gold real roda sempre assim, e o relatório vai para `eval/runs_gold/`, fora do Git (issue #56, DEC-015). Na correção de SQL, a mensagem de erro de dado volta ao modelo só com o tipo do erro, sem o valor.
+Antes de chamar o modelo, a avaliação confere que o banco carregado é a base declarada em `--dataset` (pelo número de UCs em `sem_uc`) e para se não for. Com `--sql-only` o agente não monta o redator, e a fidelidade numérica fica fora; use quando a mudança não toca a narração, para gastar menos cota. Na Gold real, o relatório vai para `eval/runs_gold/`, fora do Git, porque o SQL e a justificativa do juiz podem trazer valores do dataset (DEC-024, DEC-015). Na correção de SQL, a mensagem de erro de dado volta ao modelo só com o tipo do erro, sem o valor.
 
 Cada execução grava `eval/runs/<data>.json`, com as métricas da spec §9.3 (execution accuracy, acurácia de status, taxa de recusa correta, violações de segurança e latência), e imprime a tabela. A linha de base e os achados estão na spec §9.6. Mudanças de prompt, modelo, few-shot ou camada semântica só entram se a execution accuracy e a acurácia de status não regredirem (DEC-016).
 
@@ -99,7 +99,7 @@ Configuração: `google-gla:gemini-3.1-flash-lite`, `prompt_version` v2, narrada
 
 ### Juiz (`--judge`)
 
-Avalia clareza e fidelidade da resposta em português (spec §9.4), com a rubrica `prompts/judge/v1/judge.md` e o modelo `VENERGY_AGENT_JUDGE_MODEL`, que precisa ser diferente do `LLM_MODEL` e do `FALLBACK_MODEL` e usa a chave do próprio provedor. Só julga itens `answered` de rodada narrada, na amostra sintética: `--judge` com `--dataset gold_real` ou com `--sql-only` é recusado. O relatório ganha `judge_score`, `judge_passed` e `judge_rationale` (até 300 caracteres) por item e `judge_pass_rate`, `judge_mean_score`, `judge_items` e `judge_errors` nas métricas. O juiz ainda não foi calibrado com uma pessoa: o resultado dele não decide merge (spec §9.4).
+Avalia clareza e fidelidade da resposta em português (spec §9.4), com a rubrica `prompts/judge/v1/judge.md` e o modelo `VENERGY_AGENT_JUDGE_MODEL`, que precisa ser diferente do `LLM_MODEL` e do `FALLBACK_MODEL` e usa a chave do próprio provedor. Só julga itens `answered` de rodada narrada, na amostra ou na Gold real: `--judge` com `--sql-only` é recusado. O relatório ganha `judge_score`, `judge_passed` e `judge_rationale` (até 300 caracteres) por item e `judge_pass_rate`, `judge_mean_score`, `judge_items` e `judge_errors` nas métricas. O juiz ainda não foi calibrado com uma pessoa: o resultado dele não decide merge (spec §9.4).
 
 ### Antes de rodar a avaliação na amostra
 
@@ -149,9 +149,9 @@ Cada integrante usa a própria chave, no próprio `ai-agent/.env` (fora do Git):
 
 1. Entre em https://aistudio.google.com com a sua conta Google, vá em **Get API key** e crie uma chave.
 2. Preencha `VENERGY_AGENT_GOOGLE_API_KEY` no `ai-agent/.env`. O modelo padrão já é `google-gla:gemini-3.1-flash-lite`.
-3. Para a amostra sintética, mantenha o projeto no Free Tier, sem ativar cobrança. Os limites aparecem em *Rate limit*, no AI Studio.
+3. Mantenha o projeto no Free Tier, sem ativar cobrança. Os limites aparecem em *Rate limit*, no AI Studio.
 
-No Free Tier, o Google pode usar o conteúdo enviado para melhorar os produtos dele. Por isso, o plano gratuito serve para a amostra sintética. Para a Gold real, a regra ainda não foi decidida pelo time: até decidir, não envie a Gold real pelo plano gratuito.
+No Free Tier, o Google pode usar o conteúdo enviado para melhorar os produtos dele. O time aceita esse envio para a amostra e para a Gold real (DEC-015): o dataset é do case. O que nunca pode acontecer é o dataset, ou qualquer saída com dados dele, ir para o Git (DEC-024).
 
 O OpenRouter continua disponível pelo prefixo `openrouter:` (veja `.env.example`). Os testes não usam nenhuma chave: o modelo é simulado.
 
