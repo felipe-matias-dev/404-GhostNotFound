@@ -1,3 +1,4 @@
+import argparse
 import sys
 from collections.abc import Mapping, Sequence
 from pathlib import Path
@@ -36,9 +37,9 @@ def load_report(path: Path) -> EvaluationReport:
         raise ReportError(f"{path} não é um relatório de avaliação válido") from error
 
 
-def compare(a: EvaluationReport, b: EvaluationReport) -> str:
-    keys_a = {_key(item): item for item in a.items}
-    keys_b = {_key(item): item for item in b.items}
+def compare(a: EvaluationReport, b: EvaluationReport, skip: frozenset[str] = frozenset()) -> str:
+    keys_a = {_key(item): item for item in a.items if item.id not in skip}
+    keys_b = {_key(item): item for item in b.items if item.id not in skip}
     common = [key for key in keys_a if key in keys_b]
     metrics_a = compute_metrics([keys_a[key] for key in common])
     metrics_b = compute_metrics([keys_b[key] for key in common])
@@ -165,15 +166,17 @@ def _table(title: str, header: Sequence[str], rows: Sequence[Sequence[str]]) -> 
 
 
 def main(argv: list[str]) -> int:
-    if len(argv) != 2:
-        print("uso: python -m venergy_agent.evaluation.compare A.json B.json", file=sys.stderr)
-        return 2
+    parser = argparse.ArgumentParser(prog="python -m venergy_agent.evaluation.compare")
+    parser.add_argument("a")
+    parser.add_argument("b")
+    parser.add_argument("--skip", default="", metavar="G001,G002")
+    args = parser.parse_args(argv)
     try:
-        a, b = (load_report(Path(path)) for path in argv)
+        a, b = load_report(Path(args.a)), load_report(Path(args.b))
     except ReportError as error:
         print(error, file=sys.stderr)
         return 1
-    print(compare(a, b), end="")
+    print(compare(a, b, frozenset(filter(None, args.skip.split(",")))), end="")
     return 0
 
 

@@ -8,6 +8,7 @@ from venergy_agent.evaluation.__main__ import (
     RUNS_GOLD_DIR,
     DatasetMismatch,
     JudgeNotAllowed,
+    UnknownItems,
     check_dataset,
     format_metrics,
     judges,
@@ -16,6 +17,7 @@ from venergy_agent.evaluation.__main__ import (
     narrates,
     report_path,
     runs_dir,
+    select_items,
     write_report,
 )
 from venergy_agent.evaluation.report import EvaluationReport
@@ -136,3 +138,28 @@ def test_references_mode_refuses_flags_it_would_ignore(flag, capsys):
         main(["--only", "references", flag])
 
     assert "--only references" in capsys.readouterr().err
+
+
+ITEMS = [
+    {"id": "G1", "follow_up_of": None},
+    {"id": "G2", "follow_up_of": "G1"},
+    {"id": "G3", "follow_up_of": "G2"},
+    {"id": "G4", "follow_up_of": None},
+]
+
+
+def test_selecting_a_follow_up_brings_the_turns_it_depends_on():
+    assert [item["id"] for item in select_items(ITEMS, {"G2"})] == ["G1", "G2"]
+    assert [item["id"] for item in select_items(ITEMS, {"G4"})] == ["G4"]
+
+
+def test_selecting_an_unknown_item_is_refused():
+    with pytest.raises(UnknownItems, match="G9"):
+        select_items(ITEMS, {"G9"})
+
+
+def test_ids_are_refused_with_modes_that_do_not_run_the_golden(capsys):
+    with pytest.raises(SystemExit):
+        main(["--only", "red_team", "--ids", "G1"])
+
+    assert "--ids" in capsys.readouterr().err
