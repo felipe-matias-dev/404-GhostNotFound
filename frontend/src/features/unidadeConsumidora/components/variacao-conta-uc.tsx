@@ -31,7 +31,7 @@ export function VariacaoContaUc({ data }: { data: Uc360 }) {
 	return (
 		<section
 			aria-labelledby="uc-variacao-conta"
-			className="flex min-w-0 flex-col gap-3 rounded-md border border-border bg-surface-1 p-4"
+			className="@container flex min-w-0 flex-col gap-3 rounded-md border border-border bg-surface-1 p-4"
 		>
 			<header>
 				<div className="flex items-center gap-1.5">
@@ -86,19 +86,24 @@ function CorpoVariacao({
 
 	return (
 		<>
-			<p className="flex flex-wrap items-baseline gap-x-2 font-mono tabular-nums">
-				<span className="text-body text-text-muted">
-					{formatBRL(variacao.conta_comparada)}
-				</span>
-				<span aria-hidden className="text-text-muted">
-					→
-				</span>
-				<span className="sr-only">para</span>
-				<span className="text-heading">{formatBRL(variacao.conta)}</span>
-				<span className={cn("text-body", diferenca.texto)}>
-					{formatBRL(variacao.diferenca, { sinal: true })}
-				</span>
-			</p>
+			{/* Cada conta com o seu mês: o atendente lê ao cliente qual conta é qual, sem depender da seta.
+			    Na coluna estreita, a diferença desce para a linha de baixo. */}
+			<dl className="grid grid-cols-2 gap-3 @sm:grid-cols-3 [&_dd]:mt-1 [&_dd]:font-mono [&_dd]:tabular-nums [&_dt]:text-small [&_dt]:text-text-muted">
+				<div>
+					<dt>Conta de {formatCompetencia(variacao.competencia_comparada)}</dt>
+					<dd className="text-body">{formatBRL(variacao.conta_comparada)}</dd>
+				</div>
+				<div>
+					<dt>Conta de {formatCompetencia(variacao.competencia)}</dt>
+					<dd className="text-body">{formatBRL(variacao.conta)}</dd>
+				</div>
+				<div>
+					<dt>Diferença</dt>
+					<dd className={cn("text-body", diferenca.texto)}>
+						{formatBRL(variacao.diferenca, { sinal: true })}
+					</dd>
+				</div>
+			</dl>
 			<p className="text-body text-text-muted">
 				{variacao.diferenca === 0
 					? "A conta não mudou."
