@@ -13,6 +13,7 @@ from pydantic import ValidationError
 from venergy_agent.bootstrap import build_agent
 from venergy_agent.config import AGENT_ROOT, AgentSettings
 from venergy_agent.evaluation.database_guard import PostgresDatabaseGuard
+from venergy_agent.evaluation.references import check_references
 from venergy_agent.evaluation.report import EvaluationReport
 from venergy_agent.evaluation.runner import EvaluationRunner
 from venergy_agent.infrastructure.answer_judge import PydanticAiAnswerJudge
@@ -95,12 +96,15 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
         prog="python -m venergy_agent.evaluation",
         description="Executa o golden set e o red team e grava o relatório em eval/runs/.",
     )
-    parser.add_argument("--only", choices=("golden", "red_team"), default=None)
+    parser.add_argument("--only", choices=("golden", "red_team", "references"), default=None)
     parser.add_argument("--pause", type=float, default=DEFAULT_PAUSE_SECONDS, metavar="SECONDS")
     parser.add_argument("--dataset", choices=("amostra", "gold_real"), default="amostra")
     parser.add_argument("--sql-only", action="store_true")
     parser.add_argument("--judge", action="store_true")
-    return parser.parse_args(argv)
+    args = parser.parse_args(argv)
+    if args.only == "references" and (args.sql_only or args.judge):
+        parser.error("--only references não chama o modelo: não use com --sql-only nem --judge")
+    return args
 
 
 def load_set(path: Path) -> tuple[str, list[dict[str, Any]]]:
@@ -170,10 +174,32 @@ async def _evaluate(
     return path, format_metrics(report.metrics)
 
 
+async def _check_references(dataset: str) -> tuple[int, list[str]]:
+    settings = AgentSettings()
+    layer = await YamlSemanticLayerSource(
+        settings.semantic_layer_path, settings.gold_contract_path
+    ).load()
+    validator = SqlglotValidator(
+        dialect=settings.sql_dialect,
+        max_rows=settings.max_rows,
+        allowed_schema=settings.allowed_schema,
+    )
+    executor = PostgresQueryExecutor(settings.database_url, settings.query_timeout_seconds)
+    counted = await executor.execute(validator.validate(UC_COUNT_SQL, layer.allowed_views))
+    check_dataset(dataset, int(counted.rows[0]["total"]))
+    _, golden = load_set(EVAL_DIR / "golden_set.yaml")
+    return await check_references(golden, dataset, validator, executor, layer.allowed_views)
+
+
 def main(argv: list[str]) -> int:
     args = _parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(message)s", stream=sys.stderr)
     try:
+        if args.only == "references":
+            checked, problems = asyncio.run(_check_references(args.dataset))
+            print(f"{checked} referências conferidas na base {args.dataset}, sem chamar o modelo")
+            print("\n".join(problems) if problems else "todas executam e voltam com dados")
+            return 1 if problems else 0
         path, lines = asyncio.run(
             _evaluate(args.only, args.pause, args.dataset, args.sql_only, args.judge)
         )
