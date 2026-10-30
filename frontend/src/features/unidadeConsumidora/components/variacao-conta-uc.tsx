@@ -46,11 +46,8 @@ export function VariacaoContaUc({ data }: { data: Uc360 }) {
 						>
 							<InfoIcon aria-hidden className="size-3.5" />
 						</PopoverTrigger>
-						<PopoverContent className="max-w-72 p-3 text-body">
-							Diferença entre a conta do mês de referência e a do mesmo mês do
-							ano anterior, dividida por motivo. Consumo é a energia a mais ou a
-							menos, ao preço do ano anterior. Tarifa é o reajuste do preço por
-							kWh, incluindo a sobra de centavos do arredondamento.
+						<PopoverContent className="max-w-80 p-3 text-body">
+							<AjudaDasPartes comDias={variacao?.dias != null} />
 						</PopoverContent>
 					</Popover>
 				</div>
@@ -70,6 +67,58 @@ export function VariacaoContaUc({ data }: { data: Uc360 }) {
 				</p>
 			)}
 		</section>
+	);
+}
+
+/**
+ * O que é cada parte, como na DEC-052. Com "dias" separada, o consumo é o gasto por dia; sem
+ * ela, o consumo leva toda a energia a mais ou a menos.
+ */
+function AjudaDasPartes({ comDias }: { comDias: boolean }) {
+	return (
+		<>
+			<p className="mb-2">
+				A diferença entre as duas contas, dividida por motivo. As partes somam
+				exatamente a diferença.
+			</p>
+			<dl className="grid gap-1.5 text-small [&_dt]:font-medium [&_dt]:text-text">
+				<div>
+					<dt>Consumo</dt>
+					<dd className="text-text-muted">
+						{comDias
+							? "O cliente gastou mais ou menos energia por dia, ao preço do ano anterior."
+							: "O cliente gastou mais ou menos energia, ao preço do ano anterior."}
+					</dd>
+				</div>
+				{comDias && (
+					<div>
+						<dt>Dias na fatura</dt>
+						<dd className="text-text-muted">
+							A conta cobriu mais ou menos dias, no consumo diário do ano
+							anterior.
+						</dd>
+					</div>
+				)}
+				<div>
+					<dt>Tarifa</dt>
+					<dd className="text-text-muted">
+						Reajuste da tarifa base por kWh, sem a bandeira. Fica também com a
+						sobra de centavos do arredondamento.
+					</dd>
+				</div>
+				<div>
+					<dt>Bandeira</dt>
+					<dd className="text-text-muted">
+						Acréscimo da bandeira tarifária além do que a conta do ano anterior
+						já cobrava por kWh.
+					</dd>
+				</div>
+				<div>
+					<dt>Tributos</dt>
+					<dd className="text-text-muted">Variação dos impostos da conta.</dd>
+				</div>
+			</dl>
+		</>
 	);
 }
 
