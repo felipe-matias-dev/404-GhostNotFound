@@ -278,3 +278,57 @@ def test_inverted_ranges_return_validation_errors(client: TestClient, params: di
     response = client.get(URL, params=params)
     assert response.status_code == 422
     assert response.json()["detail"][0]["type"] == "value_error"
+
+
+@pytest.mark.parametrize(
+    ("recorte", "expected"),
+    [
+        ({"municipio": "Paulista", "bairro": "Janga", "classe": "B1"}, ["0005"]),
+        (
+            {"municipio": "Jaboatão dos Guararapes", "bairro": "Piedade", "classe": "B3"},
+            ["0004"],
+        ),
+        ({"municipio": "Inexistente"}, []),
+    ],
+)
+def test_queue_filters_segment_before_pagination(
+    client: TestClient, recorte: dict[str, str], expected: list[str]
+) -> None:
+    first = queue(client, **recorte, tamanho=1)
+    second = queue(client, **recorte, tamanho=1, pagina=2)
+    assert (codes(first), first["total"], codes(second), second["total"]) == (
+        expected,
+        len(expected),
+        [],
+        len(expected),
+    )
+
+
+def test_segment_combines_with_drop_and_active_order(client: TestClient) -> None:
+    recorte = {"municipio": "Paulista", "bairro": "Janga", "classe": "B1"}
+    client.post("/ordens-inspecao", json={"cod_ucs": ["0005"]})
+    assert codes(queue(client, **recorte, queda_min=33, queda_max=33)) == ["0005"]
+    assert queue(client, **recorte, sem_ordem_ativa=True)["total"] == 0
+
+
+def test_distribution_uses_segment_and_includes_unidentified_drop(
+    client: TestClient, engine: Engine
+) -> None:
+    with engine.begin() as connection:
+        connection.execute(
+            update(FilaSuspeita).where(FilaSuspeita.cod_uc == "0005").values(motivos=["Outro"])
+        )
+    recorte = {"municipio": "Paulista", "bairro": "Janga", "classe": "B1"}
+    response = client.get(f"{URL}/distribuicao-queda", params=recorte)
+    assert response.status_code == 200
+    distribution = response.json()
+    assert distribution == {"itens": [], "sem_queda_identificada": 1}
+    assert sum(item["total"] for item in distribution["itens"]) + distribution[
+        "sem_queda_identificada"
+    ] == queue(client, **recorte)["total"]
+    assert queue(client, **recorte, queda_min=20)["total"] == 0
+
+
+@pytest.mark.parametrize("url", [URL, f"{URL}/distribuicao-queda"])
+def test_segment_requires_municipality_for_neighborhood(client: TestClient, url: str) -> None:
+    assert client.get(url, params={"bairro": "Janga"}).status_code == 422

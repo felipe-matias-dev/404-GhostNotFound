@@ -24,6 +24,7 @@ from venergy_api.schemas import (
     FaturasNaoPagasSchema,
     InspecaoUcSchema,
     InterrupcaoUcSchema,
+    LocalidadeSchema,
     MedidorUcSchema,
     Uc360Schema,
 )
@@ -41,6 +42,19 @@ def _buscar_uc(session: Session, cod_uc: str) -> DimUc:
             detail=f"Unidade consumidora {cod_uc} não encontrada",
         )
     return uc
+
+
+@router.get("/localidades")
+def get_localidades(session: SessionDep) -> list[LocalidadeSchema]:
+    localidades = session.execute(
+        select(DimUc.municipio, DimUc.bairro)
+        .distinct()
+        .order_by(DimUc.municipio, DimUc.bairro)
+    )
+    return [
+        LocalidadeSchema(municipio=municipio, bairro=bairro)
+        for municipio, bairro in localidades
+    ]
 
 
 @router.get(

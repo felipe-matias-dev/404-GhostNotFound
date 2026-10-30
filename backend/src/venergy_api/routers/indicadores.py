@@ -14,7 +14,9 @@ from venergy_api.schemas import (
     IndicadoresComparacaoFiltroSchema,
     IndicadoresJanelaSchema,
     IndicadoresJanelasFiltroSchema,
+    IndicadoresMensaisFiltroSchema,
     IndicadoresPeriodoSchema,
+    KpisMensaisSchema,
     VariacaoIndicadoresSchema,
 )
 
@@ -86,6 +88,47 @@ def _indicadores(inicio: str, fim: str) -> dict[str, ColumnElement]:
         "n_notas": total(Segmento.n_notas),
         "satisfacao_media": _razao(soma(Segmento.soma_notas), soma(Segmento.n_notas)),
     }
+
+
+@router.get("/mensal")
+def get_mensal(
+    filtro: Annotated[IndicadoresMensaisFiltroSchema, Query()], session: SessionDep
+) -> list[KpisMensaisSchema]:
+    calendario = select(Segmento.competencia).distinct().subquery()
+    agregacao = (
+        select(
+            Segmento.competencia,
+            func.sum(Segmento.kwh_faturado).label("kwh_faturado"),
+            func.sum(Segmento.receita_faturada).label("receita_faturada"),
+            func.sum(Segmento.receita_energia).label("receita_energia"),
+            func.sum(Segmento.n_chamados).label("n_chamados"),
+            _razao(func.sum(Segmento.soma_notas), func.sum(Segmento.n_notas)).label(
+                "satisfacao_media"
+            ),
+            *indices(Segmento.horas_interrompidas, Segmento.n_interrupcoes, Segmento.n_uc, 1),
+        )
+        .where(*_recorte(filtro.municipio, filtro.bairro, filtro.classe))
+        .group_by(Segmento.competencia)
+        .subquery()
+    )
+    consulta = select(
+        calendario.c.competencia,
+        func.coalesce(agregacao.c.kwh_faturado, 0).label("kwh_faturado"),
+        func.coalesce(agregacao.c.receita_faturada, 0).label("receita_faturada"),
+        func.coalesce(agregacao.c.receita_energia, 0).label("receita_energia"),
+        func.coalesce(agregacao.c.n_chamados, 0).label("n_chamados"),
+        agregacao.c.dec,
+        agregacao.c.fec,
+        agregacao.c.satisfacao_media,
+    ).outerjoin(agregacao, calendario.c.competencia == agregacao.c.competencia)
+    if filtro.inicio:
+        consulta = consulta.where(calendario.c.competencia >= filtro.inicio)
+    if filtro.fim:
+        consulta = consulta.where(calendario.c.competencia <= filtro.fim)
+    return [
+        KpisMensaisSchema(**linha._mapping)
+        for linha in session.execute(consulta.order_by(calendario.c.competencia))
+    ]
 
 
 @router.get("/comparacao")

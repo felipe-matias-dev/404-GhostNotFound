@@ -11,6 +11,7 @@ from venergy_api.models import FatoFaturamentoMensal, KpisMensais, KpisSegmentoM
 
 COMPARE = "/indicadores/comparacao"
 WINDOWS = "/indicadores/janelas"
+MONTHLY = "/indicadores/mensal"
 
 
 def month(index: int) -> str:
@@ -415,3 +416,61 @@ def test_matches_receita_comparacao_for_the_same_pair(engine: Engine, client: Te
     for side in ("base", "atual"):
         assert indicadores[side]["receita_faturada"] == receita[side]["receita_faturada"]
         assert indicadores[side]["kwh_faturado"] == receita[side]["kwh_faturado"]
+
+
+def test_monthly_uses_weighted_components_and_global_calendar(
+    engine: Engine, client: TestClient
+) -> None:
+    store(
+        engine,
+        segment(
+            "2024-01", n_uc=100, horas_interrompidas=200, n_interrupcoes=300,
+            soma_notas=8, n_notas=2, n_chamados=3,
+        ),
+        segment(
+            "2024-01", bairro="Carmo", n_uc=300, horas_interrompidas=300,
+            n_interrupcoes=100, soma_notas=3, n_notas=1, n_chamados=5,
+        ),
+        segment("2024-02", municipio="Paulista", bairro="Janga"),
+        segment("2024-03", municipio="Paulista", bairro="Janga"),
+    )
+    response = client.get(
+        MONTHLY,
+        params={"municipio": "Recife", "classe": "B1", "inicio": "2024-01", "fim": "2024-02"},
+    )
+    assert response.status_code == 200
+    first, empty = response.json()
+    assert first["competencia"] == "2024-01"
+    assert first["dec"] == pytest.approx(1.25)
+    assert first["fec"] == pytest.approx(1.0)
+    assert first["satisfacao_media"] == pytest.approx(11 / 3)
+    assert first["n_chamados"] == 8
+    comparison = compare(
+        client, ("2024-01", "2024-01"), ("2024-01", "2024-01"),
+        municipio="Recife", classe="B1",
+    )["atual"]
+    for field in (
+        "dec", "fec", "satisfacao_media", "n_chamados", "kwh_faturado",
+        "receita_faturada", "receita_energia",
+    ):
+        assert float(first[field]) == pytest.approx(float(comparison[field]))
+    assert empty["competencia"] == "2024-02"
+    for field in ("kwh_faturado", "receita_faturada", "receita_energia", "n_chamados"):
+        assert float(empty[field]) == 0
+    assert empty["dec"] is None
+    assert empty["fec"] is None
+    assert empty["satisfacao_media"] is None
+
+
+def test_monthly_validates_filters_and_handles_empty_calendar(
+    engine: Engine, client: TestClient
+) -> None:
+    store(engine)
+    assert client.get(MONTHLY).json() == []
+    for params in (
+        {"bairro": "Janga"},
+        {"inicio": "2024-13"},
+        {"inicio": "2024-02", "fim": "2024-01"},
+        {"classe": "invalida"},
+    ):
+        assert client.get(MONTHLY, params=params).status_code == 422

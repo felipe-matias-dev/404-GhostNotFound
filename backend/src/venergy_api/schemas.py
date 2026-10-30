@@ -74,6 +74,11 @@ class DimUcSchema(BaseModel):
     energia_injetada_kwh_mes: Annotated[ExactNumber, Field(ge=0)] | None
 
 
+class LocalidadeSchema(BaseModel):
+    municipio: str
+    bairro: str
+
+
 class FaturamentoMensalSchema(BaseModel):
     """Faturamento de uma UC numa competência."""
 
@@ -153,6 +158,22 @@ class PeriodoSchema(BaseModel):
     def inicio_ate_o_fim(self) -> "PeriodoSchema":
         _inicio_ate_o_fim(self.inicio, self.fim)
         return self
+
+
+class RecorteFiltroSchema(BaseModel):
+    municipio: RequiredText | None = None
+    bairro: RequiredText | None = None
+    classe: Classe | None = None
+
+    @model_validator(mode="after")
+    def bairro_com_municipio(self) -> "RecorteFiltroSchema":
+        if self.bairro and not self.municipio:
+            raise ValueError("Informe o município junto com o bairro")
+        return self
+
+
+class OrdensFiltroSchema(RecorteFiltroSchema):
+    status: StatusOrdem | None = None
 
 
 class ComparacaoFiltroSchema(BaseModel):
@@ -528,7 +549,7 @@ class FilaSuspeitaSchema(BaseModel):
     kwh_recuperavel_est: ExactNumber | None
 
 
-class FilaFiltroSchema(BaseModel):
+class FilaFiltroSchema(RecorteFiltroSchema):
     """Página da fila e, se quiser, só as UCs que ainda não têm ordem de inspeção ativa."""
 
     pagina: Annotated[int, Field(ge=1)] = 1
@@ -811,3 +832,7 @@ class LoginSchema(BaseModel):
         str, StringConstraints(strip_whitespace=True, to_lower=True, min_length=1, max_length=50)
     ]
     senha: Annotated[str, StringConstraints(min_length=1, max_length=200)]
+
+
+class IndicadoresMensaisFiltroSchema(RecorteFiltroSchema, PeriodoSchema):
+    """Período e recorte opcionais para a série mensal de indicadores."""
