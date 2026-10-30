@@ -36,6 +36,7 @@ Hexagonal: `domain` ← `application` ← `infrastructure`.
 
 ```
 pergunta → Question → SemanticLayer (carregada uma vez)
+        → follow-up sem turno anterior no histórico → clarify, sem chamar o modelo (DEC-052)
         → orçamento da sessão esgotado? → refused, sem chamar o modelo
         → histórico da sessão (últimos turnos, sem os refused)
         → SqlGenerator (com o histórico) → SqlDraft
