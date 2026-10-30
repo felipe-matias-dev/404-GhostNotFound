@@ -10,7 +10,13 @@ from sqlalchemy.orm import Session
 from venergy_api.auth import Perfil, UsuarioLogado
 from venergy_api.database import SessionDep
 from venergy_api.models import DimUc, OrdemEvento, OrdemInspecao
-from venergy_api.ordens import STATUS_ATIVOS, StatusOrdem, TransicaoInvalidaError, validar_transicao
+from venergy_api.ordens import (
+    STATUS_ATIVOS,
+    ResultadoOrdem,
+    StatusOrdem,
+    TransicaoInvalidaError,
+    validar_transicao,
+)
 from venergy_api.schemas import (
     AtualizarOrdemSchema,
     CriarOrdensSchema,
@@ -115,6 +121,35 @@ def _buscar_ordem(session: Session, ordem_id: int, *, travar: bool = False) -> O
     return ordem
 
 
+def _mudar_status(
+    ordem: OrdemInspecao,
+    novo: StatusOrdem,
+    resultado: ResultadoOrdem | None,
+    observacao: str | None,
+    autor_login: str,
+) -> None:
+    """Valida a transição e registra a mudança. Quem chama trava a linha e faz o commit.
+
+    É o caminho único de mudança de status: o PATCH e o upload da planilha de campo passam
+    por aqui, e a regra da máquina de estados não existe em duas cópias.
+    """
+    validar_transicao(ordem.status, novo)
+    ordem.eventos.append(
+        OrdemEvento(
+            status_anterior=ordem.status,
+            status_novo=novo,
+            observacao=observacao,
+            autor_login=autor_login,
+        )
+    )
+    ordem.status = novo
+    ordem.resultado = resultado
+    # A observação da OI é o que a equipe viu em campo ou o motivo do cancelamento. O motivo
+    # de uma volta para GERADA fica só no evento, para não sobrescrevê-la.
+    if observacao is not None and novo != StatusOrdem.GERADA:
+        ordem.observacao = observacao
+
+
 @router.get("/{ordem_id}", responses={status.HTTP_404_NOT_FOUND: {"model": ErroSchema}})
 def obter_ordem(ordem_id: int, session: SessionDep) -> OrdemDetalheSchema:
     return OrdemDetalheSchema.model_validate(_buscar_ordem(session, ordem_id))
@@ -139,23 +174,8 @@ def atualizar_ordem(
     # simultâneas leriam o mesmo status atual e as duas passariam pela validação.
     ordem = _buscar_ordem(session, ordem_id, travar=True)
     try:
-        validar_transicao(ordem.status, mudanca.status)
+        _mudar_status(ordem, mudanca.status, mudanca.resultado, mudanca.observacao, usuario.login)
     except TransicaoInvalidaError as error:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(error)) from error
-
-    ordem.eventos.append(
-        OrdemEvento(
-            status_anterior=ordem.status,
-            status_novo=mudanca.status,
-            observacao=mudanca.observacao,
-            autor_login=usuario.login,
-        )
-    )
-    ordem.status = mudanca.status
-    ordem.resultado = mudanca.resultado
-    # A observação da OI é o que a equipe viu em campo ou o motivo do cancelamento. O motivo
-    # de uma volta para GERADA fica só no evento, para não sobrescrevê-la.
-    if mudanca.observacao is not None and mudanca.status != StatusOrdem.GERADA:
-        ordem.observacao = mudanca.observacao
     session.commit()
     return OrdemDetalheSchema.model_validate(ordem)
