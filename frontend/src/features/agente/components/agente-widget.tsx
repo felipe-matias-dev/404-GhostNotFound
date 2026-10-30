@@ -13,6 +13,7 @@ import {
 } from "@phosphor-icons/react";
 import { useLocation, useNavigate } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "motion/react";
+import { useEffect, useRef } from "react";
 import { LogoMark } from "#/components/layout/logo";
 import { Button } from "#/components/ui/button";
 import {
@@ -25,7 +26,11 @@ import {
 	DropdownMenuTrigger,
 } from "#/components/ui/dropdown-menu";
 import { cn } from "#/lib/utils";
-import { EXEMPLOS_PERGUNTAS, formatarTempoRelativo } from "../conversions";
+import {
+	EXEMPLOS_PERGUNTAS,
+	filtrarExemplosPorEscopo,
+	formatarTempoRelativo,
+} from "../conversions";
 import type { EscopoSugestao } from "../types";
 import { AgenteComposer } from "./agente-composer";
 import { AgenteTurnoItem } from "./agente-mensagem";
@@ -58,10 +63,25 @@ export function AgenteWidget() {
 		enviarPergunta,
 		tentarNovamente,
 	} = useAgente();
+	const fimConversaRef = useRef<HTMLDivElement>(null);
+	const ultimoTurno = sessaoAtiva.turnos.at(-1);
+	const ultimoTurnoId = ultimoTurno?.id;
+	const ultimoTurnoStatus = ultimoTurno?.status;
+
+	useEffect(() => {
+		if (!widgetAberto || !ultimoTurnoId || !ultimoTurnoStatus) return;
+		fimConversaRef.current?.scrollIntoView({
+			behavior: "smooth",
+			block: "end",
+		});
+	}, [widgetAberto, ultimoTurnoId, ultimoTurnoStatus]);
 
 	if (pathname === "/agente") return null;
 
-	const sugestoes = EXEMPLOS_PERGUNTAS.slice(0, 3);
+	const sugestoes = filtrarExemplosPorEscopo(EXEMPLOS_PERGUNTAS, escopo).slice(
+		0,
+		3,
+	);
 	const sessoesComHistorico = sessoes.filter((s) => s.turnos.length > 0);
 
 	return (
@@ -198,6 +218,7 @@ export function AgenteWidget() {
 											onRetry={(id) => void tentarNovamente(id)}
 										/>
 									))}
+									<div ref={fimConversaRef} />
 								</div>
 							)}
 						</div>

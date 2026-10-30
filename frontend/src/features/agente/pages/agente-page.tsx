@@ -66,6 +66,18 @@ export function AgentePage() {
 	const [editandoTitulo, setEditandoTitulo] = useState(false);
 	const [tituloTemp, setTituloTemp] = useState("");
 	const inputTituloRef = useRef<HTMLInputElement>(null);
+	const fimConversaRef = useRef<HTMLDivElement>(null);
+	const ultimoTurno = sessaoAtiva.turnos.at(-1);
+	const ultimoTurnoId = ultimoTurno?.id;
+	const ultimoTurnoStatus = ultimoTurno?.status;
+
+	useEffect(() => {
+		if (!ultimoTurnoId || !ultimoTurnoStatus) return;
+		fimConversaRef.current?.scrollIntoView({
+			behavior: "smooth",
+			block: "end",
+		});
+	}, [ultimoTurnoId, ultimoTurnoStatus]);
 
 	const exemplos = filtrarExemplosPorEscopo(EXEMPLOS_PERGUNTAS, escopo).slice(
 		0,
@@ -378,6 +390,7 @@ export function AgentePage() {
 									onRetry={(id) => void tentarNovamente(id)}
 								/>
 							))}
+							<div ref={fimConversaRef} className="scroll-mb-32" />
 						</div>
 						<div className="sticky bottom-0 z-10 bg-gradient-to-t from-surface-1 via-surface-1 to-transparent px-4 pt-2 pb-4">
 							<div className="mx-auto max-w-2xl">
