@@ -260,6 +260,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/fila-suspeitas/distribuicao-queda": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Distribuicao Queda */
+        get: operations["get_distribuicao_queda_fila_suspeitas_distribuicao_queda_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/fila-suspeitas": {
         parameters: {
             query?: never;
@@ -634,6 +651,20 @@ export interface components {
             /** Energia Injetada Kwh Mes */
             energia_injetada_kwh_mes: number | null;
         };
+        /** DistribuicaoQuedaItemSchema */
+        DistribuicaoQuedaItemSchema: {
+            /** Queda */
+            queda: number;
+            /** Total */
+            total: number;
+        };
+        /** DistribuicaoQuedaSchema */
+        DistribuicaoQuedaSchema: {
+            /** Itens */
+            itens: components["schemas"]["DistribuicaoQuedaItemSchema"][];
+            /** Sem Queda Identificada */
+            sem_queda_identificada: number;
+        };
         /**
          * ErroSchema
          * @description Corpo das respostas de erro do FastAPI (HTTPException), documentado no OpenAPI.
@@ -702,6 +733,8 @@ export interface components {
             /** Kwh Recuperavel Est */
             kwh_recuperavel_est: number | null;
             ordem_ativa: components["schemas"]["OrdemAtivaSchema"] | null;
+            /** Queda Percentual */
+            queda_percentual: number | null;
         };
         /**
          * FilaPaginaSchema
@@ -1632,12 +1665,39 @@ export interface operations {
             };
         };
     };
+    get_distribuicao_queda_fila_suspeitas_distribuicao_queda_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DistribuicaoQuedaSchema"];
+                };
+            };
+        };
+    };
     get_fila_fila_suspeitas_get: {
         parameters: {
             query?: {
                 pagina?: number;
                 tamanho?: number;
                 sem_ordem_ativa?: boolean;
+                ordenar_por?: "prioridade" | "energia" | "ordem_ativa" | "queda";
+                direcao?: "asc" | "desc";
+                queda_min?: number | null;
+                queda_max?: number | null;
+                medidor_eletromecanico?: boolean;
+                leituras_estimadas_min?: number | null;
+                leituras_estimadas_max?: number | null;
             };
             header?: never;
             path?: never;

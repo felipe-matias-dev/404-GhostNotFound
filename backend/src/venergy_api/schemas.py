@@ -535,6 +535,23 @@ class FilaFiltroSchema(BaseModel):
     # Mesmo teto do pedido de ordens: uma página inteira cabe num único pedido.
     tamanho: Annotated[int, Field(ge=1, le=MAX_ORDENS_POR_PEDIDO)] = 50
     sem_ordem_ativa: bool = False
+    ordenar_por: Literal["prioridade", "energia", "ordem_ativa", "queda"] = "prioridade"
+    direcao: Literal["asc", "desc"] = "asc"
+    queda_min: Annotated[int | None, Field(ge=0, le=100)] = None
+    queda_max: Annotated[int | None, Field(ge=0, le=100)] = None
+    medidor_eletromecanico: bool = False
+    leituras_estimadas_min: Annotated[int | None, Field(ge=0, le=100)] = None
+    leituras_estimadas_max: Annotated[int | None, Field(ge=0, le=100)] = None
+
+
+class DistribuicaoQuedaItemSchema(BaseModel):
+    queda: int
+    total: int
+
+
+class DistribuicaoQuedaSchema(BaseModel):
+    itens: list[DistribuicaoQuedaItemSchema]
+    sem_queda_identificada: int
 
 
 class OrdemAtivaSchema(BaseModel):
@@ -550,6 +567,7 @@ class FilaItemSchema(FilaSuspeitaSchema):
     """Uma UC da fila e a ordem ativa dela, para a tela não oferecer o que daria 409."""
 
     ordem_ativa: OrdemAtivaSchema | None
+    queda_percentual: int | None
 
 
 class FilaPaginaSchema(BaseModel):

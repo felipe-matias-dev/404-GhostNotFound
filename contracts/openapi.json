@@ -1110,6 +1110,27 @@
         }
       }
     },
+    "/fila-suspeitas/distribuicao-queda": {
+      "get": {
+        "tags": [
+          "fila de suspeitas"
+        ],
+        "summary": "Get Distribuicao Queda",
+        "operationId": "get_distribuicao_queda_fila_suspeitas_distribuicao_queda_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DistribuicaoQuedaSchema"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/fila-suspeitas": {
       "get": {
         "tags": [
@@ -1150,6 +1171,118 @@
               "type": "boolean",
               "default": false,
               "title": "Sem Ordem Ativa"
+            }
+          },
+          {
+            "name": "ordenar_por",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "prioridade",
+                "energia",
+                "ordem_ativa",
+                "queda"
+              ],
+              "type": "string",
+              "default": "prioridade",
+              "title": "Ordenar Por"
+            }
+          },
+          {
+            "name": "direcao",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string",
+              "default": "asc",
+              "title": "Direcao"
+            }
+          },
+          {
+            "name": "queda_min",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 100,
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Queda Min"
+            }
+          },
+          {
+            "name": "queda_max",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 100,
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Queda Max"
+            }
+          },
+          {
+            "name": "medidor_eletromecanico",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Medidor Eletromecanico"
+            }
+          },
+          {
+            "name": "leituras_estimadas_min",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 100,
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Leituras Estimadas Min"
+            }
+          },
+          {
+            "name": "leituras_estimadas_max",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 100,
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Leituras Estimadas Max"
             }
           }
         ],
@@ -2330,6 +2463,45 @@
         ],
         "title": "DimUcSchema"
       },
+      "DistribuicaoQuedaItemSchema": {
+        "properties": {
+          "queda": {
+            "type": "integer",
+            "title": "Queda"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "queda",
+          "total"
+        ],
+        "title": "DistribuicaoQuedaItemSchema"
+      },
+      "DistribuicaoQuedaSchema": {
+        "properties": {
+          "itens": {
+            "items": {
+              "$ref": "#/components/schemas/DistribuicaoQuedaItemSchema"
+            },
+            "type": "array",
+            "title": "Itens"
+          },
+          "sem_queda_identificada": {
+            "type": "integer",
+            "title": "Sem Queda Identificada"
+          }
+        },
+        "type": "object",
+        "required": [
+          "itens",
+          "sem_queda_identificada"
+        ],
+        "title": "DistribuicaoQuedaSchema"
+      },
       "ErroSchema": {
         "properties": {
           "detail": {
@@ -2499,6 +2671,17 @@
                 "type": "null"
               }
             ]
+          },
+          "queda_percentual": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queda Percentual"
           }
         },
         "type": "object",
@@ -2507,7 +2690,8 @@
           "score_suspeita",
           "motivos",
           "kwh_recuperavel_est",
-          "ordem_ativa"
+          "ordem_ativa",
+          "queda_percentual"
         ],
         "title": "FilaItemSchema",
         "description": "Uma UC da fila e a ordem ativa dela, para a tela não oferecer o que daria 409."

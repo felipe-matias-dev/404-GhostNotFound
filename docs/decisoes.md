@@ -54,6 +54,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | 29/10/2026 | DEC-045: tela de Rede usa período padrão de até 12 meses, aceita período válido da URL e apresenta histórico global do alimentador | Preserva o recorte escolhido e distingue o índice local do histórico do alimentador inteiro | João Euclides |
 | 29/10/2026 | DEC-047: avaliação comparativa sobre os itens em comum, aviso quando `failed` passa de 5%, e juiz (LLM as a judge) só em respostas `answered` narradas da amostra, com modelo diferente do gerador | Rodadas com versões diferentes do golden set só se comparam no que têm em comum, e o juiz não pode enviar linhas da Gold real a um modelo | Perylo |
 | 28/10/2026 | DEC-048: ordem de inspeção em campo pode voltar para gerada; a observação da volta fica só no histórico | Uma OI enviada a campo sem querer não precisa ser cancelada e gerada de novo, o que sujaria a métrica de visita desnecessária | Felipe |
+| 29/10/2026 | DEC-049: filtros da fila usam os sinais já informados nos motivos da Gold: queda, medidor eletromecânico e percentual de leituras estimadas | Mantém a fila fiel à Gold, sem recalcular métricas ou tratar ausência como zero; todos os filtros operam antes da paginação | Não informado |
 
 ## DEC-001 · Localização dos arquivos de origem (landing)
 
@@ -1481,3 +1482,11 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   para a coluna "Gerada" também passa a valer, porque o arrastar usa o mesmo mapa.
   A decisão foi renumerada de DEC-045 para DEC-048 na resolução do PR #79: DEC-045 já identifica a tela de Rede
   na `main`, DEC-046 está reservada no PR #86 e DEC-047 é a avaliação comparativa.
+
+## DEC-049 · Filtro de queda na fila de suspeitas
+
+- **Data:** 29/10/2026 · **Área:** Portal e dados
+- **Contexto:** o gerente precisa filtrar e ordenar a fila pela queda de consumo. A Gold expõe esse valor arredondado no texto `Queda de N% no consumo médio...` em `motivos`, não em uma coluna numérica própria.
+- **Decisão:** a API extrai somente esse padrão, entre 0 e 100%, sem confundir com os percentuais de leituras estimadas. A distribuição cobre a fila inteira; o filtro por faixa inclusiva e a ordenação são aplicados antes da paginação. A fila sem filtro mantém também as UCs cujo motivo não foi reconhecido; com filtro elas ficam fora e são contadas separadamente na distribuição.
+- **Extensão (29/10/2026):** o mesmo painel combina queda com `medidor_eletromecanico=true` (motivo exato `Medidor eletromecânico`) e os limites inclusivos `leituras_estimadas_min/max`, extraídos somente do motivo completo `N% das leituras das 12 últimas competências foram estimadas`. Os percentuais aceitos são inteiros entre 0 e 100; ausência, redação não reconhecida e números fora do domínio são desconhecidos, nunca zero. Os três sinais são combinados com AND na SQL e na contagem, antes da paginação. O histograma de queda permanece global. A interface confirma o conjunto com **Aplicar filtros**, conta os sinais ativos e descarta alterações não aplicadas ao fechar.
+- **Limite:** o valor é o percentual inteiro já arredondado pela Gold, não uma nova conta. Alterar a redação do motivo exige atualizar o extrator; uma coluna numérica na Gold eliminaria essa dependência.
