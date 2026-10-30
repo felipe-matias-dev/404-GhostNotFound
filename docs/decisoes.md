@@ -24,7 +24,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | 21/10/2026 | DEC-012: tokens do frontend vêm do design system da marca VE-360 (paleta OKLCH a partir de #f2c94c, neutros `graphite`, Inter Tight + Söhne Breit + JetBrains Mono); escalas padrão do Tailwind removidas | Uma única fonte de cor, tipo, raio e sombra; utilitário fora do sistema não gera CSS | João Euclides |
 | 21/10/2026 | DEC-013: componentes base trazidos do shadcn/ui no estilo `base-nova` (Base UI) e do interior.dev para `frontend/src/components/ui/`, adaptados aos tokens; nenhuma biblioteca de componentes como dependência | O código fica no repositório e segue os tokens da marca; uma única base de primitivas (Base UI, sem Radix) | João Euclides |
 | 21/10/2026 | DEC-014: o backend espelha o contrato da Gold (6 de 9 tabelas), conferido por teste no CI; a carga recria as tabelas da Gold | Divergência entre contrato e backend aparece no CI, e não na carga da Gold real; coluna nova no contrato entra sem apagar tabela à mão | Felipe |
-| 21/10/2026 | DEC-015 (proposta): o plano gratuito do Gemini recebe só a amostra sintética; a Gold real só vai com chave paga ou fornecida pela organização | No Free Tier o Google pode usar o conteúdo enviado, e o dataset é confidencial | GenAI |
+| 21/10/2026 | DEC-015 (aceita em 29/10/2026): a Gold real pode ir ao Gemini pelo plano gratuito (narrativa, insight, memória e juiz); o dataset e qualquer saída com dados dele nunca vão ao Git | O dataset é do case e o risco do Free Tier é aceito; a regra que protege os dados é a DEC-024 | Luis Felipe |
 | 21/10/2026 | DEC-016 (proposta): a `prompts/v1/` recebe a delimitação do SQL anterior e das linhas de exemplo sem virar `prompts/v2/`, só nesta mudança, antes de a v1 chegar à `main` | O golden set ainda não rodou com dados; criar a v2 mudaria o `prompt_version` da auditoria sem ganho real | GenAI |
 | 22/10/2026 | DEC-017: backend e agente formam um workspace do uv, com um único `uv.lock` na raiz | Com o `/ai`, a API instala o agente; uma resolução só garante que o que é testado é o que roda | Luis Felipe |
 | 22/10/2026 | DEC-018: a camada semântica monta relações entre views só pelas chaves estrangeiras do contrato e pelas chaves de entidade (`cod_uc`, `cod_alimentador`) | Juntar views só pelo período gera produto cartesiano | Lucas |
@@ -51,10 +51,13 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | 28/10/2026 | DEC-043: Consulta de UC na sidebar e Ctrl/Cmd + K abrem a palette global; só os cinco códigos consultados com sucesso ficam nos recentes locais | Consulta rápida sem abandonar o contexto, sem persistir nomes ou valores e sem navegar antes de validar a UC | João Euclides |
 | 27/10/2026 | DEC-040: `GET /receita/insight` devolve o insight de IA da tela de receita; o backend monta o JSON de métricas a partir da ponte da Gold, com valores arredondados como a tela os mostra, e guarda o texto num cache em memória pelo conteúdo das métricas; sem a chave do Gemini a rota responde 503; API 0.9.0 | O agente só aceita texto cujos números sejam exatamente valores do JSON (DEC-019), e uma Gold recarregada precisa gerar um insight novo, nunca um velho | Felipe |
 | 27/10/2026 | DEC-044: a visão 360 da unidade consumidora sai de uma rota só, `GET /unidades-consumidoras/{cod_uc}/visao-360`; os 12 meses terminam na última competência da Gold e a "conta alta" é o último mês contra o mesmo mês do ano anterior, com faixa de ±10%; integrada à API 0.9.0 da main | O atendente está com o cliente na linha: uma chamada só à API e uma resposta pronta para "o consumo subiu?", sem a tela refazer conta de negócio | Felipe |
+| 29/10/2026 | DEC-046 (proposta): follow-up com memória, orçamento de tokens e limite de perguntas por usuário; o histórico vem da auditoria do backend, `AgentAnswer` ganha `input_tokens` e `output_tokens`, `prompts/v3` e `429` em `POST /ai/ask` (API 0.10.0) | Follow-up ("e em Olinda?") sem o agente guardar estado nem ler `app`, e trava de custo por sessão | GenAI |
 | 29/10/2026 | DEC-045: tela de Rede usa período padrão de até 12 meses, aceita período válido da URL e apresenta histórico global do alimentador | Preserva o recorte escolhido e distingue o índice local do histórico do alimentador inteiro | João Euclides |
 | 29/10/2026 | DEC-047: avaliação comparativa sobre os itens em comum, aviso quando `failed` passa de 5%, e juiz (LLM as a judge) só em respostas `answered` narradas da amostra, com modelo diferente do gerador | Rodadas com versões diferentes do golden set só se comparam no que têm em comum, e o juiz não pode enviar linhas da Gold real a um modelo | Perylo |
 | 28/10/2026 | DEC-048: ordem de inspeção em campo pode voltar para gerada; a observação da volta fica só no histórico | Uma OI enviada a campo sem querer não precisa ser cancelada e gerada de novo, o que sujaria a métrica de visita desnecessária | Felipe |
 | 29/10/2026 | DEC-049: login com cookie httpOnly e cinco perfis; só `perdas` escreve nas ordens de inspeção e só `ti` lê a auditoria do agente | Esconder o menu não é segurança: a permissão é checada no backend, onde estão os dados; o agente já lê toda a Gold, então bloquear a leitura por tela daria falsa proteção | Felipe |
+| 29/10/2026 | DEC-050: os eventos das ordens de inspeção guardam o login de quem agiu (`autor_login`), o histórico mostra o nome dele, e a carga e a subida da API acrescentam a coluna sem apagar o histórico | O gerente de perdas é o único que escreve, e a trilha precisa responder quem concluiu ou cancelou uma ordem; recriar a tabela para isso perderia o histórico de quem já usa o portal | Felipe |
+| 29/10/2026 | DEC-051: filtros da fila usam os sinais já informados nos motivos da Gold: queda, medidor eletromecânico e percentual de leituras estimadas | Mantém a fila fiel à Gold, sem recalcular métricas ou tratar ausência como zero; todos os filtros operam antes da paginação | João Euclides |
 
 ## DEC-001 · Localização dos arquivos de origem (landing)
 
@@ -302,9 +305,9 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   para a escala de cerca de 200 inspeções por mês.
 - **Limitações:** a OI valida a UC contra `gold_dim_uc`, porque a fila de suspeitas
   (`gold_fila_suspeitas`) ainda não existe; quando existir, a tela da fila só passa a
-  enviar os `cod_uc` escolhidos, sem mudança no backend. Não há registro de quem fez
-  cada mudança, porque o portal ainda não tinha login (a autoria segue em aberto, DEC-049). Alterar colunas exige recriar as
-  tabelas do `app`, já que não há migrações.
+  enviar os `cod_uc` escolhidos, sem mudança no backend. Os eventos antigos não registram
+  quem agiu, porque o portal ainda não tinha login; a autoria entrou na DEC-050. Alterar colunas exige recriar as
+  tabelas do `app`, já que não há migrações (a DEC-050 acrescenta uma coluna sem recriar).
 
 ## DEC-010 · Energia e dinheiro como `numeric`, número na API
 
@@ -427,10 +430,10 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
     roadmap v0.2 do contrato prevê tirá-la do agente por padrão; como (views `sem_*`) está
     em aberto com GenAI.
 
-## DEC-015 · Gold real e plano gratuito do Gemini (proposta)
+## DEC-015 · Gold real e plano gratuito do Gemini (aceita)
 
-- **Data:** 21/10/2026 · **Área:** GenAI e Dados · **Autor:** GenAI
-- **Status:** proposta, a decidir na daily.
+- **Data:** 21/10/2026 · **Área:** GenAI e Dados · **Autor:** GenAI · **Decidida:** 29/10/2026, Luis Felipe (GenAI), com aprovação de Dados (Alisson, PR #89)
+- **Status:** aceita em 29/10/2026. Ver **Decisão final** no fim desta seção.
 - **Decisão proposta:** o plano gratuito do Gemini (Free Tier) recebe só a amostra sintética. A Gold real só é enviada com chave paga ou fornecida pela organização.
 - **Motivo:** no Free Tier, o Google pode usar o conteúdo enviado para melhorar os produtos dele. O dataset é confidencial e nunca vai para o repositório.
 - **Estado atual:** o README orienta o uso do plano gratuito só para a amostra. O código ainda não verifica o tipo de chave, e o modelo padrão do quickstart é o Gemini direto, então nada impede quem segue o README de enviar a Gold real pelo plano gratuito.
@@ -440,6 +443,14 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   - **avaliação na Gold real só no modo "só SQL"** (`--dataset gold_real` liga `--sql-only`): o agente não monta o redator, então só a pergunta e o esquema (com linhas de exemplo sintéticas) chegam ao modelo, e nenhuma linha da Gold sai da máquina. O relatório vai para `eval/runs_gold/`, fora do Git. Feito no PR da issue #56. Na correção de SQL, a mensagem de erro do banco volta ao modelo; nos erros de dado (SQLSTATE da classe 22, como `invalid input syntax`), tudo o que vem depois do primeiro `:` da mensagem, que pode ser um código de UC, vira `<valor>` antes, e o contexto `LINE` sai (revisão do Lucas no #65). Nos erros de sintaxe e de coluna (classe 42), o que fica entre aspas é o nome que o próprio modelo escreveu, e a mensagem fica inteira;
   - **demonstração ao vivo com a Gold real:** só perguntas agregadas, que não devolvem `cod_uc` linha a linha;
   - **o que ainda manda dado da Gold ao modelo e precisa de decisão:** a narrativa do `/ai/ask` (as linhas da amostra da resposta) e o insight da tela de receita (#58, as métricas agregadas do recorte). Opções: aceitar o envio de agregados no plano gratuito, desligar a narrativa e o insight com a Gold real (o texto determinístico continua), ou usar uma chave da organização.
+- **Decisão final (29/10/2026, Luis Felipe; aprovada por Dados, Alisson, no PR #89):** a Gold real pode ir ao Gemini pelo plano gratuito, inclusive as linhas da narrativa, o insight, o histórico da memória e o juiz. O risco do Free Tier (uso do conteúdo pelo Google) é aceito, porque o dataset é do case. O que continua proibido é **subir o dataset ao Git**, ou qualquer saída com dados dele (DEC-024).
+- **Consequências:**
+  - a avaliação na Gold real deixa de ligar `--sql-only` por conta própria: narração e juiz rodam nas duas bases, e `--sql-only` vira só economia de cota;
+  - os relatórios da Gold real continuam em `eval/runs_gold/`, fora do Git, porque o SQL e a justificativa do juiz podem trazer valores do dataset;
+  - a demonstração ao vivo pode usar a Gold real sem restringir as perguntas;
+  - a amostra continua sendo a base do CI, que não pode ter o dataset (DEC-024), e dos itens com código fictício;
+  - **memória:** a memória de conversa (G1-10, PR #86) ainda não está na `main`. Quando entrar, ela vale nas duas bases, como esta decisão diz: o #86 não desliga mais a memória na Gold real;
+  - **rodadas com e sem narração não se comparam diretamente:** uma rodada só SQL mede o SQL e o status, e uma rodada narrada mede também o texto. A linha de base 2 (29/10/2026) foi só SQL.
 
 ## DEC-016 · Exceção de versionamento do prompt v1 (proposta)
 
@@ -794,7 +805,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   - gerar OIs por códigos de UC digitados (repetidos ignorados, até 200 por pedido), enquanto não existe endpoint da fila de suspeitas;
   - Vitest no frontend só para funções puras (`src/**/__tests__/*.test.ts`, sem DOM).
 - **Motivo:** cobre o ciclo de vida da OI sem regra de negócio nova no frontend; o Kanban dá a visão do trabalho em andamento sem a lista de finalizadas crescer sem limite.
-- **Em aberto:** (1) gerar a partir da fila de suspeitas quando houver `GET` da `gold_fila_suspeitas`; (2) autoria das mudanças no histórico: o login existe (DEC-049), falta gravar quem agiu.
+- **Em aberto:** gerar a partir da fila de suspeitas quando houver `GET` da `gold_fila_suspeitas`. A autoria das mudanças, que também estava aqui, foi resolvida na DEC-050: o histórico mostra quem fez cada mudança.
 
 ## DEC-027 · Contrato da Gold v0.3: UC 360, inspeções e recortes completos
 
@@ -1357,6 +1368,52 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   A decisão foi renumerada de DEC-036 para DEC-044 na resolução do PR #55: DEC-036 já identifica a tela
   da diretoria na `main`, e DEC-041 a DEC-043 estão reservadas nas branches do portal.
 
+
+## DEC-046 · Memória de conversa, orçamento de tokens e limite de perguntas por usuário
+
+- **Status:** aceita em 30/10/2026, com o aceite do V1 (Felipe Matias) à mudança do contrato `AgentAnswer` (spec §4 e DEC-020).
+- **Data:** 29/10/2026 · **Área:** IA e Backend · **Autor:** GenAI
+- **Contexto:** o diferencial G1-10 pede follow-up ("e em Olinda?"), e o guia (§5.4) pede orçamento de tokens e limite de uso por
+  sessão. O agente é somente leitura e não guarda estado (§8 do guia); o backend já grava cada pergunta e resposta na auditoria
+  (DEC-034).
+- **Decisão:**
+  - **Histórico vem do backend, pela auditoria.** Porta `ConversationHistory.recent(session_id, limit)`, implementada pelo backend
+    (`HistoricoAuditoria`) com a conexão dele. O `venergy_agent` continua sem ler o schema `app`, e o agente continua sem gravar.
+  - **O turno é `(pergunta, SQL, status)`**, sem texto de resposta nem linhas: o SQL leva os filtros que o follow-up herda, e a
+    resposta traria dado do banco para o prompt de geração. Turnos `refused` ficam de fora; `clarify`, `unknown` e `failed` entram.
+  - **Histórico é dado:** só no prompt do usuário, entre `<historico-{nonce}>`, numa versão nova do prompt de SQL (`prompts/v3`, que
+    passa a ser o padrão). O prompt de sistema continua estável. As versões v1 e v2 ignoram o histórico. Padrão `history_turns = 3`.
+  - **Orçamento:** porta `SessionUsage.tokens_used(session_id)`. Com `session_token_budget` (padrão 200000, 0 desliga) esgotado, o
+    `ask()` devolve `refused` com motivo próprio, sem chamar o modelo. Conferido antes de cada pergunta: a que cruza o limite termina.
+    Leitura do consumo que falha → `failed` sem chamar o modelo; leitura do histórico que falha → segue sem histórico.
+  - **Limite de perguntas no backend:** `POST /ai/ask` responde `429` (`ErroSchema`, `Retry-After`) quando o usuário já fez
+    `VENERGY_API_AI_LIMITE_PERGUNTAS` (20) perguntas em `VENERGY_API_AI_JANELA_SEGUNDOS` (600), contadas pelas linhas da auditoria
+    com o relógio do banco. 0 desliga. API 0.10.0.
+- **Contrato (para o V1 revisar):** `AgentAnswer` ganha `input_tokens` e `output_tokens` (`int >= 0`, padrão 0, tokens do gerador de
+  SQL somando as tentativas; a narrativa não entra). Sem invariante nova por status. `app.ai_auditoria` ganha as duas colunas
+  (`integer not null default 0`), que a subida da API e a carga da Gold acrescentam a um banco antigo com `ADD COLUMN IF NOT EXISTS`, sem tocar nas
+  linhas (sem passo manual; banco fora do ar na subida só gera um aviso). `RespostaIaSchema` e `AuditoriaIaSchema` expõem os dois campos. Motivo novo de `refused` (`BUDGET_EXHAUSTED`).
+- **Alternativas descartadas:** o agente consultar `app.ai_auditoria` (quebra o isolamento do `venergy_agent`, D1 e DEC-034);
+  memória no processo do agente (some no restart e não escala); o agente gravar o histórico (é somente leitura); contador de
+  perguntas em memória na API (some no restart, não vale com mais de um processo); um total único de tokens (entrada e saída têm
+  preços diferentes).
+- **Identificador da sessão (revisão do PR #86):** o `session_id` de `POST /ai/ask` é opcional. Sem ele, o servidor gera um UUID4
+  aleatório e o devolve na resposta (`RespostaIaSchema.session_id`); com ele, só aceita UUID válido (`422` caso contrário). Um UUID
+  que o servidor não gerou continua aceito, porque sem autenticação não há como provar a origem, mas ids fáceis de adivinhar
+  (`"sessao-1"`) deixam de existir.
+- **Memória e a Gold real (DEC-015, aceita em 29/10/2026):** o SQL do turno anterior vai ao Gemini junto com o histórico, na API e na
+  avaliação, nas duas bases. O time aceita esse envio pelo plano gratuito; o dataset e as saídas com dados dele continuam fora do Git (DEC-024).
+- **Limitações:** a contagem do limite não é atômica: rajadas simultâneas do mesmo usuário podem passar um pouco do limite. O orçamento não conta a narrativa. O padrão de
+  200000 tokens é uma suposição a medir nos logs (`input_tokens` da etapa `geracao`).
+- **Pendente (regra de merge, DEC-016):** a troca do prompt padrão para a v3 só entra na `main` depois de `make eval ONLY=golden`
+  na v2 e na v3 e `make eval ONLY=red_team` na v3, sem regressão nos itens comuns (os que não são follow-up) e com pelo menos 4 dos 5 follow-ups do golden
+  (G046, G099, G100, G102, G103) certos, inclusive o G046, com a memória ligada no runner da avaliação (amostra).
+- **Resultado da rodada (30/10/2026):** a v3 foi rodada na Gold real, em modo só SQL, com o golden 0.14.0 e a camada 0.4.0 (`2026-10-30T172756Z`): execução 93,9%, status 94,6%, sem falhas nem erro de provedor. A v2 de referência é a rodada de 29/10 (`2026-10-29T011532Z`, golden 0.9.0). Como as duas versões do golden são diferentes, o SQL gravado da v2 foi reexecutado com o gabarito 0.14.0, nos 40 itens comuns com referência SQL: a v2 acerta 37, a v3 acerta 40, e não há regressão. Nos follow-ups, G046, G099, G101 e G102 estão certos, e G103 não. A comparação é offline, sobre o SQL gravado; a v2 não foi rodada de novo.
+- **Problema conhecido:** G103, o follow-up que depende de um turno recusado. O agente responde com um período inventado, em vez de pedir esclarecimento (issue #104). Corrigir exige mudança de prompt e nova rodada, por isso fica para depois do merge.
+- **Tokens de falhas e leitura do orçamento (issue #103):** os tokens de chamadas que falham entram no orçamento e na auditoria. Se a leitura do consumo da sessão falhar, a pergunta é negada com mensagem própria e log `step=orcamento`, por custo.
+- **Atualização (29/10/2026, revisão do Felipe no #86):** o `session_id` não sai na auditoria (`GET /ai/audit/{id}`), só na resposta do `POST /ai/ask`. (Substituída pela atualização do login, abaixo: o limite e o orçamento deixam de contar pelo `session_id`.)
+
+
 ## DEC-042 · Visão 360 da UC e comparação sazonal do consumo
 
 - **Data:** 28/10/2026 · **Área:** Portal · **Revisada após o PR #55:** a DEC-044 é a autoridade
@@ -1443,7 +1500,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   - **Aviso de `failed`:** acima de 5% dos itens em qualquer lado, a saída avisa que a comparação provavelmente não vale. O relatório não guarda o tipo de erro, e `failed` em massa é o sintoma conhecido de 429 e 503 (spec §9.6).
   - **Nova métrica `refusal_accuracy`:** itens com `expected_status = refused` (golden e red team) que terminaram `refused`. O `manipulation_block_rate` mede vazamento, não recusa.
   - **Sessão por cadeia de follow-up:** o runner passa a rodar os follow-ups em sequência, numa sessão `eval-<rodada>-<raiz>`, e os demais itens numa sessão cada, para que a memória do agente (G1-10) não contamine um item com o anterior. O `TurnRecorder` recebe cada turno.
-  - **Juiz só em `answered` narrados da amostra:** `unknown`, `refused` e `failed` são textos fixos sem LLM, e sem narrativa não há o que julgar. `--judge` com `--dataset gold_real` ou `--sql-only` é erro, porque as linhas da Gold real não saem da máquina (DEC-015, issue #56).
+  - **Juiz só em `answered` narrados:** `unknown`, `refused` e `failed` são textos fixos sem LLM, e sem narrativa não há o que julgar. `--judge` com `--sql-only` é erro. Até 29/10/2026 o juiz também era recusado na Gold real; com a DEC-015 aceita, ele roda nas duas bases.
   - **Modelo do juiz diferente do gerador:** `judge_model` (padrão `google-gla:gemini-3.5-flash-lite`) é comparado com o `llm_model` e o `fallback_model` pelo nome sem provedor e sem organização, e montar o juiz com o mesmo modelo é recusado (`--judge` sai com erro). A regra roda ao montar o juiz, e não em `AgentSettings`, para que o backend, que não usa juiz, carregue qualquer `llm_model` válido. A chave do juiz também só é exigida ao montar o juiz.
   - **Modelo padrão trocado (29/10/2026, revisão do PR #85):** o `gemini-3.1-flash` do plano não existe na API do Gemini (404), e o `gemini-2.5-flash` foi retirado para usuários novos. O `gemini-3.5-flash-lite` responde e não é versão de prévia. A independência em relação ao gerador (`gemini-3.1-flash-lite`) é só nominal: são da mesma família.
   - **Calibração inicial (Lucas, 29/10/2026, amostra):** 18 respostas com nota humana. 17 ficaram a até 1 ponto da nota do juiz (94%), 5 tiveram nota igual (28%) e 14 tiveram o mesmo passa ou não passa (78%). O juiz é um pouco mais severo, sobretudo quando falta o período. Até uma calibração maior, com mais itens, uma segunda pessoa e um critério de aceite escrito, a nota do juiz é **apoio, não métrica de decisão** da DEC-016.
@@ -1539,6 +1596,80 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   - sem limite de tentativas de login;
   - o cookie não tem `Secure`, porque o portal roda em http no ambiente local; quem publicar com https liga o flag;
   - o portal e a API têm de ficar na mesma origem (o proxy `/api` do Vite faz isso), porque o CORS não libera credenciais.
-- **Em aberto:** a autoria. `app.ordem_evento` e `app.ai_auditoria` ainda não guardam quem agiu, e a regra da auditoria poderia
-  virar "o próprio autor ou a TI". Mexer em tabela que já existe, sem migrações, quebra o banco local de quem não recriar as
-  tabelas; por isso fica para uma tarefa própria, com `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`.
+- **Em aberto:** a autoria. As ordens de inspeção passaram a guardá-la na DEC-050. Falta `app.ai_auditoria`, e a regra da
+  auditoria poderia virar "o próprio autor ou a TI". Mexer em tabela que já existe, sem migrações, quebra o banco local de quem
+  não recriar as tabelas; a DEC-050 resolveu isso com `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` na carga e na subida da API.
+
+- **Atualização (29/10/2026, login da DEC-049; revisão do Felipe no #86):** com o login, o backend sabe quem pergunta, e as
+  limitações de "omitir ou trocar o `session_id` zera os contadores" e "quem souber o id lê o histórico" deixam de valer.
+  - `app.ai_auditoria` ganha `usuario` (texto, o login de quem perguntou; nulo nas linhas de antes) e o índice `(usuario, id)`,
+    acrescentados pela subida da API e pela carga com `ADD COLUMN/INDEX IF NOT EXISTS`, sem tocar nas linhas, pelo ponto único `garantir_estrutura_do_app` da DEC-050.
+  - **O limite de perguntas é por usuário**, em todas as sessões dele, com as mesmas variáveis (`VENERGY_API_AI_LIMITE_PERGUNTAS`,
+    `VENERGY_API_AI_JANELA_SEGUNDOS`).
+  - **Pedidos simultâneos do mesmo usuário passam um de cada vez** (trava por usuário na rota, revisão do Felipe em 30/10/2026): a contagem e a gravação da auditoria ficam na mesma vez, e o limite não é mais furado por rajadas. A trava vale dentro de um processo da API, que é como o projeto roda.
+  - **O orçamento de tokens tem janela de tempo** (`VENERGY_API_AI_JANELA_ORCAMENTO_SEGUNDOS`, padrão 86400, 24 horas): soma só o que o usuário gastou na janela. Antes somava desde sempre, e quem batia o teto ficava bloqueado para sempre. A mensagem passou a ser "tente de novo mais tarde".
+  - **O orçamento de tokens é por usuário.** O contrato `ask(question, session_id)` do agente não muda: a rota define o usuário numa
+    `ContextVar` antes de chamar o agente, e `HistoricoAuditoria.tokens_used` soma os tokens do usuário em todas as sessões dele
+    (sem usuário no contexto, cai para a sessão).
+  - **A sessão pertence ao usuário:** um `session_id` que já tem linhas na auditoria de outro usuário (ou sem dono, de antes da
+    coluna) responde `403`, sem chamar o agente. Sem `session_id`, o servidor gera um UUID4 novo. O histórico continua por
+    `session_id` (separa as conversas), mas só o dono o usa.
+  - Limitação que fica: os contadores são por login, e não por pessoa; quem tem várias contas tem vários limites.
+
+## DEC-050 · Autoria nos eventos das ordens de inspeção
+
+- **Data:** 29/10/2026 · **Área:** Portal · **Autor:** Felipe
+- **Contexto:** a DEC-049 trouxe o login, mas `app.ordem_evento` seguia sem registrar quem gerou, enviou a campo, concluiu ou
+  cancelou cada ordem (DEC-009, DEC-026). O case não pede isso: é uma extensão do perfil por cargo. Vale porque só o gerente de
+  perdas escreve, e a trilha passa a responder "quem cancelou esta ordem?".
+- **Decisão:**
+  - `app.ordem_evento` ganha `autor_login` (texto, pode ser nulo), preenchido com o login de quem chamou
+    `POST /ordens-inspecao` ou `PATCH /ordens-inspecao/{id}`. `GET /ordens-inspecao/{id}` devolve em cada evento o
+    `autor_login` e o `autor_nome`, este lido de `app.usuarios` na hora da consulta (nulo se o login não existe mais lá). API
+    0.11.0;
+  - o histórico da ordem, na tela de Perdas, mostra o autor ao lado da data: o nome, ou o login se o usuário não existe mais;
+  - a rota recebe o usuário da mesma dependência (`exigir_perfil(Perfil.PERDAS)`) que já barra os outros perfis com 403: uma
+    checagem só, que também entrega o autor;
+  - um único ponto garante a estrutura do `app` (`garantir_estrutura_do_app`, em `estrutura_app.py`), chamado pela carga, logo
+    depois do `create_all` e na mesma transação, e pela subida da API. Ele roda
+    `ALTER TABLE IF EXISTS app.ordem_evento ADD COLUMN IF NOT EXISTS autor_login text`. Num banco novo o `create_all` já criou a
+    coluna e o comando não faz nada; num banco que já tem a tabela, é ele que traz a coluna sem apagar o histórico. Nenhum dos
+    dois caminhos apaga ou altera linha do `app`: criam o que falta e acrescentam colunas novas;
+  - na subida, banco fora do ar não impede a API de subir: o log registra só o tipo do erro, sem a URL, e as rotas que usam o
+    banco respondem erro como já respondiam. É a mesma regra do PR #86 para `app.ai_auditoria`, que passa a usar este ponto.
+- **Texto, sem chave estrangeira para `app.usuarios`:** um token vale até vencer mesmo que o usuário seja apagado (DEC-049). Com a
+  chave estrangeira, a ação daria erro e a trilha se perderia. O evento guarda só o login; o nome é buscado em `app.usuarios`
+  quando o histórico é lido, numa relação só de leitura. O front não teria de onde tirá-lo: o `GET /auth/me` só dá o nome de
+  quem está logado, e o histórico mostra o de quem agiu.
+- **Alternativas descartadas:**
+  - Alembic: ferramenta nova a poucos dias da entrega, para uma coluna.
+  - `ALTER` só na carga: quem atualiza a API sem rodar a carga fica com o banco antigo, e gerar ou mover uma ordem de inspeção
+    dá 500 (a API grava uma coluna que não existe). O aviso no grupo cobre o time, não quem clona o repositório.
+  - Passo explícito de migração (`make migrate`) com checagem na subida: nada acontece sem pedir, mas acrescenta um passo à
+    implantação e repete o problema da carga para quem esquecê-lo.
+  - `ALTER` no comando dos usuários de demonstração: o comando é só dos usuários, e quem não o rodasse ficaria sem a coluna.
+  - Recriar `app.ordem_evento` ou `docker compose down -v`: apagaria o histórico das ordens de quem já usa o portal.
+- **Limitações conhecidas:**
+  - os eventos de antes do login ficam com `autor_login` nulo: não se inventa autor;
+  - o valor é o do token, sem conferência contra `app.usuarios` no momento da gravação;
+  - o nome mostrado é o atual de `app.usuarios`, e não o do momento da ação; os nomes das personas não mudam;
+  - mesmo quando a coluna já existe, o `ALTER TABLE` pega uma trava exclusiva rápida na tabela a cada subida. Para um portal
+    local, com uma subida por vez, não pesa; conferir o catálogo antes evitaria a trava, ao custo de mais código.
+- **Auditoria do agente (PR #86):** `garantir_estrutura_do_app` também chama `garantir_estrutura_da_auditoria`, que acrescenta a
+  `app.ai_auditoria` as colunas de tokens e `usuario` e os índices de sessão e de usuário. Num banco antes da primeira carga,
+  sem a tabela, não faz nada. A leitura da auditoria continua só da TI até o portal ter um painel de auditoria.
+
+## DEC-051 · Filtro de queda na fila de suspeitas
+
+- **Data:** 29/10/2026 · **Área:** Portal e dados · **Autor:** João Euclides
+- **Contexto:** o gerente precisa filtrar e ordenar a fila pela queda de consumo. A Gold expõe esse valor arredondado no texto `Queda de N% no consumo médio...` em `motivos`, não em uma coluna numérica própria.
+- **Decisão:** a API extrai somente esse padrão, entre 0 e 100%, sem confundir com os percentuais de leituras estimadas. A distribuição cobre a fila inteira; o filtro por faixa inclusiva e a ordenação são aplicados antes da paginação. A fila sem filtro mantém também as UCs cujo motivo não foi reconhecido; com filtro elas ficam fora e são contadas separadamente na distribuição.
+- **Extensão (29/10/2026):** o painel combina queda com `medidor_eletromecanico=true` e os limites inclusivos `leituras_estimadas_min/max`, extraídos do motivo completo de leituras estimadas. A Gold só emite esse motivo para percentuais a partir de 25%; o filtro aceita limites de 25 a 100 e não abrange valores inferiores nem ausentes. A ausência também pode indicar dados indisponíveis, nunca é interpretada como zero. Os três sinais são combinados com AND antes da paginação.
+- **Limite:** o valor é o percentual inteiro já arredondado pela Gold, não uma nova conta. Alterar a redação do motivo exige atualizar o extrator; uma coluna numérica na Gold eliminaria essa dependência.
+
+## DEC-052 · Follow-up sem referência vira esclarecimento antes do modelo
+
+- **Data:** 30/10/2026
+- **Contexto:** turnos recusados não entram no histórico (DEC-046). O G103, "Agora faça o mesmo para Olinda.", ficava sem referência, e o modelo respondia com um palpite, contra o requisito central de não inventar (issue #104).
+- **Decisão:** quando o histórico da sessão está vazio e a pergunta depende de outro turno, o `AskUseCase` devolve `clarify` sem chamar o modelo. A regra está em `domain/followup.py` e cobre dois casos: pedidos de repetição ("faça o mesmo", "repita a mesma consulta", "o mesmo para X") e perguntas elípticas de até 4 palavras que começam com "e" ("E em Olinda?").
+- **Consequências:** o comportamento é determinístico e não gasta cota. Como não muda prompt, modelo nem camada semântica, não exige rodada da DEC-016 para entrar. Uma pergunta completa que começa com "e" segue para o modelo. Follow-ups escritos de outra forma também seguem, e aí vale o que o prompt manda. Se a leitura do histórico falhar, a pergunta dependente também recebe `clarify`.

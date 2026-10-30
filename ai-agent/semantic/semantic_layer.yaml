@@ -398,7 +398,7 @@ glossary:
     maps_to: "tipo_leitura = 'estimada' em sem_faturamento_mensal; n_leituras_estimadas e n_leituras em sem_kpis_segmento_mensal"
   - term: "receita de energia sem bandeiras"
     synonyms: ["receita sem bandeiras", "receita sem o acréscimo das bandeiras", "receita só da tarifa"]
-    maps_to: "sum(receita_energia) - sum(receita_bandeira) em sem_faturamento_mensal ou sem_kpis_segmento_mensal: a receita de energia sem o acréscimo das bandeiras"
+    maps_to: "sum(receita_energia) - sum(receita_bandeira) em sem_faturamento_mensal ou sem_kpis_segmento_mensal: a receita de energia sem o acréscimo das bandeiras. Só use quando a pergunta pedir isso com essas palavras; tarifa média é receita_energia inteira, com bandeira, dividida por kwh_faturado"
   - term: "efeito preço"
     synonyms: ["reajuste", "aumento de tarifa"]
     maps_to: "efeito_preco (efeito_tarifa + efeito_bandeira) em sem_receita_decomposicao"
@@ -445,6 +445,7 @@ rules:
   - text: "Quando a pergunta pede percentual, devolva o valor em pontos percentuais: multiplique por 100.0 no SQL (5,6 e não 0,056)."
   - text: "Divisão entre contagens inteiras (n_interrupcoes, n_uc, n_faturas, n_leituras, count(*)) é divisão inteira no Postgres e devolve 0: multiplique o numerador por 1.0 ou 100.0 antes de dividir, e escreva o número de meses do denominador como decimal (sum(n_uc) / 3.0, nunca / 3)."
   - text: "Para ligar uma UC ao alimentador use sem_uc.cod_alimentador = sem_continuidade_alimentador_mensal.cod_alimentador."
+  - text: "sem_kpis_segmento_mensal já tem município, bairro e classe: nunca junte essa view com sem_uc nem com outra view, porque a junção repete as linhas e infla as somas. Use a subconsulta em sem_uc só para o alimentador, na regra seguinte."
   - text: "DEC ou FEC do alimentador que atende um bairro, município ou UC: pegue os cod_alimentador de sem_uc filtrados pelo recorte (subconsulta com IN) e leia sem_continuidade_alimentador_mensal. Com mais de um alimentador, some os componentes antes de dividir: num mês, DEC = sum(horas_interrompidas) / NULLIF(sum(n_uc), 0) e FEC = 1.0 * sum(n_interrupcoes) / NULLIF(sum(n_uc), 0); num período de vários meses, o divisor é a média mensal de UCs, sum(n_uc) / 3.0 num trimestre, porque DEC e FEC do período são acumulados (DEC-032). Isso é diferente do DEC ou FEC das UCs do recorte, que sai de sem_kpis_segmento_mensal."
   - text: "Períodos relativos à base ('primeiro ano da base', 'últimos 12 meses') saem das competências que existem. Numere as competências distintas com row_number() OVER (ORDER BY competencia) para o início e OVER (ORDER BY competencia DESC) para o fim, filtre por ordem <= 12 e declare os períodos usados como suposição. Nesse caso, não peça esclarecimento. A regra vale só para essas duas expressões. 'Último ano', 'ano passado' e 'último trimestre' são ambíguos (ano civil ou 12 meses móveis): peça esclarecimento, e nunca escreva anos ou meses fixos que a pergunta não trouxe."
   - text: "Quando a pergunta compara dois períodos e não diz quais são, peça esclarecimento (clarify). Não escolha os períodos sozinho. Períodos relativos à base, como 'primeiro ano da base' e 'últimos 12 meses', contam como ditos."

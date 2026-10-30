@@ -70,3 +70,20 @@ async def test_sql_only_agent_never_builds_the_answer_writer(settings, monkeypat
     agent = await build_agent(settings, narrate=False)
 
     assert isinstance(agent, AskUseCase)
+
+
+async def test_history_and_usage_ports_and_limits_reach_the_use_case(settings):
+    history = object()
+    settings = settings.model_copy(update={"history_turns": 2, "session_token_budget": 500})
+
+    agent = await build_agent(settings, history=history, usage=history)
+
+    assert agent._history is history and agent._usage is history
+    assert agent._history_turns == 2
+    assert agent._session_token_budget == 500
+
+
+async def test_without_the_ports_the_agent_builds_as_before(settings):
+    agent = await build_agent(settings)
+
+    assert agent._history is None and agent._usage is None

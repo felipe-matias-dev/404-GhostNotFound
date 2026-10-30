@@ -3,6 +3,7 @@
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Annotated, Any, Literal
+from uuid import UUID
 
 from pydantic import (
     BaseModel,
@@ -535,6 +536,41 @@ class FilaFiltroSchema(BaseModel):
     # Mesmo teto do pedido de ordens: uma página inteira cabe num único pedido.
     tamanho: Annotated[int, Field(ge=1, le=MAX_ORDENS_POR_PEDIDO)] = 50
     sem_ordem_ativa: bool = False
+    ordenar_por: Literal["prioridade", "energia", "ordem_ativa", "queda"] = "prioridade"
+    direcao: Literal["asc", "desc"] = "asc"
+    queda_min: Annotated[int | None, Field(ge=0, le=100)] = None
+    queda_max: Annotated[int | None, Field(ge=0, le=100)] = None
+    medidor_eletromecanico: bool = False
+    leituras_estimadas_min: Annotated[int | None, Field(ge=25, le=100)] = None
+    leituras_estimadas_max: Annotated[int | None, Field(ge=25, le=100)] = None
+
+    @model_validator(mode="after")
+    def limites_validos(self) -> "FilaFiltroSchema":
+        if (
+            self.queda_min is not None
+            and self.queda_max is not None
+            and self.queda_min > self.queda_max
+        ):
+            raise ValueError("queda_min deve ser menor ou igual a queda_max")
+        if (
+            self.leituras_estimadas_min is not None
+            and self.leituras_estimadas_max is not None
+            and self.leituras_estimadas_min > self.leituras_estimadas_max
+        ):
+            raise ValueError(
+                "leituras_estimadas_min deve ser menor ou igual a leituras_estimadas_max"
+            )
+        return self
+
+
+class DistribuicaoQuedaItemSchema(BaseModel):
+    queda: int
+    total: int
+
+
+class DistribuicaoQuedaSchema(BaseModel):
+    itens: list[DistribuicaoQuedaItemSchema]
+    sem_queda_identificada: int
 
 
 class OrdemAtivaSchema(BaseModel):
@@ -550,6 +586,7 @@ class FilaItemSchema(FilaSuspeitaSchema):
     """Uma UC da fila e a ordem ativa dela, para a tela não oferecer o que daria 409."""
 
     ordem_ativa: OrdemAtivaSchema | None
+    queda_percentual: int | None
 
 
 class FilaPaginaSchema(BaseModel):
@@ -616,6 +653,10 @@ class EventoSchema(BaseModel):
     status_anterior: StatusOrdem | None
     status_novo: StatusOrdem
     observacao: str | None
+    # Login de quem agiu; vazio nos eventos de antes do login (DEC-050).
+    autor_login: str | None
+    # Nome para a tela, lido de app.usuarios; vazio se o login não existe mais lá.
+    autor_nome: str | None
     ocorrido_em: datetime
 
 
@@ -628,7 +669,6 @@ class OrdemDetalheSchema(OrdemSchema):
 # A entrada é limitada na API, antes de chegar ao agente. O teto de 500 caracteres da pergunta
 # continua sendo do agente; este é folgado, só para não aceitar um corpo gigante.
 MAX_PERGUNTA_IA = 2000
-MAX_SESSAO_IA = 100
 
 
 class PerguntaIaSchema(BaseModel):
@@ -637,13 +677,13 @@ class PerguntaIaSchema(BaseModel):
     question: Annotated[
         str, StringConstraints(strip_whitespace=True, min_length=1, max_length=MAX_PERGUNTA_IA)
     ]
-    session_id: Annotated[
-        str, StringConstraints(strip_whitespace=True, min_length=1, max_length=MAX_SESSAO_IA)
-    ]
+    # Opcional: sem ele o servidor gera um UUID4 aleatório e o devolve na resposta. Com ele, só
+    # UUID (o histórico da sessão é protegido por esse identificador, não por autenticação).
+    session_id: UUID | None = None
 
 
-class RespostaIaSchema(BaseModel):
-    """A resposta do agente (AgentAnswer) mais o id do registro de auditoria dela."""
+class RespostaIaBaseSchema(BaseModel):
+    """A resposta do agente (AgentAnswer) mais o id do registro de auditoria dela, sem a sessão."""
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -666,13 +706,23 @@ class RespostaIaSchema(BaseModel):
     model: str
     prompt_version: str
     latency_ms: int
+    # Tokens do gerador de SQL (todas as tentativas) e da narração neste pedido; 0 quando o
+    # modelo não rodou.
+    input_tokens: int
+    output_tokens: int
 
 
-class AuditoriaIaSchema(RespostaIaSchema):
+class RespostaIaSchema(RespostaIaBaseSchema):
+    """A resposta devolvida pelo POST /ai/ask. Só ela traz o session_id, para o cliente
+    continuar a conversa; a auditoria não o expõe (o id da sessão protege o histórico)."""
+
+    session_id: str
+
+
+class AuditoriaIaSchema(RespostaIaBaseSchema):
     """O registro completo da auditoria: a resposta com a pergunta e o momento em que veio."""
 
     pergunta: str
-    session_id: str
     criado_em: datetime
 
 

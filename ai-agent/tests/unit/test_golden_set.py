@@ -113,3 +113,13 @@ def test_only_out_of_range_periods_may_have_an_empty_reference(items):
     allowed = {item["id"] for item in items if item.get("allow_empty_reference")}
 
     assert allowed == {"G019", "G029", "G030"}
+
+
+def test_at_least_5_follow_ups_that_point_to_an_earlier_item(items):
+    position = {item["id"]: index for index, item in enumerate(items)}
+    follow_ups = [item for item in items if item["follow_up_of"]]
+
+    assert len(follow_ups) >= 5
+    for item in follow_ups:
+        assert item["category"] == "followup", item["id"]
+        assert position[item["follow_up_of"]] < position[item["id"]], item["id"]

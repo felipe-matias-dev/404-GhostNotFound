@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "V-Energy Grid 360 API",
-    "version": "0.10.0"
+    "version": "0.11.0"
   },
   "paths": {
     "/health": {
@@ -1273,6 +1273,32 @@
         }
       }
     },
+    "/fila-suspeitas/distribuicao-queda": {
+      "get": {
+        "tags": [
+          "fila de suspeitas"
+        ],
+        "summary": "Get Distribuicao Queda",
+        "operationId": "get_distribuicao_queda_fila_suspeitas_distribuicao_queda_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DistribuicaoQuedaSchema"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ]
+      }
+    },
     "/fila-suspeitas": {
       "get": {
         "tags": [
@@ -1318,6 +1344,118 @@
               "type": "boolean",
               "default": false,
               "title": "Sem Ordem Ativa"
+            }
+          },
+          {
+            "name": "ordenar_por",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "prioridade",
+                "energia",
+                "ordem_ativa",
+                "queda"
+              ],
+              "type": "string",
+              "default": "prioridade",
+              "title": "Ordenar Por"
+            }
+          },
+          {
+            "name": "direcao",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string",
+              "default": "asc",
+              "title": "Direcao"
+            }
+          },
+          {
+            "name": "queda_min",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 100,
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Queda Min"
+            }
+          },
+          {
+            "name": "queda_max",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 100,
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Queda Max"
+            }
+          },
+          {
+            "name": "medidor_eletromecanico",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Medidor Eletromecanico"
+            }
+          },
+          {
+            "name": "leituras_estimadas_min",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 100,
+                  "minimum": 25
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Leituras Estimadas Min"
+            }
+          },
+          {
+            "name": "leituras_estimadas_max",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 100,
+                  "minimum": 25
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Leituras Estimadas Max"
             }
           }
         ],
@@ -1632,7 +1770,7 @@
           "agente de IA"
         ],
         "summary": "Perguntar",
-        "description": "Pergunta ao agente e grava a resposta, qualquer que seja o status, na auditoria.",
+        "description": "Pergunta ao agente e grava a resposta, qualquer que seja o status, na auditoria.\n\nResponde 403, sem chamar o agente, se o session_id já pertence a outro usuário, e 429, também\nsem chamar o agente, se o usuário já fez o máximo de perguntas na janela. O limite e o\norçamento de tokens valem por usuário, em todas as sessões dele: omitir ou trocar o\nsession_id não zera nada. O session_id só separa as conversas, e cada uma é de quem a\ncomeçou (DEC-046).",
         "operationId": "perguntar_ai_ask_post",
         "requestBody": {
           "content": {
@@ -1651,6 +1789,26 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/RespostaIaSchema"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErroSchema"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErroSchema"
                 }
               }
             }
@@ -1976,13 +2134,17 @@
             "type": "integer",
             "title": "Latency Ms"
           },
+          "input_tokens": {
+            "type": "integer",
+            "title": "Input Tokens"
+          },
+          "output_tokens": {
+            "type": "integer",
+            "title": "Output Tokens"
+          },
           "pergunta": {
             "type": "string",
             "title": "Pergunta"
-          },
-          "session_id": {
-            "type": "string",
-            "title": "Session Id"
           },
           "criado_em": {
             "type": "string",
@@ -2008,8 +2170,9 @@
           "model",
           "prompt_version",
           "latency_ms",
+          "input_tokens",
+          "output_tokens",
           "pergunta",
-          "session_id",
           "criado_em"
         ],
         "title": "AuditoriaIaSchema",
@@ -2558,6 +2721,45 @@
         ],
         "title": "DimUcSchema"
       },
+      "DistribuicaoQuedaItemSchema": {
+        "properties": {
+          "queda": {
+            "type": "integer",
+            "title": "Queda"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "queda",
+          "total"
+        ],
+        "title": "DistribuicaoQuedaItemSchema"
+      },
+      "DistribuicaoQuedaSchema": {
+        "properties": {
+          "itens": {
+            "items": {
+              "$ref": "#/components/schemas/DistribuicaoQuedaItemSchema"
+            },
+            "type": "array",
+            "title": "Itens"
+          },
+          "sem_queda_identificada": {
+            "type": "integer",
+            "title": "Sem Queda Identificada"
+          }
+        },
+        "type": "object",
+        "required": [
+          "itens",
+          "sem_queda_identificada"
+        ],
+        "title": "DistribuicaoQuedaSchema"
+      },
       "ErroSchema": {
         "properties": {
           "detail": {
@@ -2598,6 +2800,28 @@
             ],
             "title": "Observacao"
           },
+          "autor_login": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Autor Login"
+          },
+          "autor_nome": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Autor Nome"
+          },
           "ocorrido_em": {
             "type": "string",
             "format": "date-time",
@@ -2609,6 +2833,8 @@
           "status_anterior",
           "status_novo",
           "observacao",
+          "autor_login",
+          "autor_nome",
           "ocorrido_em"
         ],
         "title": "EventoSchema"
@@ -2727,6 +2953,17 @@
                 "type": "null"
               }
             ]
+          },
+          "queda_percentual": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queda Percentual"
           }
         },
         "type": "object",
@@ -2735,7 +2972,8 @@
           "score_suspeita",
           "motivos",
           "kwh_recuperavel_est",
-          "ordem_ativa"
+          "ordem_ativa",
+          "queda_percentual"
         ],
         "title": "FilaItemSchema",
         "description": "Uma UC da fila e a ordem ativa dela, para a tela não oferecer o que daria 409."
@@ -3522,16 +3760,21 @@
             "title": "Question"
           },
           "session_id": {
-            "type": "string",
-            "maxLength": 100,
-            "minLength": 1,
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Session Id"
           }
         },
         "type": "object",
         "required": [
-          "question",
-          "session_id"
+          "question"
         ],
         "title": "PerguntaIaSchema",
         "description": "Pergunta em português para o agente de IA, dentro de uma conversa."
@@ -3846,6 +4089,18 @@
           "latency_ms": {
             "type": "integer",
             "title": "Latency Ms"
+          },
+          "input_tokens": {
+            "type": "integer",
+            "title": "Input Tokens"
+          },
+          "output_tokens": {
+            "type": "integer",
+            "title": "Output Tokens"
+          },
+          "session_id": {
+            "type": "string",
+            "title": "Session Id"
           }
         },
         "type": "object",
@@ -3865,10 +4120,13 @@
           "request_id",
           "model",
           "prompt_version",
-          "latency_ms"
+          "latency_ms",
+          "input_tokens",
+          "output_tokens",
+          "session_id"
         ],
         "title": "RespostaIaSchema",
-        "description": "A resposta do agente (AgentAnswer) mais o id do registro de auditoria dela."
+        "description": "A resposta devolvida pelo POST /ai/ask. Só ela traz o session_id, para o cliente\ncontinuar a conversa; a auditoria não o expõe (o id da sessão protege o histórico)."
       },
       "ResultadoOrdem": {
         "type": "string",

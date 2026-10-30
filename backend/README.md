@@ -89,12 +89,12 @@ acrescentar `VENERGY_API_JWT_SECRET` (mínimo de 32 caracteres) e `VENERGY_API_S
 | `GET /continuidade/alimentadores/mensal?inicio=&fim=&cod_alimentador=` | DEC e FEC de cada alimentador por competência, como a Gold calculou; `cod_alimentador` se repete para escolher alguns |
 | `GET /continuidade/alimentadores/ranking?inicio=&fim=&criterio=` | Os alimentadores do pior para o melhor num período obrigatório, por `dec` (padrão) ou `fec`. DEC do período = soma das horas ÷ média mensal das UCs atendidas, e `n_meses` diz quantos meses entraram na média ([DEC-033](../docs/decisoes.md)) |
 | `GET /continuidade/recortes?inicio=&fim=&criterio=&municipio=&bairro=&classe=` | DEC e FEC do nível abaixo do filtro, do pior para o melhor: sem filtro, por município; com `municipio`, por bairro; com `municipio` e `bairro`, por alimentador. `classe` filtra em qualquer nível, e `bairro` sem `municipio` dá `422` |
-| `GET /fila-suspeitas?pagina=&tamanho=&sem_ordem_ativa=` | A fila de suspeitas pela posição no ranking (1 = mais suspeita), com motivos, energia recuperável e a `ordem_ativa` da UC, se houver. `tamanho` vai até 200; `sem_ordem_ativa=true` esconde as UCs que já têm ordem, e o `total` acompanha o filtro |
+| `GET /fila-suspeitas` | Fila paginada e filtrada antes da paginação por `sem_ordem_ativa`, queda, medidor eletromecânico e leituras estimadas. Leituras estimadas aceitam limites entre 25 e 100%, pois a Gold não informa os valores inferiores; motivos ausentes ou não reconhecidos ficam fora da faixa. Limites inválidos ou invertidos retornam `422` com lista de erros de validação. `ordenar_por` e `direcao` controlam a ordenação global |
 | `POST /ordens-inspecao` | Só o perfil `perdas` (`403` para os outros). Gera uma ordem de inspeção por UC (`{"cod_ucs": [...]}`), tudo ou nada: `404` se uma UC não existir, `409` se já tiver ordem ativa |
 | `GET /ordens-inspecao?status=` | Lista as ordens, das mais recentes para as mais antigas, opcionalmente por status |
 | `GET /ordens-inspecao/{id}` | Uma ordem com o histórico de mudanças de status |
 | `PATCH /ordens-inspecao/{id}` | Só o perfil `perdas`. Muda o status (`EM_CAMPO`, `GERADA` na volta de campo, `CONCLUIDA` com `resultado`, `CANCELADA`), com `observacao` opcional: `409` se a mudança não for permitida |
-| `POST /ai/ask` | Pergunta ao agente de IA (`{"question": "...", "session_id": "..."}`) e devolve a resposta com o `audit_id` do registro gravado em `app.ai_auditoria`. Todo status é gravado, e se a gravação falhar a resposta não sai (`500`). Sem a chave do Gemini, `503` ([DEC-034](../docs/decisoes.md)) |
+| `POST /ai/ask` | Pergunta ao agente de IA (`{"question": "...", "session_id": "<uuid>"}`; o `session_id` é opcional: sem ele o servidor gera um UUID4 e o devolve na resposta, e com ele só aceita UUID, senão `422`) e devolve a resposta com o `audit_id` do registro gravado em `app.ai_auditoria`, junto com o usuário logado. Todo status é gravado, e se a gravação falhar a resposta não sai (`500`). Sem a chave do Gemini, `503` ([DEC-034](../docs/decisoes.md)). O limite de perguntas e o orçamento de tokens valem por usuário, em todas as sessões dele: com o usuário no limite da janela, `429` com `Retry-After`, e com um `session_id` que pertence a outro usuário, `403`, nos dois casos sem chamar o agente ([DEC-046](../docs/decisoes.md)) |
 | `GET /ai/audit/{id}` | Só o perfil `ti` (`403` para os outros). A auditoria de uma resposta: pergunta, SQL executado, views, linhas, modelo, versão do prompt, latência e horário. `404` se não existir |
 | `GET /receita/insight?periodo_base=&periodo_atual=&municipio=&bairro=&classe=` | Um insight de IA sobre a ponte de receita do recorte da tela (2 a 4 frases), com as `metricas` que sustentam cada número do texto. Os filtros são os de `/receita/decomposicao`. `texto` vem vazio quando o agente descarta a narração (número fora das métricas) ou o provedor falha: a tela aparece sem insight. O mesmo recorte não paga o modelo duas vezes (cache em memória pelo conteúdo das métricas). `503` sem a chave do Gemini ([DEC-040](../docs/decisoes.md)) |
 
@@ -104,7 +104,10 @@ existem no total da empresa e por alimentador, porque não dá para somá-los po
 
 As regras das ordens (status, resultado, uma ordem ativa por UC) estão na
 [DEC-009](../docs/decisoes.md#dec-009--modelo-das-ordens-de-inspeção). As tabelas do schema
-`app` são criadas pela carga (passo 6), que nunca apaga o que está nelas.
+`app` são criadas pela carga (passo 6), que nunca apaga o que está nelas. Quem já tinha o banco
+antes da [DEC-050](../docs/decisoes.md#dec-050--autoria-nos-eventos-das-ordens-de-inspeção) só
+precisa reiniciar a API: a subida, assim como a carga, acrescenta a coluna `autor_login` ao
+histórico das ordens sem apagar nenhuma.
 
 ## Contrato OpenAPI
 
@@ -176,7 +179,7 @@ O `docker compose` cria, na primeira subida (`infra/postgres/init/01-init.sh`):
 | O quê | Para quê |
 |---|---|
 | Schema `gold` | Tabelas da Gold e views `sem_*` do agente, recriadas a cada carga |
-| Schema `app` | Dados criados no portal (ordens de inspeção). A carga nunca toca nele |
+| Schema `app` | Dados criados no portal (ordens de inspeção). A carga nunca apaga uma linha dele |
 | Usuário `venergy` | Usado pela API: lê e escreve |
 | Usuário `venergy_agent` | Usado pelo agente de IA: só `SELECT` no schema `gold`, sem acesso a `app` |
 | Banco `venergy_test` | Mesma estrutura, usado só pelos testes |
@@ -196,8 +199,13 @@ Variáveis lidas do `.env` (veja `.env.example`):
 | `VENERGY_API_DATABASE_URL` | Endereço do banco. Obrigatória |
 | `VENERGY_API_GOLD_DIR` | Pasta dos CSVs da Gold. Obrigatória |
 | `VENERGY_API_CORS_ORIGINS` | Endereços do frontend autorizados a chamar a API pelo navegador. Padrão: `["http://localhost:3000"]` |
+| `VENERGY_API_AI_LIMITE_PERGUNTAS` | Máximo de perguntas por usuário na janela, no `POST /ai/ask` (`429` ao passar). `0` desliga. Padrão: `20` |
+| `VENERGY_API_AI_JANELA_SEGUNDOS` | Janela do limite acima, em segundos. Padrão: `600` |
+| `VENERGY_API_AI_JANELA_ORCAMENTO_SEGUNDOS` | Janela do orçamento de tokens do agente por usuário, em segundos: só o gasto dentro dela conta. Padrão: `86400` (24 horas) |
 
 Os caminhos são relativos à pasta `backend/`, de onde os comandos rodam.
+
+A auditoria (`app.ai_auditoria`) ganhou as colunas `input_tokens` e `output_tokens`. A API na subida e a carga da Gold as acrescentam sozinhas a um banco antigo (`ALTER TABLE ... ADD COLUMN IF NOT EXISTS`, sem tocar nas linhas): não há passo manual (DEC-046). Com o banco fora do ar na subida, a API sobe e registra um aviso.
 
 ## Testes e qualidade
 
@@ -222,6 +230,7 @@ src/venergy_api/
 ├── ordens.py     # regras das ordens de inspeção (máquina de estados), sem banco
 ├── schemas.py    # contrato dos dados: validação da carga e formato das respostas
 ├── carga.py      # CSVs da Gold → banco
+├── estrutura_app.py  # colunas novas do schema app, na carga e na subida, sem apagar dado
 ├── amostra.py    # gerador da amostra sintética
 ├── openapi.py    # export do contrato para contracts/openapi.json
 └── routers/      # rotas, um arquivo por domínio

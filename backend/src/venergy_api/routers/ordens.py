@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from venergy_api.auth import Perfil
+from venergy_api.auth import Perfil, UsuarioLogado
 from venergy_api.database import SessionDep
 from venergy_api.models import DimUc, OrdemEvento, OrdemInspecao
 from venergy_api.ordens import STATUS_ATIVOS, StatusOrdem, TransicaoInvalidaError, validar_transicao
@@ -26,7 +26,8 @@ INDICE_UC_ATIVA = "uq_ordem_inspecao_uc_ativa"
 
 # Gerar e mudar ordem é a única escrita do sistema, e é trabalho do gerente de perdas. Os
 # outros perfis só consultam; o menu esconde os botões, e esta barreira vale para quem chama a API.
-SOMENTE_PERDAS = Depends(exigir_perfil(Perfil.PERDAS))
+# A mesma dependência que barra com 403 entrega quem agiu, para o histórico guardar o autor.
+UsuarioDePerdasDep = Annotated[UsuarioLogado, Depends(exigir_perfil(Perfil.PERDAS))]
 
 
 def _erro_ja_ativas(cod_ucs: list[str]) -> HTTPException:
@@ -39,14 +40,15 @@ def _erro_ja_ativas(cod_ucs: list[str]) -> HTTPException:
 @router.post(
     "",
     status_code=status.HTTP_201_CREATED,
-    dependencies=[SOMENTE_PERDAS],
     responses={
         status.HTTP_403_FORBIDDEN: {"model": ErroSchema},
         status.HTTP_404_NOT_FOUND: {"model": ErroSchema},
         status.HTTP_409_CONFLICT: {"model": ErroSchema},
     },
 )
-def criar_ordens(pedido: CriarOrdensSchema, session: SessionDep) -> list[OrdemSchema]:
+def criar_ordens(
+    pedido: CriarOrdensSchema, session: SessionDep, usuario: UsuarioDePerdasDep
+) -> list[OrdemSchema]:
     """Gera uma OI por UC, tudo ou nada: se uma UC falhar, nenhuma OI é criada."""
     # Sem FK para a Gold (ver models.OrdemInspecao), a existência da UC é garantida aqui.
     encontradas = set(session.scalars(select(DimUc.cod_uc).where(DimUc.cod_uc.in_(pedido.cod_ucs))))
@@ -71,7 +73,10 @@ def criar_ordens(pedido: CriarOrdensSchema, session: SessionDep) -> list[OrdemSc
         raise _erro_ja_ativas(ja_ativas)
 
     ordens = [
-        OrdemInspecao(cod_uc=cod, eventos=[OrdemEvento(status_novo=StatusOrdem.GERADA)])
+        OrdemInspecao(
+            cod_uc=cod,
+            eventos=[OrdemEvento(status_novo=StatusOrdem.GERADA, autor_login=usuario.login)],
+        )
         for cod in pedido.cod_ucs
     ]
     session.add_all(ordens)
@@ -117,7 +122,6 @@ def obter_ordem(ordem_id: int, session: SessionDep) -> OrdemDetalheSchema:
 
 @router.patch(
     "/{ordem_id}",
-    dependencies=[SOMENTE_PERDAS],
     responses={
         status.HTTP_403_FORBIDDEN: {"model": ErroSchema},
         status.HTTP_404_NOT_FOUND: {"model": ErroSchema},
@@ -125,7 +129,10 @@ def obter_ordem(ordem_id: int, session: SessionDep) -> OrdemDetalheSchema:
     },
 )
 def atualizar_ordem(
-    ordem_id: int, mudanca: AtualizarOrdemSchema, session: SessionDep
+    ordem_id: int,
+    mudanca: AtualizarOrdemSchema,
+    session: SessionDep,
+    usuario: UsuarioDePerdasDep,
 ) -> OrdemDetalheSchema:
     """Muda o status da OI (inclusive cancelar) e registra a mudança no histórico."""
     # Trava a linha até o commit (SELECT ... FOR UPDATE): sem isso, duas mudanças
@@ -141,6 +148,7 @@ def atualizar_ordem(
             status_anterior=ordem.status,
             status_novo=mudanca.status,
             observacao=mudanca.observacao,
+            autor_login=usuario.login,
         )
     )
     ordem.status = mudanca.status

@@ -66,6 +66,8 @@ Cada parte do sistema responde à pergunta de uma pessoa da V-Energy.
 | **Beatriz**, operação | Quais alimentadores e regiões têm o pior DEC e FEC? | `GET /continuidade/alimentadores/ranking`, `/mensal` e `/recortes` ([DEC-033](docs/decisoes.md#dec-033--dec-e-fec-por-período-e-recorte-e-a-fila-de-suspeitas-paginada)) | API pronta, tela em construção |
 | **Patrícia**, diretora de TI | Os dados são confiáveis e seguros? Dá para perguntar em português? | Pipeline com travas de qualidade, agente Text-to-SQL em `POST /ai/ask` com auditoria e insight de IA em `GET /receita/insight` | Pipeline e API prontos; chat no portal em construção |
 
+Na fila de perdas, **Filtros** combina queda de consumo, medidor eletromecânico e leituras estimadas. A Gold só informa leituras estimadas a partir de 25%; o filtro aceita de 25% a 100% e não inclui percentuais inferiores ou desconhecidos. Os filtros atuam antes da paginação ([DEC-051](docs/decisoes.md#dec-051--filtro-de-queda-na-fila-de-suspeitas)).
+
 <!-- Capturas do portal (João): docs/img/portal-visao-geral.png, docs/img/portal-receita.png, docs/img/portal-perdas.png -->
 
 ## Arquitetura
@@ -98,7 +100,7 @@ flowchart LR
 Três regras sustentam o desenho ([arquitetura e domínio](docs/arquitetura.md)):
 
 - **Contrato antes de implementação.** Portal e agente trabalham contra o contrato da Gold ([`contracts/gold_schema.yaml`](contracts/gold_schema.yaml), v0.3.0) e uma amostra sintética desde o primeiro dia, sem esperar o dado real nem expor o dataset ([DEC-003](docs/decisoes.md#dec-003--walking-skeleton-com-amostra-sintética)). O frontend gera o client a partir de [`contracts/openapi.json`](contracts/openapi.json) e quebra na compilação se a API mudar ([DEC-005](docs/decisoes.md#dec-005--contrato-openapi-entre-api-e-frontend)).
-- **A Gold é descartável; o trabalho do usuário, não.** A carga recria o schema `gold` a cada execução e nunca toca o `app`, onde ficam as ordens de inspeção e a auditoria do agente ([DEC-002](docs/decisoes.md#dec-002--banco-local-postgresql)).
+- **A Gold é descartável; o trabalho do usuário, não.** A carga recria o schema `gold` a cada execução e nunca apaga nem altera uma linha do `app`, onde ficam as ordens de inspeção e a auditoria do agente: ela só cria as tabelas que faltam e acrescenta colunas novas ([DEC-002](docs/decisoes.md#dec-002--banco-local-postgresql), [DEC-050](docs/decisoes.md#dec-050--autoria-nos-eventos-das-ordens-de-inspeção)).
 - **Um número, uma fonte.** Cálculos de negócio (PVM, DEC/FEC, score de suspeita) ficam na Gold e no backend. O frontend só exibe, e o agente lê as métricas prontas em vez de recalculá-las.
 
 | Camada | Tecnologia | Por que |
@@ -145,19 +147,20 @@ A segurança mora no banco e no validador, nunca no prompt:
 5. **Os números do texto são conferidos com as linhas.** Se a narrativa citar um número que não está no resultado, a resposta volta a um texto determinístico com os valores ([spec §5.1](ai-agent/docs/specs/2026-10-19-architecture-design.md)).
 6. **Toda resposta é auditada.** Fica gravada em `app.ai_auditoria` (pergunta, SQL, linhas, modelo, versão do prompt, latência) e pode ser lida em `GET /ai/audit/{id}` ([DEC-034](docs/decisoes.md#dec-034--auditoria-do-agente-de-ia-gravação-leitura-e-subida-sem-a-chave)).
 
-**Avaliação.** Usamos um golden set de 93 perguntas e 17 ataques de red team. Toda mudança de prompt, modelo ou camada semântica só entra se o golden set não regredir ([DEC-016](docs/decisoes.md)). Última rodada (28/10/2026, [`eval/runs/2026-10-28T113557Z.json`](ai-agent/eval/runs/2026-10-28T113557Z.json)), sobre a amostra sintética:
+**Avaliação.** Usamos um golden set de 98 perguntas e 17 ataques de red team. Toda mudança de prompt, modelo ou camada semântica só entra se o golden set não regredir ([DEC-016](docs/decisoes.md)). Últimas rodadas (29/10/2026):
 
-| Métrica | Resultado |
-|---|---|
-| SQL com o resultado certo (execution accuracy) | 100% (48 de 48) |
-| Status certo (respondeu, não sei, esclarecer, recusar) | 95,9% (71 de 74) |
-| Red team: escritas aceitas, views alteradas, vazamentos de prompt | 0, 0, 0 |
-| Latência p50 / p95 | 3,3 s / 15,3 s |
+| Métrica | Gold real (linha de base 2, três rodadas) | Amostra sintética |
+|---|---|---|
+| SQL com o resultado certo (execution accuracy) | 88,9% a 92,1% (56 a 58 de 63) | 100% (48 de 48) |
+| Status certo (respondeu, não sei, esclarecer, recusar) | 94,4% a 96,6% | 100% (74 de 74) |
+| Fidelidade numérica do texto | — (rodada só SQL, sem narração) | 83,3% |
+| Red team: escritas aceitas, views alteradas, vazamentos de prompt | — | 0, 0, 0 (rodada de 28/10) |
+
+A coluna da Gold real reúne três rodadas da camada 0.4.0 com o golden 0.11.0 (uma do GenAI e duas do Lucas, 29/10/2026): a variação vem sobretudo do G089, em que o modelo às vezes fazia divisão inteira e devolvia 0. As duas colunas não são a mesma rodada: a da Gold real foi **só SQL** (mede o SQL e o status, sem o texto), e a da amostra foi **narrada** (mede também o texto). Com a DEC-015 aceita, a próxima rodada na Gold real pode ser narrada. A meta do case para o agente sobre os dados reais (G1-05, pelo menos 80%) está cumprida. Os relatórios da Gold real ficam fora do Git ([DEC-024](docs/decisoes.md)), e o da amostra está em [`eval/runs/2026-10-29T144926Z.json`](ai-agent/eval/runs/2026-10-29T144926Z.json). Detalhes e comparações: [spec §9.6](ai-agent/docs/specs/2026-10-19-architecture-design.md).
 
 **Limitações conhecidas:**
-- **Ainda não houve rodada sobre a Gold real.**
-- **12 dos 93 itens do golden set têm revisão humana registrada.**
-- **A fidelidade numérica do texto ficou em 68%, contra a meta de 100%.** Parte das falhas vem das suposições, que citam o período pedido e não um número das linhas ([spec §9.6](ai-agent/docs/specs/2026-10-19-architecture-design.md)).
+- **O golden set da `main` tem revisão de Dados em todos os itens** (issue #90, PR #94); os follow-ups novos do #86 ainda aguardam.
+- **Na Gold real, três erros do agente** (percentual como fração, divisão entre contagens e "receita sem bandeiras") estão corrigidos no PR da camada 0.4.1, que aguarda a rodada.
 
 ### Atendimento: visão 360 da UC
 

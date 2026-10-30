@@ -3,6 +3,7 @@
 import os
 from collections.abc import Callable, Iterator
 from pathlib import Path
+from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
@@ -75,16 +76,19 @@ def client_for(tmp_path: Path, perfil: Perfil) -> Callable[..., TestClient]:
 
     O cliente já nasce logado com o `perfil` da fixture, para os testes de cada rota não
     repetirem o login. `sem_login=True` devolve a API como ela é, para testar o login de verdade.
+    Campos extras (`ai_limite_perguntas=2`, por exemplo) vão para as configurações da API.
     """
 
-    def build(engine: Engine, *, sem_login: bool = False) -> TestClient:
+    def build(engine: Engine, *, sem_login: bool = False, **extras: Any) -> TestClient:
         # _env_file=None: os testes nunca leem o .env de quem está rodando.
         settings = Settings(
             _env_file=None,
-            database_url=engine.url.render_as_string(),
+            # Com a senha: a subida da API conecta com esta URL (DEC-050), e o padrão põe ***.
+            database_url=engine.url.render_as_string(hide_password=False),
             gold_dir=tmp_path / "gold",
             jwt_secret=JWT_SECRET,
             cors_origins=[FRONTEND_ORIGIN],
+            **extras,
         )
         app = create_app(settings)
 

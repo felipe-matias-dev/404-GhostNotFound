@@ -89,10 +89,9 @@ def test_real_gold_reports_go_to_a_folder_outside_git():
     assert "ai-agent/eval/runs_gold/" in ignored
 
 
-def test_real_gold_always_runs_without_the_answer_writer():
-    assert narrates("amostra", sql_only=False) is True
-    assert narrates("amostra", sql_only=True) is False
-    assert narrates("gold_real", sql_only=False) is False
+def test_narration_is_on_unless_sql_only_is_asked():
+    assert narrates(sql_only=False) is True
+    assert narrates(sql_only=True) is False
 
 
 @pytest.mark.parametrize(("dataset", "uc_count"), [("amostra", 50_000), ("gold_real", 8)])
@@ -107,22 +106,16 @@ def test_matching_database_passes_the_check(dataset, uc_count):
 
 
 def test_judge_is_off_unless_requested():
-    assert judges("amostra", judge=False, sql_only=False) is False
-    assert judges("gold_real", judge=False, sql_only=False) is False
+    assert judges(judge=False, sql_only=False) is False
 
 
-def test_judge_runs_on_the_sample_when_requested():
-    assert judges("amostra", judge=True, sql_only=False) is True
-
-
-def test_judge_is_refused_on_the_real_gold_and_names_the_reason():
-    with pytest.raises(JudgeNotAllowed, match="#56"):
-        judges("gold_real", judge=True, sql_only=False)
+def test_judge_runs_when_requested_with_the_narrative():
+    assert judges(judge=True, sql_only=False) is True
 
 
 def test_judge_is_refused_without_the_narrative():
     with pytest.raises(JudgeNotAllowed, match="--sql-only"):
-        judges("amostra", judge=True, sql_only=True)
+        judges(judge=True, sql_only=True)
 
 
 def test_judge_mean_score_is_a_number_and_not_a_percentage():
@@ -132,6 +125,14 @@ def test_judge_mean_score_is_a_number_and_not_a_percentage():
     assert lines[1].endswith("80.0%")
 
 
-def test_judge_flag_is_refused_before_any_connection_on_the_real_gold(capsys):
-    assert main(["--dataset", "gold_real", "--judge"]) == 1
-    assert "juiz" in capsys.readouterr().err
+def test_judge_flag_without_the_narrative_is_refused_before_any_connection(capsys):
+    assert main(["--dataset", "gold_real", "--sql-only", "--judge"]) == 1
+    assert "--sql-only" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("flag", ["--sql-only", "--judge"])
+def test_references_mode_refuses_flags_it_would_ignore(flag, capsys):
+    with pytest.raises(SystemExit):
+        main(["--only", "references", flag])
+
+    assert "--only references" in capsys.readouterr().err
