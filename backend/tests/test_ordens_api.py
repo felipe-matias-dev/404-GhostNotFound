@@ -6,8 +6,9 @@ from httpx2 import Response
 from sqlalchemy import Engine, update
 from sqlalchemy.orm import Session
 
+from venergy_api.auth import Perfil
 from venergy_api.database import Base
-from venergy_api.models import DimUc, OrdemEvento, OrdemInspecao
+from venergy_api.models import DimUc, OrdemEvento, OrdemInspecao, Usuario
 from venergy_api.ordens import StatusOrdem
 from venergy_api.schemas import MAX_ORDENS_POR_PEDIDO
 
@@ -298,3 +299,23 @@ def test_an_event_from_before_the_login_has_no_author(client: TestClient, engine
     [evento] = client.get(f"/ordens-inspecao/{ordem['id']}").json()["eventos"]
 
     assert evento["autor_login"] is None
+
+
+def test_history_shows_the_name_of_who_acted(client: TestClient, engine: Engine) -> None:
+    with Session(engine) as session, session.begin():
+        session.add(Usuario(login="teste", nome="Teste", perfil=Perfil.PERDAS, senha_hash="x"))
+    [ordem] = create_orders(client, "0001")
+
+    enviada = change(client, ordem["id"], status="EM_CAMPO").json()
+
+    assert [e["autor_nome"] for e in enviada["eventos"]] == ["Teste", "Teste"]
+
+
+def test_author_no_longer_in_the_users_table_keeps_the_login_without_a_name(
+    client: TestClient,
+) -> None:
+    [ordem] = create_orders(client, "0001")
+
+    [evento] = client.get(f"/ordens-inspecao/{ordem['id']}").json()["eventos"]
+
+    assert (evento["autor_login"], evento["autor_nome"]) == ("teste", None)

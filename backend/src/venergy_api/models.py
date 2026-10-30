@@ -390,6 +390,18 @@ class OrdemEvento(Base):
     )
 
     ordem: Mapped[OrdemInspecao] = relationship(back_populates="eventos")
+    # Só leitura, pelo login e sem chave estrangeira: o nome é buscado na consulta, e não copiado
+    # para o evento. selectin traz os autores de todos os eventos numa consulta só.
+    autor: Mapped["Usuario | None"] = relationship(
+        primaryjoin="foreign(OrdemEvento.autor_login) == Usuario.login",
+        viewonly=True,
+        lazy="selectin",
+    )
+
+    @property
+    def autor_nome(self) -> str | None:
+        """Nome de quem agiu; vazio sem autor ou se o login não está mais em app.usuarios."""
+        return self.autor.nome if self.autor else None
 
 
 class AiAuditoria(Base):

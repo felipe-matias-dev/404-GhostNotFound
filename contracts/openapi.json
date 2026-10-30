@@ -2609,6 +2609,17 @@
             ],
             "title": "Autor Login"
           },
+          "autor_nome": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Autor Nome"
+          },
           "ocorrido_em": {
             "type": "string",
             "format": "date-time",
@@ -2621,6 +2632,7 @@
           "status_novo",
           "observacao",
           "autor_login",
+          "autor_nome",
           "ocorrido_em"
         ],
         "title": "EventoSchema"

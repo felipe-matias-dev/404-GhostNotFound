@@ -707,6 +707,8 @@ export interface components {
             observacao: string | null;
             /** Autor Login */
             autor_login: string | null;
+            /** Autor Nome */
+            autor_nome: string | null;
             /**
              * Ocorrido Em
              * Format: date-time
