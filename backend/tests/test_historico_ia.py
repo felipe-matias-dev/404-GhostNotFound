@@ -62,7 +62,7 @@ def test_recent_returns_the_last_turns_of_the_session_oldest_first(engine: Engin
     gravar(engine, "s1", "terceira", sql=None, status="clarify", minutos_atras=10)
     gravar(engine, "s2", "de outra sessão")
 
-    turnos = asyncio.run(HistoricoAuditoria(engine).recent("s1", 2))
+    turnos = asyncio.run(HistoricoAuditoria(lambda: engine).recent("s1", 2))
 
     assert [turno.question for turno in turnos] == ["segunda", "terceira"]
     assert turnos[0].sql == "SELECT 2"
@@ -71,14 +71,14 @@ def test_recent_returns_the_last_turns_of_the_session_oldest_first(engine: Engin
 
 
 def test_recent_of_an_unknown_session_is_empty(engine: Engine) -> None:
-    assert asyncio.run(HistoricoAuditoria(engine).recent("nova", 3)) == ()
+    assert asyncio.run(HistoricoAuditoria(lambda: engine).recent("nova", 3)) == ()
 
 
 def test_recent_skips_a_status_the_agent_does_not_know(engine: Engine) -> None:
     gravar(engine, "s1", "antiga", minutos_atras=20)
     gravar(engine, "s1", "de um status futuro", status="inventado", minutos_atras=10)
 
-    turnos = asyncio.run(HistoricoAuditoria(engine).recent("s1", 5))
+    turnos = asyncio.run(HistoricoAuditoria(lambda: engine).recent("s1", 5))
 
     assert [turno.question for turno in turnos] == ["antiga"]
 
@@ -88,7 +88,7 @@ def test_tokens_used_sums_input_and_output_of_the_session_only(engine: Engine) -
     gravar(engine, "s1", "b", input_tokens=50, output_tokens=5)
     gravar(engine, "s2", "c", input_tokens=999, output_tokens=999)
 
-    historico = HistoricoAuditoria(engine)
+    historico = HistoricoAuditoria(lambda: engine)
 
     assert asyncio.run(historico.tokens_used("s1")) == 175
     assert asyncio.run(historico.tokens_used("sem-linhas")) == 0
@@ -100,7 +100,7 @@ def test_refused_turns_do_not_take_a_slot_of_the_limit(engine: Engine) -> None:
     gravar(engine, "s1", "recusada 2", status="refused", sql=None, minutos_atras=10)
     gravar(engine, "s1", "mais recente", minutos_atras=5)
 
-    turnos = asyncio.run(HistoricoAuditoria(engine).recent("s1", 2))
+    turnos = asyncio.run(HistoricoAuditoria(lambda: engine).recent("s1", 2))
 
     assert [turno.question for turno in turnos] == ["respondida", "mais recente"]
 
@@ -116,7 +116,7 @@ def test_a_clarify_turn_keeps_the_question_the_agent_asked(engine: Engine) -> No
         clarification="Qual período você quer?",
     )
 
-    [turno] = asyncio.run(HistoricoAuditoria(engine).recent("s1", 3))
+    [turno] = asyncio.run(HistoricoAuditoria(lambda: engine).recent("s1", 3))
 
     assert turno.clarification == "Qual período você quer?"
 
@@ -126,7 +126,7 @@ def test_tokens_used_of_the_requesting_user_add_up_across_all_the_sessions(engin
     gravar(engine, "s2", "b", input_tokens=50, output_tokens=5, usuario="ana")
     gravar(engine, "s1", "c", input_tokens=999, output_tokens=999, usuario="bia")
     gravar(engine, "s3", "d", input_tokens=777, output_tokens=777)
-    historico = HistoricoAuditoria(engine)
+    historico = HistoricoAuditoria(lambda: engine)
 
     token = usuario_da_requisicao.set("ana")
     try:

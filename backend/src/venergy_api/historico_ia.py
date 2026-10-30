@@ -1,5 +1,6 @@
 """Histórico de uma sessão e consumo de tokens do usuário, lidos da trilha de auditoria."""
 
+from collections.abc import Callable
 from contextvars import ContextVar
 
 from sqlalchemy import Engine, func, select
@@ -31,8 +32,10 @@ class HistoricoAuditoria:
     portas são assíncronas e a sessão do backend é síncrona.
     """
 
-    def __init__(self, engine: Engine) -> None:
-        self._engine = engine
+    def __init__(self, obter_engine: Callable[[], Engine]) -> None:
+        # A engine só é pedida na primeira consulta: na subida da API, as configurações do banco
+        # podem nem estar disponíveis (os testes montam o app sem .env).
+        self._obter_engine = obter_engine
 
     async def recent(self, session_id: str, limit: int) -> tuple[ConversationTurn, ...]:
         return await run_in_threadpool(self._recent, session_id, limit)
@@ -43,7 +46,7 @@ class HistoricoAuditoria:
     def _recent(self, session_id: str, limit: int) -> tuple[ConversationTurn, ...]:
         if limit <= 0:
             return ()
-        with Session(self._engine) as session:
+        with Session(self._obter_engine()) as session:
             linhas = session.execute(
                 select(
                     AiAuditoria.pergunta,
@@ -77,7 +80,7 @@ class HistoricoAuditoria:
             if usuario is not None
             else AiAuditoria.session_id == session_id
         )
-        with Session(self._engine) as session:
+        with Session(self._obter_engine()) as session:
             return int(
                 session.scalar(
                     select(

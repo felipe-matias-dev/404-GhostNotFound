@@ -66,7 +66,7 @@ async def montar_agente(
     if settings is None:
         return None
     try:
-        historico = HistoricoAuditoria(obter_engine())
+        historico = HistoricoAuditoria(obter_engine)
         return await build_agent(settings, history=historico, usage=historico)
     except SemanticLayerError as error:
         # Uma mudança no contrato da Gold pode deixar a camada semântica do agente inválida

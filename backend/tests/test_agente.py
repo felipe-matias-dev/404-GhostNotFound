@@ -108,12 +108,19 @@ def test_wires_the_audit_history_into_both_agent_ports(
     def valid_settings() -> AgentSettings:
         return AgentSettings(_env_file=None, database_url=DATABASE_URL, google_api_key="chave")
 
-    asyncio.run(montar_agente(valid_settings, lambda: engine))
+    pedidos_de_engine = []
+
+    def obter_engine() -> object:
+        pedidos_de_engine.append(1)
+        return engine
+
+    asyncio.run(montar_agente(valid_settings, obter_engine))
 
     [portas] = montados
     assert isinstance(portas["history"], HistoricoAuditoria)
     assert portas["usage"] is portas["history"]
-    assert portas["history"]._engine is engine
+    assert pedidos_de_engine == []
+    assert portas["history"]._obter_engine() is engine
 
 
 def test_returns_none_and_logs_the_problems_when_the_semantic_layer_is_invalid(
