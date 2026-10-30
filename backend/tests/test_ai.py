@@ -11,12 +11,13 @@ from sqlalchemy import Engine, func, select
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 from venergy_agent.domain.answer import AgentAnswer, AnswerStatus, Confidence
+from venergy_agent.domain.conversation import ConversationTurn
 
 from venergy_api.agente import get_agente
 from venergy_api.auditoria import gravar_auditoria
 from venergy_api.auth import Perfil, UsuarioLogado
 from venergy_api.database import Base
-from venergy_api.historico_ia import usuario_da_requisicao
+from venergy_api.historico_ia import HistoricoAuditoria, usuario_da_requisicao
 from venergy_api.models import AiAuditoria
 from venergy_api.schemas import MAX_PERGUNTA_IA
 from venergy_api.sessao import usuario_atual
@@ -560,6 +561,34 @@ def test_the_owner_keeps_using_the_own_session(
 
     assert response.status_code == 200, response.text
     assert len(agente.chamadas) == 1
+
+
+class AgenteQueLeOHistorico(AgenteFalso):
+    """Lê o histórico da sessão pela mesma porta que o agente real usa (HistoricoAuditoria)."""
+
+    def __init__(self, answer: AgentAnswer, engine: Engine) -> None:
+        super().__init__(answer)
+        self._historico = HistoricoAuditoria(lambda: engine)
+        self.historicos_vistos: list[tuple[ConversationTurn, ...]] = []
+
+    async def ask(self, question: str, session_id: str) -> AgentAnswer:
+        self.historicos_vistos.append(await self._historico.recent(session_id, 3))
+        return await super().ask(question, session_id)
+
+
+def test_a_follow_up_in_the_same_session_sees_the_previous_turn(
+    engine: Engine, client_for: Callable[[Engine], TestClient]
+) -> None:
+    client = client_for(engine)
+    agente = AgenteQueLeOHistorico(answered_answer(), engine)
+    client.app.dependency_overrides[get_agente] = lambda: agente
+
+    client.post("/ai/ask", json={"question": PERGUNTA, "session_id": SESSAO})
+    response = client.post("/ai/ask", json={"question": "E no mês anterior?", "session_id": SESSAO})
+
+    assert response.status_code == 200, response.text
+    assert agente.historicos_vistos[0] == ()
+    assert [turno.question for turno in agente.historicos_vistos[1]] == [PERGUNTA]
 
 
 class AgenteQueLeOUsuario(AgenteFalso):
