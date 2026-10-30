@@ -526,3 +526,48 @@ def test_year_boundary_pairs_january_with_the_previous_january(client: TestClien
     assert body["meses"][-1]["competencia"] == "2025-06"
     january = next(mes for mes in body["meses"] if mes["competencia"] == "2025-01")
     assert january["kwh_ano_anterior"] == 70
+
+
+def test_bill_variation_splits_the_difference_with_the_same_month_of_the_previous_year(
+    client: TestClient, seed
+) -> None:
+    # Mesma energia e mesmos dias nos dois anos: a conta subiu R$ 8,50, sendo R$ 1,90 da
+    # bandeira que entrou, R$ 5,60 de reajuste da tarifa e R$ 1,00 de tributos.
+    seed(
+        make_uc("0001"),
+        make_invoice("0001", "2024-12"),
+        make_invoice(
+            "0001",
+            "2025-12",
+            receita_bandeira=Decimal("1.90"),
+            receita_energia=Decimal("77.50"),
+            tributos=Decimal("21.00"),
+            receita_faturada=Decimal("98.50"),
+        ),
+    )
+
+    body = client.get(URL.format(cod_uc="0001")).json()
+
+    assert body["variacao_conta"] == {
+        "competencia": "2025-12",
+        "competencia_comparada": "2024-12",
+        "conta": 98.5,
+        "conta_comparada": 90.0,
+        "diferenca": 8.5,
+        "dias": 0.0,
+        "consumo": 0.0,
+        "tarifa": 5.6,
+        "bandeira": 1.9,
+        "tributos": 1.0,
+        "leitura_estimada": False,
+    }
+
+
+def test_bill_variation_is_empty_without_the_bill_of_the_previous_year(
+    client: TestClient, seed
+) -> None:
+    seed(make_uc("0001"), make_invoice("0001", "2025-12"))
+
+    body = client.get(URL.format(cod_uc="0001")).json()
+
+    assert body["variacao_conta"] is None

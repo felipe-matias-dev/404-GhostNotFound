@@ -1231,6 +1231,7 @@ export interface components {
         Uc360Schema: {
             cadastro: components["schemas"]["DimUcSchema"];
             consumo: components["schemas"]["ConsumoUcSchema"];
+            variacao_conta: components["schemas"]["VariacaoContaSchema"] | null;
             faturas_nao_pagas: components["schemas"]["FaturasNaoPagasSchema"];
             medidor: components["schemas"]["MedidorUcSchema"] | null;
             /** Interrupcoes */
@@ -1260,6 +1261,36 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /**
+         * VariacaoContaSchema
+         * @description Por que a conta do mês de referência mudou, em R$, contra o mesmo mês do ano anterior.
+         *
+         *     As cinco partes somam exatamente a `diferenca` entre as duas contas.
+         */
+        VariacaoContaSchema: {
+            /** Competencia */
+            competencia: string;
+            /** Competencia Comparada */
+            competencia_comparada: string;
+            /** Conta */
+            conta: number;
+            /** Conta Comparada */
+            conta_comparada: number;
+            /** Diferenca */
+            diferenca: number;
+            /** Dias */
+            dias: number | null;
+            /** Consumo */
+            consumo: number;
+            /** Tarifa */
+            tarifa: number;
+            /** Bandeira */
+            bandeira: number;
+            /** Tributos */
+            tributos: number;
+            /** Leitura Estimada */
+            leitura_estimada: boolean;
         };
         /**
          * VariacaoIndicadoresSchema
