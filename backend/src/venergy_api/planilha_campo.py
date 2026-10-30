@@ -7,13 +7,14 @@ seria lido de dois jeitos.
 """
 
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from io import BytesIO
 from zipfile import BadZipFile
 
-from openpyxl import load_workbook
+from openpyxl import Workbook, load_workbook
 from openpyxl.utils.exceptions import InvalidFileException
 
 from venergy_api.ordens import ResultadoOrdem
@@ -232,3 +233,37 @@ def _data(valor: object) -> date | None:
 def _formatar_kwh(kwh: Decimal) -> str:
     texto = f"{kwh:,.3f}".rstrip("0").rstrip(".")
     return texto.replace(",", "_").replace(".", ",").replace("_", ".")
+
+
+TIPO_XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+# As sete primeiras são as do formato de inspecoes.xlsx: a equipe preenche e o upload lê. Município
+# e bairro vão ao final só para quem está em campo saber onde fica a unidade; o leitor as ignora.
+COLUNAS_EXPORTACAO = (
+    "id_inspecao",
+    "id_uc",
+    "data",
+    "inspetor",
+    "resultado",
+    "tipo_irregularidade",
+    "kwh_recuperado",
+    "municipio",
+    "bairro",
+)
+
+
+def montar_planilha(ordens: Iterable[tuple[int, str, str | None, str | None]]) -> bytes:
+    """Planilha das ordens em campo, no formato que o upload lê de volta.
+
+    Cada item é (id da ordem, cod_uc, município, bairro). O código da inspeção sai como
+    `OI-<id>`, para a observação da ordem concluída apontar de volta para ela.
+    """
+    livro = Workbook()
+    aba = livro.active
+    aba.title = "em-campo"
+    aba.append(list(COLUNAS_EXPORTACAO))
+    for ordem_id, cod_uc, municipio, bairro in ordens:
+        aba.append([f"OI-{ordem_id}", cod_uc, None, None, None, None, None, municipio, bairro])
+    saida = BytesIO()
+    livro.save(saida)
+    return saida.getvalue()

@@ -1622,6 +1622,42 @@
       }
     },
     "/ordens-inspecao/planilha": {
+      "get": {
+        "tags": [
+          "ordens de inspeção"
+        ],
+        "summary": "Exportar Planilha",
+        "description": "Baixa as OIs em campo na planilha que a equipe preenche e o upload lê de volta.",
+        "operationId": "exportar_planilha_ordens_inspecao_planilha_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErroSchema"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ]
+      },
       "post": {
         "tags": [
           "ordens de inspeção"

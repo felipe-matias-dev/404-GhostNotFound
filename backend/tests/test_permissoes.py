@@ -84,9 +84,12 @@ def test_so_perdas_gera_e_atualiza_ordens_de_inspecao(api: TestClient, perfil: P
         "/ordens-inspecao/planilha", files={"arquivo": ("campo.xlsx", b"x", "application/xlsx")}
     )
 
+    exportar = api.get("/ordens-inspecao/planilha")
+
     assert gerar.status_code == 403
     assert atualizar.status_code == 403
     assert planilha.status_code == 403
+    assert exportar.status_code == 403
 
 
 def test_perdas_chega_nas_ordens_de_inspecao(api: TestClient):

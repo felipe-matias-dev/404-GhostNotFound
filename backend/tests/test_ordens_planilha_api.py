@@ -4,12 +4,13 @@ from io import BytesIO
 import pytest
 from fastapi.testclient import TestClient
 from httpx2 import Response
-from openpyxl import Workbook
+from openpyxl import Workbook, load_workbook
 from sqlalchemy import Engine
 from sqlalchemy.orm import Session
 
 from venergy_api.database import Base
 from venergy_api.models import DimUc, OrdemEvento
+from venergy_api.planilha_campo import COLUNAS_EXPORTACAO
 
 ROTA = "/ordens-inspecao/planilha"
 XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -198,3 +199,52 @@ def test_an_unusable_file_returns_422_and_records_nothing(
 
 def test_a_request_without_the_file_returns_422(client: TestClient) -> None:
     assert client.post(ROTA).status_code == 422
+
+
+def baixar(client: TestClient) -> Workbook:
+    response = client.get(ROTA)
+    assert response.status_code == 200, response.text
+    assert response.headers["content-type"] == XLSX
+    assert "ordens-em-campo.xlsx" in response.headers["content-disposition"]
+    return load_workbook(BytesIO(response.content))
+
+
+def test_export_lists_only_the_orders_in_the_field_with_the_upload_header(
+    client: TestClient,
+) -> None:
+    em_campo = gerar_ordem(client, "0001")
+    gerar_ordem(client, "0002", em_campo=False)
+    concluida = gerar_ordem(client, "0003")
+    client.patch(f"/ordens-inspecao/{concluida}", json={"status": "CANCELADA"})
+
+    linhas = list(baixar(client).active.iter_rows(values_only=True))
+
+    assert linhas[0] == tuple(COLUNAS_EXPORTACAO)
+    assert linhas[1:] == [
+        (f"OI-{em_campo}", "0001", None, None, None, None, None, "Recife", "Boa Viagem")
+    ]
+
+
+def test_export_without_orders_in_the_field_has_only_the_header(client: TestClient) -> None:
+    gerar_ordem(client, "0001", em_campo=False)
+
+    assert len(list(baixar(client).active.iter_rows())) == 1
+
+
+def test_the_exported_file_filled_in_comes_back_through_the_upload(client: TestClient) -> None:
+    primeira = gerar_ordem(client, "0001")
+    segunda = gerar_ordem(client, "0002")
+    livro = baixar(client)
+    aba = livro.active
+    aba["E2"], aba["F2"], aba["G2"] = "CONFIRMADA", "BY-PASS", "80,5"
+    aba["E3"], aba["G3"] = "SEM IRREGULARIDADE", 0
+    arquivo = BytesIO()
+    livro.save(arquivo)
+
+    corpo = enviar(client, arquivo.getvalue()).json()
+
+    assert [c["ordem_id"] for c in corpo["concluidas"]] == [primeira, segunda]
+    assert corpo["rejeitadas"] == []
+    ordem = detalhe(client, primeira)
+    assert ordem["resultado"] == "IRREGULAR_CONFIRMADA"
+    assert "(inspeção OI-" in ordem["observacao"]

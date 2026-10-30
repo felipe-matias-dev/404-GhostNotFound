@@ -2,7 +2,7 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -17,7 +17,13 @@ from venergy_api.ordens import (
     TransicaoInvalidaError,
     validar_transicao,
 )
-from venergy_api.planilha_campo import MAX_BYTES, PlanilhaInvalida, ler_planilha
+from venergy_api.planilha_campo import (
+    MAX_BYTES,
+    TIPO_XLSX,
+    PlanilhaInvalida,
+    ler_planilha,
+    montar_planilha,
+)
 from venergy_api.schemas import (
     AtualizarOrdemSchema,
     CriarOrdensSchema,
@@ -248,6 +254,32 @@ def _motivo_sem_ordem_em_campo(
     if ordem.status is StatusOrdem.GERADA:
         return "A ordem ainda não foi enviada a campo"
     return None
+
+
+@router.get(
+    "/planilha",
+    response_class=Response,
+    responses={
+        status.HTTP_200_OK: {
+            "content": {TIPO_XLSX: {"schema": {"type": "string", "format": "binary"}}}
+        },
+        status.HTTP_403_FORBIDDEN: {"model": ErroSchema},
+    },
+)
+def exportar_planilha(session: SessionDep, _usuario: UsuarioDePerdasDep) -> Response:
+    """Baixa as OIs em campo na planilha que a equipe preenche e o upload lê de volta."""
+    consulta = (
+        select(OrdemInspecao.id, OrdemInspecao.cod_uc, DimUc.municipio, DimUc.bairro)
+        .outerjoin(DimUc, DimUc.cod_uc == OrdemInspecao.cod_uc)
+        .where(OrdemInspecao.status == StatusOrdem.EM_CAMPO)
+        .order_by(OrdemInspecao.id)
+    )
+    conteudo = montar_planilha(tuple(linha) for linha in session.execute(consulta))
+    return Response(
+        content=conteudo,
+        media_type=TIPO_XLSX,
+        headers={"Content-Disposition": 'attachment; filename="ordens-em-campo.xlsx"'},
+    )
 
 
 @router.get("/{ordem_id}", responses={status.HTTP_404_NOT_FOUND: {"model": ErroSchema}})
