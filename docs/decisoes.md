@@ -58,7 +58,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | 29/10/2026 | DEC-049: login com cookie httpOnly e cinco perfis; só `perdas` escreve nas ordens de inspeção e só `ti` lê a auditoria do agente | Esconder o menu não é segurança: a permissão é checada no backend, onde estão os dados; o agente já lê toda a Gold, então bloquear a leitura por tela daria falsa proteção | Felipe |
 | 29/10/2026 | DEC-050: os eventos das ordens de inspeção guardam o login de quem agiu (`autor_login`), o histórico mostra o nome dele, e a carga e a subida da API acrescentam a coluna sem apagar o histórico | O gerente de perdas é o único que escreve, e a trilha precisa responder quem concluiu ou cancelou uma ordem; recriar a tabela para isso perderia o histórico de quem já usa o portal | Felipe |
 | 29/10/2026 | DEC-051: filtros da fila usam os sinais já informados nos motivos da Gold: queda, medidor eletromecânico e percentual de leituras estimadas | Mantém a fila fiel à Gold, sem recalcular métricas ou tratar ausência como zero; todos os filtros operam antes da paginação | João Euclides |
-| 30/10/2026 | DEC-053: o upload da planilha de campo conclui a ordem em campo da UC da linha, aplica as linhas válidas e devolve as rejeitadas com o motivo; o tipo, o kWh, a data e o inspetor ficam na observação da ordem | O case pede registrar o resultado sem digitar, e a planilha não traz o número da ordem, só a UC; uma linha escrita errada à mão não pode travar o arquivo da equipe inteira | Felipe |
+| 30/10/2026 | DEC-053: o portal exporta as ordens em campo numa planilha e o upload da mesma planilha preenchida conclui as ordens, aplica as linhas válidas e devolve as rejeitadas com o motivo; o tipo, o kWh, a data e o inspetor ficam na observação da ordem | O case traz as duas pontas como diferenciais (enviar a fila à equipe de campo e registrar o resultado sem digitar); a planilha exportada já sai no formato que o upload lê, e uma linha escrita errada à mão não pode travar o arquivo da equipe inteira | Felipe |
 
 ## DEC-001 · Localização dos arquivos de origem (landing)
 
@@ -1675,7 +1675,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Decisão:** quando o histórico da sessão está vazio e a pergunta depende de outro turno, o `AskUseCase` devolve `clarify` sem chamar o modelo. A regra está em `domain/followup.py` e cobre dois casos: pedidos de repetição ("faça o mesmo", "repita a mesma consulta", "o mesmo para X") e perguntas elípticas de até 4 palavras que começam com "e" ("E em Olinda?").
 - **Consequências:** o comportamento é determinístico e não gasta cota. Como não muda prompt, modelo nem camada semântica, não exige rodada da DEC-016 para entrar. Uma pergunta completa que começa com "e" segue para o modelo. Follow-ups escritos de outra forma também seguem, e aí vale o que o prompt manda. Se a leitura do histórico falhar, a pergunta dependente também recebe `clarify`.
 
-## DEC-053 · Upload da planilha de campo conclui as ordens em campo
+## DEC-053 · Planilha de campo: exportar as ordens em campo e subir o resultado
 
 - **Data:** 30/10/2026 · **Área:** Portal e backend · **Autor:** Felipe
 - **Contexto:** o case traz, como diferencial, "subir pelo portal a planilha que a equipe preenche em campo, para que os
@@ -1683,7 +1683,14 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   planilha tem o formato de `inspecoes.xlsx` (`id_inspecao`, `id_uc`, `data`, `inspetor`, `resultado`, `tipo_irregularidade`,
   `kwh_recuperado`), não traz o número da ordem e chega com as sujeiras já catalogadas em `docs/qualidade-dados.md`
   (INSP-01 a INSP-07).
-- **Decisão:** `POST /ordens-inspecao/planilha` (`multipart/form-data`, campo `arquivo`, só o perfil `perdas`):
+- **Decisão:** as duas pontas usam a mesma rota e o mesmo formato:
+  - **Exportar.** `GET /ordens-inspecao/planilha` (só o perfil `perdas`) baixa um XLSX com as ordens `EM_CAMPO`, uma por
+    linha, com as colunas de `inspecoes.xlsx` (`id_inspecao`, `id_uc`, `data`, `inspetor`, `resultado`,
+    `tipo_irregularidade`, `kwh_recuperado`) e, ao final, `municipio` e `bairro` para a equipe saber onde fica a unidade. O
+    `id_inspecao` sai como `OI-<id da ordem>` e `id_uc` já vem preenchido; o resto fica em branco para a equipe preencher.
+    Exporta só as ordens em campo, porque são as únicas que o upload pode concluir: a linha exportada sempre corresponde a uma
+    ordem que dá para concluir. Sem ordens em campo, o arquivo sai só com o cabeçalho;
+  - **Subir.** `POST /ordens-inspecao/planilha` (`multipart/form-data`, campo `arquivo`, só o perfil `perdas`):
   - **Ligação por UC.** A linha vale para a ordem ativa da UC, que é única (índice `uq_ordem_inspecao_uc_ativa`, DEC-009);
   - **Só conclui ordem em campo.** A ordem `GERADA` é rejeitada ("ainda não foi enviada a campo"): a máquina de estados não
     permite `GERADA → CONCLUIDA`, e o upload não inventa um envio a campo que ninguém fez. A mudança passa pela mesma função do
@@ -1701,8 +1708,11 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   - **tudo ou nada**, porque uma linha errada travaria o arquivo inteiro e o aceite pede o relatório de rejeitadas;
   - **enviar a campo e concluir no mesmo upload**, que cria um envio no histórico que ninguém fez;
   - **colunas novas na ordem** (tipo, kWh, data), que mexem no schema, no contrato e na tela sem o case pedir;
+  - **exportar a fila de suspeitas em CSV**, como diz o backlog (V1-11): a equipe teria de salvar como XLSX antes de devolver, e
+    as unidades da fila ainda não têm ordem para o upload concluir;
   - **pandas**, dependência pesada para ler uma planilha pequena: a leitura usa `openpyxl` em modo somente leitura.
-- **Consequências:** reenviar o mesmo arquivo não muda nada (a ordem já está concluída e a linha é rejeitada). O kWh recuperado
+- **Consequências:** a exportação cumpre o V1-11 com outro desenho: XLSX das ordens em campo, e não CSV da fila. Quem quiser
+  exportar a fila de suspeitas ainda precisa gerar e enviar as ordens a campo antes. Reenviar o mesmo arquivo não muda nada (a ordem já está concluída e a linha é rejeitada). O kWh recuperado
   fica em texto, então não dá para somá-lo no portal; se isso virar necessidade, a saída é a coluna numérica. O formato foi
   montado a partir do pipeline e do case, não de um arquivo de campo real: a planilha original não estava disponível, e os
   testes usam planilhas sintéticas. O número da ordem não vem na planilha; se a equipe passar a preenchê-lo, a ligação pode

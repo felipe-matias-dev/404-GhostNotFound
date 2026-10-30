@@ -212,11 +212,11 @@ O registro completo, com 38 decisões numeradas e as suposições, está em [`do
 - **Descartado:** rotas por ação (`/concluir`, `/cancelar`), que espalham a validação.
 - **Efeito:** cada visita fica no histórico, e o resultado registrado mede se a fila de suspeitas acerta.
 
-**Planilha de campo conclui as ordens em campo** · [DEC-053](docs/decisoes.md#dec-053--upload-da-planilha-de-campo-conclui-as-ordens-em-campo)
+**Planilha de campo: exportar as ordens em campo e subir o resultado** · [DEC-053](docs/decisoes.md#dec-053--planilha-de-campo-exportar-as-ordens-em-campo-e-subir-o-resultado)
 - **Problema:** a equipe volta de campo com uma planilha, e digitar cada resultado ordem por ordem é o retrabalho que o Rafael quer evitar.
-- **Decisão:** `POST /ordens-inspecao/planilha` liga cada linha à ordem em campo da unidade consumidora, conclui as válidas e devolve as rejeitadas com o motivo. As regras de limpeza são as da Silver (grafias do resultado, datas, vírgula decimal).
+- **Decisão:** `GET /ordens-inspecao/planilha` exporta as ordens em campo no formato de `inspecoes.xlsx`, e `POST /ordens-inspecao/planilha` liga cada linha à ordem em campo da unidade consumidora, conclui as válidas e devolve as rejeitadas com o motivo. As regras de limpeza são as da Silver (grafias do resultado, datas, vírgula decimal).
 - **Descartado:** tudo ou nada, porque uma linha escrita errada travaria o arquivo inteiro; e concluir ordem que ainda não foi enviada a campo, que pularia a máquina de estados.
-- **Efeito:** reenviar o mesmo arquivo não muda nada, e o histórico mostra quem subiu a planilha. Tipo, kWh, data e inspetor ficam no texto da observação. Backend pronto; a tela de envio ainda não existe.
+- **Efeito:** a planilha exportada volta pelo upload sem remontar nada, reenviar o mesmo arquivo não muda nada, e o histórico mostra quem subiu a planilha. Tipo, kWh, data e inspetor ficam no texto da observação. Backend pronto; a tela de envio ainda não existe.
 
 **DEC e FEC calculados a partir dos componentes** · [DEC-033](docs/decisoes.md#dec-033--dec-e-fec-por-período-e-recorte-e-a-fila-de-suspeitas-paginada)
 - **Problema:** DEC e FEC não se somam nem se tiram a média entre alimentadores ou bairros.
