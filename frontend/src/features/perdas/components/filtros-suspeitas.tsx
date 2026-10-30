@@ -8,7 +8,7 @@ import {
 	PopoverContent,
 	PopoverTrigger,
 } from "#/components/ui/popover";
-import { distribuicaoQueda, filaKey } from "../api";
+import { distribuicaoQueda } from "../api";
 import { FILTROS_FILA_INICIAIS, type FiltrosFila } from "../types";
 
 export function FiltrosSuspeitas({
@@ -24,7 +24,7 @@ export function FiltrosSuspeitas({
 	const [rascunho, setRascunho] = useState(value);
 	const medidorId = useId();
 	const { data, isPending, isError, refetch } = useQuery({
-		queryKey: [...filaKey, "distribuicao-queda"],
+		queryKey: ["distribuicao-queda"],
 		queryFn: distribuicaoQueda,
 	});
 	const bins = Array.from({ length: 21 }, (_, index) => ({
@@ -123,6 +123,7 @@ export function FiltrosSuspeitas({
 						<div className="grid gap-1">
 							<FaixaPercentual
 								label="Leituras estimadas"
+								minimo={25}
 								value={rascunho.leiturasEstimadas}
 								disabled={disabled}
 								onChange={(leiturasEstimadas) =>
@@ -131,8 +132,8 @@ export function FiltrosSuspeitas({
 							/>
 							{rascunho.leiturasEstimadas !== null && (
 								<p className="px-2 pb-2 text-small text-text-muted">
-									Nas 12 últimas competências. Percentuais não informados ficam
-									fora ao filtrar.
+									A Gold só informa percentuais a partir de 25%. Valores abaixo
+									desse limite ou não informados ficam fora do filtro.
 								</p>
 							)}
 						</div>
@@ -165,15 +166,17 @@ function FaixaPercentual({
 	value,
 	onChange,
 	disabled,
+	minimo = 0,
 	children,
 }: {
 	label: string;
 	value: [number, number] | null;
 	onChange: (value: [number, number] | null) => void;
 	disabled: boolean;
+	minimo?: number;
 	children?: ReactNode;
 }) {
-	const [min, max] = value ?? [0, 100];
+	const [min, max] = value ?? [minimo, 100];
 	const id = useId();
 	return (
 		<fieldset className="grid gap-1">
@@ -187,7 +190,7 @@ function FaixaPercentual({
 					label={label}
 					checked={value !== null}
 					disabled={disabled}
-					onChange={(checked) => onChange(checked ? [0, 100] : null)}
+					onChange={(checked) => onChange(checked ? [minimo, 100] : null)}
 				/>
 				{label}
 			</label>
@@ -207,7 +210,7 @@ function FaixaPercentual({
 							<input
 								aria-label={`${label}: ${limite.toLowerCase()}`}
 								type="range"
-								min={0}
+								min={minimo}
 								max={100}
 								value={index === 0 ? min : max}
 								onChange={(event) => {

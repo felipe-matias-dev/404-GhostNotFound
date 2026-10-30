@@ -20,6 +20,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from venergy_api.auth import Perfil
 from venergy_api.database import Base
 from venergy_api.ordens import STATUS_ATIVOS, ResultadoOrdem, StatusOrdem
 
@@ -380,11 +381,27 @@ class OrdemEvento(Base):
         _enum_como_texto(StatusOrdem, "ck_ordem_evento_status_novo")
     )
     observacao: Mapped[str | None]
+    # Login de quem agiu, em texto e sem chave estrangeira: um token vale até vencer mesmo se o
+    # usuário for apagado, e a ação não pode falhar nem perder a trilha por isso (DEC-050).
+    # Vazio nos eventos de antes do login, que não têm autor conhecido.
+    autor_login: Mapped[str | None]
     ocorrido_em: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
 
     ordem: Mapped[OrdemInspecao] = relationship(back_populates="eventos")
+    # Só leitura, pelo login e sem chave estrangeira: o nome é buscado na consulta, e não copiado
+    # para o evento. selectin traz os autores de todos os eventos numa consulta só.
+    autor: Mapped["Usuario | None"] = relationship(
+        primaryjoin="foreign(OrdemEvento.autor_login) == Usuario.login",
+        viewonly=True,
+        lazy="selectin",
+    )
+
+    @property
+    def autor_nome(self) -> str | None:
+        """Nome de quem agiu; vazio sem autor ou se o login não está mais em app.usuarios."""
+        return self.autor.nome if self.autor else None
 
 
 class AiAuditoria(Base):
@@ -417,3 +434,16 @@ class AiAuditoria(Base):
     model: Mapped[str]
     prompt_version: Mapped[str]
     latency_ms: Mapped[int]
+
+
+class Usuario(Base):
+    """Quem pode entrar no portal. Schema app: a carga da Gold nunca apaga esta tabela."""
+
+    __tablename__ = "usuarios"
+    __table_args__ = {"schema": "app"}
+
+    login: Mapped[str] = mapped_column(primary_key=True)
+    nome: Mapped[str]
+    perfil: Mapped[Perfil] = mapped_column(_enum_como_texto(Perfil, "ck_usuarios_perfil"))
+    # Só o hash Argon2: com a tabela vazada, ninguém lê as senhas.
+    senha_hash: Mapped[str]

@@ -1,6 +1,7 @@
 import { getRouteApi } from "@tanstack/react-router";
-import { useState } from "react";
 import { Pagina } from "#/components/layout/pagina";
+import { useSession } from "#/features/auth";
+import { useMediaQuery } from "#/lib/use-media-query";
 import { AcoesOrdemProvider, useAcoesOrdem } from "../components/acoes-ordem";
 import { FilaSuspeitas } from "../components/fila-suspeitas";
 import { GerarOrdens } from "../components/gerar-ordens";
@@ -23,11 +24,17 @@ export function PerdasPage() {
 }
 
 function OrdensSecao() {
-	const { status } = route.useSearch();
+	const { status, secao: secaoParam } = route.useSearch();
+	const { data: user } = useSession();
+	const canEdit = user?.perfil === "perdas";
 	const navigate = route.useNavigate();
-	const [secao, setSecao] = useState<"fila" | "ordens">("fila");
+	const secao = secaoParam ?? (status ? "ordens" : "fila");
+	const setSecao = (next: "fila" | "ordens") =>
+		navigate({ search: (prev) => ({ ...prev, secao: next }) });
 	const { visao, definirVisao } = useVisaoOrdens();
-	const visaoEfetiva = visao;
+	// Abaixo de 48rem o Kanban não cabe: a tabela vira cards, sem mexer na preferência salva.
+	const largo = useMediaQuery("(min-width: 48rem)");
+	const visaoEfetiva = largo && canEdit ? visao : "tabela";
 
 	const filtrar = (next: StatusOrdem | undefined) =>
 		navigate({ search: (prev) => ({ ...prev, status: next }) });
@@ -77,8 +84,10 @@ function OrdensSecao() {
 							<h2 id="ordens-titulo" className="sr-only">
 								Ordens de inspeção
 							</h2>
-							<GerarOrdens />
-							<VisaoToggle value={visao} onChange={definirVisao} />
+							{canEdit && <GerarOrdens />}
+							{largo && canEdit && (
+								<VisaoToggle value={visao} onChange={definirVisao} />
+							)}
 						</div>
 						{visaoEfetiva === "tabela" && (
 							<StatusFilter value={status} onChange={filtrar} />

@@ -902,7 +902,7 @@ export function DataTable<T>({
 				)}
 			</div>
 
-			{showRows && (
+			{(showRows || (showEmpty && pagination && pageIndex > 0)) && (
 				<div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-1">
 					<p
 						className={cn(
@@ -910,7 +910,9 @@ export function DataTable<T>({
 							busy && "text-text-disabled",
 						)}
 					>
-						{start + 1}–{start + pageRows.length} de {total}
+						{showRows
+							? `${start + 1}–${start + pageRows.length} de ${total}`
+							: `Nenhuma linha nesta página · ${total} no total`}
 						{selectable && chosen.size > 0 && (
 							<>
 								{" · "}
@@ -928,7 +930,7 @@ export function DataTable<T>({
 							</>
 						)}
 					</p>
-					{pageCount > 1 && (
+					{(pageCount > 1 || pageIndex > 0) && (
 						<nav
 							aria-label={`Páginas de ${label}`}
 							className="flex items-center gap-1"
@@ -953,7 +955,7 @@ export function DataTable<T>({
 								variant="ghost"
 								size="icon-sm"
 								aria-label="Próxima página"
-								disabled={pageIndex === pageCount - 1 || pagination?.disabled}
+								disabled={pageIndex >= pageCount - 1 || pagination?.disabled}
 								onClick={() =>
 									pagination
 										? pagination.onPageChange(pageIndex + 1)

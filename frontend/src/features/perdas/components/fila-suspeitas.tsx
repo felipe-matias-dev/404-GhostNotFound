@@ -14,9 +14,10 @@ import {
 	SheetHeader,
 	SheetTitle,
 } from "#/components/ui/sheet";
+import { useSession } from "#/features/auth";
 import type { components } from "#/lib/api-schema.gen";
 import { formatKWh } from "#/lib/format";
-import { filaKey, listarFila } from "../api";
+import { filaKey, listarFila, TAMANHO_PAGINA } from "../api";
 import { mensagemErroOrdem } from "../conversions";
 import { useCriarOrdens } from "../hooks/use-criar-ordens";
 import { FILTROS_FILA_INICIAIS, type FiltrosFila } from "../types";
@@ -91,6 +92,8 @@ const COLUNAS: DataTableColumn<FilaItem>[] = [
 ];
 
 export function FilaSuspeitas({ onVerOrdens }: { onVerOrdens: () => void }) {
+	const { data: user } = useSession();
+	const canEdit = user?.perfil === "perdas";
 	const [pagina, setPagina] = useState(1);
 	const [sort, setSort] = useState<SortState | null>(null);
 	const [filtros, setFiltros] = useState<FiltrosFila>(FILTROS_FILA_INICIAIS);
@@ -142,7 +145,9 @@ export function FilaSuspeitas({ onVerOrdens }: { onVerOrdens: () => void }) {
 								? `${data.total} ${data.total === 1 ? "suspeita" : "suspeitas"}`
 								: "Carregando fila…"}
 					</span>
-					<span className="ml-2">Selecione UCs sem ordem ativa.</span>
+					{canEdit && (
+						<span className="ml-2">Selecione UCs sem ordem ativa.</span>
+					)}
 				</p>
 				<div className="flex flex-wrap items-center gap-2">
 					<FiltrosSuspeitas
@@ -153,13 +158,15 @@ export function FilaSuspeitas({ onVerOrdens }: { onVerOrdens: () => void }) {
 							mudarPagina(1);
 						}}
 					/>
-					<Button
-						size="sm"
-						onClick={gerar}
-						disabled={selecionadasValidas.length === 0 || criar.isPending}
-					>
-						{criar.isPending ? "Gerando…" : "Gerar ordens de inspeção"}
-					</Button>
+					{canEdit && (
+						<Button
+							size="sm"
+							onClick={gerar}
+							disabled={selecionadasValidas.length === 0 || criar.isPending}
+						>
+							{criar.isPending ? "Gerando…" : "Gerar ordens de inspeção"}
+						</Button>
+					)}
 				</div>
 			</div>
 			{mensagem && (
@@ -184,7 +191,13 @@ export function FilaSuspeitas({ onVerOrdens }: { onVerOrdens: () => void }) {
 				loading={isPending}
 				error={isError ? "Não foi possível carregar a fila." : null}
 				onRetry={() => refetch()}
-				emptyMessage="Nenhuma unidade na fila de suspeitas."
+				emptyMessage={
+					filtros.queda ||
+					filtros.medidorEletromecanico ||
+					filtros.leiturasEstimadas
+						? "Nenhuma unidade consumidora atende a esses filtros."
+						: "Nenhuma unidade na fila de suspeitas."
+				}
 				sort={sort}
 				serverSort
 				onSortChange={(next) => {
@@ -192,15 +205,17 @@ export function FilaSuspeitas({ onVerOrdens }: { onVerOrdens: () => void }) {
 					setSort(next);
 					mudarPagina(1);
 				}}
-				pageSize={data?.tamanho ?? 20}
+				pageSize={data?.tamanho ?? TAMANHO_PAGINA}
 				pagination={{
 					page: pagina - 1,
 					total: data?.total ?? 0,
 					onPageChange: (page) => mudarPagina(page + 1),
 					disabled: criar.isPending,
 				}}
-				selected={new Set(selecionadasValidas)}
-				onSelectedChange={(selected) => setSelecionadas([...selected])}
+				selected={canEdit ? new Set(selecionadasValidas) : undefined}
+				onSelectedChange={
+					canEdit ? (selected) => setSelecionadas([...selected]) : undefined
+				}
 				isRowSelectable={(item) => !item.ordem_ativa && !criar.isPending}
 				onRowClick={setDetalhe}
 			/>

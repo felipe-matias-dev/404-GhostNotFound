@@ -6,7 +6,7 @@ Uso: uv run uvicorn venergy_api.main:create_app --factory --reload --reload-dir 
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from venergy_api.agente import (
@@ -15,9 +15,11 @@ from venergy_api.agente import (
     montar_redator_insights,
 )
 from venergy_api.config import Settings, get_settings
+from venergy_api.estrutura_app import garantir_estrutura_na_subida
 from venergy_api.insights import CacheInsights
 from venergy_api.routers import (
     ai,
+    auth,
     continuidade,
     fila,
     health,
@@ -26,6 +28,7 @@ from venergy_api.routers import (
     receita,
     unidades,
 )
+from venergy_api.sessao import usuario_atual
 
 
 @asynccontextmanager
@@ -35,6 +38,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     # trocarem o agente por um falso (dependency_overrides), sem chamar o Gemini.
     # Os logs entram aqui, e não no create_app: os testes não mexem no log do processo.
     configurar_logs_do_agente()
+    # Antes de atender: uma API nova sobre um banco antigo gravaria colunas que ainda não
+    # existem (DEC-050). Só acrescenta o que falta, nunca apaga nem altera dado.
+    garantir_estrutura_na_subida(app.state.settings.database_url)
     app.state.agente = await montar_agente()
     app.state.redator_insights = await montar_redator_insights()
     yield
@@ -45,22 +51,29 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # com as suas próprias, sem depender de um .env na máquina.
     settings = settings or get_settings()
 
-    app = FastAPI(title="V-Energy Grid 360 API", version="0.10.0", lifespan=lifespan)
+    app = FastAPI(title="V-Energy Grid 360 API", version="0.11.0", lifespan=lifespan)
     # Criado com o app, e não no lifespan: o cache não depende de nada externo, e o app dos
     # testes (sem lifespan) também precisa dele.
     app.state.cache_insights = CacheInsights()
+    # A dependência de login lê o segredo daqui, e não de get_settings(): os testes montam o
+    # app com as próprias configurações.
+    app.state.settings = settings
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
         # Só o que a API usa: leitura, mais POST e PATCH das ordens de inspeção.
         allow_methods=["GET", "POST", "PATCH"],
     )
+    # Só a saúde e a porta de entrada ficam abertas. O login é exigido aqui, num lugar só, e
+    # não rota a rota: um router novo nasce protegido, e esquecer dele fica difícil.
+    login = [Depends(usuario_atual)]
     app.include_router(health.router)
-    app.include_router(unidades.router)
-    app.include_router(receita.router)
-    app.include_router(continuidade.router)
-    app.include_router(indicadores.router)
-    app.include_router(fila.router)
-    app.include_router(ordens.router)
-    app.include_router(ai.router)
+    app.include_router(auth.router)
+    app.include_router(unidades.router, dependencies=login)
+    app.include_router(receita.router, dependencies=login)
+    app.include_router(continuidade.router, dependencies=login)
+    app.include_router(indicadores.router, dependencies=login)
+    app.include_router(fila.router, dependencies=login)
+    app.include_router(ordens.router, dependencies=login)
+    app.include_router(ai.router, dependencies=login)
     return app

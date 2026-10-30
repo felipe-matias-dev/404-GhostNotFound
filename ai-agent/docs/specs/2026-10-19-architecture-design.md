@@ -203,7 +203,7 @@ O validador é a primeira trava. A segunda é o banco: role somente leitura, com
 | Campo | Padrão | Restrição |
 |---|---|---|
 | `llm_model` | `google-gla:gemini-3.1-flash-lite` | Prefixo `google-gla:` ou `openrouter:`, com nome de modelo |
-| `fallback_model` | `None` | Mesma regra |
+| `fallback_model` | `None` | Mesma regra, para cada modelo. Aceita uma cadeia separada por vírgula, tentada em ordem (`FallbackModel`), inclusive entre provedores. Na API do `docker compose`, o padrão é `google-gla:gemini-3.5-flash` (`GEMINI_FALLBACK_MODEL`, com `OPENROUTER_API_KEY` para modelos `openrouter:`); entra sozinho em 429 ou 503, e nenhum modelo da cadeia pode ser igual ao `judge_model` |
 | `google_api_key` | obrigatório se algum modelo usa `google-gla:` | `SecretStr`, nunca no `repr`; em branco conta como ausente |
 | `openrouter_api_key` | obrigatório se algum modelo usa `openrouter:` | Idem |
 | `temperature` | `0.0` | `0 ≤ t ≤ 0.2` |
@@ -292,7 +292,7 @@ Comparar o texto do SQL não vale como métrica: duas consultas diferentes podem
 - A rubrica é fixa e versionada (`prompts/judge/v1`). A saída é `JudgeVerdict(score: int 1–5, passed: bool, rationale: str)`, validada por Pydantic.
 - Antes de confiar no juiz, calibrar com uma amostra pequena avaliada por uma pessoa.
 - **Implementado** (DEC-047): `domain/judge.py` (`JudgeVerdict`, `PASS_SCORE = 4`: `passed` é verdadeiro se e só se `score >= 4`), porta `AnswerJudge`, adapter `PydanticAiAnswerJudge` e rubrica `prompts/judge/v1/judge.md`, com pergunta, resposta e linhas delimitadas por nonce.
-- O juiz só avalia itens `answered` de rodada narrada, e só na amostra sintética: `--judge` é recusado com `--dataset gold_real` (as linhas não saem da máquina, DEC-015) e com `--sql-only`. Um erro do provedor no juiz deixa os campos nulos e conta em `judge_errors`.
+- O juiz só avalia itens `answered` de rodada narrada, na amostra ou na Gold real (DEC-015, aceita em 29/10/2026): `--judge` é recusado com `--sql-only`. Um erro do provedor no juiz deixa os campos nulos e conta em `judge_errors`.
 - **Calibração pendente:** em 15 itens `answered`, uma pessoa dá a nota 1–5 sem ver a do juiz. O juiz passa a contar com concordância de `passed` em pelo menos 12 de 15 e diferença média absoluta de nota até 1; senão a rubrica vai para `judge/v2`. Até lá, o resultado do juiz não decide merge.
 
 ### 9.5 Encaixe na arquitetura
@@ -619,7 +619,7 @@ Pedidos a abrir como issue para a área dona. O GenAI não altera esses arquivos
   - G040 continua `clarify`, mas a nota muda: os períodos da decomposição já estão definidos no contrato, só não estão na pergunta;
   - G058 e G059: "comercial" é `classe_cadastro = 'Comercial'`, não `classe = 'B3'`, que junta comercial e poder público;
   - G060 deixa de ser `unknown`: a decomposição está em `sem_receita_decomposicao`. Sem os períodos na pergunta, é `clarify`.
-- A revisão humana de cada item é do GenAI (Perylo), e a dos SQLs contra a amostra, dos Dados. O gabarito só se fixa com a Gold real.
+- A revisão humana de cada item (pergunta, referência, esperado e `datasets`) é de Dados (Alisson), que conhece a Gold; o GenAI responde às dúvidas e não assina itens (decisão de 29/10/2026, issue #90). Antes, a pergunta era do GenAI e o SQL de Dados.
 
 **8. `AnswerWriter` + verificação numérica.** Narrativa a partir das linhas, com o conteúdo do banco delimitado como dado (§5.2) e volta ao texto determinístico quando a verificação falha. A mesma verificação numérica serve ao item 9.
 - Estado: feito (PR #36). O `AnswerWriter` entra pelo `build_agent`, e o prompt fica em `prompts/answer/v2/`. A v2 (revisão do PR #52) recebe a unidade de cada coluna da camada semântica (`receita_faturada (R$)`) e escreve a unidade junto do número; uma coluna renomeada no SQL (alias) fica sem unidade. A v3 (PR #75) pede o período: quando as linhas têm `competencia`, a narrativa cita o primeiro e o último mês das linhas que recebeu, e só é aceita se citar os dois.

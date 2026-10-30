@@ -174,7 +174,7 @@ def test_estimated_readings_bounds_are_inclusive_and_missing_is_not_zero(
     client: TestClient, engine: Engine
 ) -> None:
     with engine.begin() as connection:
-        for code, percentage in [("0005", 0), ("0007", 100)]:
+        for code, percentage in [("0005", 25), ("0007", 100)]:
             connection.execute(
                 update(FilaSuspeita)
                 .where(FilaSuspeita.cod_uc == code)
@@ -184,11 +184,12 @@ def test_estimated_readings_bounds_are_inclusive_and_missing_is_not_zero(
                     ]
                 )
             )
-    assert codes(queue(client, leituras_estimadas_max=0)) == ["0005"]
+    assert codes(queue(client, leituras_estimadas_max=25)) == ["0005"]
     assert codes(queue(client, leituras_estimadas_min=100)) == ["0007"]
-    page = queue(client, leituras_estimadas_min=0, leituras_estimadas_max=100)
+    page = queue(client, leituras_estimadas_min=25, leituras_estimadas_max=100)
     assert (codes(page), page["total"]) == (["0005", "0007"], 2)
     assert "0004" in codes(queue(client))
+    assert client.get(URL, params={"leituras_estimadas_max": 20}).status_code == 422
 
 
 @pytest.mark.parametrize(
@@ -210,7 +211,7 @@ def test_estimated_readings_filter_excludes_unrecognized_reasons(
         connection.execute(
             update(FilaSuspeita).where(FilaSuspeita.cod_uc == "0005").values(motivos=[reason])
         )
-    page = queue(client, leituras_estimadas_min=0, leituras_estimadas_max=100)
+    page = queue(client, leituras_estimadas_min=25, leituras_estimadas_max=100)
     assert (codes(page), page["total"]) == ([], 0)
     assert "0005" in codes(queue(client))
 

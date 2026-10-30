@@ -540,8 +540,8 @@ class FilaFiltroSchema(BaseModel):
     queda_min: Annotated[int | None, Field(ge=0, le=100)] = None
     queda_max: Annotated[int | None, Field(ge=0, le=100)] = None
     medidor_eletromecanico: bool = False
-    leituras_estimadas_min: Annotated[int | None, Field(ge=0, le=100)] = None
-    leituras_estimadas_max: Annotated[int | None, Field(ge=0, le=100)] = None
+    leituras_estimadas_min: Annotated[int | None, Field(ge=25, le=100)] = None
+    leituras_estimadas_max: Annotated[int | None, Field(ge=25, le=100)] = None
 
 
 class DistribuicaoQuedaItemSchema(BaseModel):
@@ -634,6 +634,10 @@ class EventoSchema(BaseModel):
     status_anterior: StatusOrdem | None
     status_novo: StatusOrdem
     observacao: str | None
+    # Login de quem agiu; vazio nos eventos de antes do login (DEC-050).
+    autor_login: str | None
+    # Nome para a tela, lido de app.usuarios; vazio se o login não existe mais lá.
+    autor_nome: str | None
     ocorrido_em: datetime
 
 
@@ -780,3 +784,12 @@ class IndicadoresJanelaSchema(BaseModel):
     n_uc_medio: float | None
     tarifa_media: float | None
     tarifa_base_media: float | None
+
+
+class LoginSchema(BaseModel):
+    """Pedido de login. Os tetos evitam que um corpo gigante vire trabalho para o Argon2."""
+
+    login: Annotated[
+        str, StringConstraints(strip_whitespace=True, to_lower=True, min_length=1, max_length=50)
+    ]
+    senha: Annotated[str, StringConstraints(min_length=1, max_length=200)]

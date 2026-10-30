@@ -10,6 +10,7 @@ export const ordensKeys = {
 };
 
 export const filaKey = ["fila-suspeitas"] as const;
+export const TAMANHO_PAGINA = 20;
 
 export function distribuicaoQueda() {
 	return unwrap(api.GET("/fila-suspeitas/distribuicao-queda"));
@@ -25,7 +26,7 @@ export function listarFila(
 			params: {
 				query: {
 					pagina,
-					tamanho: 20,
+					tamanho: TAMANHO_PAGINA,
 					queda_min: filtros.queda?.[0],
 					queda_max: filtros.queda?.[1],
 					medidor_eletromecanico: filtros.medidorEletromecanico,

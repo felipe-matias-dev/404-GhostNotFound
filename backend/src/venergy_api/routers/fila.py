@@ -111,6 +111,8 @@ def get_fila(filtro: Annotated[FilaFiltroSchema, Query()], session: SessionDep) 
         consulta = consulta.where(medidor)
     if filtro.leituras_estimadas_min is not None or filtro.leituras_estimadas_max is not None:
         estimadas = leituras_estimadas_percentual()
+        total_consulta = total_consulta.where(estimadas >= 25)
+        consulta = consulta.where(estimadas >= 25)
         if filtro.leituras_estimadas_min is not None:
             total_consulta = total_consulta.where(estimadas >= filtro.leituras_estimadas_min)
             consulta = consulta.where(estimadas >= filtro.leituras_estimadas_min)

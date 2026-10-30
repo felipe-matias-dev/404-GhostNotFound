@@ -21,6 +21,63 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Entrar */
+        post: operations["entrar_auth_login_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Quem Sou Eu
+         * @description Quem está logado. O portal chama ao abrir, para saber o perfil e montar o menu.
+         */
+        get: operations["quem_sou_eu_auth_me_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sair
+         * @description Apaga o cookie. Sem sessão também responde 204: sair duas vezes não é erro.
+         */
+        post: operations["sair_auth_logout_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/unidades-consumidoras/{cod_uc}": {
         parameters: {
             query?: never;
@@ -679,6 +736,10 @@ export interface components {
             status_novo: components["schemas"]["StatusOrdem"];
             /** Observacao */
             observacao: string | null;
+            /** Autor Login */
+            autor_login: string | null;
+            /** Autor Nome */
+            autor_nome: string | null;
             /**
              * Ocorrido Em
              * Format: date-time
@@ -910,6 +971,16 @@ export interface components {
             satisfacao_media: number | null;
         };
         /**
+         * LoginSchema
+         * @description Pedido de login. Os tetos evitam que um corpo gigante vire trabalho para o Argon2.
+         */
+        LoginSchema: {
+            /** Login */
+            login: string;
+            /** Senha */
+            senha: string;
+        };
+        /**
          * MedidorUcSchema
          * @description O medidor vigente de uma UC e quantas vezes ele já foi trocado.
          */
@@ -1003,6 +1074,11 @@ export interface components {
             /** Periodo Atual */
             periodo_atual: string;
         };
+        /**
+         * Perfil
+         * @enum {string}
+         */
+        Perfil: "diretoria" | "atendimento" | "perdas" | "operacao" | "ti";
         /**
          * PerguntaIaSchema
          * @description Pergunta em português para o agente de IA, dentro de uma conversa.
@@ -1164,6 +1240,14 @@ export interface components {
             /** Inspecoes */
             inspecoes: components["schemas"]["InspecaoUcSchema"][];
         };
+        /** UsuarioLogado */
+        UsuarioLogado: {
+            /** Login */
+            login: string;
+            /** Nome */
+            nome: string;
+            perfil: components["schemas"]["Perfil"];
+        };
         /** ValidationError */
         ValidationError: {
             /** Location */
@@ -1241,6 +1325,95 @@ export interface operations {
                         [key: string]: string;
                     };
                 };
+            };
+        };
+    };
+    entrar_auth_login_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoginSchema"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UsuarioLogado"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErroSchema"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    quem_sou_eu_auth_me_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UsuarioLogado"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErroSchema"];
+                };
+            };
+        };
+    };
+    sair_auth_logout_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -1778,6 +1951,15 @@ export interface operations {
                     "application/json": components["schemas"]["OrdemSchema"][];
                 };
             };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErroSchema"];
+                };
+            };
             /** @description Not Found */
             404: {
                 headers: {
@@ -1871,6 +2053,15 @@ export interface operations {
                     "application/json": components["schemas"]["OrdemDetalheSchema"];
                 };
             };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErroSchema"];
+                };
+            };
             /** @description Not Found */
             404: {
                 headers: {
@@ -1960,6 +2151,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AuditoriaIaSchema"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErroSchema"];
                 };
             };
             /** @description Not Found */

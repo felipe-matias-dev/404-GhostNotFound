@@ -24,6 +24,42 @@ cp .env.example .env.local   # ajuste se o backend não estiver em localhost:800
 npm run dev                  # http://localhost:3000
 ```
 
+### Login e perfis
+
+O portal abre em `/login` quando não há sessão. A feature `auth` usa o contrato do
+FastAPI (`/auth/login`, `/auth/me`, `/auth/logout`), via proxy `/api` e cookie
+`HttpOnly`; nenhum token é guardado pelo JavaScript. Crie os usuários pelo comando
+`make users` na raiz e use a senha `SENHA_DEMO` do seu `.env` (ver o README da raiz).
+Não há cadastro público, recuperação de senha ou login social no backend.
+
+| Perfil | Entrada | Minha área | Outras consultas |
+|---|---|---|---|
+| Diretoria | Visão geral | Visão geral, Receita, Rede, Consulta de UC | Perdas |
+| Atendimento | Consulta de UC | Consulta de UC | Visão geral, Receita, Rede, Perdas |
+| Perdas | Perdas | Consulta de UC, Perdas | Visão geral, Receita, Rede |
+| Operação | Rede | Rede, Consulta de UC | Visão geral, Receita, Perdas |
+| TI | Visão geral | Todas as telas existentes | Não aparece, pois todas estão em Minha área |
+
+Todos os perfis encontram todas as telas existentes na sidebar, sem duplicações:
+**Minha área** vem primeiro e **Outras consultas** reúne as demais telas. Grupos
+vazios não aparecem. `PROFILES.primaryRoutes` define prioridade, não permissão.
+O menu dá foco, não restringe leituras (DEC-049). Só Perdas vê a geração e as
+ações das ordens; os demais consultam a tabela e o histórico, que mostra quem fez
+cada mudança ([DEC-050](../docs/decisoes.md#dec-050--autoria-nos-eventos-das-ordens-de-inspeção)).
+Um link de dados aberto sem sessão é retomado após o login. Retornos externos,
+desconhecidos ou para o próprio login são descartados. Um `401` durante o uso
+volta à entrada; `403` não encerra a sessão. Falha ao verificar a sessão mostra
+uma opção de tentar novamente, sem confundir indisponibilidade com credencial inválida.
+Sair ou trocar de usuário limpa as consultas em memória; as UCs recentes ficam
+separadas por login no navegador, sem migrar o histórico compartilhado anterior.
+
+A entrada reaproveita `Logo`, `Button`, `FloatingLabelInput` e os tokens de
+`src/styles.css`, inclusive o tema salvo. A marca sobe antes de revelar o formulário;
+o fundo em Canvas 2D representa conexões de distribuição e UCs, não dados ao vivo.
+Não usa biblioteca 3D nem recursos externos. A animação pode ser pausada, para
+quando a aba fica oculta e é estática com `prefers-reduced-motion: reduce`.
+
+
 ## Variáveis de ambiente
 
 | Variável | Padrão | Uso |
@@ -138,7 +174,7 @@ export const Route = createFileRoute("/perdas")({
 
 `src/routes/__root.tsx` envolve todas as rotas no `AppShell` (`components/layout/app-shell`), montado sobre a Sidebar do shadcn (`components/ui/sidebar`, variante `inset`): a navegação recolhe para ícones pelo trigger, pelo rail ou com Ctrl/Cmd+B. Com a navegação aberta, o trigger fica ao lado da logo; recolhida, ele passa para o header. Abaixo de 768px a navegação vira um `Sheet` e o trigger fica sempre no header. O header traz o título da seção (o `<h1>` da página) e o painel de conteúdo rola sozinho e volta ao topo a cada tela. Rota sem match cai em `pages/nao-encontrado.tsx`, sem título no header nem item ativo na navegação.
 
-Tela nova na navegação: crie a rota e adicione o item em `NAVEGACAO` (`components/layout/app-sidebar/navegacao.ts`), com grupo **Análise** ou **Operação** e o ícone de **Fundamentos/Ícones**. O título do header e o item ativo da sidebar vêm de `useItemAtivo`; rotas filhas que existem (`/uc/$id`) herdam a seção. **Consulta de UC** é uma ação que abre a palette, não um link para uma página de busca. O conteúdo da página vai dentro de `Pagina` (`components/layout/pagina`), que fixa largura e respiro.
+Tela nova na navegação: crie a rota e adicione o item em `NAVEGACAO` (`components/layout/app-sidebar/navegacao.ts`), com o ícone de **Fundamentos/Ícones**. Atualize `PROFILES.primaryRoutes` (`features/auth/profiles.ts`) para os cargos que a têm como prioridade. `organizarNavegacao` põe essas telas em **Minha área** e todas as demais em **Outras consultas**, sem exclusão nem duplicação. O título do header e o item ativo da sidebar vêm de `useItemAtivo`; rotas filhas que existem (`/uc/$id`) herdam a seção. **Consulta de UC** é uma ação que abre a palette, não um link para uma página de busca. O conteúdo da página vai dentro de `Pagina` (`components/layout/pagina`), que fixa largura e respiro.
 
 Recorte da tela no topo (ex.: `Receita › Recife ▾ › Boa Viagem ▾`): a página renderiza `<HeaderTrilha>` (`components/layout/header`) com um `Breadcrumb`, e o conteúdo aparece no header logo depois do título, que vira link para a seção sem recorte. Na Receita, cada nível é um `DropdownMenu` para trocar de município ou bairro: é a forma acessível de escolher o que o mapa também escolhe.
 
@@ -149,7 +185,7 @@ Recorte da tela no topo (ex.: `Receita › Recife ▾ › Boa Viagem ▾`): a p�
 ### Visão 360 da unidade consumidora
 
 - **Consulta de UC** na sidebar abre a palette global, também disponível por Ctrl/Cmd + K.
-  A navegação se divide em **Análise** (Visão geral, Receita, Rede) e **Operação** (Consulta de UC, Perdas).
+  A navegação se divide em **Minha área** e **Outras consultas**, conforme as prioridades do cargo, mantendo todas as telas acessíveis.
 - A palette consulta `GET /unidades-consumidoras/{cod_uc}/visao-360` antes de navegar para
   `/uc?cod_uc=...`. A resposta preenche o cache da visão 360, sem uma segunda consulta.
   O código continua textual e exato; filtrar recentes não é busca global nem resolução aproximada de identidade.
@@ -208,9 +244,9 @@ Recorte da tela no topo (ex.: `Receita › Recife ▾ › Boa Viagem ▾`): a p�
 
 - O seletor superior em pills **Suspeitas / Inspeções** alterna as duas telas sem repetir os títulos do cabeçalho; a troca preserva a página e a seleção da fila. A fila usa `DataTable` com 20 UCs por página da API, inicialmente na ordem da Gold. A barra junto à lista mostra o total ou a seleção atual e a ação **Gerar ordens de inspeção**. A energia estimada e a presença de ordem ativa podem ser ordenadas na API, antes da paginação; mudar a ordem retorna à primeira página e limpa a seleção. UCs com OI ativa não são selecionáveis. Abrir a linha mostra os motivos completos; clicar no código da UC abre sua consulta.
 - Os códigos de UC têm sublinhado permanente para identificar os links; o traço fica dentro da altura da célula, sem ser cortado pela truncagem do texto.
-- O botão **Filtros**, junto à ação de gerar ordens, abre um popover com três sinais combináveis: faixa de **Queda no consumo**, **Somente medidor eletromecânico** e faixa de **Leituras estimadas** nas 12 últimas competências. Os controles de faixa só aparecem quando a respectiva caixa está marcada; desmarcar os recolhe. **Aplicar filtros** confirma o conjunto e fecha o painel, enquanto **Limpar filtros** remove todos. O contador do botão mostra quantos sinais estão aplicados. Fechar sem aplicar descarta o rascunho, preservando os filtros anteriores. Aplicar ou limpar volta à primeira página e limpa a seleção. O histograma só aparece com **Queda no consumo** marcada, logo abaixo dos controles de faixa, e mostra a fila inteira em faixas de cinco pontos percentuais, sem ser recortado pelos filtros. Todos os filtros são combinados na API antes da paginação. Os percentuais são os inteiros informados nos motivos da Gold; ausências e formatos não reconhecidos não viram zero e ficam fora somente quando a respectiva faixa está ativa ([DEC-049](../docs/decisoes.md)).
-- O gerente pode gerar OIs para as UCs selecionadas ou informar os códigos manualmente em **Gerar OIs**. Após gerar pela fila, o link **Ver ordens** abre o quadro. A criação é atômica: uma UC inexistente ou com OI ativa impede todo o lote. Alterações de ordens atualizam a fila e a lista de OIs.
-- O quadro de ordens usa colunas com rolagem horizontal em telas estreitas; a visualização em tabela continua disponível.
+- A fila combina filtros antes da paginação. Leituras estimadas aceitam faixas de 25% a 100%, pois a Gold não informa o percentual abaixo desse limite; valores ausentes ficam fora do filtro ([DEC-051](../docs/decisoes.md#dec-051--filtro-de-queda-na-fila-de-suspeitas)).
+- Apenas o perfil `perdas` pode selecionar UCs e gerar OIs. A criação é atômica: uma UC inexistente ou com OI ativa impede todo o lote.
+- Em telas estreitas ou para perfis sem permissão de edição, as ordens usam a tabela; a preferência de visualização é preservada.
 
 ## Design system
 
