@@ -70,6 +70,8 @@ export function maiorParte(
 	partes: ParteDaConta[],
 	diferenca: number,
 ): ParteDaConta | null {
+	// Conta igual: nada pesou, mesmo que as partes tenham se compensado.
+	if (diferenca === 0) return null;
 	let maior: ParteDaConta | null = null;
 	for (const parte of partes) {
 		if (Math.sign(parte.valor) !== Math.sign(diferenca) || parte.valor === 0)
