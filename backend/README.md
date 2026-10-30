@@ -105,9 +105,9 @@ existem no total da empresa e por alimentador, porque não dá para somá-los po
 As regras das ordens (status, resultado, uma ordem ativa por UC) estão na
 [DEC-009](../docs/decisoes.md#dec-009--modelo-das-ordens-de-inspeção). As tabelas do schema
 `app` são criadas pela carga (passo 6), que nunca apaga o que está nelas. Quem já tinha o banco
-antes da [DEC-050](../docs/decisoes.md#dec-050--autoria-nos-eventos-das-ordens-de-inspeção) roda
-`uv run python -m venergy_api.carga` de novo: ela acrescenta a coluna `autor_login` ao histórico
-das ordens sem apagar nenhuma.
+antes da [DEC-050](../docs/decisoes.md#dec-050--autoria-nos-eventos-das-ordens-de-inspeção) só
+precisa reiniciar a API: a subida, assim como a carga, acrescenta a coluna `autor_login` ao
+histórico das ordens sem apagar nenhuma.
 
 ## Contrato OpenAPI
 
@@ -225,6 +225,7 @@ src/venergy_api/
 ├── ordens.py     # regras das ordens de inspeção (máquina de estados), sem banco
 ├── schemas.py    # contrato dos dados: validação da carga e formato das respostas
 ├── carga.py      # CSVs da Gold → banco
+├── estrutura_app.py  # colunas novas do schema app, na carga e na subida, sem apagar dado
 ├── amostra.py    # gerador da amostra sintética
 ├── openapi.py    # export do contrato para contracts/openapi.json
 └── routers/      # rotas, um arquivo por domínio

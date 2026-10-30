@@ -37,4 +37,4 @@ Contexto do GenAI para todos os times (contrato com o backend, o que o agente pr
 
 ## Ordens de inspeção e schemas
 
-- `gold.*` é recarregável e é sobrescrito pela carga. `app.*` (ordens de inspeção) nunca é tocado por ela.
+- `gold.*` é recarregável e é sobrescrito pela carga. Nenhuma linha de `app.*` (ordens de inspeção) é apagada ou alterada por ela: a carga e a subida da API só criam as tabelas que faltam e acrescentam colunas novas, por `garantir_estrutura_do_app` (DEC-050).
