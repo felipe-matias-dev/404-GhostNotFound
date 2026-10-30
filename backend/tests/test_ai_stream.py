@@ -58,7 +58,7 @@ class AgenteQueTrava:
 
     async def stream(self, question: str, session_id: str) -> AsyncIterator[object]:
         try:
-            yield StageEvent(stage=Stage.UNDERSTANDING, attempt=1)
+            yield StageEvent(stage=Stage.QUERYING, attempt=1, input_tokens=500, output_tokens=40)
             await asyncio.Event().wait()
         finally:
             self.fechado = True
@@ -168,4 +168,5 @@ def test_disconnect_closes_the_agent_and_counts_the_question(
     with Session(engine) as session:
         auditoria = session.scalars(select(AiAuditoria)).one()
     assert auditoria.status == "failed"
+    assert (auditoria.input_tokens, auditoria.output_tokens) == (500, 40)
     assert auditoria.usuario == "teste"

@@ -27,6 +27,8 @@ class StageEvent(BaseModel):
     type: Literal["stage"] = "stage"
     stage: Stage
     attempt: int = Field(ge=1)
+    input_tokens: int = Field(0, ge=0, exclude=True)
+    output_tokens: int = Field(0, ge=0, exclude=True)
 
     @computed_field
     @property

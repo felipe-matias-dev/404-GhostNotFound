@@ -244,7 +244,7 @@ class AskUseCase:
         last_model: str | None = None
         for attempt in range(1, self._max_attempts + 1):
             stage = Stage.UNDERSTANDING if attempt == 1 else Stage.CORRECTING
-            emit(StageEvent(stage=stage, attempt=attempt))
+            emit(_stage_event(stage, attempt, spent))
             generation = await self._generate(question, feedback, attempt, history, spent)
             if generation is None:
                 return self._unanswered(
@@ -297,7 +297,7 @@ class AskUseCase:
                     clarification, request_id, started, model=generation.model, spent=spent
                 )
 
-            emit(StageEvent(stage=Stage.QUERYING, attempt=attempt))
+            emit(_stage_event(Stage.QUERYING, attempt, spent))
             began = time.perf_counter()
             try:
                 validated = self._validator.validate(draft.sql, self._layer.allowed_views)
@@ -377,7 +377,7 @@ class AskUseCase:
                 truncated=result.truncated,
                 latency_ms=_elapsed_ms(began),
             )
-            emit(StageEvent(stage=Stage.WRITING, attempt=attempt))
+            emit(_stage_event(Stage.WRITING, attempt, spent))
             return await self._answered(
                 question, draft, validated, result, generation, attempt, started, spent
             )
@@ -703,6 +703,15 @@ class AskUseCase:
         line = {"request_id": request_id, "session_id": session_id, "step": step, "status": status}
         line.update(fields)
         logger.info(json.dumps(line, ensure_ascii=False, default=str))
+
+
+def _stage_event(stage: Stage, attempt: int, spent: _Spent) -> StageEvent:
+    return StageEvent(
+        stage=stage,
+        attempt=attempt,
+        input_tokens=spent.input_tokens,
+        output_tokens=spent.output_tokens,
+    )
 
 
 def _row_text(columns: tuple[str, ...], row: dict[str, object], units: Mapping[str, str]) -> str:

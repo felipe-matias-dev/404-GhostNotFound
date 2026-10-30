@@ -1107,3 +1107,13 @@ async def test_closing_the_stream_cancels_the_run(layer):
     assert first.stage is Stage.UNDERSTANDING
     assert generator.cancelled is True
     assert executor.queries == []
+
+
+async def test_stage_events_carry_the_tokens_spent_so_far_outside_the_serialized_event(layer):
+    events = await collect(
+        use_case(layer, ScriptedGenerator(generation()), ScriptedExecutor(result()))
+    )
+
+    assert events[0].input_tokens == 0
+    assert events[1].input_tokens == generation().input_tokens
+    assert "input_tokens" not in events[1].model_dump_json()

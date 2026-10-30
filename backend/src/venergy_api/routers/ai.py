@@ -7,6 +7,7 @@ from collections.abc import AsyncIterator
 from typing import Annotated, Any
 from uuid import uuid4
 
+import anyio
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Path, Request, status
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import StreamingResponse
@@ -14,7 +15,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 from venergy_agent.application.ports import TextToSqlAgent
 from venergy_agent.domain.answer import AgentAnswer, AnswerStatus, Confidence
-from venergy_agent.domain.events import AnswerEvent
+from venergy_agent.domain.events import AnswerEvent, StageEvent
 
 from venergy_api.agente import AgenteDep
 from venergy_api.auditoria import (
@@ -188,8 +189,18 @@ def _erro_sse(detalhe: str) -> str:
     return _sse("error", json.dumps({"type": "error", "detail": detalhe}, ensure_ascii=False))
 
 
-def _gravar_abandono(session: Session, pergunta: str, session_id: str, login: str) -> None:
-    """A pergunta abandonada conta no limite: sem isso, desconectar burlaria a trava de uso."""
+def _gravar_abandono(
+    session: Session,
+    pergunta: str,
+    session_id: str,
+    login: str,
+    ultima_etapa: StageEvent | None,
+) -> None:
+    """A pergunta abandonada conta no limite e no orçamento: sem isso, desconectar burlaria os dois.
+
+    Os tokens são os da última etapa emitida. Os de uma chamada ao modelo ainda em curso não
+    entram, porque o provedor só os informa ao terminar.
+    """
     abandono = AgentAnswer(
         answer=RESPOSTA_ABANDONADA,
         status=AnswerStatus.FAILED,
@@ -206,6 +217,8 @@ def _gravar_abandono(session: Session, pergunta: str, session_id: str, login: st
         model="nao_informado",
         prompt_version="nao_informado",
         latency_ms=0,
+        input_tokens=ultima_etapa.input_tokens if ultima_etapa else 0,
+        output_tokens=ultima_etapa.output_tokens if ultima_etapa else 0,
     )
     try:
         gravar_auditoria(session, pergunta, session_id, abandono, login)
@@ -235,6 +248,8 @@ async def _eventos(
             token = usuario_da_requisicao.set(usuario.login)
             eventos = agente.stream(pergunta, session_id)
             proximo: asyncio.Future[Any] | None = None
+            ultima_etapa: StageEvent | None = None
+            abandonada = False
             try:
                 while answer is None:
                     proximo = proximo or asyncio.ensure_future(anext(eventos))
@@ -247,18 +262,30 @@ async def _eventos(
                     if isinstance(evento, AnswerEvent):
                         answer = evento.answer
                     else:
+                        ultima_etapa = evento
                         yield _sse(evento.type, evento.model_dump_json())
             except StopAsyncIteration:
                 proximo = None
             except (asyncio.CancelledError, GeneratorExit):
-                _gravar_abandono(sessao, pergunta, session_id, usuario.login)
+                abandonada = True
                 raise
             finally:
                 usuario_da_requisicao.reset(token)
-                if proximo is not None:
-                    proximo.cancel()
-                    await asyncio.gather(proximo, return_exceptions=True)
-                await eventos.aclose()
+                # Blindado: num cliente que desconectou, todo await seria cancelado de novo.
+                with anyio.CancelScope(shield=True):
+                    if proximo is not None:
+                        proximo.cancel()
+                        await asyncio.gather(proximo, return_exceptions=True)
+                    await eventos.aclose()
+                    if abandonada:
+                        await run_in_threadpool(
+                            _gravar_abandono,
+                            sessao,
+                            pergunta,
+                            session_id,
+                            usuario.login,
+                            ultima_etapa,
+                        )
             if answer is None:
                 yield _erro_sse("O agente não devolveu uma resposta. Tente de novo.")
                 return
