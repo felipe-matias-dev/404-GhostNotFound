@@ -194,7 +194,9 @@ function CorpoVariacao({
 									tom(parte.valor),
 								)}
 							>
-								{formatBRL(parte.valor, { sinal: true })}
+								{parte.valor === 0
+									? "sem mudança"
+									: formatBRL(parte.valor, { sinal: true })}
 							</span>
 						</li>
 					);
