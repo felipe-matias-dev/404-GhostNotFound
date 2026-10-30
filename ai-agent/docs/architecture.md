@@ -2,7 +2,7 @@
 
 Resumo para orientar quem chega ao `ai-agent/` (pessoa ou sessão de IA). A fonte da verdade continua sendo a [spec](specs/2026-10-19-architecture-design.md); este arquivo só diz o que existe hoje, onde está e o que falta. Atualize-o no mesmo PR que mudar o estado.
 
-- **Atualizado em:** 28/10/2026: camada semântica 0.4.0 com o contrato da Gold v0.3 (tabelas por UC). O que está em revisão está na spec §1.
+- **Atualizado em:** 30/10/2026: camada semântica 0.4.1 (contagens como `numeric` nas views, percentual, FEC do alimentador por média mensal de UCs e receita de energia sem bandeiras) com o contrato da Gold v0.3 (tabelas por UC). O que está em revisão está na spec §1.
 
 ## 1. O que o agente faz
 
@@ -64,7 +64,7 @@ Período (G1-05): quando as linhas têm `competencia`, o texto determinístico c
 
 ## 4. Camada semântica hoje
 
-`semantic/semantic_layer.yaml` (versão 0.4.0 do arquivo, contrato da Gold v0.3) tem nove views:
+`semantic/semantic_layer.yaml` (versão 0.4.1 do arquivo, contrato da Gold v0.3) tem nove views:
 
 | View | Tabela da Gold | Responde sobre |
 |---|---|---|
@@ -79,6 +79,8 @@ Período (G1-05): quando as linhas têm `competencia`, o texto determinístico c
 | `sem_receita_decomposicao` | `gold_receita_decomposicao` | efeitos de preço (tarifa e bandeira), volume e mix entre dois períodos `AAAA-MM/AAAA-MM` |
 
 Relações: `sem_faturamento_mensal`, `sem_interrupcoes_uc`, `sem_atendimentos_uc` e `sem_medidor_uc` ligam a `sem_uc` por `cod_uc`, pela chave estrangeira do contrato, e nunca entre si (DEC-018, atualização da camada 0.4.0). `sem_uc` ↔ `sem_continuidade_alimentador_mensal` por `cod_alimentador`. As views de KPIs e a decomposição não têm relação: respondem sozinhas (DEC-018).
+
+Tipos nas views: toda coluna `integer` de unidade `contagem` no contrato sai como `numeric` no `views.sql` (`CAST(... AS numeric)`), então uma divisão entre contagens das views não trunca para 0, seja qual for o SQL do modelo. Colunas em dias (`dias_em_atraso`, `dias_faturados`, `soma_dias_em_atraso`) continuam `integer`, para que a soma com uma data funcione. `count(*)` e `count(DISTINCT ...)` continuam `bigint`, e para eles vale a regra do `1.0 *` (G089, revisão do #88). O validador continua só validando.
 
 Testes que protegem a camada: validação contra o contrato (`test_semantic_source.py`), toda SQL de exemplo passa pelo validador (`test_semantic_examples.py`), deriva do `views.sql` (`test_views_sql.py`) e consultas reais pelo validador e pelo executor (`tests/integration/test_semantic_views.py`).
 
