@@ -1955,7 +1955,7 @@
           "agente de IA"
         ],
         "summary": "Delete Sessao",
-        "description": "Esconde a conversa do usuário. A auditoria dela continua intacta para a TI.",
+        "description": "Esconde a conversa do usuário. A auditoria dela continua intacta para a TI.\n\nEspera a pergunta em andamento do usuário terminar: sem a trava, o turno seria gravado\nnuma conversa já escondida.",
         "operationId": "delete_sessao_ai_sessions__session_id__delete",
         "security": [
           {

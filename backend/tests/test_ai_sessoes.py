@@ -12,6 +12,7 @@ from venergy_api.auth import Perfil, UsuarioLogado
 from venergy_api.database import Base
 from venergy_api.estrutura_app import garantir_estrutura_do_app
 from venergy_api.models import AiAuditoria
+from venergy_api.routers import ai as rota_ai
 from venergy_api.sessao import usuario_atual
 
 SESSAO = "3f2b8c1e-5d4a-4e7b-9a60-1c2d3e4f5a6b"
@@ -170,3 +171,29 @@ def test_old_database_gets_the_session_table(engine: Engine) -> None:
         garantir_estrutura_do_app(connection)
 
     assert inspect(engine).has_table("ai_sessao", schema="app")
+
+
+def test_patch_answers_404_when_the_session_disappears_meanwhile(
+    api: TestClient, engine: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    turno(engine, SESSAO, "Pergunta")
+    monkeypatch.setattr(rota_ai, "listar_sessoes", lambda *_: [])
+
+    assert api.patch(f"/ai/sessions/{SESSAO}", json={"favorita": True}).status_code == 404
+
+
+def test_delete_waits_for_the_question_in_progress_of_the_user(
+    api: TestClient, engine: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    turno(engine, SESSAO, "Pergunta")
+    excluiu_com_trava = []
+    excluir = rota_ai.excluir_sessao
+
+    def espiar(session: Session, session_id: str, usuario: str) -> None:
+        excluiu_com_trava.append(rota_ai.trava_do_usuario(api.app, usuario).locked())
+        excluir(session, session_id, usuario)
+
+    monkeypatch.setattr(rota_ai, "excluir_sessao", espiar)
+
+    assert api.delete(f"/ai/sessions/{SESSAO}").status_code == 204
+    assert excluiu_com_trava == [True]

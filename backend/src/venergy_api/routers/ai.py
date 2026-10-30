@@ -183,7 +183,11 @@ def patch_sessao(
     alterar_sessao(
         session, str(session_id), usuario.login, alteracao.model_dump(exclude_unset=True)
     )
-    return listar_sessoes(session, usuario.login, str(session_id))[0]
+    sessoes = listar_sessoes(session, usuario.login, str(session_id))
+    # Um DELETE simultâneo pode ter escondido a conversa depois da verificação.
+    if not sessoes:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversa não encontrada")
+    return sessoes[0]
 
 
 @router.delete(
@@ -191,10 +195,17 @@ def patch_sessao(
     status_code=status.HTTP_204_NO_CONTENT,
     responses={status.HTTP_404_NOT_FOUND: {"model": ErroSchema}},
 )
-def delete_sessao(session_id: UUID, session: SessionDep, usuario: UsuarioDep) -> None:
-    """Esconde a conversa do usuário. A auditoria dela continua intacta para a TI."""
-    _exigir_sessao(session, str(session_id), usuario.login)
-    excluir_sessao(session, str(session_id), usuario.login)
+async def delete_sessao(
+    session_id: UUID, session: SessionDep, request: Request, usuario: UsuarioDep
+) -> None:
+    """Esconde a conversa do usuário. A auditoria dela continua intacta para a TI.
+
+    Espera a pergunta em andamento do usuário terminar: sem a trava, o turno seria gravado
+    numa conversa já escondida.
+    """
+    async with trava_do_usuario(request.app, usuario.login):
+        await run_in_threadpool(_exigir_sessao, session, str(session_id), usuario.login)
+        await run_in_threadpool(excluir_sessao, session, str(session_id), usuario.login)
 
 
 @router.get(

@@ -458,6 +458,9 @@ export interface paths {
         /**
          * Delete Sessao
          * @description Esconde a conversa do usuário. A auditoria dela continua intacta para a TI.
+         *
+         *     Espera a pergunta em andamento do usuário terminar: sem a trava, o turno seria gravado
+         *     numa conversa já escondida.
          */
         delete: operations["delete_sessao_ai_sessions__session_id__delete"];
         options?: never;
