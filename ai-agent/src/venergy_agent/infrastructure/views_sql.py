@@ -23,7 +23,7 @@ def render_views_sql(layer_path: Path = LAYER_PATH, contract_path: Path = CONTRA
     for definition in view_definitions(layer, contract):
         types = contract["tables"][definition.source_table]["columns"]
         columns = ",\n    ".join(
-            _numeric(column) if types[column]["type"] == "integer" else column
+            _numeric(column) if _e_contagem(types[column]) else column
             for column in definition.columns
         )
         statements.append(
@@ -32,6 +32,10 @@ def render_views_sql(layer_path: Path = LAYER_PATH, contract_path: Path = CONTRA
             f"FROM {VIEWS_SCHEMA}.{definition.source_table};\n"
         )
     return HEADER + "\n" + "\n".join(statements)
+
+
+def _e_contagem(coluna: dict) -> bool:
+    return coluna["type"] == "integer" and coluna.get("unit") == "contagem"
 
 
 def _numeric(column: str) -> str:

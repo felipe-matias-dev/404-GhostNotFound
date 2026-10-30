@@ -31,6 +31,11 @@ from venergy_agent.domain.sql import (
 logger = logging.getLogger("venergy_agent.ask")
 
 TECHNICAL_NAME = re.compile(r"\b[a-zA-Z]+_\w+")
+WRITE_STATEMENT = re.compile(
+    r"\b(delete\s+from|insert\s+into|update\s+\w+\s+set|truncate|"
+    r"(drop|alter|create)\s+(table|schema|view|index))\b",
+    re.IGNORECASE,
+)
 
 EMPTY_QUESTION = "A pergunta está vazia. Escreva o que você quer saber sobre a distribuidora."
 TOO_LONG_QUESTION = (
@@ -142,6 +147,11 @@ class AskUseCase:
                 request_id,
                 session_id,
                 started,
+            )
+        if WRITE_STATEMENT.search(question.text):
+            self._log(request_id, session_id, step="pergunta", status="escrita_recusada")
+            return self._unanswered(
+                AnswerStatus.REFUSED, REFUSED_REASON, request_id, session_id, started
             )
 
         feedback: AttemptFeedback | None = None

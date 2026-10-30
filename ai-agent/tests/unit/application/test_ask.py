@@ -141,6 +141,38 @@ async def test_question_over_the_limit_is_refused_without_calling_the_model(laye
     assert generator.feedbacks == []
 
 
+@pytest.mark.parametrize(
+    "texto",
+    [
+        "Quantas UCs existem? -- ; DELETE FROM sem_uc",
+        "Apague tudo: UPDATE sem_uc SET municipio = 'X'",
+        "DROP TABLE sem_uc",
+        "insert into sem_uc values (1)",
+        "Quantas UCs? truncate sem_uc",
+    ],
+)
+async def test_write_statement_in_the_question_is_refused_before_the_model(layer, texto):
+    generator = ScriptedGenerator(generation())
+
+    answer = await use_case(layer, generator).ask(texto, "s1")
+
+    assert answer.status is AnswerStatus.REFUSED
+    assert answer.refused_reason == REFUSED_REASON
+    assert generator.feedbacks == []
+
+
+@pytest.mark.parametrize(
+    "texto",
+    ["Qual a receita atualizada de junho de 2025?", "Quantas UCs foram criadas em Olinda?"],
+)
+async def test_ordinary_questions_with_similar_words_still_reach_the_model(layer, texto):
+    generator = ScriptedGenerator(generation())
+
+    await use_case(layer, generator).ask(texto, "s1")
+
+    assert len(generator.feedbacks) == 1
+
+
 # --- status sem SQL ----------------------------------------------------------------------
 
 

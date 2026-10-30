@@ -35,10 +35,10 @@ SELECT
     data_vencimento,
     data_pagamento,
     status_pagamento,
-    CAST(dias_em_atraso AS numeric) AS dias_em_atraso,
+    dias_em_atraso,
     tipo_leitura,
     tipo_medidor,
-    CAST(dias_faturados AS numeric) AS dias_faturados
+    dias_faturados
 FROM gold.gold_fato_faturamento_mensal;
 
 CREATE OR REPLACE VIEW gold.sem_continuidade_alimentador_mensal AS
@@ -90,7 +90,7 @@ SELECT
     CAST(n_faturas_nao_pagas AS numeric) AS n_faturas_nao_pagas,
     valor_nao_pago,
     CAST(n_faturas_pagas_com_atraso AS numeric) AS n_faturas_pagas_com_atraso,
-    CAST(soma_dias_em_atraso AS numeric) AS soma_dias_em_atraso,
+    soma_dias_em_atraso,
     CAST(n_leituras AS numeric) AS n_leituras,
     CAST(n_leituras_estimadas AS numeric) AS n_leituras_estimadas
 FROM gold.gold_kpis_segmento_mensal;

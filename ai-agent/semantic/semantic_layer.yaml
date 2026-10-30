@@ -127,7 +127,7 @@ views:
         unit: "UC·h"
         description: "soma, sobre as UCs do alimentador, das horas de interrupção na competência; não são horas do alimentador. É o numerador do DEC do alimentador, que divide pela média mensal de UCs"
     sample_rows:
-      - {cod_alimentador: "AL-01", competencia: "2025-03", dec: 1.2, fec: 0.4, n_uc: 1500, n_interrupcoes: 3, horas_interrompidas: 2.5}
+      - {cod_alimentador: "AL-01", competencia: "2025-03", dec: 1.2, fec: 0.4, n_uc: 1500, n_interrupcoes: 600, horas_interrompidas: 1800.0}
       - {cod_alimentador: "AL-02", competencia: "2025-03", dec: 0.0, fec: 0.0, n_uc: 800, n_interrupcoes: 0, horas_interrompidas: 0.0}
 
   - name: sem_kpis_mensais
