@@ -1673,3 +1673,10 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Contexto:** turnos recusados não entram no histórico (DEC-046). O G103, "Agora faça o mesmo para Olinda.", ficava sem referência, e o modelo respondia com um palpite, contra o requisito central de não inventar (issue #104).
 - **Decisão:** quando o histórico da sessão está vazio e a pergunta depende de outro turno, o `AskUseCase` devolve `clarify` sem chamar o modelo. A regra está em `domain/followup.py` e cobre dois casos: pedidos de repetição ("faça o mesmo", "repita a mesma consulta", "o mesmo para X") e perguntas elípticas de até 4 palavras que começam com "e" ("E em Olinda?").
 - **Consequências:** o comportamento é determinístico e não gasta cota. Como não muda prompt, modelo nem camada semântica, não exige rodada da DEC-016 para entrar. Uma pergunta completa que começa com "e" segue para o modelo. Follow-ups escritos de outra forma também seguem, e aí vale o que o prompt manda. Se a leitura do histórico falhar, a pergunta dependente também recebe `clarify`.
+
+## DEC-054 · Comparação de indicadores exige períodos completos e em ordem
+
+- **Data:** 30/10/2026
+- **Contexto:** a issue #66 pedia uma rota nova para comparar os indicadores entre dois períodos de vários meses, mas `GET /indicadores/comparacao` (DEC-041) já faz essa conta com os componentes somados (DEC-033). Faltavam duas regras: um período sem dado virava variação de -100%, e nada impedia base depois do atual ou sobreposta a ele.
+- **Decisão:** não criar outra rota, nem mudar os parâmetros `base_inicio`, `base_fim`, `atual_inicio` e `atual_fim`. A base precisa terminar antes do início do atual, ou a rota responde `422`. Se faltar algum mês em um dos períodos, a rota responde `200` com os valores e `n_meses`, e a variação fica nula.
+- **Consequências:** a tela consegue mostrar o que existe sem exibir uma variação enganosa. A regra vale só para esta rota: `GET /receita/comparacao` continua como está. O frontend ainda precisa aceitar trechos de vários meses no seletor.

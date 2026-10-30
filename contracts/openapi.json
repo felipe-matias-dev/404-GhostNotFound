@@ -4483,7 +4483,7 @@
           "satisfacao_media"
         ],
         "title": "VariacaoIndicadoresSchema",
-        "description": "Variação em % de cada indicador (8.0 = +8,0%); nula sem base ou com base zero."
+        "description": "Variação em % de cada indicador (8.0 = +8,0%).\n\nNula com base zero ou se faltar algum mês em um dos períodos (DEC-054)."
       }
     },
     "securitySchemes": {

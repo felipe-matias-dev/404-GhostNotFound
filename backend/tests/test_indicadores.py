@@ -11,6 +11,7 @@ from venergy_api.models import FatoFaturamentoMensal, KpisMensais, KpisSegmentoM
 
 COMPARE = "/indicadores/comparacao"
 WINDOWS = "/indicadores/janelas"
+NO_BASE = ("2000-01", "2000-01")
 
 
 def month(index: int) -> str:
@@ -113,7 +114,7 @@ def test_single_month_matches_gold_kpis(engine: Engine, client: TestClient) -> N
         ),
     )
 
-    atual = compare(client, ("2025-01", "2025-01"), ("2025-01", "2025-01"))["atual"]
+    atual = compare(client, NO_BASE, ("2025-01", "2025-01"))["atual"]
 
     assert atual["n_meses"] == 1
     assert atual["receita_faturada"] == 1200.0
@@ -170,7 +171,7 @@ def test_multi_month_dec_fec_match_recortes_and_are_not_a_mean_of_months(
         ),
     )
 
-    atual = compare(client, ("2025-01", "2025-02"), ("2025-01", "2025-02"))["atual"]
+    atual = compare(client, NO_BASE, ("2025-01", "2025-02"))["atual"]
     recortes = client.get(
         "/continuidade/recortes", params={"inicio": "2025-01", "fim": "2025-02"}
     ).json()["recortes"]
@@ -192,13 +193,11 @@ def test_n_uc_is_stock_not_flow(engine: Engine, client: TestClient) -> None:
         segment("2024-03", n_uc=100, municipio="Olinda", bairro="Carmo"),
     )
 
-    atual = compare(client, ("2024-01", "2024-03"), ("2024-01", "2024-03"))["atual"]
+    atual = compare(client, NO_BASE, ("2024-01", "2024-03"))["atual"]
     assert atual["n_uc_medio"] == pytest.approx(400 / 3)
     assert atual["n_uc_fim"] == 200
 
-    only_recife = compare(
-        client, ("2024-01", "2024-03"), ("2024-01", "2024-03"), municipio="Recife"
-    )["atual"]
+    only_recife = compare(client, NO_BASE, ("2024-01", "2024-03"), municipio="Recife")["atual"]
     assert only_recife["n_uc_medio"] == pytest.approx(100.0)
     assert only_recife["n_uc_fim"] == 100
 
@@ -211,7 +210,7 @@ def test_n_uc_fim_is_the_last_month_with_data(engine: Engine, client: TestClient
         segment("2024-03", n_uc=110),
     )
 
-    atual = compare(client, ("2024-01", "2024-12"), ("2024-01", "2024-02"))["atual"]
+    atual = compare(client, NO_BASE, ("2024-01", "2024-02"))["atual"]
     assert atual["n_uc_fim"] == 100
     assert atual["n_uc_medio"] == pytest.approx(95.0)
 
@@ -225,7 +224,7 @@ def test_satisfaction_is_sum_of_grades_over_grades_given(
         segment("2025-02", n_chamados=3, soma_notas=Decimal(9), n_notas=3),
     )
 
-    atual = compare(client, ("2025-01", "2025-02"), ("2025-01", "2025-02"))["atual"]
+    atual = compare(client, NO_BASE, ("2025-01", "2025-02"))["atual"]
     assert atual["satisfacao_media"] == pytest.approx(3.5)
     assert atual["satisfacao_media"] != pytest.approx(4.0)
 
@@ -242,12 +241,12 @@ def test_tariffs(engine: Engine, client: TestClient) -> None:
         segment("2025-02", kwh_faturado=Decimal("0.000"), receita_energia=Decimal("0.00")),
     )
 
-    with_flag = compare(client, ("2025-01", "2025-01"), ("2025-01", "2025-01"))["atual"]
+    with_flag = compare(client, NO_BASE, ("2025-01", "2025-01"))["atual"]
     assert with_flag["tarifa_media"] == pytest.approx(0.8)
     assert with_flag["tarifa_base_media"] == pytest.approx(0.75)
     assert with_flag["tarifa_base_media"] < with_flag["tarifa_media"]
 
-    no_kwh = compare(client, ("2025-02", "2025-02"), ("2025-02", "2025-02"))["atual"]
+    no_kwh = compare(client, NO_BASE, ("2025-02", "2025-02"))["atual"]
     assert no_kwh["tarifa_media"] is None
     assert no_kwh["tarifa_base_media"] is None
 
@@ -266,11 +265,13 @@ def test_filters_by_class_and_municipality(engine: Engine, client: TestClient) -
     )
     period = ("2025-01", "2025-01")
 
-    assert compare(client, period, period)["atual"]["receita_faturada"] == 700.0
-    assert compare(client, period, period, classe="B3")["atual"]["receita_faturada"] == 200.0
-    assert compare(client, period, period, municipio="Olinda")["atual"]["receita_faturada"] == 400.0
+    assert compare(client, NO_BASE, period)["atual"]["receita_faturada"] == 700.0
+    assert compare(client, NO_BASE, period, classe="B3")["atual"]["receita_faturada"] == 200.0
     assert (
-        compare(client, period, period, municipio="Recife", classe="B1")["atual"][
+        compare(client, NO_BASE, period, municipio="Olinda")["atual"]["receita_faturada"] == 400.0
+    )
+    assert (
+        compare(client, NO_BASE, period, municipio="Recife", classe="B1")["atual"][
             "receita_faturada"
         ]
         == 100.0
@@ -342,7 +343,7 @@ def test_windows_keep_months_missing_only_in_the_segment(
     assert window["receita_faturada"] == 13200.0
     assert window["kwh_faturado"] == 11000.0
     assert window["n_uc_medio"] == pytest.approx(1100 / 12)
-    comparison = compare(client, ("2024-01", "2024-12"), ("2024-01", "2024-12"), **recorte)["atual"]
+    comparison = compare(client, NO_BASE, ("2024-01", "2024-12"), **recorte)["atual"]
     for field in (
         "receita_faturada",
         "receita_energia",
@@ -415,3 +416,61 @@ def test_matches_receita_comparacao_for_the_same_pair(engine: Engine, client: Te
     for side in ("base", "atual"):
         assert indicadores[side]["receita_faturada"] == receita[side]["receita_faturada"]
         assert indicadores[side]["kwh_faturado"] == receita[side]["kwh_faturado"]
+
+
+def test_variation_is_null_without_the_current_period(engine: Engine, client: TestClient) -> None:
+    store(engine, segment("2025-01"))
+
+    result = compare(client, ("2025-01", "2025-01"), ("2026-01", "2026-01"))
+
+    assert result["atual"]["n_meses"] == 0
+    assert result["variacao_pct"]["receita_faturada"] is None
+
+
+def test_variation_is_null_when_a_period_has_missing_months(
+    engine: Engine, client: TestClient
+) -> None:
+    store(engine, segment("2024-01"), segment("2024-02"), segment("2025-01"))
+
+    result = compare(client, ("2024-01", "2024-02"), ("2025-01", "2025-02"))
+
+    assert result["atual"]["n_meses"] == 1
+    assert result["atual"]["receita_faturada"] == 1200.0
+    assert result["variacao_pct"]["receita_faturada"] is None
+
+
+def test_twelve_months_against_twelve_months(engine: Engine, client: TestClient) -> None:
+    store(
+        engine,
+        *(segment(month(i), receita_faturada=Decimal("100.00")) for i in range(12)),
+        *(segment(month(i), receita_faturada=Decimal("110.00")) for i in range(12, 24)),
+    )
+
+    result = compare(client, (month(0), month(11)), (month(12), month(23)))
+
+    assert result["base"]["receita_faturada"] == 1200.0
+    assert result["atual"]["receita_faturada"] == 1320.0
+    assert result["variacao_pct"]["receita_faturada"] == pytest.approx(10.0)
+
+
+@pytest.mark.parametrize(
+    ("base", "atual"),
+    [
+        (("2025-01", "2025-06"), ("2024-01", "2024-06")),
+        (("2024-01", "2024-12"), ("2024-12", "2025-11")),
+    ],
+)
+def test_base_must_end_before_the_current_period_starts(
+    client: TestClient, base: tuple[str, str], atual: tuple[str, str]
+) -> None:
+    response = client.get(
+        COMPARE,
+        params={
+            "base_inicio": base[0],
+            "base_fim": base[1],
+            "atual_inicio": atual[0],
+            "atual_fim": atual[1],
+        },
+    )
+
+    assert response.status_code == 422

@@ -80,7 +80,7 @@ acrescentar `VENERGY_API_JWT_SECRET` (mínimo de 32 caracteres) e `VENERGY_API_S
 | `POST /auth/logout` | Apaga o cookie de sessão. `204`, com ou sem sessão |
 | `GET /unidades-consumidoras/{cod_uc}` | Resumo de uma unidade consumidora, ou `404` se ela não existir |
 | `GET /unidades-consumidoras/{cod_uc}/visao-360` | A unidade consumidora numa tela só: cadastro e painel solar, consumo dos 12 meses até a última competência da Gold contra o ano anterior (com `tendencia`: `subiu`, `estavel`, `caiu` ou `sem_comparacao`, faixa de ±10%), faturas não pagas, medidor, interrupções, chamados e inspeções ([DEC-044](../docs/decisoes.md)). `404` se a unidade não existir |
-| `GET /indicadores/comparacao` | Indicadores e variações entre dois períodos, para a empresa ou recorte de município, bairro e classe ([DEC-041](../docs/decisoes.md)) |
+| `GET /indicadores/comparacao` | Indicadores e variações entre dois períodos, para a empresa ou recorte de município, bairro e classe; a base termina antes do atual (`422`) e a variação é nula se faltar mês ([DEC-041](../docs/decisoes.md), [DEC-054](../docs/decisoes.md)) |
 | `GET /indicadores/janelas` | Indicadores em janelas consecutivas de competências completas, para a empresa ou recorte de município, bairro e classe ([DEC-041](../docs/decisoes.md)) |
 | `GET /receita/mensal?inicio=&fim=` | KPIs de cada competência (`gold_kpis_mensais`), do mês mais antigo ao mais recente, com recorte opcional (`AAAA-MM`, inclusivo) |
 | `GET /receita/comparacao` | kWh e receita de dois períodos (`base_inicio`, `base_fim`, `atual_inicio`, `atual_fim`) e a variação, com filtros opcionais de `municipio`, `bairro` e `classe` |
