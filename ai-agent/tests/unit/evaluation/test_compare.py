@@ -203,3 +203,11 @@ def test_main_reports_invalid_json_with_a_short_message(tmp_path, capsys):
 
     assert main([str(broken), str(broken)]) == 1
     assert "broken.json" in capsys.readouterr().err
+
+
+def test_skipped_items_are_out_of_the_comparison():
+    a = report([item("G1"), item("G2", matched=False)])
+    b = report([item("G1"), item("G2", matched=True)])
+
+    assert "G2" not in compare(a, b, frozenset({"G2"}))
+    assert "G2" in compare(a, b)
