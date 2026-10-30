@@ -69,8 +69,18 @@ def test_segment_dec_divides_summed_hours_by_the_average_over_the_months_asked(
         "GROUP BY municipio",
     )
 
-    assert result.rows[0]["dec"] == 0.6
-    assert round(result.rows[0]["satisfacao"], 4) == 3.8333
+    assert result.rows[0]["dec"] == Decimal("0.6")
+    assert round(result.rows[0]["satisfacao"], 4) == Decimal("3.8333")
+
+
+def test_integer_counts_in_a_ratio_do_not_truncate_to_zero(agent_database_url, gold_views):
+    result = run(
+        agent_database_url,
+        "SELECT sum(n_interrupcoes) / NULLIF(sum(n_uc), 0) AS fec "
+        "FROM sem_continuidade_alimentador_mensal WHERE competencia = '2025-03'",
+    )
+
+    assert result.rows[0]["fec"] > 0
 
 
 def test_decomposition_effects_add_up_to_the_revenue_change(agent_database_url, gold_views):

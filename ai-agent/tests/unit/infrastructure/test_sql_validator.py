@@ -199,3 +199,47 @@ def test_syntax_error_reason_has_no_terminal_escape_codes(validator, sql):
         validator.validate(sql, ALLOWED)
 
     assert "\x1b" not in rejected.value.reason
+
+
+def test_integer_count_division_gets_a_numeric_numerator(validator):
+    query = validator.validate(
+        "SELECT SUM(n_uc) / NULLIF(SUM(n_uc), 0) AS ratio FROM sem_uc",
+        ALLOWED,
+    )
+
+    assert "CAST(SUM(n_uc) AS DECIMAL) / NULLIF" in query.sql
+
+
+def test_division_numerator_already_numeric_is_not_cast_twice(validator):
+    query = validator.validate(
+        "SELECT CAST(SUM(n_uc) AS NUMERIC) / SUM(n_uc) AS ratio FROM sem_uc",
+        ALLOWED,
+    )
+
+    assert "CAST(CAST(" not in query.sql
+
+
+def test_every_division_in_the_query_is_converted(validator):
+    query = validator.validate(
+        "SELECT (SELECT SUM(n_uc) / 2 FROM sem_uc) AS a, "
+        "CASE WHEN SUM(n_uc) > 0 THEN SUM(n_uc) / SUM(n_uc) END AS b FROM sem_uc",
+        ALLOWED,
+    )
+
+    assert query.sql.count("CAST(SUM(n_uc) AS DECIMAL)") == 2
+
+
+def test_nested_division_in_the_divisor_is_converted_too(validator):
+    query = validator.validate(
+        "SELECT SUM(n_uc) / NULLIF(SUM(n_uc) / 3.0, 0) AS ratio FROM sem_uc",
+        ALLOWED,
+    )
+
+    assert query.sql.count("CAST(") == 2
+
+
+def test_queries_without_division_are_unchanged(validator):
+    query = validator.validate("SELECT SUM(n_uc) AS total FROM sem_uc", ALLOWED)
+
+    assert "CAST" not in query.sql
+    assert query.sql.upper() == "SELECT SUM(N_UC) AS TOTAL FROM GOLD.SEM_UC LIMIT 200"

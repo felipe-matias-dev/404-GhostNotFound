@@ -36,8 +36,8 @@ views:
       - name: possui_gd
         description: "verdadeiro quando a UC tem geração própria (painel solar)"
       - name: consumo_medio_kwh_12m
-        unit: "kWh"
-        description: "consumo médio da UC nos últimos 12 meses, em kWh; vazio quando a UC não tem nenhuma leitura"
+        unit: "kWh/mês"
+        description: "consumo médio mensal da UC nos últimos 12 meses, em kWh por mês; vazio quando a UC não tem nenhuma leitura"
       - name: data_ligacao
         description: "data em que a UC foi ligada (cliente desde)"
       - name: data_conexao_gd
@@ -124,8 +124,8 @@ views:
       - name: n_interrupcoes
         description: "número de interrupções do alimentador na competência"
       - name: horas_interrompidas
-        unit: "h"
-        description: "horas em que o alimentador ficou interrompido na competência"
+        unit: "UC·h"
+        description: "soma, sobre as UCs do alimentador, das horas de interrupção na competência; não são horas do alimentador. É o numerador do DEC do alimentador, que divide pela média mensal de UCs"
     sample_rows:
       - {cod_alimentador: "AL-01", competencia: "2025-03", dec: 1.2, fec: 0.4, n_uc: 1500, n_interrupcoes: 3, horas_interrompidas: 2.5}
       - {cod_alimentador: "AL-02", competencia: "2025-03", dec: 0.0, fec: 0.0, n_uc: 800, n_interrupcoes: 0, horas_interrompidas: 0.0}
