@@ -65,6 +65,7 @@ Da raiz do repositório:
 make eval                                  # os dois conjuntos, na amostra
 make eval ONLY=red_team                    # só o red team
 make eval SQL_ONLY=1                       # sem o redator: menos cota
+make eval ONLY=references DATASET=gold_real  # só confere as referências do golden na base carregada, sem modelo
 make eval DATASET=gold_real                # Gold real, com redator (relatório fora do Git)
 make eval JUDGE=1                          # com o juiz, só na amostra narrada
 make eval-compare A=eval/runs/a.json B=eval/runs/b.json
