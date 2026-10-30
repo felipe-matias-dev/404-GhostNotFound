@@ -154,7 +154,7 @@ function CorpoVariacao({
 			<p className="text-body text-text-muted">
 				{variacao.diferenca === 0
 					? "A conta não mudou."
-					: `A conta ${variacao.diferenca > 0 ? "subiu" : "caiu"} ${formatBRL(Math.abs(variacao.diferenca))}.`}
+					: `A conta ${variacao.diferenca > 0 ? "subiu" : "caiu"}.`}
 				{maior && (
 					<>
 						{" "}
