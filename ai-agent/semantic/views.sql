@@ -47,8 +47,8 @@ SELECT
     competencia,
     dec,
     fec,
-    n_uc,
-    n_interrupcoes,
+    CAST(n_uc AS numeric) AS n_uc,
+    CAST(n_interrupcoes AS numeric) AS n_interrupcoes,
     horas_interrompidas
 FROM gold.gold_continuidade_alimentador_mensal;
 
@@ -60,7 +60,7 @@ SELECT
     receita_energia,
     dec,
     fec,
-    n_chamados,
+    CAST(n_chamados AS numeric) AS n_chamados,
     satisfacao_media
 FROM gold.gold_kpis_mensais;
 
@@ -74,25 +74,25 @@ SELECT
     cod_alimentador,
     tipo_medidor,
     possui_gd,
-    n_uc,
+    CAST(n_uc AS numeric) AS n_uc,
     kwh_faturado,
     receita_faturada,
     receita_energia,
     tributos,
     receita_arrecadada,
     horas_interrompidas,
-    n_interrupcoes,
-    n_chamados,
+    CAST(n_interrupcoes AS numeric) AS n_interrupcoes,
+    CAST(n_chamados AS numeric) AS n_chamados,
     soma_notas,
-    n_notas,
+    CAST(n_notas AS numeric) AS n_notas,
     receita_bandeira,
-    n_faturas,
-    n_faturas_nao_pagas,
+    CAST(n_faturas AS numeric) AS n_faturas,
+    CAST(n_faturas_nao_pagas AS numeric) AS n_faturas_nao_pagas,
     valor_nao_pago,
-    n_faturas_pagas_com_atraso,
+    CAST(n_faturas_pagas_com_atraso AS numeric) AS n_faturas_pagas_com_atraso,
     soma_dias_em_atraso,
-    n_leituras,
-    n_leituras_estimadas
+    CAST(n_leituras AS numeric) AS n_leituras,
+    CAST(n_leituras_estimadas AS numeric) AS n_leituras_estimadas
 FROM gold.gold_kpis_segmento_mensal;
 
 CREATE OR REPLACE VIEW semantic.sem_receita_decomposicao AS
@@ -145,6 +145,6 @@ SELECT
     modelo,
     data_instalacao,
     idade_anos,
-    n_trocas,
+    CAST(n_trocas AS numeric) AS n_trocas,
     data_ultima_troca
 FROM gold.gold_medidor_uc;
