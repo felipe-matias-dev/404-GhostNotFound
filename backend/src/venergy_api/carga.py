@@ -20,6 +20,7 @@ from sqlalchemy.exc import ProgrammingError
 
 from venergy_api.config import get_settings
 from venergy_api.database import Base, get_engine
+from venergy_api.estrutura_app import garantir_estrutura_do_app
 from venergy_api.models import (
     AtendimentoUc,
     ContinuidadeAlimentadorMensal,
@@ -175,16 +176,6 @@ def drop_agent_views(connection: Connection) -> None:
     connection.execute(text(f"DROP VIEW {', '.join(f'gold.{quote(nome)}' for nome in nomes)}"))
 
 
-def _acrescentar_colunas_do_app(connection: Connection) -> None:
-    """Acrescenta ao schema app as colunas que nasceram depois das tabelas já criadas."""
-    # O create_all cria a tabela que falta, mas não acrescenta coluna a uma que já existe, e
-    # apagar app.ordem_evento para isso perderia o histórico das ordens (DEC-050). Num banco
-    # novo a coluna já veio do create_all e o comando não faz nada.
-    connection.execute(
-        text("ALTER TABLE app.ordem_evento ADD COLUMN IF NOT EXISTS autor_login text")
-    )
-
-
 def load_gold(gold_dir: Path, engine: Engine, tamanho_lote: int = TAMANHO_LOTE) -> dict[str, int]:
     """Substitui as tabelas da Gold pelo conteúdo dos CSVs e devolve as linhas por tabela."""
     csv_paths: dict[GoldTable, Path] = {}
@@ -221,7 +212,8 @@ def load_gold(gold_dir: Path, engine: Engine, tamanho_lote: int = TAMANHO_LOTE) 
         Base.metadata.drop_all(connection, tables=gold_tables)
         # Cria a Gold e o que faltar no schema app, sem mexer no que já está lá.
         Base.metadata.create_all(connection)
-        _acrescentar_colunas_do_app(connection)
+        # Um banco antigo ganha as colunas novas do app, sem tocar nas linhas (DEC-050).
+        garantir_estrutura_do_app(connection)
         for table, csv_path in csv_paths.items():
             rows = iter_rows(csv_path, table.schema)
             written = _inserir_em_lotes(connection, table.model, rows, tamanho_lote)
