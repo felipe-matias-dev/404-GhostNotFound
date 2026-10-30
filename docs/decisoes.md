@@ -1673,3 +1673,11 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Contexto:** turnos recusados não entram no histórico (DEC-046). O G103, "Agora faça o mesmo para Olinda.", ficava sem referência, e o modelo respondia com um palpite, contra o requisito central de não inventar (issue #104).
 - **Decisão:** quando o histórico da sessão está vazio e a pergunta depende de outro turno, o `AskUseCase` devolve `clarify` sem chamar o modelo. A regra está em `domain/followup.py` e cobre dois casos: pedidos de repetição ("faça o mesmo", "repita a mesma consulta", "o mesmo para X") e perguntas elípticas de até 4 palavras que começam com "e" ("E em Olinda?").
 - **Consequências:** o comportamento é determinístico e não gasta cota. Como não muda prompt, modelo nem camada semântica, não exige rodada da DEC-016 para entrar. Uma pergunta completa que começa com "e" segue para o modelo. Follow-ups escritos de outra forma também seguem, e aí vale o que o prompt manda. Se a leitura do histórico falhar, a pergunta dependente também recebe `clarify`.
+
+## DEC-055 · Etapas do agente por SSE em `POST /ai/ask/stream`
+
+- **Data:** 30/10/2026
+- **Contexto:** o time adiou os eventos de progresso em 24/10 (PR #39, fechado sem merge). A tela de chat já existe, e o time pediu a rota agora (issue #38).
+- **Decisão:** o agente ganha `stream()`, com as etapas e a resposta final, e `ask()` continua igual. A rota emite `stage` e termina em `answer`, com `audit_id` e `session_id`, ou em `error`. A cada 15 s sem evento vai um comentário `: ping`. O texto não chega por partes, porque os números são conferidos antes (DEC-019). Verificações falhas antes do stream respondem com o status HTTP. Depois de aberto o stream, a verificação repete com a trava do usuário, e uma recusa nesse momento vira `error`.
+- **Cliente que desconecta:** o agente é cancelado, e a pergunta entra na auditoria como `failed`, para contar no limite por usuário. Os tokens já gastos nessa pergunta ficam fora do orçamento, porque o agente só os informa na resposta final.
+- **Consequências:** `POST /ai/ask` segue disponível. O portal ainda precisa ler o stream para mostrar as etapas.

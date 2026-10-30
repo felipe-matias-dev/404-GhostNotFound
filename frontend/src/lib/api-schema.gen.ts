@@ -425,6 +425,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/ai/ask/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Perguntar Em Stream
+         * @description A mesma pergunta do POST /ai/ask, com as etapas do agente até a resposta final (DEC-055).
+         *
+         *     O texto só chega inteiro, no último evento, porque os números são conferidos antes (DEC-019).
+         *     Erros de verificação respondem com o status HTTP, sem abrir o stream.
+         */
+        post: operations["perguntar_em_stream_ai_ask_stream_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/ai/audit/{audit_id}": {
         parameters: {
             query?: never;
@@ -2126,6 +2149,81 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RespostaIaSchema"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErroSchema"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErroSchema"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErroSchema"];
+                };
+            };
+        };
+    };
+    perguntar_em_stream_ai_ask_stream_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PerguntaIaSchema"];
+            };
+        };
+        responses: {
+            /** @description Eventos SSE: stage, ping de comentário e, por último, answer ou error. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": {
+                        /** @constant */
+                        type: "stage";
+                        /** @enum {unknown} */
+                        stage: "understanding" | "querying" | "correcting" | "writing";
+                        label: string;
+                        attempt: number;
+                    } | {
+                        /** @constant */
+                        type: "answer";
+                        answer: components["schemas"]["RespostaIaSchema"];
+                    } | {
+                        /** @constant */
+                        type: "error";
+                        detail: string;
+                    };
                 };
             };
             /** @description Forbidden */

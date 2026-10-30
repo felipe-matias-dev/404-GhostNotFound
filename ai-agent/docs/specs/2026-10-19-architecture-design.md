@@ -26,7 +26,7 @@ O agente transforma uma pergunta em português numa consulta SQL somente leitura
 
 **Em revisão:** red team, runner de métricas e linha de base (item 7, PR #41, §9.6); avaliação comparativa e juiz (branch `feat/ai-agent-avaliacao-comparativa-juiz`, §9.4 e §9.5, DEC-047).
 
-**Falta:** a revisão humana do golden set e as decisões da §9.6. Os eventos de progresso para SSE (PR #39 e issue #38) ficam como alteração futura (decisão do time em 24/10/2026).
+**Falta:** a revisão humana do golden set e as decisões da §9.6. Os eventos de progresso para SSE (issue #38), adiados em 24/10/2026, foram retomados em 30/10/2026 (DEC-055).
 
 **Critério de sucesso de cada feature:** `uv run pytest` e `uv run ruff check` passam em `ai-agent/` (inclusive no CI), os contratos desta spec batem com o código e os testes da §8 cobrem as regras novas.
 

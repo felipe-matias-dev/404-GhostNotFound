@@ -1841,6 +1841,145 @@
         ]
       }
     },
+    "/ai/ask/stream": {
+      "post": {
+        "tags": [
+          "agente de IA"
+        ],
+        "summary": "Perguntar Em Stream",
+        "description": "A mesma pergunta do POST /ai/ask, com as etapas do agente até a resposta final (DEC-055).\n\nO texto só chega inteiro, no último evento, porque os números são conferidos antes (DEC-019).\nErros de verificação respondem com o status HTTP, sem abrir o stream.",
+        "operationId": "perguntar_em_stream_ai_ask_stream_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PerguntaIaSchema"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Eventos SSE: stage, ping de comentário e, por último, answer ou error.",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "properties": {
+                        "type": {
+                          "const": "stage"
+                        },
+                        "stage": {
+                          "enum": [
+                            "understanding",
+                            "querying",
+                            "correcting",
+                            "writing"
+                          ]
+                        },
+                        "label": {
+                          "type": "string"
+                        },
+                        "attempt": {
+                          "type": "integer"
+                        }
+                      },
+                      "type": "object",
+                      "required": [
+                        "type",
+                        "stage",
+                        "label",
+                        "attempt"
+                      ],
+                      "title": "StageEvent"
+                    },
+                    {
+                      "properties": {
+                        "type": {
+                          "const": "answer"
+                        },
+                        "answer": {
+                          "$ref": "#/components/schemas/RespostaIaSchema"
+                        }
+                      },
+                      "type": "object",
+                      "required": [
+                        "type",
+                        "answer"
+                      ],
+                      "title": "AnswerEvent"
+                    },
+                    {
+                      "properties": {
+                        "type": {
+                          "const": "error"
+                        },
+                        "detail": {
+                          "type": "string"
+                        }
+                      },
+                      "type": "object",
+                      "required": [
+                        "type",
+                        "detail"
+                      ],
+                      "title": "ErrorEvent"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErroSchema"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErroSchema"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErroSchema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ]
+      }
+    },
     "/ai/audit/{audit_id}": {
       "get": {
         "tags": [
