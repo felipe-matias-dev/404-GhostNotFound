@@ -81,7 +81,7 @@ def test_loading_twice_does_not_duplicate_rows(tmp_path: Path, engine: Engine) -
 
 # As views que o GenAI pôs no views.sql: o teste acompanha o arquivo, e não uma lista à mão.
 AGENT_VIEWS = set(
-    re.findall(r"CREATE OR REPLACE VIEW gold\.(\w+)", AGENT_VIEWS_SQL.read_text("utf-8"))
+    re.findall(r"CREATE OR REPLACE VIEW semantic\.(\w+)", AGENT_VIEWS_SQL.read_text("utf-8"))
 )
 
 
@@ -135,7 +135,7 @@ def test_views_that_do_not_match_the_gold_cancel_the_load(
     # O GenAI ainda não regerou o arquivo depois de uma mudança no contrato.
     stale_views = tmp_path / "views.sql"
     stale_views.write_text(
-        "CREATE OR REPLACE VIEW gold.sem_uc AS SELECT coluna_que_saiu FROM gold.gold_dim_uc;",
+        "CREATE OR REPLACE VIEW semantic.sem_uc AS SELECT coluna_que_saiu FROM gold.gold_dim_uc;",
         encoding="utf-8",
     )
     monkeypatch.setattr(carga, "AGENT_VIEWS_SQL", stale_views)
