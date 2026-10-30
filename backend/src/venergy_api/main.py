@@ -41,7 +41,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     configurar_logs_do_agente()
     # Antes do agente: ele lê o consumo da sessão na auditoria, que precisa das colunas novas.
     garantir_colunas_na_subida(get_engine)
-    app.state.agente = await montar_agente()
+    app.state.agente = await montar_agente(
+        janela_orcamento_segundos=app.state.settings.ai_janela_orcamento_segundos
+    )
     app.state.redator_insights = await montar_redator_insights()
     yield
 
@@ -57,6 +59,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.cache_insights = CacheInsights()
     app.state.ai_limite_perguntas = settings.ai_limite_perguntas
     app.state.ai_janela_segundos = settings.ai_janela_segundos
+    app.state.ai_travas = {}
     # A dependência de login lê o segredo daqui, e não de get_settings(): os testes montam o
     # app com as próprias configurações.
     app.state.settings = settings

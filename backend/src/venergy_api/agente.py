@@ -54,6 +54,7 @@ def _carregar_configuracao(
 async def montar_agente(
     carregar_config: Callable[[], AgentSettings] = AgentSettings,
     obter_engine: Callable[[], Engine] = get_engine,
+    janela_orcamento_segundos: int = 86400,
 ) -> TextToSqlAgent | None:
     """Monta o agente, ou devolve None se a configuração ou a camada semântica forem inválidas.
 
@@ -66,7 +67,7 @@ async def montar_agente(
     if settings is None:
         return None
     try:
-        historico = HistoricoAuditoria(obter_engine)
+        historico = HistoricoAuditoria(obter_engine, janela_orcamento_segundos)
         return await build_agent(settings, history=historico, usage=historico)
     except SemanticLayerError as error:
         # Uma mudança no contrato da Gold pode deixar a camada semântica do agente inválida

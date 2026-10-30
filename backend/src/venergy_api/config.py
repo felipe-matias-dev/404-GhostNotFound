@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     # de custo e de abuso acidental, não de segurança (DEC-046).
     ai_limite_perguntas: int = Field(20, ge=0)
     ai_janela_segundos: int = Field(600, gt=0)
+    ai_janela_orcamento_segundos: int = Field(86400, gt=0)
 
 
 @lru_cache

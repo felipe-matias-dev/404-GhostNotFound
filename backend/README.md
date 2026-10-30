@@ -198,6 +198,7 @@ Variáveis lidas do `.env` (veja `.env.example`):
 | `VENERGY_API_CORS_ORIGINS` | Endereços do frontend autorizados a chamar a API pelo navegador. Padrão: `["http://localhost:3000"]` |
 | `VENERGY_API_AI_LIMITE_PERGUNTAS` | Máximo de perguntas por usuário na janela, no `POST /ai/ask` (`429` ao passar). `0` desliga. Padrão: `20` |
 | `VENERGY_API_AI_JANELA_SEGUNDOS` | Janela do limite acima, em segundos. Padrão: `600` |
+| `VENERGY_API_AI_JANELA_ORCAMENTO_SEGUNDOS` | Janela do orçamento de tokens do agente por usuário, em segundos: só o gasto dentro dela conta. Padrão: `86400` (24 horas) |
 
 Os caminhos são relativos à pasta `backend/`, de onde os comandos rodam.
 

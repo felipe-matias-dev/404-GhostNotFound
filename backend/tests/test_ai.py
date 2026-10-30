@@ -1,4 +1,6 @@
+import asyncio
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from uuid import UUID, uuid4
@@ -581,3 +583,25 @@ def test_the_agent_runs_with_the_requesting_user_and_the_context_is_cleared_afte
 
     assert agente.usuario_visto == USUARIO
     assert usuario_da_requisicao.get() is None
+
+
+class AgenteLento(AgenteFalso):
+    async def ask(self, question: str, session_id: str) -> AgentAnswer:
+        await asyncio.sleep(0.3)
+        return await super().ask(question, session_id)
+
+
+def test_simultaneous_questions_of_the_same_user_cannot_pass_the_limit_together(
+    engine: Engine, client_for: Callable[..., TestClient]
+) -> None:
+    client = client_for(engine, ai_limite_perguntas=1, ai_janela_segundos=600)
+    agente = AgenteLento(answered_answer())
+    client.app.dependency_overrides[get_agente] = lambda: agente
+
+    with client, ThreadPoolExecutor(max_workers=2) as pool:
+        respostas = list(
+            pool.map(lambda _: client.post("/ai/ask", json={"question": PERGUNTA}), range(2))
+        )
+
+    assert sorted(r.status_code for r in respostas) == [200, 429]
+    assert len(agente.chamadas) == 1

@@ -1,12 +1,15 @@
 """Rotas do agente de IA: perguntar em linguagem natural e auditar como ele respondeu."""
 
+import asyncio
 import logging
 from typing import Annotated
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Path, Request, status
+from fastapi import APIRouter, Depends, FastAPI, HTTPException, Path, Request, status
 from fastapi.concurrency import run_in_threadpool
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session
+from venergy_agent.application.ports import TextToSqlAgent
 
 from venergy_api.agente import AgenteDep
 from venergy_api.auditoria import (
@@ -14,7 +17,7 @@ from venergy_api.auditoria import (
     gravar_auditoria,
     sessao_de_outro_usuario,
 )
-from venergy_api.auth import Perfil
+from venergy_api.auth import Perfil, UsuarioLogado
 from venergy_api.database import SessionDep
 from venergy_api.historico_ia import usuario_da_requisicao
 
@@ -28,6 +31,10 @@ router = APIRouter(prefix="/ai", tags=["agente de IA"])
 MAX_ID_AUDITORIA = 2_147_483_647
 
 logger = logging.getLogger(__name__)
+
+
+def trava_do_usuario(app: FastAPI, login: str) -> asyncio.Lock:
+    return app.state.ai_travas.setdefault(login, asyncio.Lock())
 
 
 @router.post(
@@ -53,6 +60,19 @@ async def perguntar(
     session_id não zera nada. O session_id só separa as conversas, e cada uma é de quem a
     começou (DEC-046).
     """
+    # Uma pergunta por vez para cada usuário: sem a trava, pedidos simultâneos passariam juntos
+    # pela contagem do limite, porque a auditoria só é gravada depois da resposta do modelo.
+    async with trava_do_usuario(request.app, usuario.login):
+        return await _responder(pedido, agente, session, request, usuario)
+
+
+async def _responder(
+    pedido: PerguntaIaSchema,
+    agente: TextToSqlAgent,
+    session: Session,
+    request: Request,
+    usuario: UsuarioLogado,
+) -> RespostaIaSchema:
     session_id = str(pedido.session_id or uuid4())
     limite = request.app.state.ai_limite_perguntas
     janela = request.app.state.ai_janela_segundos

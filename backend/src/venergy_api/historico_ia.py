@@ -2,6 +2,7 @@
 
 from collections.abc import Callable
 from contextvars import ContextVar
+from datetime import timedelta
 
 from sqlalchemy import Engine, func, select
 from sqlalchemy.orm import Session
@@ -32,10 +33,15 @@ class HistoricoAuditoria:
     portas são assíncronas e a sessão do backend é síncrona.
     """
 
-    def __init__(self, obter_engine: Callable[[], Engine]) -> None:
+    def __init__(
+        self, obter_engine: Callable[[], Engine], janela_orcamento_segundos: int = 86400
+    ) -> None:
         # A engine só é pedida na primeira consulta: na subida da API, as configurações do banco
         # podem nem estar disponíveis (os testes montam o app sem .env).
         self._obter_engine = obter_engine
+        # O orçamento vale numa janela de tempo, e não desde sempre: quem bate o teto volta a
+        # perguntar quando o gasto mais antigo sai da janela.
+        self._janela_orcamento = timedelta(seconds=janela_orcamento_segundos)
 
     async def recent(self, session_id: str, limit: int) -> tuple[ConversationTurn, ...]:
         return await run_in_threadpool(self._recent, session_id, limit)
@@ -87,7 +93,7 @@ class HistoricoAuditoria:
                         func.coalesce(
                             func.sum(AiAuditoria.input_tokens + AiAuditoria.output_tokens), 0
                         )
-                    ).where(dono)
+                    ).where(dono, AiAuditoria.criado_em > func.now() - self._janela_orcamento)
                 )
                 or 0
             )

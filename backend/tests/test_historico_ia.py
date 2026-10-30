@@ -133,3 +133,23 @@ def test_tokens_used_of_the_requesting_user_add_up_across_all_the_sessions(engin
         assert asyncio.run(historico.tokens_used("s-nova")) == 175
     finally:
         usuario_da_requisicao.reset(token)
+
+
+def test_tokens_older_than_the_budget_window_no_longer_count(engine: Engine) -> None:
+    gravar(
+        engine,
+        "s1",
+        "ontem",
+        input_tokens=900,
+        output_tokens=100,
+        minutos_atras=25 * 60,
+        usuario="ana",
+    )
+    gravar(engine, "s1", "agora", input_tokens=40, output_tokens=2, usuario="ana")
+    historico = HistoricoAuditoria(lambda: engine, janela_orcamento_segundos=24 * 3600)
+
+    token = usuario_da_requisicao.set("ana")
+    try:
+        assert asyncio.run(historico.tokens_used("s1")) == 42
+    finally:
+        usuario_da_requisicao.reset(token)

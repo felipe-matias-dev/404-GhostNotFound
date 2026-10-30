@@ -149,7 +149,7 @@ def test_api_starts_with_the_agent_stored_in_the_app_state(
 ) -> None:
     agente = AgenteFalso()
 
-    async def montar_agente_falso() -> AgenteFalso:
+    async def montar_agente_falso(**_: object) -> AgenteFalso:
         return agente
 
     monkeypatch.setattr("venergy_api.main.montar_agente", montar_agente_falso)
@@ -162,7 +162,7 @@ def test_api_starts_with_the_agent_stored_in_the_app_state(
 def test_api_starts_and_serves_health_when_the_agent_is_unavailable(
     engine: Engine, client_for: Callable[[Engine], TestClient], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    async def montar_agente_ausente() -> None:
+    async def montar_agente_ausente(**_: object) -> None:
         return None
 
     monkeypatch.setattr("venergy_api.main.montar_agente", montar_agente_ausente)

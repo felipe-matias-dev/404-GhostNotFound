@@ -48,8 +48,7 @@ REFUSED_REASON = (
     "faturamento, interrupções e atendimento da distribuidora, consultando os dados."
 )
 BUDGET_EXHAUSTED = (
-    "Esta conversa atingiu o limite de uso do assistente. "
-    "Abra uma nova conversa para continuar perguntando."
+    "Você atingiu o limite de uso do assistente por enquanto. Tente de novo mais tarde."
 )
 MODEL_FAILED = "Não consegui consultar o modelo de linguagem agora. Tente de novo em instantes."
 INTERNAL_FAILED = "Algo deu errado do nosso lado. Tente de novo em instantes."

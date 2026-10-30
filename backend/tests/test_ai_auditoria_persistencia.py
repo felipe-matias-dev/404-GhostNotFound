@@ -114,7 +114,7 @@ def test_api_startup_ensures_the_audit_columns(
 ) -> None:
     chamadas = []
 
-    async def sem_agente() -> None:
+    async def sem_agente(**_: object) -> None:
         return None
 
     monkeypatch.setattr("venergy_api.main.montar_agente", sem_agente)
