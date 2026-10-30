@@ -67,6 +67,8 @@ Período (G1-05): quando as linhas têm `competencia`, o texto determinístico c
 
 Relações: `sem_faturamento_mensal`, `sem_interrupcoes_uc`, `sem_atendimentos_uc` e `sem_medidor_uc` ligam a `sem_uc` por `cod_uc`, pela chave estrangeira do contrato, e nunca entre si (DEC-018, atualização da camada 0.4.0). `sem_uc` ↔ `sem_continuidade_alimentador_mensal` por `cod_alimentador`. As views de KPIs e a decomposição não têm relação: respondem sozinhas (DEC-018).
 
+Tipos nas views: toda coluna `integer` do contrato sai como `numeric` no `views.sql` (`CAST(... AS numeric)`), então uma divisão entre contagens nunca trunca para 0, seja qual for o SQL do modelo (G089, revisão do #88). O validador continua só validando.
+
 Testes que protegem a camada: validação contra o contrato (`test_semantic_source.py`), toda SQL de exemplo passa pelo validador (`test_semantic_examples.py`), deriva do `views.sql` (`test_views_sql.py`) e consultas reais pelo validador e pelo executor (`tests/integration/test_semantic_views.py`).
 
 ## 5. Cobertura da Gold (contrato v0.3.0)

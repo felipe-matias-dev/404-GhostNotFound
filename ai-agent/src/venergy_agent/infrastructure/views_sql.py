@@ -21,13 +21,21 @@ def render_views_sql(layer_path: Path = LAYER_PATH, contract_path: Path = CONTRA
     layer, contract = read_documents(layer_path, contract_path)
     statements = []
     for definition in view_definitions(layer, contract):
-        columns = ",\n    ".join(definition.columns)
+        types = contract["tables"][definition.source_table]["columns"]
+        columns = ",\n    ".join(
+            _numeric(column) if types[column]["type"] == "integer" else column
+            for column in definition.columns
+        )
         statements.append(
             f"CREATE OR REPLACE VIEW {VIEWS_SCHEMA}.{definition.name} AS\n"
             f"SELECT\n    {columns}\n"
             f"FROM {VIEWS_SCHEMA}.{definition.source_table};\n"
         )
     return HEADER + "\n" + "\n".join(statements)
+
+
+def _numeric(column: str) -> str:
+    return f"CAST({column} AS numeric) AS {column}"
 
 
 def main(argv: list[str]) -> int:

@@ -12,7 +12,6 @@ from venergy_agent.domain.sql import ValidatedQuery
 TERMINAL_ESCAPE = re.compile(r"\x1b\[[0-9;]*m")
 MONTH_LITERAL = re.compile(r"\d{4}-(0[1-9]|1[0-2])")
 FORBIDDEN_NODES = (exp.DML, exp.DDL, exp.Command, exp.Set, exp.Copy, exp.Into, exp.Lock)
-NUMERIC_TYPES = (exp.DataType.Type.DECIMAL, exp.DataType.Type.DOUBLE, exp.DataType.Type.FLOAT)
 FORBIDDEN_FUNCTIONS = (
     exp.Anonymous,
     exp.CurrentUser,
@@ -46,7 +45,6 @@ class SqlglotValidator:
         root = self._parse(sql)
         self._reject_forbidden_nodes(root)
         views = self._collect_views(root, allowed_views)
-        root = self._numeric_division_numerators(root)
         root, applied_limit, limit_imposed = self._apply_limit(root)
         return ValidatedQuery(
             sql=root.sql(dialect=self._dialect),
@@ -100,14 +98,6 @@ class SqlglotValidator:
         if any(id(table) not in resolved for table in root.find_all(exp.Table)):
             raise SqlRejected("could not resolve the tables of the query")
         return frozenset(used)
-
-    def _numeric_division_numerators(self, root: exp.Query) -> exp.Query:
-        for division in list(root.find_all(exp.Div)):
-            numerator = division.this
-            if isinstance(numerator, exp.Cast) and numerator.to.is_type(*NUMERIC_TYPES):
-                continue
-            division.set("this", exp.cast(numerator, "numeric", dialect=self._dialect))
-        return root
 
     def _apply_limit(self, root: exp.Query) -> tuple[exp.Query, int, bool]:
         current = root.args.get("limit")

@@ -70,6 +70,7 @@ MONTH_NAMES = (
 FALLBACK_MAX_ROWS = 5
 FALLBACK_MAX_COLUMNS = 4
 MISSING_VALUE = "sem valor"
+MAX_DECIMAL_PLACES = 6
 TEXT_VALUE_MAX_CHARS = 120
 EMPTY_RESULT = (
     "Nenhum registro atende à consulta. O agente não distingue zero de dado ausente, "
@@ -541,7 +542,11 @@ def _pt_br(value: object) -> str:
     if isinstance(value, bool):
         return "sim" if value else "não"
     if isinstance(value, int | float | Decimal):
-        grouped = format(Decimal(str(value)), ",f")
+        number = Decimal(str(value))
+        exponent = number.as_tuple().exponent
+        if isinstance(exponent, int) and exponent < -MAX_DECIMAL_PLACES:
+            number = number.quantize(Decimal(1).scaleb(-MAX_DECIMAL_PLACES)).normalize()
+        grouped = format(number, ",f")
         return grouped.replace(",", "_").replace(".", ",").replace("_", ".")
     return _shorten(str(value))
 

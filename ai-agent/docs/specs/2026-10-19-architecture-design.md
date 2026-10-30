@@ -530,6 +530,8 @@ Primeira execução: `eval/runs/2026-10-24T033727Z.json`. Configuração: `gemin
 - **Regra de merge (DEC-016):** a execution accuracy subiu. A acurácia de status ficou dentro do intervalo das rodadas da 0.3.6 (57 a 60), e as três falhas (G038 e G056 respondidos em vez de pedir esclarecimento, G055 `unknown` em vez de `refused`) são itens que já oscilaram nas rodadas da 0.3.6 sem mudança de código. A mudança entra.
 - **Red team:** R009 terminou em `clarify` e R015 em `unknown`, como antes; nenhum executou SQL. A rodada teve 16 respostas 503 e 1 resposta 429 do Gemini, absorvidas pelo backoff.
 
+**Contagens como `numeric` nas views (camada 0.4.1, revisão do Felipe no #88):** a divisão inteira do G089 (FEC = 0) é tratada no tipo, e não no validador nem só na regra de texto: o gerador do `views.sql` expõe toda coluna `integer` do contrato como `numeric`. Uma primeira tentativa, que reescrevia o numerador de toda divisão no validador, foi descartada: não cobria a divisão aninhada, quebrava divisão de intervalo de tempo e fazia o validador mudar o significado do SQL, inclusive o de referência da avaliação.
+
 **Linha de base 2, Gold real (29/10/2026, issue #56, relatório em `eval/runs_gold/`, fora do Git):** golden 0.11.0, camada 0.4.0, prompt de SQL v2, `--dataset gold_real`, só SQL e só golden. Foram 91 chamadas, sem 429 e sem `failed`. A Gold foi gerada pelos notebooks do repositório a partir das duas bases do case, com o aval de Dados, e os totais batem com o diagnóstico.
 
 | Métrica | Gold real |

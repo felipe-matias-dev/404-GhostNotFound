@@ -618,6 +618,17 @@ async def test_fallback_text_writes_numbers_in_pt_br_and_null_as_missing(layer):
     )
 
 
+async def test_fallback_text_trims_long_division_decimals_but_keeps_money_cents(layer):
+    query_result = table(
+        ("fec", "taxa", "receita"),
+        (Decimal("4.5000000000000000"), Decimal("0.05612345678901"), Decimal("35482.70")),
+    )
+
+    text = await fallback_text(layer, query_result)
+
+    assert text.endswith("Resultado: fec = 4,5, taxa = 0,056123, receita = 35.482,70.")
+
+
 async def test_fallback_text_omits_the_values_of_a_large_result(layer):
     query_result = table(("total",), *[(n,) for n in range(6)])
 

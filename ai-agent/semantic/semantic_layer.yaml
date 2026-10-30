@@ -396,8 +396,8 @@ glossary:
   - term: "leitura estimada"
     synonyms: ["conta pela média", "leitura pela média", "sem leitura"]
     maps_to: "tipo_leitura = 'estimada' em sem_faturamento_mensal; n_leituras_estimadas e n_leituras em sem_kpis_segmento_mensal"
-  - term: "receita sem bandeiras"
-    synonyms: ["receita sem o acréscimo das bandeiras", "receita só da tarifa"]
+  - term: "receita de energia sem bandeiras"
+    synonyms: ["receita sem bandeiras", "receita sem o acréscimo das bandeiras", "receita só da tarifa"]
     maps_to: "sum(receita_energia) - sum(receita_bandeira) em sem_faturamento_mensal ou sem_kpis_segmento_mensal: a receita de energia sem o acréscimo das bandeiras"
   - term: "efeito preço"
     synonyms: ["reajuste", "aumento de tarifa"]
