@@ -425,6 +425,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/ai/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Obter Sessoes
+         * @description As conversas não excluídas do usuário: favoritas primeiro, depois as mais recentes.
+         */
+        get: operations["obter_sessoes_ai_sessions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ai/sessions/{session_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Sessao
+         * @description Esconde a conversa do usuário. A auditoria dela continua intacta para a TI.
+         */
+        delete: operations["delete_sessao_ai_sessions__session_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Patch Sessao
+         * @description Renomeia ou favorita uma conversa do usuário.
+         */
+        patch: operations["patch_sessao_ai_sessions__session_id__patch"];
+        trace?: never;
+    };
     "/ai/audit/{audit_id}": {
         parameters: {
             query?: never;
@@ -449,6 +493,16 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * AlteracaoSessaoIaSchema
+         * @description Novo título, estrela ou os dois. Nenhum deles pode vir nulo, e ao menos um é obrigatório.
+         */
+        AlteracaoSessaoIaSchema: {
+            /** Titulo */
+            titulo?: string;
+            /** Favorita */
+            favorita?: boolean;
+        };
         /**
          * AnswerStatus
          * @enum {string}
@@ -1220,6 +1274,30 @@ export interface components {
          * @enum {string}
          */
         ResultadoOrdem: "IRREGULAR_CONFIRMADA" | "REGULAR" | "NAO_REALIZADA";
+        /**
+         * SessaoIaSchema
+         * @description Uma conversa do usuário com o agente, com os turnos da auditoria em ordem.
+         */
+        SessaoIaSchema: {
+            /** Session Id */
+            session_id: string;
+            /** Titulo */
+            titulo: string;
+            /** Favorita */
+            favorita: boolean;
+            /**
+             * Criada Em
+             * Format: date-time
+             */
+            criada_em: string;
+            /**
+             * Atualizada Em
+             * Format: date-time
+             */
+            atualizada_em: string;
+            /** Turnos */
+            turnos: components["schemas"]["AuditoriaIaSchema"][];
+        };
         /**
          * StatusOrdem
          * @enum {string}
@@ -2137,6 +2215,15 @@ export interface operations {
                     "application/json": components["schemas"]["ErroSchema"];
                 };
             };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErroSchema"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -2162,6 +2249,108 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErroSchema"];
+                };
+            };
+        };
+    };
+    obter_sessoes_ai_sessions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessaoIaSchema"][];
+                };
+            };
+        };
+    };
+    delete_sessao_ai_sessions__session_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErroSchema"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_sessao_ai_sessions__session_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AlteracaoSessaoIaSchema"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessaoIaSchema"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErroSchema"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

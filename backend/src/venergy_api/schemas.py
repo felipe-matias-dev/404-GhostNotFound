@@ -671,6 +671,9 @@ class OrdemDetalheSchema(OrdemSchema):
 MAX_PERGUNTA_IA = 2000
 
 
+MAX_TITULO_SESSAO_IA = 120
+
+
 class PerguntaIaSchema(BaseModel):
     """Pergunta em português para o agente de IA, dentro de uma conversa."""
 
@@ -724,6 +727,32 @@ class AuditoriaIaSchema(RespostaIaBaseSchema):
 
     pergunta: str
     criado_em: datetime
+
+
+class SessaoIaSchema(BaseModel):
+    """Uma conversa do usuário com o agente, com os turnos da auditoria em ordem."""
+
+    session_id: str
+    titulo: str
+    favorita: bool
+    criada_em: datetime
+    atualizada_em: datetime
+    turnos: list[AuditoriaIaSchema]
+
+
+class AlteracaoSessaoIaSchema(BaseModel):
+    """Novo título, estrela ou os dois. Nenhum deles pode vir nulo, e ao menos um é obrigatório."""
+
+    titulo: Annotated[
+        str, StringConstraints(strip_whitespace=True, min_length=1, max_length=MAX_TITULO_SESSAO_IA)
+    ] = None  # type: ignore[assignment]
+    favorita: bool = None  # type: ignore[assignment]
+
+    @model_validator(mode="after")
+    def tem_alteracao(self) -> "AlteracaoSessaoIaSchema":
+        if not self.model_fields_set:
+            raise ValueError("Informe o título ou a estrela")
+        return self
 
 
 class ErroSchema(BaseModel):

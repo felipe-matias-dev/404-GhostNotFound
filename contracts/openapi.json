@@ -1803,6 +1803,16 @@
               }
             }
           },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErroSchema"
+                }
+              }
+            }
+          },
           "429": {
             "description": "Too Many Requests",
             "content": {
@@ -1839,6 +1849,156 @@
             "APIKeyCookie": []
           }
         ]
+      }
+    },
+    "/ai/sessions": {
+      "get": {
+        "tags": [
+          "agente de IA"
+        ],
+        "summary": "Obter Sessoes",
+        "description": "As conversas não excluídas do usuário: favoritas primeiro, depois as mais recentes.",
+        "operationId": "obter_sessoes_ai_sessions_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SessaoIaSchema"
+                  },
+                  "type": "array",
+                  "title": "Response Obter Sessoes Ai Sessions Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ]
+      }
+    },
+    "/ai/sessions/{session_id}": {
+      "patch": {
+        "tags": [
+          "agente de IA"
+        ],
+        "summary": "Patch Sessao",
+        "description": "Renomeia ou favorita uma conversa do usuário.",
+        "operationId": "patch_sessao_ai_sessions__session_id__patch",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AlteracaoSessaoIaSchema"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessaoIaSchema"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErroSchema"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "agente de IA"
+        ],
+        "summary": "Delete Sessao",
+        "description": "Esconde a conversa do usuário. A auditoria dela continua intacta para a TI.",
+        "operationId": "delete_sessao_ai_sessions__session_id__delete",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErroSchema"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/ai/audit/{audit_id}": {
@@ -1914,6 +2074,23 @@
   },
   "components": {
     "schemas": {
+      "AlteracaoSessaoIaSchema": {
+        "properties": {
+          "titulo": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Titulo"
+          },
+          "favorita": {
+            "type": "boolean",
+            "title": "Favorita"
+          }
+        },
+        "type": "object",
+        "title": "AlteracaoSessaoIaSchema",
+        "description": "Novo título, estrela ou os dois. Nenhum deles pode vir nulo, e ao menos um é obrigatório."
+      },
       "AnswerStatus": {
         "type": "string",
         "enum": [
@@ -4136,6 +4313,50 @@
           "NAO_REALIZADA"
         ],
         "title": "ResultadoOrdem"
+      },
+      "SessaoIaSchema": {
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "title": "Session Id"
+          },
+          "titulo": {
+            "type": "string",
+            "title": "Titulo"
+          },
+          "favorita": {
+            "type": "boolean",
+            "title": "Favorita"
+          },
+          "criada_em": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Criada Em"
+          },
+          "atualizada_em": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Atualizada Em"
+          },
+          "turnos": {
+            "items": {
+              "$ref": "#/components/schemas/AuditoriaIaSchema"
+            },
+            "type": "array",
+            "title": "Turnos"
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id",
+          "titulo",
+          "favorita",
+          "criada_em",
+          "atualizada_em",
+          "turnos"
+        ],
+        "title": "SessaoIaSchema",
+        "description": "Uma conversa do usuário com o agente, com os turnos da auditoria em ordem."
       },
       "StatusOrdem": {
         "type": "string",
