@@ -107,7 +107,7 @@ O banco local só tem a amostra sintética do backend (`venergy_api.amostra`). A
 
 - O YAML não registra a versão do contrato (`conventions.agent.contract_version`).
 - D7 resolvido: a carga apaga as views `sem_*` antes de recriar as tabelas da Gold e as aplica de novo no fim, numa única transação (`backend/src/venergy_api/carga.py`, `drop_agent_views`). Se uma view não bater com a Gold, a carga falha e desfaz tudo.
-- D1 continua aberto: as views ficam no schema `gold`, onde o `venergy_agent` lê todas as tabelas.
+- D1 resolvido (DEC-056): as views ficam no schema `semantic`, o único que o `venergy_agent` lê.
 - O golden set tem revisão humana parcial: `revisado_por` está preenchido em 99 de 105 itens; faltam os follow-ups da memória (G046 e G099 a G103).
 - Recortes de receita: a tela (`GET /receita/comparacao`, DEC-021) soma a fato com o cadastro atual da UC, e o agente soma `sem_kpis_segmento_mensal`. Os números só divergem se uma UC mudou de recorte; alinhar quando o backend migrar para a tabela de segmentos.
 

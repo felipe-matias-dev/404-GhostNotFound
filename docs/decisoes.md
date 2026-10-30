@@ -1673,3 +1673,11 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Contexto:** turnos recusados não entram no histórico (DEC-046). O G103, "Agora faça o mesmo para Olinda.", ficava sem referência, e o modelo respondia com um palpite, contra o requisito central de não inventar (issue #104).
 - **Decisão:** quando o histórico da sessão está vazio e a pergunta depende de outro turno, o `AskUseCase` devolve `clarify` sem chamar o modelo. A regra está em `domain/followup.py` e cobre dois casos: pedidos de repetição ("faça o mesmo", "repita a mesma consulta", "o mesmo para X") e perguntas elípticas de até 4 palavras que começam com "e" ("E em Olinda?").
 - **Consequências:** o comportamento é determinístico e não gasta cota. Como não muda prompt, modelo nem camada semântica, não exige rodada da DEC-016 para entrar. Uma pergunta completa que começa com "e" segue para o modelo. Follow-ups escritos de outra forma também seguem, e aí vale o que o prompt manda. Se a leitura do histórico falhar, a pergunta dependente também recebe `clarify`.
+
+## DEC-056 · Views do agente no schema `semantic` (D1)
+
+- **Data:** 30/10/2026
+- **Contexto:** as views `sem_*` ficavam em `gold`, onde o `venergy_agent` lia todas as tabelas, inclusive colunas sensíveis e a fila de suspeitas, que as views deixam de fora. A allowlist só valia no validador.
+- **Decisão:** as views passam para o schema `semantic`, e o `venergy_agent` tem `USAGE` e `SELECT` só nele, sem acesso a `gold` nem a `app`. A role ganha `statement_timeout` de 30 s, acima do timeout de 10 s de cada consulta. O padrão de `allowed_schema` passa a ser `semantic`.
+- **Banco existente:** a carga e a subida da API aplicam as permissões e, se a Gold já estiver carregada, recriam as views em `semantic`, sem apagar dados. Banco novo recebe tudo do `01-init.sh`.
+- **Consequências:** o modelo não vê o nome do schema, então o prompt não muda. A carga continua apagando e recriando as views na mesma transação.

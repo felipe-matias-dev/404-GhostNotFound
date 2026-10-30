@@ -18,7 +18,7 @@ def test_every_view_is_created_in_the_gold_schema():
     sql = render_views_sql()
 
     for name in ("sem_uc", "sem_faturamento_mensal", "sem_continuidade_alimentador_mensal"):
-        assert f"CREATE OR REPLACE VIEW gold.{name} AS" in sql
+        assert f"CREATE OR REPLACE VIEW semantic.{name} AS" in sql
 
 
 def test_column_marked_a_confirmar_never_reaches_the_view():

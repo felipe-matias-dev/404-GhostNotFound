@@ -88,7 +88,7 @@ AGENT_VIEWS = set(
 def gold_views(engine: Engine) -> set[str]:
     with engine.connect() as connection:
         return set(
-            connection.scalars(text("SELECT viewname FROM pg_views WHERE schemaname = 'gold'"))
+            connection.scalars(text("SELECT viewname FROM pg_views WHERE schemaname = 'semantic'"))
         )
 
 

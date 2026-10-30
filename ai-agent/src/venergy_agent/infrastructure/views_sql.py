@@ -4,7 +4,8 @@ from pathlib import Path
 from venergy_agent.config import AGENT_ROOT, REPO_ROOT
 from venergy_agent.infrastructure.semantic_source import read_documents, view_definitions
 
-VIEWS_SCHEMA = "gold"
+VIEWS_SCHEMA = "semantic"
+SOURCE_SCHEMA = "gold"
 LAYER_PATH = AGENT_ROOT / "semantic" / "semantic_layer.yaml"
 CONTRACT_PATH = REPO_ROOT / "contracts" / "gold_schema.yaml"
 OUTPUT_PATH = AGENT_ROOT / "semantic" / "views.sql"
@@ -25,7 +26,7 @@ def render_views_sql(layer_path: Path = LAYER_PATH, contract_path: Path = CONTRA
         statements.append(
             f"CREATE OR REPLACE VIEW {VIEWS_SCHEMA}.{definition.name} AS\n"
             f"SELECT\n    {columns}\n"
-            f"FROM {VIEWS_SCHEMA}.{definition.source_table};\n"
+            f"FROM {SOURCE_SCHEMA}.{definition.source_table};\n"
         )
     return HEADER + "\n" + "\n".join(statements)
 

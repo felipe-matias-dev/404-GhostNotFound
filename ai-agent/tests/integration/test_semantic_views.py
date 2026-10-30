@@ -14,7 +14,7 @@ ALLOWED = frozenset(
 
 
 def run(agent_database_url, sql):
-    validator = SqlglotValidator(dialect="postgres", max_rows=200, allowed_schema="gold")
+    validator = SqlglotValidator(dialect="postgres", max_rows=200, allowed_schema="semantic")
     executor = PostgresQueryExecutor(agent_database_url, timeout_seconds=10)
     query = validator.validate(sql, ALLOWED)
     return asyncio.run(executor.execute(query))
