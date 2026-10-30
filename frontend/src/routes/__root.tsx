@@ -14,6 +14,7 @@ import { AppShell } from "#/components/layout/app-shell";
 import { NAVEGACAO, organizarNavegacao } from "#/components/layout/app-sidebar";
 import { Logo } from "#/components/layout/logo";
 import { Button } from "#/components/ui/button";
+import { AgenteProvider, AgenteWidget } from "#/features/agente";
 import {
 	PROFILES,
 	SessionControls,
@@ -135,7 +136,9 @@ function RootLayout() {
 
 	return (
 		<ConsultaUcProvider key={session.data.login} usuario={session.data.login}>
-			<Portal />
+			<AgenteProvider usuario={session.data.login}>
+				<Portal />
+			</AgenteProvider>
 		</ConsultaUcProvider>
 	);
 }
@@ -152,8 +155,9 @@ function Portal() {
 			<AppShell onConsultarUc={abrir} itens={itens} conta={<SessionControls />}>
 				<Outlet />
 			</AppShell>
+			<AgenteWidget />
 			<TanStackDevtools
-				config={{ position: "bottom-right" }}
+				config={{ position: "bottom-left" }}
 				plugins={[
 					{ name: "Tanstack Router", render: <TanStackRouterDevtoolsPanel /> },
 					TanStackQueryDevtools,

@@ -31,6 +31,7 @@ describe("role navigation", () => {
 			["/", "Outras consultas"],
 			["/receita", "Outras consultas"],
 			["/rede", "Outras consultas"],
+			["/agente", "Outras consultas"],
 		]);
 	});
 
