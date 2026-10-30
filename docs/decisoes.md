@@ -57,6 +57,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | 29/10/2026 | DEC-049: login com cookie httpOnly e cinco perfis; só `perdas` escreve nas ordens de inspeção e só `ti` lê a auditoria do agente | Esconder o menu não é segurança: a permissão é checada no backend, onde estão os dados; o agente já lê toda a Gold, então bloquear a leitura por tela daria falsa proteção | Felipe |
 | 29/10/2026 | DEC-050: os eventos das ordens de inspeção guardam o login de quem agiu (`autor_login`), o histórico mostra o nome dele, e a carga e a subida da API acrescentam a coluna sem apagar o histórico | O gerente de perdas é o único que escreve, e a trilha precisa responder quem concluiu ou cancelou uma ordem; recriar a tabela para isso perderia o histórico de quem já usa o portal | Felipe |
 | 29/10/2026 | DEC-051: filtros da fila usam os sinais já informados nos motivos da Gold: queda, medidor eletromecânico e percentual de leituras estimadas | Mantém a fila fiel à Gold, sem recalcular métricas ou tratar ausência como zero; todos os filtros operam antes da paginação | João Euclides |
+| 30/10/2026 | DEC-052: a visão 360 devolve `variacao_conta`, a diferença da conta contra o mesmo mês do ano anterior dividida em dias, consumo, tarifa, bandeira e tributos, com a fórmula da decomposição da receita (DEC-029); as partes somam exatamente a diferença; API 0.12.0 | A atendente consegue dizer ao cliente por que a conta subiu, e não só se o consumo subiu; calculado no backend e sem IA, porque o número precisa ser exato e imediato com o cliente na linha | Felipe |
 
 ## DEC-001 · Localização dos arquivos de origem (landing)
 
@@ -1603,3 +1604,51 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Decisão:** a API extrai somente esse padrão, entre 0 e 100%, sem confundir com os percentuais de leituras estimadas. A distribuição cobre a fila inteira; o filtro por faixa inclusiva e a ordenação são aplicados antes da paginação. A fila sem filtro mantém também as UCs cujo motivo não foi reconhecido; com filtro elas ficam fora e são contadas separadamente na distribuição.
 - **Extensão (29/10/2026):** o painel combina queda com `medidor_eletromecanico=true` e os limites inclusivos `leituras_estimadas_min/max`, extraídos do motivo completo de leituras estimadas. A Gold só emite esse motivo para percentuais a partir de 25%; o filtro aceita limites de 25 a 100 e não abrange valores inferiores nem ausentes. A ausência também pode indicar dados indisponíveis, nunca é interpretada como zero. Os três sinais são combinados com AND antes da paginação.
 - **Limite:** o valor é o percentual inteiro já arredondado pela Gold, não uma nova conta. Alterar a redação do motivo exige atualizar o extrator; uma coluna numérica na Gold eliminaria essa dependência.
+
+## DEC-052 · Variação da conta da unidade consumidora dividida por motivo
+
+- **Data:** 30/10/2026 · **Área:** Portal · **Autor:** Felipe
+- **Contexto:** o case pede que o atendente responda ao cliente na hora, "inclusive quando ele reclama de conta alta". A visão 360
+  (DEC-044) só dizia se o **consumo** subiu, e a tela já admitia o limite: "a comparação de consumo não explica sozinha a variação do
+  valor da conta". Do ano anterior ela trazia só o kWh, sem a conta em reais. Na amostra sintética, a unidade 0001 tem consumo na faixa
+  de estabilidade (174 kWh contra 179), mas a conta de dez/2025 é R$ 9,23 maior que a de dez/2024: o atendente via o consumo e não
+  tinha como explicar a diferença.
+- **Decisão:** `GET /unidades-consumidoras/{cod_uc}/visao-360` ganha `variacao_conta`: a conta do mês de referência contra a do mesmo
+  mês do ano anterior, com a diferença em R$ dividida em cinco partes que **somam exatamente a diferença**, centavo por centavo.
+  Com `Q` = `kwh_faturado`, `E` = `receita_energia`, `B` = `receita_bandeira`, `R` = `receita_faturada` e `d` = `dias_faturados`
+  (0 = ano anterior, 1 = atual):
+  - **volume** = `(Q1 − Q0) × E0/Q0`: mais ou menos energia, ao preço do ano anterior; se divide em **dias** e **consumo**;
+  - **dias** = `(d1 − d0) × (Q0/d0) × E0/Q0`: a conta cobriu mais ou menos dias, no consumo diário do ano anterior;
+  - **consumo** = volume − dias: a pessoa gastou mais ou menos por dia;
+  - **bandeira** = `B1 − Q1 × B0/Q0`: o acréscimo da bandeira além do que a conta do ano anterior já trazia por kWh;
+  - **tarifa** = `(E1 − E0) − dias − consumo − bandeira`: o reajuste da tarifa base;
+  - **tributos** = `(R1 − R0) − (E1 − E0)`.
+
+  É a mesma identidade da DEC-029 (volume + tarifa + bandeira = variação da receita de energia), aplicada a uma fatura. Os valores são
+  `Decimal` (DEC-010); dias, consumo e bandeira são arredondados para centavos e a **tarifa fica com a sobra do arredondamento**, para a
+  soma fechar sem uma linha "arredondamento". Exemplo da amostra sintética, unidade 0001, dez/2025 contra dez/2024: a conta subiu
+  R$ 9,23, sendo tarifa +R$ 11,82, consumo −R$ 4,43, tributos +R$ 1,84, bandeira e dias R$ 0,00 (verde e 31 dias nos dois meses).
+  - **Sem dias** numa das contas: `dias` vem vazio e todo o volume vai para o consumo.
+  - **Sem divisão** (`variacao_conta` vazio): sem fatura no mês de referência, sem fatura no mesmo mês do ano anterior, ou sem energia na
+    conta do ano anterior (painel solar que compensou tudo), porque aí não existe preço por kWh. É o mesmo princípio do
+    `sem_comparacao` da `tendencia`.
+  - **`leitura_estimada`** é verdadeiro quando uma das duas leituras foi estimada: a próxima leitura real corrige o consumo.
+- **Suposição nossa:** o case não define como explicar uma conta. A comparação é com o **mesmo mês do ano anterior**, a mesma base da
+  `tendencia` da DEC-044, para os dois blocos da tela falarem do mesmo par de contas e para tirar o efeito das estações.
+- **Alternativas descartadas:**
+  - Comparar com a conta do mês anterior: é o que o cliente costuma dizer ("veio mais alta que a de novembro"), mas mistura estações e
+    deixaria dois pares de contas diferentes lado a lado na tela. A tela deve dizer a competência comparada.
+  - Uma fórmula própria, sem relação com a da receita: a conta de um cliente e a receita da empresa passam a se explicar pelo mesmo método.
+  - Uma linha "arredondamento": confunde a atendente; a sobra vai para a tarifa.
+  - Uma rota nova: a visão 360 já busca 24 meses de faturas, e o cliente está na linha (DEC-044).
+  - Calcular na tela: a API não entregava `receita_bandeira` nem `tributos`, e cálculo de negócio fica no backend.
+  - Um texto de IA no lugar da tabela (G2-05 do backlog): o número precisa ser exato e imediato, não espera o modelo e não falha quando
+    ele cai. O insight com IA continua na tela de Receita, que cumpre o que o case pede (pelo menos uma tela). O G2-05 pode narrar
+    esse JSON depois.
+- **Limitações conhecidas:**
+  - A parte "tributos" é a variação total dos impostos, sem separar alíquota de base de cálculo.
+  - `receita_energia` ainda é a base provisória da DEC-023: se a reconciliação mudar a definição, a fórmula acompanha sem mudar o
+    contrato da rota.
+  - Com um ano de distância quase sempre houve reajuste, então a parte da tarifa tende a aparecer. É o dado real.
+- **Impacto:** campo novo na rota existente, sem quebra de contrato; API 0.12.0, com `contracts/openapi.json` e os tipos do client
+  regenerados. Nenhuma mudança na Gold nem no agente. A tela da visão 360 pode exibir o campo com o tipo gerado do OpenAPI.
