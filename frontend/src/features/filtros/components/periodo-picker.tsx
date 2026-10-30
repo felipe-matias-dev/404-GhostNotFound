@@ -1,12 +1,11 @@
 import {
 	ArrowsLeftRightIcon,
 	CalendarBlankIcon,
-	CaretDownIcon,
 	CaretLeftIcon,
 	CaretRightIcon,
 	CheckIcon,
 } from "@phosphor-icons/react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
 	Popover,
 	PopoverContent,
@@ -101,6 +100,14 @@ export function PeriodoPicker({
 	const listaAtalhos = useMemo(() => atalhos(pares), [pares]);
 	const bases = par ? basesDoAtual(pares, par.periodo_atual) : [];
 
+	useEffect(() => {
+		if (!aberto || ano !== 0) return;
+		const periodo = par?.periodo_atual ?? pares.at(-1)?.periodo_atual;
+		if (!periodo) return;
+		setAno(Math.floor(trechoDe(periodo).fim / 12));
+		if (par && !manual) setRascunho([...par.periodo_atual.split("/"), ...par.periodo_base.split("/")]);
+	}, [aberto, ano, manual, par, pares]);
+
 	const abrir = (proximo: boolean) => {
 		setAberto(proximo);
 		setAncora(null);
@@ -148,11 +155,9 @@ export function PeriodoPicker({
 		<Popover open={aberto} onOpenChange={abrir}>
 			<PopoverTrigger
 				aria-label={`Períodos comparados: ${atual}. Trocar`}
-				className="flex h-7 min-w-0 cursor-pointer items-center gap-1.5 rounded-md border border-border-strong px-2 text-small text-text-muted outline-none transition-colors hover:bg-hover hover:text-text focus-visible:border-focus-ring focus-visible:ring-3 focus-visible:ring-focus-ring/50 data-popup-open:bg-hover data-popup-open:text-text"
+				className="flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md border border-border-strong text-text-muted outline-none transition-colors hover:bg-hover hover:text-text focus-visible:border-focus-ring focus-visible:ring-3 focus-visible:ring-focus-ring/50 data-popup-open:bg-hover data-popup-open:text-text"
 			>
-				<CalendarBlankIcon aria-hidden className="size-3.5 shrink-0" />
-				<span className="truncate">{atual}</span>
-				<CaretDownIcon aria-hidden className="size-3 shrink-0" />
+				<CalendarBlankIcon aria-hidden className="size-4" />
 			</PopoverTrigger>
 			<PopoverContent
 				align="end"

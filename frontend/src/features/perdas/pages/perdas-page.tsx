@@ -48,11 +48,6 @@ function OrdensSecao() {
 	return (
 		<Pagina className="min-h-full max-w-none">
 			<h1 className="sr-only">Perdas</h1>
-			<p className="max-w-prose text-small text-text-muted" role="note">
-				O período é mantido para as outras análises. A fila de suspeitas usa a
-				janela fixa de 12 meses da Gold; as inspeções não são filtradas por
-				período. Município, bairro e classe se aplicam às duas seções.
-			</p>
 			<nav
 				aria-label="Seções de perdas"
 				className="flex items-center gap-2 border-b border-border pb-4"

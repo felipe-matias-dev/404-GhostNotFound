@@ -58,6 +58,9 @@ separadas por login no navegador, sem migrar o histórico compartilhado anterior
 Visão geral, Receita, Rede e Perdas compartilham período, município, bairro e classe
 pela URL. Os filtros próprios de cada tela são lembrados enquanto a sessão do portal
 estiver aberta; atualizar a página preserva apenas os filtros presentes na URL.
+O botão de calendário abre a seleção de períodos nas telas analíticas, exceto Perdas.
+A faixa superior reúne o recorte compartilhado; **Filtros de suspeitas** afeta apenas
+os sinais da fila.
 Na Rede, `inicio` e `fim` representam o período atual. Um par válido que não conste
 na decomposição permanece selecionado, com aviso de indisponibilidade da ponte.
 Períodos inválidos recebidos por URL são removidos antes das consultas, com aviso visível.

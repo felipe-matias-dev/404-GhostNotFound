@@ -113,7 +113,7 @@ export function FiltrosPortal() {
 
 	if (pathname === "/uc") {
 		return (
-			<div className="mb-4 flex flex-col gap-1 text-small text-text-muted" role="note">
+			<div className="border-b border-border px-3 py-4 text-small text-text-muted lg:px-5" role="note">
 				<p>
 					Contexto da análise:{" "}
 					{par
@@ -140,20 +140,23 @@ export function FiltrosPortal() {
 
 	return (
 		<div
-			className="mb-4 flex flex-wrap items-center gap-2"
+			className="flex flex-wrap items-center gap-x-2 gap-y-2 border-b border-border px-3 py-3 lg:px-5"
 			role="group"
 			aria-label="Filtros da análise"
 		>
-			<PeriodoPicker
-				pares={periodos.data ?? []}
-				par={par}
-				onEscolher={alterar}
-				erro={periodos.isError}
-				carregando={periodos.isPending}
-				retry={() => {
-					void periodos.refetch();
-				}}
-			/>
+			<span className="hidden text-small font-medium text-text-muted sm:inline">Análise</span>
+			{pathname !== "/perdas" && (
+				<PeriodoPicker
+					pares={periodos.data ?? []}
+					par={par}
+					onEscolher={alterar}
+					erro={periodos.isError}
+					carregando={periodos.isPending}
+					retry={() => {
+						void periodos.refetch();
+					}}
+				/>
+			)}
 			<NivelMenu
 				nivel="Município"
 				todos="Todos os municípios"
@@ -177,8 +180,9 @@ export function FiltrosPortal() {
 				/>
 			)}
 			<ClassePicker classe={filtros.classe} onEscolher={(classe) => alterar({ classe })} />
-			<Button variant="ghost" onClick={limparRecorte}>
-				Limpar recorte
+			<Button variant="ghost" size="xs" onClick={limparRecorte} aria-label="Limpar recorte">
+				<span className="sm:hidden">Limpar</span>
+				<span className="hidden sm:inline">Limpar recorte</span>
 			</Button>
 			{aviso && (
 				<span role="status" className="text-small text-text-muted">

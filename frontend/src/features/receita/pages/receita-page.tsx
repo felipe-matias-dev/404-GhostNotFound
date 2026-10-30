@@ -140,12 +140,9 @@ export function ReceitaPage() {
 					className="h-96 lg:sticky lg:top-5 lg:h-[calc(100svh-8rem)]"
 				/>
 				<section
-					aria-labelledby="ponte-titulo"
+					aria-label="Decomposição de receita"
 					className="@container flex min-w-0 flex-col gap-3"
 				>
-					<h2 id="ponte-titulo" className="text-heading">
-						Ponte de receita
-					</h2>
 					{/* Largo: ponte e ranking lado a lado, sem a ponte esticar por toda a largura. */}
 					<div className="grid gap-3 @4xl:grid-cols-[minmax(0,1fr)_minmax(22rem,0.8fr)]">
 						<PonteWaterfall

@@ -1,4 +1,4 @@
-import { CaretDownIcon, FunnelSimpleIcon } from "@phosphor-icons/react";
+import { CaretDownIcon } from "@phosphor-icons/react";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -28,13 +28,12 @@ export function ClassePicker({
 			<DropdownMenuTrigger
 				aria-label={`Classe de consumo: ${classe ? `${classe} ${CLASSE_ROTULO[classe]}` : "todas"}. Trocar`}
 				className={cn(
-					"flex h-7 min-w-0 cursor-pointer items-center gap-1.5 rounded-md border px-2 text-small outline-none transition-colors hover:bg-hover hover:text-text focus-visible:border-focus-ring focus-visible:ring-3 focus-visible:ring-focus-ring/50 data-popup-open:bg-hover data-popup-open:text-text",
+					"flex h-8 min-w-0 cursor-pointer items-center gap-1.5 rounded-md border px-2 text-small outline-none transition-colors hover:bg-hover hover:text-text focus-visible:border-focus-ring focus-visible:ring-3 focus-visible:ring-focus-ring/50 data-popup-open:bg-hover data-popup-open:text-text",
 					classe
 						? "border-accent bg-accent-subtle text-accent-text"
 						: "border-border-strong text-text-muted",
 				)}
 			>
-				<FunnelSimpleIcon aria-hidden className="size-3.5 shrink-0" />
 				<span className="truncate">
 					{classe ? `${classe} · ${CLASSE_ROTULO[classe]}` : "Todas as classes"}
 				</span>

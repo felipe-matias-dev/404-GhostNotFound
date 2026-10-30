@@ -6,14 +6,6 @@ import {
 import { useEffect, useMemo, useRef } from "react";
 import { Pagina } from "#/components/layout/pagina";
 import {
-	Breadcrumb,
-	BreadcrumbItem,
-	BreadcrumbLink,
-	BreadcrumbList,
-	BreadcrumbPage,
-	BreadcrumbSeparator,
-} from "#/components/ui/breadcrumb";
-import {
 	SegmentedControl,
 	type SegmentedOption,
 } from "#/components/ui/segmented-control";
@@ -208,14 +200,6 @@ export function RedePage() {
 	const escolherCriterio = (proximo: Criterio) =>
 		void ir({ criterio: proximo === "dec" ? undefined : proximo });
 
-	// O breadcrumb remove a geografia de um nível, preservando classe, período e visão.
-	const voltarAosMunicipios = () =>
-		void ir({
-			municipio: undefined,
-			bairro: undefined,
-			alimentador: undefined,
-			serie: undefined,
-		});
 
 	// Abrir a linha grava o nível que a resposta atual oferece, nunca o da resposta anterior.
 	const abrirLinha = (linha: LinhaContinuidade) => {
@@ -287,63 +271,6 @@ export function RedePage() {
 
 	return (
 		<Pagina className="max-w-none">
-			{visao === "localidades" && (
-				<Breadcrumb aria-label="Recorte da rede">
-					<BreadcrumbList>
-						<BreadcrumbItem className="min-w-0">
-							{municipio ? (
-								<BreadcrumbLink
-									render={
-										<button
-											type="button"
-											onClick={voltarAosMunicipios}
-										/>
-									}
-								>
-									Todos os municípios
-								</BreadcrumbLink>
-							) : (
-								<BreadcrumbPage>Todos os municípios</BreadcrumbPage>
-							)}
-						</BreadcrumbItem>
-						{municipio && (
-							<>
-								<BreadcrumbSeparator />
-								<BreadcrumbItem className="min-w-0">
-									{bairro ? (
-										<BreadcrumbLink
-											render={
-												<button
-													type="button"
-													onClick={() =>
-														void ir({
-															bairro: undefined,
-															alimentador: undefined,
-															serie: undefined,
-														})
-													}
-												/>
-											}
-										>
-											{municipio}
-										</BreadcrumbLink>
-									) : (
-										<BreadcrumbPage>{municipio}</BreadcrumbPage>
-									)}
-								</BreadcrumbItem>
-							</>
-						)}
-						{bairro && (
-							<>
-								<BreadcrumbSeparator />
-								<BreadcrumbItem className="min-w-0">
-									<BreadcrumbPage>{bairro}</BreadcrumbPage>
-								</BreadcrumbItem>
-							</>
-						)}
-					</BreadcrumbList>
-				</Breadcrumb>
-			)}
 
 			<section
 				aria-labelledby="rede-titulo"

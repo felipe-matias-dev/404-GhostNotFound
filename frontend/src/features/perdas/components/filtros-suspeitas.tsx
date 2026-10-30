@@ -58,7 +58,7 @@ export function FiltrosSuspeitas({
 				})}
 			>
 				<FunnelIcon aria-hidden />
-				Filtros
+				Filtros de suspeitas
 				{ativos > 0 && (
 					<span className="rounded-sm bg-accent-subtle px-1.5 text-small text-accent-text">
 						{ativos}
