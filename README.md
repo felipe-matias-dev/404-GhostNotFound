@@ -185,8 +185,16 @@ do valor da conta. Faturas pendentes não têm corte por período e os históric
 somente na apresentação. A Gold é histórica, não indica falta de energia em tempo real.
 Diferenças da apresentação e limites em
 [DEC-042](docs/decisoes.md#dec-042--visão-360-da-uc-e-comparação-sazonal-do-consumo).
-A comparação monetária com o ano anterior, o tipo de leitura e a diferença absoluta em kWh
-saíram da tela porque não estão no contrato aprovado; não são simulados por outras chamadas.
+A diferença absoluta em kWh não aparece na tela porque não está no contrato aprovado; não é
+simulada por outras chamadas.
+
+O card **Por que a conta mudou**, no topo da tela, responde à reclamação de conta alta em reais:
+a conta do mês de referência contra a do mesmo mês do ano anterior, com a diferença dividida em
+consumo, tarifa, bandeira e tributos, e a parte que mais pesou destacada. As partes vêm prontas
+de `variacao_conta`, na mesma rota da visão 360, e somam exatamente a diferença; a tela não faz
+conta. Sem a conta do ano anterior, o card diz que não há com o que comparar, e uma leitura
+estimada ganha um aviso. Fórmula e limites em
+[DEC-052](docs/decisoes.md#dec-052--variação-da-conta-da-unidade-consumidora-dividida-por-motivo).
 
 ## Decisões que defendemos
 
