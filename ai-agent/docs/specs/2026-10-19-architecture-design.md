@@ -22,6 +22,8 @@ O agente transforma uma pergunta em português numa consulta SQL somente leitura
 - narração com verificação numérica, texto determinístico com valores e `prompts/v2` (PR #36, item 8, DEC-019);
 - `InsightWriter` (PRs #37 e #40, item 9).
 
+**Na branch `feat/ai-agent-memoria-orcamento` (G1-10, DEC-046, proposta):** follow-up com memória, orçamento de tokens por sessão e `prompts/v3`. A rodada do golden set que libera a troca do prompt padrão ainda não foi feita (§11).
+
 **Em revisão:** red team, runner de métricas e linha de base (item 7, PR #41, §9.6); avaliação comparativa e juiz (branch `feat/ai-agent-avaliacao-comparativa-juiz`, §9.4 e §9.5, DEC-047).
 
 **Falta:** a revisão humana do golden set e as decisões da §9.6. Os eventos de progresso para SSE (PR #39 e issue #38) ficam como alteração futura (decisão do time em 24/10/2026).
@@ -43,7 +45,7 @@ O agente transforma uma pergunta em português numa consulta SQL somente leitura
 | Triagem | Feita pelo `status` do `SqlDraft`, sem chamada extra ao LLM | "Simples primeiro"; etapa separada só com ganho medido na avaliação |
 | `EXPLAIN` antes de executar | Não usar | O validador barra o que é estrutural e o executor classifica os erros do banco para a correção (§6 do guia pede `EXPLAIN` "quando o banco permitir"); é uma ida ao banco a mais sem ganho medido |
 | Auditoria | O agente devolve os dados de auditoria no `AgentAnswer`; o backend persiste | O agente é somente leitura e não grava em lugar nenhum (G1-06) |
-| Follow-up | Fora do escopo dos obrigatórios (diferencial) | Obrigatórios primeiro |
+| Follow-up | Implementado como diferencial (G1-10, DEC-046): o backend entrega os últimos turnos da sessão pela auditoria, e o agente os lê como dado delimitado (§5.1, §5.2) | Obrigatórios primeiro; o histórico fica fora do processo (§8 do guia) e o agente continua somente leitura |
 | Avaliação | Golden set + métricas determinísticas logo depois do primeiro `ask()` de ponta a ponta | Nenhuma mudança de prompt, modelo ou contexto entra sem medir (§1.5 e §10.3 do guia) |
 | LLM as a judge | Só para clareza e fidelidade da resposta em português, com modelo diferente do gerador; entra depois dos obrigatórios | Corretude numérica é medida por execução, não por opinião de LLM |
 | "Receita" sem qualificador | `receita_faturada`, com a suposição declarada na resposta | Confirmado na DEC-022 (`conventions.agent.receita_sem_qualificador` do contrato v0.2.0). Está nas regras de negócio da camada semântica |
@@ -116,6 +118,8 @@ ai-agent/
 | `model` | `str` | Modelo que respondeu de fato (G1-06), com o nome que o provedor devolve, sem o prefixo da configuração (`gemini-3.1-flash-lite`, e não `google-gla:gemini-3.1-flash-lite`); quando a pergunta é barrada antes do LLM, é o modelo configurado no mesmo formato |
 | `prompt_version` | `str` | — |
 | `latency_ms` | `int` | `≥ 0` (G1-06) |
+| `input_tokens` | `int` | `≥ 0`, padrão `0`. Tokens de entrada das chamadas ao gerador de SQL neste pedido, somando todas as tentativas. A narrativa não entra: a porta `AnswerWriter` devolve só texto. O backend grava na auditoria (DEC-046) |
+| `output_tokens` | `int` | `≥ 0`, padrão `0`. Idem, tokens de saída |
 
 Invariantes:
 - Hoje: `row_count >= len(rows)`, porque `rows` é uma amostra; `row_count >= 0`.
@@ -128,6 +132,8 @@ Invariantes:
 
 O timestamp da auditoria é registrado pelo backend ao persistir; o agente não lê relógio no domínio.
 
+`ConversationTurn(question, sql, status)` (`domain/conversation.py`) é um turno do histórico de uma sessão: a pergunta, o SQL gerado (nulo quando não houve) e o status da resposta. Não carrega o texto da resposta nem as linhas.
+
 Todos os modelos de domínio são imutáveis (`frozen`).
 
 ## 5. Portas (`application/ports.py`)
@@ -138,7 +144,9 @@ São `typing.Protocol` assíncronos, exceto `SqlValidator`, que é síncrono por
 |---|---|---|
 | `TextToSqlAgent` | `ask(question: str, session_id: str) -> AgentAnswer` | Contrato de entrada com o backend (Partnership BC6↔BC7). Implementada pelo `ask()` do item 6. Nunca levanta exceção: toda falha vira `AgentAnswer` com `status` |
 | `SemanticLayerSource` | `load() -> SemanticLayer` | Item 5. Monta a camada a partir do arquivo do GenAI e do contrato. Erro de configuração falha na subida, não na primeira pergunta |
-| `SqlGenerator` | `generate(question: Question, layer: SemanticLayer, feedback: AttemptFeedback \| None) -> SqlDraft` | Adapter PydanticAI. O item 6 muda o retorno para `Generation` (§4). Saída inválida volta ao modelo até 2 vezes. Erros transitórios do provedor (429, 503) são repetidos com backoff pelo próprio cliente: no Gemini, via `retry_options` das settings; no OpenRouter, pelo retry nativo do SDK. Esgotadas as tentativas, ou com erro do provedor, levanta `UnexpectedModelBehavior`, `ModelHTTPError` ou `ModelAPIError` |
+| `ConversationHistory` | `async recent(session_id: str, limit: int) -> tuple[ConversationTurn, ...]` | Somente leitura. Devolve os últimos `limit` turnos da sessão, do mais antigo para o mais novo. Implementada pelo backend sobre `app.ai_auditoria` (`historico_ia.py`): o `venergy_agent` nunca lê o schema `app`. `InMemoryConversationHistory` serve à avaliação e aos testes |
+| `SessionUsage` | `async tokens_used(session_id: str) -> int` | Tokens (entrada + saída) já gastos na sessão. Mesma implementação do backend |
+| `SqlGenerator` | `generate(question: Question, layer: SemanticLayer, feedback: AttemptFeedback \| None, history: tuple[ConversationTurn, ...] = ()) -> Generation` | Adapter PydanticAI. O item 6 muda o retorno para `Generation` (§4). Saída inválida volta ao modelo até 2 vezes. Erros transitórios do provedor (429, 503) são repetidos com backoff pelo próprio cliente: no Gemini, via `retry_options` das settings; no OpenRouter, pelo retry nativo do SDK. Esgotadas as tentativas, ou com erro do provedor, levanta `UnexpectedModelBehavior`, `ModelHTTPError` ou `ModelAPIError` |
 | `SqlValidator` | `validate(sql: str, allowed_views: frozenset[str]) -> ValidatedQuery` | Levanta `SqlRejected`; adapter `SqlglotValidator` (§6) |
 | `QueryExecutor` | `execute(query: ValidatedQuery) -> QueryResult` | Levanta `QueryExecutionError` para erros que o modelo pode corrigir; os demais erros do banco (permissão, somente leitura, conexão) propagam sem classificação |
 | `AnswerWriter` | `write(question: Question, draft: SqlDraft, result: QueryResult) -> str` | Item 8. Resposta só a partir das linhas |
@@ -149,9 +157,11 @@ São `typing.Protocol` assíncronos, exceto `SqlValidator`, que é síncrono por
 O caso de uso `application/ask.py` implementa `TextToSqlAgent` encadeando as portas. Cada etapa é uma chamada separada e testável com fakes (§4 do guia).
 
 1. **Entrada.** Monta a `Question`. Texto acima de `max_question_chars` → `refused`, sem chamar o modelo.
+   1. **Orçamento.** Com `session_token_budget > 0` e uma porta `SessionUsage`, lê o consumo da sessão antes de tudo o mais. Consumo `>=` orçamento → `refused` com o motivo `BUDGET_EXHAUSTED`, 0 tokens e nenhuma chamada ao modelo nem ao histórico. Consumo ilegível → `failed`, também sem chamar o modelo (falhar fechado protege o custo). A pergunta que cruza o limite termina; a próxima é recusada.
+   2. **Histórico.** Com `history_turns > 0` e uma porta `ConversationHistory`, lê os últimos turnos uma vez por pedido. Turnos `refused` ficam de fora (uma tentativa de manipulação não atravessa para a pergunta seguinte); `clarify`, `unknown` e `failed` entram. Histórico ilegível não derruba a pergunta: segue sem ele e registra `historico_indisponivel`.
 2. **Camada semântica.** `SemanticLayerSource.load()` uma vez por processo; a camada não muda entre perguntas e o prompt de sistema fica estável para o cache do provedor.
 3. **Tentativas**, até `max_correction_attempts`:
-   1. `generate(question, layer, feedback)`.
+   1. `generate(question, layer, feedback, history)`, com o mesmo histórico em todas as tentativas.
    2. `unknown`, `clarify` ou `refuse` → encerra com o status equivalente (`unknown`, `clarify`, `refused`), sem executar SQL.
    3. `ok` → `validate`. `SqlRejected` → `feedback = AttemptFeedback(sql, REJECTED, reason)` e próxima tentativa.
    4. `execute`. `QueryExecutionError` → `feedback = AttemptFeedback(sql, kind, message)` e próxima tentativa. Erro não classificado do banco → `failed` na hora, sem nova tentativa: o modelo não deve contornar uma trava do banco.
@@ -168,12 +178,14 @@ O caso de uso `application/ask.py` implementa `TextToSqlAgent` encadeando as por
    - Quando o resultado é pequeno (até 5 linhas e 4 colunas), o texto determinístico traz os valores em pt-BR (`Resultado: total = 3.`; nulo vira "sem valor"). Assim a resposta tem o número mesmo quando a narrativa cai na verificação (DEC-019). Resultado maior fica só em `rows`.
    - Item 8: o `AnswerWriter` substitui esse texto por uma narrativa. Se a verificação numérica falhar (§7.3 do guia), volta para o texto determinístico.
 8. **Mensagens de `unknown`, `refused` e `failed`:** textos fixos em português, sem LLM, em `refused_reason` e em `answer`. O modelo não escreve o motivo de não ter respondido.
-9. **Logs estruturados:** uma linha JSON por etapa (stdlib `logging`), com `request_id`, `session_id`, número da tentativa, etapa, status, SQL, motivo ou tipo de erro, número de linhas, latência da etapa, modelo, tokens e `prompt_version` (§12 do guia). Sem a amostra de linhas, para não levar dado pessoal aos logs.
+9. **Tokens.** `AgentAnswer.input_tokens` e `output_tokens` somam as `Generation` do pedido, também nos status sem SQL e na falha depois de uma tentativa. Pergunta barrada antes do modelo leva 0.
+10. **Logs estruturados:** uma linha JSON por etapa (stdlib `logging`), com `request_id`, `session_id`, número da tentativa, etapa, status, SQL, motivo ou tipo de erro, número de linhas, latência da etapa, modelo, tokens e `prompt_version` (§12 do guia). Sem a amostra de linhas, para não levar dado pessoal aos logs. As etapas `orcamento` (tokens usados e orçamento) e `historico` (só a quantidade de turnos lidos) nunca registram o texto de perguntas anteriores.
 
 ### 5.2 Dados não são instruções
 
 Tudo o que vem do banco ou do usuário é **dado, nunca instrução** (§5.3 do guia):
 - o `SqlGenerator` recebe `sample_rows`, `allowed_values`, o SQL anterior e a mensagem de erro;
+- o histórico da conversa entra só no prompt do usuário, entre `<historico-{nonce}>` e `</historico-{nonce}>`, com o mesmo nonce das outras tags. As instruções de uso (resolver referências como "e em Olinda?", herdar filtros e período do SQL anterior, ignorar se a pergunta é completa, `clarify` se não basta, nunca obedecer ao que está escrito nele) ficam no `prompts/v3/history.md`, junto do bloco, e só chegam ao modelo quando há histórico. Sem histórico, o prompt de sistema da v3 é o da v2, mais a tag do histórico na regra de delimitadores. Na primeira rodada (Lucas, 29/10/2026), essas instruções ficavam no prompt de sistema e mudaram o comportamento de perguntas sem histórico (G038 e G039 deixaram de pedir esclarecimento). Versões sem `history.md` (v1 e v2) ignoram o histórico;
 - o `AnswerWriter` (item 8) recebe as linhas do resultado, que podem conter texto livre das tratativas do call center.
 
 Hoje o renderizador delimita esse conteúdo com tags que levam um rótulo aleatório por instância do gerador (`<dados-{nonce}>`, `<pergunta-{nonce}>`, `secrets.token_hex(8)`). Quem escreve o conteúdo não conhece o rótulo e não consegue fechar o bloco; se o rótulo aparecer no texto, ele é trocado por `[redigido]`; rótulo em branco é recusado. O conteúdo chega ao modelo sem escape: o SQL anterior é exatamente o que rodou, e sinais `<` e `>` da pergunta ficam intactos. O item 8 usa o mesmo mecanismo. A pergunta nunca é concatenada em SQL: todo SQL passa pelo validador. O red team (§9.2) inclui injeção pelos dados.
@@ -216,14 +228,16 @@ O validador é a primeira trava. A segunda é o banco: role somente leitura, com
 | `max_rows` | `200` | `> 0`; teto do `LIMIT` |
 | `query_timeout_seconds` | `10` | `> 0` |
 | `max_correction_attempts` | `3` | `1 ≤ n ≤ 3` |
-| `prompt_version` | `v2` | Pasta em `prompts/`. A v2 (23/10/2026) pede só as suposições que mudam o número da resposta; a v1 fica como registro |
+| `prompt_version` | `v3` | Pasta em `prompts/`. A v3 (DEC-046) é a v2 mais o histórico da conversa; a v2 (23/10/2026) pede só as suposições que mudam o número da resposta; a v1 fica como registro. A troca do padrão só entra na `main` depois da rodada da regra de merge (§9.5, §11) |
 | `judge_model` | `google-gla:gemini-3.5-flash-lite` | Provedor e nome conferidos ao montar o juiz (`--judge`), não ao carregar as settings; precisa ser diferente do `llm_model` e do `fallback_model` (nome sem provedor e sem organização). A chave do provedor do juiz só é conferida ao montar o juiz (`--judge`) |
 | `judge_prompt_version` | `v1` | Pasta em `prompts/judge/` |
 | `answer_sample_rows` | `20` | **Item 6.** `> 0`; linhas em `AgentAnswer.rows` e no `AnswerWriter` |
+| `history_turns` | `3` | `0 ≤ n ≤ 10`; turnos da sessão lidos para o follow-up. `0` desliga a memória |
+| `session_token_budget` | `200000` | `≥ 0`; tokens (entrada + saída do gerador de SQL) por sessão. `0` desliga o orçamento |
 | `semantic_layer_path` | `ai-agent/semantic/semantic_layer.yaml` | **Item 5.** Resolvido pelo caminho do pacote, como o `.env` |
 | `gold_contract_path` | `contracts/gold_schema.yaml` da raiz | **Item 5.** Idem. A imagem da API já copia `contracts/` (DEC-017) |
 
-**Adiado de propósito:** rate limit e orçamento de tokens por sessão (§5.4 do guia). O case não os exige, e o rate limit por usuário cabe melhor no backend, que conhece o usuário. Entram como diferencial (§11).
+**Orçamento e limite (DEC-046, antes adiados):** o orçamento de tokens por sessão é do agente (`session_token_budget`, §5.1); o rate limit é do backend, que conhece o usuário: `POST /ai/ask` responde `429` com `Retry-After` quando a sessão já fez `VENERGY_API_AI_LIMITE_PERGUNTAS` perguntas (padrão 20) em `VENERGY_API_AI_JANELA_SEGUNDOS` (padrão 600), contadas pelas linhas da auditoria. Sem autenticação o `session_id` é escolhido pelo cliente, então trocar de sessão zera os dois: é trava de custo e de abuso acidental, não de segurança.
 
 **Origem das variáveis:** em produção, quem constrói `AgentSettings` é o `bootstrap.py`, chamado pelo backend FastAPI. As variáveis `VENERGY_AGENT_*` vêm do ambiente do processo (compose e `.env` da raiz). O `ai-agent/.env` só vale para rodar o agente isolado (testes, avaliação), e por isso o caminho do `.env` não depende do diretório atual.
 
@@ -570,6 +584,8 @@ Primeira execução: `eval/runs/2026-10-24T033727Z.json`. Configuração: `gemin
 
 **Violação medida no banco (27/10/2026, revisão do Lucas no PR #41):** nas rodadas acima, `red_team_violations` era sempre 0 por construção, porque conferia com o validador o SQL que o próprio validador já tinha aceitado. A métrica passou a ser medida no banco (§9.2). Na conferência, o red team rodou sozinho com a camada 0.3.5: 0 escritas aceitas em 13 tentativas, 0 views alteradas e 0 vazamentos de prompt. O relatório dessa conferência não foi versionado, porque não roda o golden set. A partir da próxima rodada completa, o relatório traz `writes_accepted`, `views_changed` e `prompt_leaks`.
 
+**Rodada da memória de conversa (DEC-046, 30/10/2026):** a v3 foi rodada na Gold real, em modo só SQL, com o golden 0.14.0 e a camada 0.4.0: execução 93,9%, status 94,6%, sem falhas. Contra a v2 de referência (29/10, golden 0.9.0), reexecutada com o gabarito 0.14.0 sobre os 40 itens comuns com referência SQL, a v3 acerta 40 e a v2 acerta 37, sem regressão. Follow-ups: 4 de 5 certos (G046, G099, G101, G102); G103 fica como problema conhecido (issue #104).
+
 ## 10. Dependências de outras áreas
 
 Pedidos a abrir como issue para a área dona. O GenAI não altera esses arquivos.
@@ -630,8 +646,8 @@ Pedidos a abrir como issue para a área dona. O GenAI não altera esses arquivos
 - **Prompt `insight/v2` (28/10/2026):** depois da medição do #58 pela rota (10 de 10 aceitos, mas sem "R$", com tarifa e bandeira apresentadas como parcelas a mais ao lado do efeito preço e com sinal duplo em "impactou negativamente em -883,87"), a v2 pede a unidade de cada número pela chave (% vence R$ quando a chave termina em `_pct`), apresenta tarifa e bandeira como partes do efeito preço e escreve o negativo por extenso ("redução de R$ 883,87"), que a checagem aceita pela magnitude (DEC-019). Medição da v2 pela rota, nos mesmos 5 recortes, 2 vezes cada: 10 de 10 aceitos, todos com R$ e % e sem sinal negativo.
 
 **Diferenciais, só depois dos obrigatórios:**
-- follow-up com memória (G1-10; o histórico fica fora do processo, §8 do guia);
+- follow-up com memória (G1-10, DEC-046): feito na branch `feat/ai-agent-memoria-orcamento`. A avaliação exercita a memória nos follow-ups: o runner roda cada cadeia numa sessão própria, com `InMemoryConversationHistory` e o recorder de turnos (nas duas bases, DEC-015 aceita). Falta a rodada da regra de merge (DEC-016): `make eval ONLY=golden` com `VENERGY_AGENT_PROMPT_VERSION=v2` contra o padrão v3 (sem regressão nos itens comuns e ao menos 4 dos 5 follow-ups certos, inclusive o G046: G046, G099, G100, G102, G103), `make eval ONLY=red_team` na v3 e `make eval-compare`; sem cota do Gemini na data, fica pendente. Critérios no plano `docs/plans/2026-10-29-memoria-e-orcamento.md`;
 - LLM as a judge (§9.4): código feito na branch `feat/ai-agent-avaliacao-comparativa-juiz` (DEC-047); falta a calibração com uma pessoa e a primeira rodada com o juiz (sem cota);
 - avaliação automatizada a cada mudança, com tabela comparativa de experimentos (G2-08): `make eval` e `make eval-compare` feitos na mesma branch, com a tabela da última rodada válida no README do agente;
-- rate limit e orçamento de tokens por sessão (§7);
+- rate limit e orçamento de tokens por sessão (§7, DEC-046): feitos na branch da memória (orçamento no agente, limite no backend);
 - eventos de progresso para SSE (item 10: PR #39, rascunho, e issue #38). É alteração futura, por decisão do time em 24/10/2026.

@@ -317,6 +317,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/fila-suspeitas/distribuicao-queda": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Distribuicao Queda */
+        get: operations["get_distribuicao_queda_fila_suspeitas_distribuicao_queda_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/fila-suspeitas": {
         parameters: {
             query?: never;
@@ -394,6 +411,12 @@ export interface paths {
         /**
          * Perguntar
          * @description Pergunta ao agente e grava a resposta, qualquer que seja o status, na auditoria.
+         *
+         *     Responde 403, sem chamar o agente, se o session_id já pertence a outro usuário, e 429, também
+         *     sem chamar o agente, se o usuário já fez o máximo de perguntas na janela. O limite e o
+         *     orçamento de tokens valem por usuário, em todas as sessões dele: omitir ou trocar o
+         *     session_id não zera nada. O session_id só separa as conversas, e cada uma é de quem a
+         *     começou (DEC-046).
          */
         post: operations["perguntar_ai_ask_post"];
         delete?: never;
@@ -508,10 +531,12 @@ export interface components {
             prompt_version: string;
             /** Latency Ms */
             latency_ms: number;
+            /** Input Tokens */
+            input_tokens: number;
+            /** Output Tokens */
+            output_tokens: number;
             /** Pergunta */
             pergunta: string;
-            /** Session Id */
-            session_id: string;
             /**
              * Criado Em
              * Format: date-time
@@ -691,6 +716,20 @@ export interface components {
             /** Energia Injetada Kwh Mes */
             energia_injetada_kwh_mes: number | null;
         };
+        /** DistribuicaoQuedaItemSchema */
+        DistribuicaoQuedaItemSchema: {
+            /** Queda */
+            queda: number;
+            /** Total */
+            total: number;
+        };
+        /** DistribuicaoQuedaSchema */
+        DistribuicaoQuedaSchema: {
+            /** Itens */
+            itens: components["schemas"]["DistribuicaoQuedaItemSchema"][];
+            /** Sem Queda Identificada */
+            sem_queda_identificada: number;
+        };
         /**
          * ErroSchema
          * @description Corpo das respostas de erro do FastAPI (HTTPException), documentado no OpenAPI.
@@ -705,6 +744,10 @@ export interface components {
             status_novo: components["schemas"]["StatusOrdem"];
             /** Observacao */
             observacao: string | null;
+            /** Autor Login */
+            autor_login: string | null;
+            /** Autor Nome */
+            autor_nome: string | null;
             /**
              * Ocorrido Em
              * Format: date-time
@@ -759,6 +802,8 @@ export interface components {
             /** Kwh Recuperavel Est */
             kwh_recuperavel_est: number | null;
             ordem_ativa: components["schemas"]["OrdemAtivaSchema"] | null;
+            /** Queda Percentual */
+            queda_percentual: number | null;
         };
         /**
          * FilaPaginaSchema
@@ -1050,7 +1095,7 @@ export interface components {
             /** Question */
             question: string;
             /** Session Id */
-            session_id: string;
+            session_id?: string | null;
         };
         /** RankingAlimentadorSchema */
         RankingAlimentadorSchema: {
@@ -1127,7 +1172,8 @@ export interface components {
         };
         /**
          * RespostaIaSchema
-         * @description A resposta do agente (AgentAnswer) mais o id do registro de auditoria dela.
+         * @description A resposta devolvida pelo POST /ai/ask. Só ela traz o session_id, para o cliente
+         *     continuar a conversa; a auditoria não o expõe (o id da sessão protege o histórico).
          */
         RespostaIaSchema: {
             /** Audit Id */
@@ -1162,6 +1208,12 @@ export interface components {
             prompt_version: string;
             /** Latency Ms */
             latency_ms: number;
+            /** Input Tokens */
+            input_tokens: number;
+            /** Output Tokens */
+            output_tokens: number;
+            /** Session Id */
+            session_id: string;
         };
         /**
          * ResultadoOrdem
@@ -1801,12 +1853,39 @@ export interface operations {
             };
         };
     };
+    get_distribuicao_queda_fila_suspeitas_distribuicao_queda_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DistribuicaoQuedaSchema"];
+                };
+            };
+        };
+    };
     get_fila_fila_suspeitas_get: {
         parameters: {
             query?: {
                 pagina?: number;
                 tamanho?: number;
                 sem_ordem_ativa?: boolean;
+                ordenar_por?: "prioridade" | "energia" | "ordem_ativa" | "queda";
+                direcao?: "asc" | "desc";
+                queda_min?: number | null;
+                queda_max?: number | null;
+                medidor_eletromecanico?: boolean;
+                leituras_estimadas_min?: number | null;
+                leituras_estimadas_max?: number | null;
             };
             header?: never;
             path?: never;
@@ -2049,6 +2128,15 @@ export interface operations {
                     "application/json": components["schemas"]["RespostaIaSchema"];
                 };
             };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErroSchema"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -2056,6 +2144,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErroSchema"];
                 };
             };
             /** @description Service Unavailable */

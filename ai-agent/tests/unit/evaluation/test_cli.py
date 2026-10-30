@@ -128,3 +128,11 @@ def test_judge_mean_score_is_a_number_and_not_a_percentage():
 def test_judge_flag_without_the_narrative_is_refused_before_any_connection(capsys):
     assert main(["--dataset", "gold_real", "--sql-only", "--judge"]) == 1
     assert "--sql-only" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("flag", ["--sql-only", "--judge"])
+def test_references_mode_refuses_flags_it_would_ignore(flag, capsys):
+    with pytest.raises(SystemExit):
+        main(["--only", "references", flag])
+
+    assert "--only references" in capsys.readouterr().err

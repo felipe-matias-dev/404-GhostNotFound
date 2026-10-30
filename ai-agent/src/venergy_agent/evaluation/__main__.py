@@ -18,6 +18,7 @@ from venergy_agent.evaluation.report import EvaluationReport
 from venergy_agent.evaluation.runner import EvaluationRunner
 from venergy_agent.infrastructure.answer_judge import PydanticAiAnswerJudge
 from venergy_agent.infrastructure.llm import build_judge_model
+from venergy_agent.infrastructure.memory_history import InMemoryConversationHistory
 from venergy_agent.infrastructure.postgres_executor import PostgresQueryExecutor
 from venergy_agent.infrastructure.semantic_source import (
     SemanticLayerError,
@@ -100,7 +101,10 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--dataset", choices=("amostra", "gold_real"), default="amostra")
     parser.add_argument("--sql-only", action="store_true")
     parser.add_argument("--judge", action="store_true")
-    return parser.parse_args(argv)
+    args = parser.parse_args(argv)
+    if args.only == "references" and (args.sql_only or args.judge):
+        parser.error("--only references não chama o modelo: não use com --sql-only nem --judge")
+    return args
 
 
 def load_set(path: Path) -> tuple[str, list[dict[str, Any]]]:
@@ -135,7 +139,8 @@ async def _evaluate(
     counted = await executor.execute(validator.validate(UC_COUNT_SQL, layer.allowed_views))
     check_dataset(dataset, int(counted.rows[0]["total"]))
     narrate = narrates(sql_only)
-    agent = await build_agent(settings, narrate=narrate)
+    memory = InMemoryConversationHistory()
+    agent = await build_agent(settings, narrate=narrate, history=memory)
     answer_judge = _build_judge(settings) if with_judge else None
     runner = EvaluationRunner(
         agent=agent,
@@ -147,6 +152,7 @@ async def _evaluate(
         ),
         pause_seconds=pause_seconds,
         judge=answer_judge,
+        recorder=memory,
     )
     golden_version, golden = load_set(EVAL_DIR / "golden_set.yaml")
     red_team_version, red_team = load_set(EVAL_DIR / "red_team.yaml")

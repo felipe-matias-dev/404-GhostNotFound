@@ -74,6 +74,16 @@ export function tituloEvento(
 }
 
 /**
+ * Quem fez a mudança: o nome, ou o login se o usuário não existe mais. Nulo nos eventos de
+ * antes do login, que não têm autor (DEC-050).
+ */
+export function autorEvento(
+	evento: Pick<EventoOrdem, "autor_nome" | "autor_login">,
+): string | null {
+	return evento.autor_nome ?? evento.autor_login ?? null;
+}
+
+/**
  * Mensagem para o usuário a partir da falha da API: o `detail` do FastAPI é texto no 404/409
  * e lista de erros de validação no 422. Sem `detail` legível (rede, 500), usa `padrao`.
  */

@@ -2,6 +2,7 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 
 from venergy_agent.application.ports import QueryExecutor, SqlValidator
+from venergy_agent.domain.errors import QueryExecutionError, SqlRejected
 from venergy_agent.evaluation.metrics import no_data
 
 
@@ -21,7 +22,7 @@ async def check_references(
         checked += 1
         try:
             result = await executor.execute(validator.validate(sql, allowed_views))
-        except Exception as error:
+        except (SqlRejected, QueryExecutionError) as error:
             problems.append(f"{item['id']}: não executa ({type(error).__name__})")
             continue
         if no_data(result.rows) and not item.get("allow_empty_reference", False):
