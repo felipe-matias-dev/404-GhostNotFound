@@ -2,7 +2,7 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Query
 from sqlalchemy import Integer, and_, any_, case, cast, func, select
 
 from venergy_api.database import SessionDep
@@ -55,21 +55,6 @@ def get_distribuicao_queda(session: SessionDep) -> DistribuicaoQuedaSchema:
 @router.get("")
 def get_fila(filtro: Annotated[FilaFiltroSchema, Query()], session: SessionDep) -> FilaPaginaSchema:
     """A fila da mais para a menos suspeita, com a ordem ativa de cada UC."""
-    if (
-        filtro.queda_min is not None
-        and filtro.queda_max is not None
-        and filtro.queda_min > filtro.queda_max
-    ):
-        raise HTTPException(status_code=422, detail="queda_min deve ser menor ou igual a queda_max")
-    if (
-        filtro.leituras_estimadas_min is not None
-        and filtro.leituras_estimadas_max is not None
-        and filtro.leituras_estimadas_min > filtro.leituras_estimadas_max
-    ):
-        raise HTTPException(
-            status_code=422,
-            detail="leituras_estimadas_min deve ser menor ou igual a leituras_estimadas_max",
-        )
     queda = queda_percentual()
     fila = FilaSuspeita
     # Junção à esquerda: toda UC da fila aparece, com ou sem ordem. O índice único parcial

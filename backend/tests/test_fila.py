@@ -265,3 +265,16 @@ def test_all_suspicion_filters_combine_before_pagination(
 )
 def test_rejects_invalid_suspicion_filters(client: TestClient, params: dict) -> None:
     assert client.get(URL, params=params).status_code == 422
+
+
+@pytest.mark.parametrize(
+    "params",
+    [
+        {"queda_min": 50, "queda_max": 25},
+        {"leituras_estimadas_min": 50, "leituras_estimadas_max": 25},
+    ],
+)
+def test_inverted_ranges_return_validation_errors(client: TestClient, params: dict) -> None:
+    response = client.get(URL, params=params)
+    assert response.status_code == 422
+    assert response.json()["detail"][0]["type"] == "value_error"

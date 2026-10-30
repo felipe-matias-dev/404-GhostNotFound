@@ -543,6 +543,24 @@ class FilaFiltroSchema(BaseModel):
     leituras_estimadas_min: Annotated[int | None, Field(ge=25, le=100)] = None
     leituras_estimadas_max: Annotated[int | None, Field(ge=25, le=100)] = None
 
+    @model_validator(mode="after")
+    def limites_validos(self) -> "FilaFiltroSchema":
+        if (
+            self.queda_min is not None
+            and self.queda_max is not None
+            and self.queda_min > self.queda_max
+        ):
+            raise ValueError("queda_min deve ser menor ou igual a queda_max")
+        if (
+            self.leituras_estimadas_min is not None
+            and self.leituras_estimadas_max is not None
+            and self.leituras_estimadas_min > self.leituras_estimadas_max
+        ):
+            raise ValueError(
+                "leituras_estimadas_min deve ser menor ou igual a leituras_estimadas_max"
+            )
+        return self
+
 
 class DistribuicaoQuedaItemSchema(BaseModel):
     queda: int
