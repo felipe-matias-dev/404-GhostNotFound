@@ -56,6 +56,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | 28/10/2026 | DEC-048: ordem de inspeção em campo pode voltar para gerada; a observação da volta fica só no histórico | Uma OI enviada a campo sem querer não precisa ser cancelada e gerada de novo, o que sujaria a métrica de visita desnecessária | Felipe |
 | 29/10/2026 | DEC-049: login com cookie httpOnly e cinco perfis; só `perdas` escreve nas ordens de inspeção e só `ti` lê a auditoria do agente | Esconder o menu não é segurança: a permissão é checada no backend, onde estão os dados; o agente já lê toda a Gold, então bloquear a leitura por tela daria falsa proteção | Felipe |
 | 29/10/2026 | DEC-050: os eventos das ordens de inspeção guardam o login de quem agiu (`autor_login`), o histórico mostra o nome dele, e a carga e a subida da API acrescentam a coluna sem apagar o histórico | O gerente de perdas é o único que escreve, e a trilha precisa responder quem concluiu ou cancelou uma ordem; recriar a tabela para isso perderia o histórico de quem já usa o portal | Felipe |
+| 29/10/2026 | DEC-051: filtros da fila usam os sinais já informados nos motivos da Gold: queda, medidor eletromecânico e percentual de leituras estimadas | Mantém a fila fiel à Gold, sem recalcular métricas ou tratar ausência como zero; todos os filtros operam antes da paginação | João Euclides |
 
 ## DEC-001 · Localização dos arquivos de origem (landing)
 
@@ -1594,3 +1595,11 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Em aberto:** a autoria da auditoria do agente (`app.ai_auditoria`). O PR #86 (memória de conversa) cria a coluna `usuario`
   e passa a acrescentá-la pelo mesmo `garantir_estrutura_do_app`. A leitura continua só da TI até o portal ter um painel de
   auditoria.
+
+## DEC-051 · Filtro de queda na fila de suspeitas
+
+- **Data:** 29/10/2026 · **Área:** Portal e dados · **Autor:** João Euclides
+- **Contexto:** o gerente precisa filtrar e ordenar a fila pela queda de consumo. A Gold expõe esse valor arredondado no texto `Queda de N% no consumo médio...` em `motivos`, não em uma coluna numérica própria.
+- **Decisão:** a API extrai somente esse padrão, entre 0 e 100%, sem confundir com os percentuais de leituras estimadas. A distribuição cobre a fila inteira; o filtro por faixa inclusiva e a ordenação são aplicados antes da paginação. A fila sem filtro mantém também as UCs cujo motivo não foi reconhecido; com filtro elas ficam fora e são contadas separadamente na distribuição.
+- **Extensão (29/10/2026):** o painel combina queda com `medidor_eletromecanico=true` e os limites inclusivos `leituras_estimadas_min/max`, extraídos do motivo completo de leituras estimadas. A Gold só emite esse motivo para percentuais a partir de 25%; o filtro aceita limites de 25 a 100 e não abrange valores inferiores nem ausentes. A ausência também pode indicar dados indisponíveis, nunca é interpretada como zero. Os três sinais são combinados com AND antes da paginação.
+- **Limite:** o valor é o percentual inteiro já arredondado pela Gold, não uma nova conta. Alterar a redação do motivo exige atualizar o extrator; uma coluna numérica na Gold eliminaria essa dependência.

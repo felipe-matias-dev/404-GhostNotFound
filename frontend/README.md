@@ -240,6 +240,14 @@ Recorte da tela no topo (ex.: `Receita › Recife ▾ › Boa Viagem ▾`): a p�
 - Consultas: hooks em ordem fixa com `skipToken` para a visão inativa e para série sem código; `AbortSignal` propagado às três chamadas; cache global de 5 min sem `keepPreviousData`. Troca de chave mostra o molde nativo; recarga da mesma chave mantém os dados com `aria-busy`/`Atualizando…` e erro de refetch em aviso externo com retry, sem esconder as linhas. Erro inicial aparece no estado nativo, nunca como vazio.
 - Acessibilidade: foco retorna à linha que abriu o painel (ou ao título `tabIndex={-1}` em deep link), `Sheet` prende o foco e `Esc`/X/backdrop fecham; Back/Forward reabrem pelo histórico. O gráfico expõe a tabela `sr-only` com todas as competências, inclusive as lacunas.
 
+### Perdas
+
+- O seletor superior em pills **Suspeitas / Inspeções** alterna as duas telas sem repetir os títulos do cabeçalho; a troca preserva a página e a seleção da fila. A fila usa `DataTable` com 20 UCs por página da API, inicialmente na ordem da Gold. A barra junto à lista mostra o total ou a seleção atual e a ação **Gerar ordens de inspeção**. A energia estimada e a presença de ordem ativa podem ser ordenadas na API, antes da paginação; mudar a ordem retorna à primeira página e limpa a seleção. UCs com OI ativa não são selecionáveis. Abrir a linha mostra os motivos completos; clicar no código da UC abre sua consulta.
+- Os códigos de UC têm sublinhado permanente para identificar os links; o traço fica dentro da altura da célula, sem ser cortado pela truncagem do texto.
+- A fila combina filtros antes da paginação. Leituras estimadas aceitam faixas de 25% a 100%, pois a Gold não informa o percentual abaixo desse limite; valores ausentes ficam fora do filtro ([DEC-051](../docs/decisoes.md#dec-051--filtro-de-queda-na-fila-de-suspeitas)).
+- Apenas o perfil `perdas` pode selecionar UCs e gerar OIs. A criação é atômica: uma UC inexistente ou com OI ativa impede todo o lote.
+- Em telas estreitas ou para perfis sem permissão de edição, as ordens usam a tabela; a preferência de visualização é preservada.
+
 ## Design system
 
 Os componentes reutilizáveis (backlog V2-02) são construídos e documentados no Storybook
@@ -253,6 +261,7 @@ carrega `src/styles.css`.
   componentes não usam cor ou espaçamento solto.
 - **Componentes** (`src/components/ui/`) e **Layout** (`src/components/layout/`): story em
   `<nome>.stories.tsx` ao lado do componente, cobrindo padrão, carregando, erro e vazio.
+- **Checkbox** (`ui/checkbox/`): componente compartilhado pelo `DataTable` (tabela e cards) e pelos filtros de suspeitas, com os mesmos tamanho, borda, marca de seleção e animação. O painel de filtros usa opções de 32 px, padding reduzido e controles percentuais recolhíveis; os estados marcado, desmarcado, parcial e desabilitado estão no Storybook.
 - Painel **Accessibility** (addon a11y) sem violações.
 - Sem biblioteca de componentes como dependência. Componentes do
   [shadcn/ui](https://ui.shadcn.com/) (estilo `base-nova`, sobre Base UI) entram pela CLI (`npx shadcn@latest add <nome>`,

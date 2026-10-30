@@ -28,3 +28,15 @@ export type AcaoOrdem = "enviar" | "concluir" | "cancelar";
 export const MAX_ORDENS_POR_PEDIDO = 200;
 
 export type VisaoOrdens = "kanban" | "tabela";
+
+export type FiltrosFila = {
+	queda: [number, number] | null;
+	medidorEletromecanico: boolean;
+	leiturasEstimadas: [number, number] | null;
+};
+
+export const FILTROS_FILA_INICIAIS: FiltrosFila = {
+	queda: null,
+	medidorEletromecanico: false,
+	leiturasEstimadas: null,
+};

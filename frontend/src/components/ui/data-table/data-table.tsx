@@ -10,15 +10,12 @@
 // - estados de carregando (molde das linhas), erro (com "Tentar de novo") e vazio;
 // - abaixo de 48rem de largura do container (celular, painel estreito), vira lista de cards
 //   com a ordenação em chips; os cards também viajam (layout animation).
-import { Checkbox } from "@base-ui/react/checkbox";
 import {
 	ArrowsClockwiseIcon,
 	ArrowsDownUpIcon,
 	ArrowUpIcon,
 	CaretLeftIcon,
 	CaretRightIcon,
-	CheckIcon,
-	MinusIcon,
 	TrayIcon,
 	XCircleIcon,
 } from "@phosphor-icons/react";
@@ -32,6 +29,7 @@ import {
 	useState,
 } from "react";
 import { Button } from "#/components/ui/button";
+import { Checkbox } from "#/components/ui/checkbox";
 import { cn } from "#/lib/utils";
 
 const CELL = {
@@ -100,11 +98,21 @@ export type DataTableProps<T> = {
 	sort?: SortState | null;
 	defaultSort?: SortState | null;
 	onSortChange?: (next: SortState | null) => void;
+	/** A API já devolve as linhas ordenadas; mantém apenas os controles visuais. */
+	serverSort?: boolean;
 	pageSize?: number;
+	/** Paginação controlada pela API, com índice de página começando em zero. */
+	pagination?: {
+		page: number;
+		total: number;
+		onPageChange: (page: number) => void;
+		disabled?: boolean;
+	};
 	rowHeight?: number;
 	/** Seleção múltipla: ativa quando `onSelectedChange` é passado. */
 	selected?: ReadonlySet<string>;
 	onSelectedChange?: (next: Set<string>) => void;
+	isRowSelectable?: (row: T) => boolean;
 	onRowClick?: (row: T) => void;
 	/**
 	 * Ações da linha (botões). Na tabela, última coluna; no card, rodapé. Não disparam
@@ -148,6 +156,7 @@ function useSortableRows<T>({
 	sort,
 	defaultSort,
 	onSortChange,
+	serverSort,
 }: {
 	rows: T[];
 	getRowId: (row: T) => string;
@@ -155,6 +164,7 @@ function useSortableRows<T>({
 	sort: SortState | null | undefined;
 	defaultSort: SortState | null;
 	onSortChange?: (next: SortState | null) => void;
+	serverSort: boolean;
 }) {
 	const [internal, setInternal] = useState<SortState | null>(defaultSort);
 	const controlled = sort !== undefined;
@@ -162,7 +172,7 @@ function useSortableRows<T>({
 
 	const ordered = useMemo(() => {
 		const base = rows.map((row, i) => ({ id: getRowId(row), row, i }));
-		if (current) {
+		if (current && !serverSort) {
 			const dir = current.direction === "asc" ? 1 : -1;
 			base.sort((x, y) => {
 				const a = getValue(x.row, current.columnId);
@@ -181,7 +191,7 @@ function useSortableRows<T>({
 			});
 		}
 		return base.map(({ id, row }) => ({ id, row }));
-	}, [rows, current, getRowId, getValue]);
+	}, [rows, current, getRowId, getValue, serverSort]);
 
 	const toggle = (columnId: string) => {
 		const next: SortState | null =
@@ -238,54 +248,6 @@ function SortArrow({
 	);
 }
 
-function SelectBox({
-	checked,
-	indeterminate = false,
-	onChange,
-	label,
-	reduced,
-	className,
-}: {
-	checked: boolean;
-	indeterminate?: boolean;
-	onChange: (checked: boolean) => void;
-	label: string;
-	reduced: boolean;
-	className?: string;
-}) {
-	const on = checked || indeterminate;
-	return (
-		<Checkbox.Root
-			checked={checked}
-			indeterminate={indeterminate}
-			onCheckedChange={(next) => onChange(next)}
-			aria-label={label}
-			onClick={(event) => event.stopPropagation()}
-			className={cn(
-				"relative z-10 grid size-4 shrink-0 cursor-pointer place-items-center rounded-sm border outline-none transition-colors duration-150 focus-visible:border-focus-ring focus-visible:ring-3 focus-visible:ring-focus-ring/50",
-				on
-					? "border-accent bg-accent text-on-accent"
-					: "border-border-strong text-transparent hover:bg-hover",
-				className,
-			)}
-		>
-			<motion.span
-				aria-hidden
-				className="flex"
-				initial={false}
-				animate={{ scale: on ? 1 : 0.4 }}
-				transition={reduced ? INSTANT : CELL}
-			>
-				{indeterminate ? (
-					<MinusIcon weight="bold" className="size-3" />
-				) : (
-					<CheckIcon weight="bold" className="size-3" />
-				)}
-			</motion.span>
-		</Checkbox.Root>
-	);
-}
-
 function StateBlock({
 	tone,
 	children,
@@ -332,10 +294,13 @@ export function DataTable<T>({
 	sort,
 	defaultSort = null,
 	onSortChange,
+	serverSort = false,
 	pageSize = 10,
+	pagination,
 	rowHeight = 44,
 	selected,
 	onSelectedChange,
+	isRowSelectable,
 	onRowClick,
 	rowActions,
 	rowActionsWidth = "160px",
@@ -378,18 +343,27 @@ export function DataTable<T>({
 		sort,
 		defaultSort,
 		onSortChange,
+		serverSort,
 	});
 
 	const selectable = onSelectedChange !== undefined;
 	const chosen = selected ?? new Set<string>();
 
-	const pageCount = Math.max(1, Math.ceil(ordered.length / pageSize));
-	const pageIndex = Math.min(page, pageCount - 1);
+	const total = pagination?.total ?? ordered.length;
+	const pageCount = Math.max(1, Math.ceil(total / pageSize));
+	const pageIndex = pagination
+		? pagination.page
+		: Math.min(page, pageCount - 1);
 	const start = pageIndex * pageSize;
-	const pageRows = ordered.slice(start, start + pageSize);
-
-	const chosenOnPage = pageRows.filter(({ id }) => chosen.has(id)).length;
-	const allOnPage = pageRows.length > 0 && chosenOnPage === pageRows.length;
+	const pageRows = pagination
+		? ordered
+		: ordered.slice(start, start + pageSize);
+	const selectableRows = pageRows.filter(
+		({ row }) => isRowSelectable?.(row) ?? true,
+	);
+	const chosenOnPage = selectableRows.filter(({ id }) => chosen.has(id)).length;
+	const allOnPage =
+		selectableRows.length > 0 && chosenOnPage === selectableRows.length;
 	const someOnPage = chosenOnPage > 0 && !allOnPage;
 
 	const template = [
@@ -423,7 +397,7 @@ export function DataTable<T>({
 
 	const setPageSelected = (on: boolean) => {
 		const next = new Set(chosen);
-		for (const { id } of pageRows) {
+		for (const { id } of selectableRows) {
 			if (on) next.add(id);
 			else next.delete(id);
 		}
@@ -502,7 +476,7 @@ export function DataTable<T>({
 			>
 				<table
 					aria-label={label}
-					aria-rowcount={data.length + 1}
+					aria-rowcount={total + 1}
 					aria-colcount={
 						columns.length + (selectable ? 1 : 0) + (rowActions ? 1 : 0)
 					}
@@ -516,12 +490,12 @@ export function DataTable<T>({
 						>
 							{selectable && (
 								<th scope="col" className="flex min-w-0">
-									<SelectBox
+									<Checkbox
 										checked={allOnPage}
 										indeterminate={someOnPage}
 										onChange={setPageSelected}
 										label="Selecionar todas desta página"
-										reduced={reduced}
+										disabled={selectableRows.length === 0}
 									/>
 								</th>
 							)}
@@ -676,11 +650,11 @@ export function DataTable<T>({
 										>
 											{selectable && (
 												<td className="flex min-w-0">
-													<SelectBox
+													<Checkbox
 														checked={isSelected}
 														onChange={(on) => setRowSelected(id, on)}
 														label={`Selecionar ${nameOf(row)}`}
-														reduced={reduced}
+														disabled={!(isRowSelectable?.(row) ?? true)}
 													/>
 												</td>
 											)}
@@ -750,56 +724,60 @@ export function DataTable<T>({
 				{showRows && (
 					<div className="flex items-center gap-2">
 						{selectable && (
-							<SelectBox
+							<Checkbox
 								checked={allOnPage}
 								indeterminate={someOnPage}
 								onChange={setPageSelected}
 								label="Selecionar todas desta página"
-								reduced={reduced}
+								disabled={selectableRows.length === 0}
 								className="ml-3"
 							/>
 						)}
-						<ArrowsDownUpIcon
-							aria-hidden
-							className={cn(
-								"size-4 shrink-0 text-text-muted",
-								!selectable && "ml-1",
-							)}
-						/>
-						{/* biome-ignore lint/a11y/useSemanticElements: grupo de botões, não formulário. */}
-						<div
-							role="group"
-							aria-label="Ordenar por"
-							className="-my-1 flex min-w-0 flex-1 gap-1.5 overflow-x-auto py-1 pr-1"
-						>
-							{columns.filter(isSortable).map((column) => {
-								const state = ariaSort(column.id);
-								return (
-									<button
-										key={column.id}
-										type="button"
-										aria-pressed={state !== "none"}
-										aria-label={`Ordenar por ${column.header}${
-											state === "none"
-												? ""
-												: state === "ascending"
-													? ", crescente"
-													: ", decrescente"
-										}`}
-										onClick={() => onToggle(column.id)}
-										className={cn(
-											"flex h-7 shrink-0 cursor-pointer items-center gap-1 rounded-full border px-2.5 text-small outline-none transition-colors duration-150 focus-visible:border-focus-ring focus-visible:ring-3 focus-visible:ring-focus-ring/50",
-											state !== "none"
-												? "border-border-strong bg-surface-2 text-text"
-												: "border-border text-text-muted hover:bg-hover hover:text-text",
-										)}
-									>
-										{column.header}
-										<SortArrow state={state} reduced={reduced} />
-									</button>
-								);
-							})}
-						</div>
+						{columns.some(isSortable) && (
+							<>
+								<ArrowsDownUpIcon
+									aria-hidden
+									className={cn(
+										"size-4 shrink-0 text-text-muted",
+										!selectable && "ml-1",
+									)}
+								/>
+								{/* biome-ignore lint/a11y/useSemanticElements: grupo de botões, não formulário. */}
+								<div
+									role="group"
+									aria-label="Ordenar por"
+									className="-my-1 flex min-w-0 flex-1 gap-1.5 overflow-x-auto py-1 pr-1"
+								>
+									{columns.filter(isSortable).map((column) => {
+										const state = ariaSort(column.id);
+										return (
+											<button
+												key={column.id}
+												type="button"
+												aria-pressed={state !== "none"}
+												aria-label={`Ordenar por ${column.header}${
+													state === "none"
+														? ""
+														: state === "ascending"
+															? ", crescente"
+															: ", decrescente"
+												}`}
+												onClick={() => onToggle(column.id)}
+												className={cn(
+													"flex h-7 shrink-0 cursor-pointer items-center gap-1 rounded-full border px-2.5 text-small outline-none transition-colors duration-150 focus-visible:border-focus-ring focus-visible:ring-3 focus-visible:ring-focus-ring/50",
+													state !== "none"
+														? "border-border-strong bg-surface-2 text-text"
+														: "border-border text-text-muted hover:bg-hover hover:text-text",
+												)}
+											>
+												{column.header}
+												<SortArrow state={state} reduced={reduced} />
+											</button>
+										);
+									})}
+								</div>
+							</>
+						)}
 					</div>
 				)}
 
@@ -873,11 +851,11 @@ export function DataTable<T>({
 									>
 										<div className="flex items-center gap-2.5">
 											{selectable && (
-												<SelectBox
+												<Checkbox
 													checked={isSelected}
 													onChange={(on) => setRowSelected(id, on)}
 													label={`Selecionar ${nameOf(row)}`}
-													reduced={reduced}
+													disabled={!(isRowSelectable?.(row) ?? true)}
 												/>
 											)}
 											{first && (
@@ -924,7 +902,7 @@ export function DataTable<T>({
 				)}
 			</div>
 
-			{showRows && (
+			{(showRows || (showEmpty && pagination && pageIndex > 0)) && (
 				<div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-1">
 					<p
 						className={cn(
@@ -932,7 +910,9 @@ export function DataTable<T>({
 							busy && "text-text-disabled",
 						)}
 					>
-						{start + 1}–{start + pageRows.length} de {data.length}
+						{showRows
+							? `${start + 1}–${start + pageRows.length} de ${total}`
+							: `Nenhuma linha nesta página · ${total} no total`}
 						{selectable && chosen.size > 0 && (
 							<>
 								{" · "}
@@ -950,7 +930,7 @@ export function DataTable<T>({
 							</>
 						)}
 					</p>
-					{pageCount > 1 && (
+					{(pageCount > 1 || pageIndex > 0) && (
 						<nav
 							aria-label={`Páginas de ${label}`}
 							className="flex items-center gap-1"
@@ -959,8 +939,12 @@ export function DataTable<T>({
 								variant="ghost"
 								size="icon-sm"
 								aria-label="Página anterior"
-								disabled={pageIndex === 0}
-								onClick={() => setPage(pageIndex - 1)}
+								disabled={pageIndex === 0 || pagination?.disabled}
+								onClick={() =>
+									pagination
+										? pagination.onPageChange(pageIndex - 1)
+										: setPage(pageIndex - 1)
+								}
 							>
 								<CaretLeftIcon aria-hidden />
 							</Button>
@@ -971,8 +955,12 @@ export function DataTable<T>({
 								variant="ghost"
 								size="icon-sm"
 								aria-label="Próxima página"
-								disabled={pageIndex === pageCount - 1}
-								onClick={() => setPage(pageIndex + 1)}
+								disabled={pageIndex >= pageCount - 1 || pagination?.disabled}
+								onClick={() =>
+									pagination
+										? pagination.onPageChange(pageIndex + 1)
+										: setPage(pageIndex + 1)
+								}
 							>
 								<CaretRightIcon aria-hidden />
 							</Button>

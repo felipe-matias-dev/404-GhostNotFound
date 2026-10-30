@@ -1,5 +1,6 @@
+import type { SortState } from "#/components/ui/data-table";
 import { api, unwrap } from "#/lib/api";
-import type { AtualizarOrdem, StatusOrdem } from "./types";
+import type { AtualizarOrdem, FiltrosFila, StatusOrdem } from "./types";
 
 export const ordensKeys = {
 	all: ["ordens-inspecao"] as const,
@@ -7,6 +8,43 @@ export const ordensKeys = {
 		[...ordensKeys.all, { status }] as const,
 	detalhe: (id: number) => [...ordensKeys.all, "detalhe", id] as const,
 };
+
+export const filaKey = ["fila-suspeitas"] as const;
+export const TAMANHO_PAGINA = 20;
+
+const ORDENACAO_FILA: Record<string, "queda" | "energia" | "ordem_ativa"> = {
+	queda: "queda",
+	energia: "energia",
+	ordem_ativa: "ordem_ativa",
+};
+
+export function distribuicaoQueda() {
+	return unwrap(api.GET("/fila-suspeitas/distribuicao-queda"));
+}
+
+export function listarFila(
+	pagina: number,
+	sort: SortState | null,
+	filtros: FiltrosFila,
+) {
+	return unwrap(
+		api.GET("/fila-suspeitas", {
+			params: {
+				query: {
+					pagina,
+					tamanho: TAMANHO_PAGINA,
+					queda_min: filtros.queda?.[0],
+					queda_max: filtros.queda?.[1],
+					medidor_eletromecanico: filtros.medidorEletromecanico,
+					leituras_estimadas_min: filtros.leiturasEstimadas?.[0],
+					leituras_estimadas_max: filtros.leiturasEstimadas?.[1],
+					ordenar_por: ORDENACAO_FILA[sort?.columnId ?? ""] ?? "prioridade",
+					direcao: sort?.direction ?? "asc",
+				},
+			},
+		}),
+	);
+}
 
 export function listarOrdens(status: StatusOrdem | undefined) {
 	return unwrap(api.GET("/ordens-inspecao", { params: { query: { status } } }));

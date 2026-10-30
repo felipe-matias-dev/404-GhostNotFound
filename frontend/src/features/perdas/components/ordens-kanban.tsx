@@ -23,7 +23,7 @@ import { OrdemAcoesBotoes } from "./ordem-acoes-botoes";
 // Ocupa a área toda da tela: `flex-1` preenche a altura que sobra na página, e as colunas
 // esticam junto (alvo de soltar até o fim da tela, mesmo com poucas OIs).
 const GRADE =
-	"grid min-h-0 flex-1 grid-flow-col auto-cols-[minmax(15rem,1fr)] gap-3 overflow-x-auto";
+	"grid min-h-[28rem] flex-1 grid-flow-col auto-cols-[minmax(17rem,1fr)] gap-3 overflow-x-auto pb-2";
 
 const VER_TODAS_ROTULO: Record<"CONCLUIDA" | "CANCELADA", string> = {
 	CONCLUIDA: "Ver todas as ordens concluídas",
@@ -227,7 +227,7 @@ function ColunaKanban({
 				onSoltar(status);
 			}}
 			className={cn(
-				"flex flex-col gap-2 rounded-lg border bg-surface-1 p-2",
+				"flex flex-col gap-3 rounded-lg border bg-surface-1 p-3",
 				destacada
 					? "border-accent border-dashed bg-accent-subtle"
 					: "border-border",
@@ -333,7 +333,7 @@ function CartaoKanban({
 			}}
 			onDragEnd={onFinalizarArraste}
 			className={cn(
-				"flex flex-col gap-2 rounded-md border border-transparent bg-transparent p-3",
+				"flex flex-col gap-3 rounded-md border border-border bg-surface-2 p-4",
 				"transition-[translate,background-color,border-color,box-shadow] duration-150 ease-out hover:-translate-y-0.5 hover:border-border-strong hover:bg-surface-2 hover:shadow-overlay focus-within:border-border-strong focus-within:bg-surface-2 focus-within:shadow-overlay motion-reduce:transition-none motion-reduce:hover:translate-y-0",
 				arrastavel && "cursor-grab active:cursor-grabbing",
 			)}
