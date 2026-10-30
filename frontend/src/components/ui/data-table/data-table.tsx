@@ -10,15 +10,12 @@
 // - estados de carregando (molde das linhas), erro (com "Tentar de novo") e vazio;
 // - abaixo de 48rem de largura do container (celular, painel estreito), vira lista de cards
 //   com a ordenação em chips; os cards também viajam (layout animation).
-import { Checkbox } from "@base-ui/react/checkbox";
 import {
 	ArrowsClockwiseIcon,
 	ArrowsDownUpIcon,
 	ArrowUpIcon,
 	CaretLeftIcon,
 	CaretRightIcon,
-	CheckIcon,
-	MinusIcon,
 	TrayIcon,
 	XCircleIcon,
 } from "@phosphor-icons/react";
@@ -32,6 +29,7 @@ import {
 	useState,
 } from "react";
 import { Button } from "#/components/ui/button";
+import { Checkbox } from "#/components/ui/checkbox";
 import { cn } from "#/lib/utils";
 
 const CELL = {
@@ -247,54 +245,6 @@ function SortArrow({
 				<ArrowUpIcon weight="bold" className="size-3" />
 			</motion.span>
 		</motion.span>
-	);
-}
-
-function SelectBox({
-	checked,
-	indeterminate = false,
-	onChange,
-	label,
-	reduced,
-	className,
-}: {
-	checked: boolean;
-	indeterminate?: boolean;
-	onChange: (checked: boolean) => void;
-	label: string;
-	reduced: boolean;
-	className?: string;
-}) {
-	const on = checked || indeterminate;
-	return (
-		<Checkbox.Root
-			checked={checked}
-			indeterminate={indeterminate}
-			onCheckedChange={(next) => onChange(next)}
-			aria-label={label}
-			onClick={(event) => event.stopPropagation()}
-			className={cn(
-				"relative z-10 grid size-4 shrink-0 cursor-pointer place-items-center rounded-sm border outline-none transition-colors duration-150 focus-visible:border-focus-ring focus-visible:ring-3 focus-visible:ring-focus-ring/50",
-				on
-					? "border-accent bg-accent text-on-accent"
-					: "border-border-strong text-transparent hover:bg-hover",
-				className,
-			)}
-		>
-			<motion.span
-				aria-hidden
-				className="flex"
-				initial={false}
-				animate={{ scale: on ? 1 : 0.4 }}
-				transition={reduced ? INSTANT : CELL}
-			>
-				{indeterminate ? (
-					<MinusIcon weight="bold" className="size-3" />
-				) : (
-					<CheckIcon weight="bold" className="size-3" />
-				)}
-			</motion.span>
-		</Checkbox.Root>
 	);
 }
 
@@ -540,12 +490,12 @@ export function DataTable<T>({
 						>
 							{selectable && (
 								<th scope="col" className="flex min-w-0">
-									<SelectBox
+									<Checkbox
 										checked={allOnPage}
 										indeterminate={someOnPage}
 										onChange={setPageSelected}
 										label="Selecionar todas desta página"
-										reduced={reduced}
+										disabled={selectableRows.length === 0}
 									/>
 								</th>
 							)}
@@ -700,11 +650,11 @@ export function DataTable<T>({
 										>
 											{selectable && (
 												<td className="flex min-w-0">
-													<SelectBox
+													<Checkbox
 														checked={isSelected}
 														onChange={(on) => setRowSelected(id, on)}
 														label={`Selecionar ${nameOf(row)}`}
-														reduced={reduced}
+														disabled={!(isRowSelectable?.(row) ?? true)}
 													/>
 												</td>
 											)}
@@ -774,12 +724,12 @@ export function DataTable<T>({
 				{showRows && (
 					<div className="flex items-center gap-2">
 						{selectable && (
-							<SelectBox
+							<Checkbox
 								checked={allOnPage}
 								indeterminate={someOnPage}
 								onChange={setPageSelected}
 								label="Selecionar todas desta página"
-								reduced={reduced}
+								disabled={selectableRows.length === 0}
 								className="ml-3"
 							/>
 						)}
@@ -901,11 +851,11 @@ export function DataTable<T>({
 									>
 										<div className="flex items-center gap-2.5">
 											{selectable && (
-												<SelectBox
+												<Checkbox
 													checked={isSelected}
 													onChange={(on) => setRowSelected(id, on)}
 													label={`Selecionar ${nameOf(row)}`}
-													reduced={reduced}
+													disabled={!(isRowSelectable?.(row) ?? true)}
 												/>
 											)}
 											{first && (

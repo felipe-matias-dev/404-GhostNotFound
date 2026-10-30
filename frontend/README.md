@@ -217,6 +217,7 @@ carrega `src/styles.css`.
   componentes não usam cor ou espaçamento solto.
 - **Componentes** (`src/components/ui/`) e **Layout** (`src/components/layout/`): story em
   `<nome>.stories.tsx` ao lado do componente, cobrindo padrão, carregando, erro e vazio.
+- **Checkbox** (`ui/checkbox/`): componente compartilhado pelo `DataTable` (tabela e cards) e pelos filtros de suspeitas, com os mesmos tamanho, borda, marca de seleção e animação. O painel de filtros usa opções de 32 px, padding reduzido e controles percentuais recolhíveis; os estados marcado, desmarcado, parcial e desabilitado estão no Storybook.
 - Painel **Accessibility** (addon a11y) sem violações.
 - Sem biblioteca de componentes como dependência. Componentes do
   [shadcn/ui](https://ui.shadcn.com/) (estilo `base-nova`, sobre Base UI) entram pela CLI (`npx shadcn@latest add <nome>`,
