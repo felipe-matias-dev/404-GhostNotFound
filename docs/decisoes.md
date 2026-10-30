@@ -1687,9 +1687,13 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   - **Exportar.** `GET /ordens-inspecao/planilha` (só o perfil `perdas`) baixa um XLSX com as ordens `EM_CAMPO`, uma por
     linha, com as colunas de `inspecoes.xlsx` (`id_inspecao`, `id_uc`, `data`, `inspetor`, `resultado`,
     `tipo_irregularidade`, `kwh_recuperado`) e, ao final, `municipio` e `bairro` para a equipe saber onde fica a unidade. O
-    `id_inspecao` sai como `OI-<id da ordem>` e `id_uc` já vem preenchido; o resto fica em branco para a equipe preencher.
+    `id_inspecao` sai como `OI-<id da ordem>` e `id_uc` já vem preenchido; o resto fica em branco para a equipe preencher. A planilha já sai com seleção nas colunas: `resultado` é uma lista
+    (`CONFIRMADA` ou `SEM IRREGULARIDADE`), `data` aceita só data e `kwh_recuperado` só número maior ou igual a zero. É um apoio
+    à equipe: o upload continua conferindo tudo, porque um valor colado por cima da lista passa pela planilha;
     Exporta só as ordens em campo, porque são as únicas que o upload pode concluir: a linha exportada sempre corresponde a uma
     ordem que dá para concluir. Sem ordens em campo, o arquivo sai só com o cabeçalho;
+  - **Tela.** Na seção de inspeções de Perdas, só para o perfil `perdas`, o botão "Baixar planilha de campo" e o botão "Enviar
+    planilha de campo", que abre um modal com o resumo (concluídas e rejeitadas) e a tabela das linhas rejeitadas com o motivo;
   - **Subir.** `POST /ordens-inspecao/planilha` (`multipart/form-data`, campo `arquivo`, só o perfil `perdas`):
   - **Ligação por UC.** A linha vale para a ordem ativa da UC, que é única (índice `uq_ordem_inspecao_uc_ativa`, DEC-009);
   - **Só conclui ordem em campo.** A ordem `GERADA` é rejeitada ("ainda não foi enviada a campo"): a máquina de estados não
@@ -1707,6 +1711,8 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Descartado:**
   - **tudo ou nada**, porque uma linha errada travaria o arquivo inteiro e o aceite pede o relatório de rejeitadas;
   - **enviar a campo e concluir no mesmo upload**, que cria um envio no histórico que ninguém fez;
+  - **aba de instruções na planilha**, descartada por uma lista de seleção nas próprias colunas, que evita o erro em vez de explicá-lo
+    (e o upload teria de ignorar a aba);
   - **colunas novas na ordem** (tipo, kWh, data), que mexem no schema, no contrato e na tela sem o case pedir;
   - **exportar a fila de suspeitas em CSV**, como diz o backlog (V1-11): a equipe teria de salvar como XLSX antes de devolver, e
     as unidades da fila ainda não têm ordem para o upload concluir;
