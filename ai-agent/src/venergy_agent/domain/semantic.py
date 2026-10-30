@@ -14,6 +14,10 @@ class ColumnSpec(BaseModel):
     unit: str | None = None
     allowed_values: tuple[str, ...] = ()
 
+    @property
+    def view_type(self) -> str:
+        return "numeric" if self.type == "integer" and self.unit == "contagem" else self.type
+
 
 class ViewSpec(BaseModel):
     model_config = ConfigDict(frozen=True)
