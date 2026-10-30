@@ -2,8 +2,7 @@
 // sobre `bg` e o conteúdo num painel `surface-1` com borda e raio `lg`. O trigger fica ao
 // lado da logo com a navegação aberta e vai para o Header quando ela recolhe (no celular,
 // abre o Sheet). O MotionConfig casa as animações com o `duration-200 ease-linear` da
-// sidebar e respeita o "reduzir movimento" do sistema. O título do Header leva ao início da
-// seção (sem recorte) e a página pode pôr a trilha do recorte ao lado dele com `HeaderTrilha`.
+// sidebar e respeita o "reduzir movimento" do sistema.
 import { Link } from "@tanstack/react-router";
 import { LayoutGroup, MotionConfig } from "motion/react";
 import { type ReactNode, useState } from "react";
@@ -18,17 +17,20 @@ import { Header, HeaderTrilhaContext } from "#/components/layout/header";
 import { SidebarInset, SidebarProvider } from "#/components/ui/sidebar";
 import { ThemeToggle } from "#/components/ui/theme-toggle";
 import { TooltipProvider } from "#/components/ui/tooltip";
+import type { DestinoPortal } from "#/lib/filtros";
 
 export function AppShell({
 	children,
 	onConsultarUc,
 	itens = NAVEGACAO,
 	conta,
+	searchPara,
 }: {
 	children: ReactNode;
 	onConsultarUc: () => void;
 	itens?: ItemNavegacao[];
 	conta?: ReactNode;
+	searchPara: (destino: DestinoPortal) => Record<string, unknown>;
 }) {
 	const atual = useItemAtivo(NAVEGACAO);
 	const [trilha, setTrilha] = useState<HTMLDivElement | null>(null);
@@ -51,6 +53,7 @@ export function AppShell({
 							itens={itens}
 							onConsultarUc={onConsultarUc}
 							conta={conta}
+							searchPara={searchPara}
 						/>
 						<SidebarInset className="min-h-0 overflow-hidden">
 							<Header
@@ -58,6 +61,7 @@ export function AppShell({
 									atual && (
 										<Link
 											to={atual.to}
+											search={searchPara(atual.to) as never}
 											className="rounded-sm outline-none transition-colors hover:text-text focus-visible:text-text"
 										>
 											{atual.rotulo}

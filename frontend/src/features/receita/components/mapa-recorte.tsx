@@ -6,7 +6,9 @@ import {
 	RMR_MUNICIPIOS,
 	RMR_VIEWBOX,
 } from "#/components/ui/region-map";
+import { useFiltrosPortal } from "#/features/filtros";
 import { formatBRL, formatPct } from "#/lib/format";
+import type { ParPeriodos, Recorte } from "#/lib/filtros";
 import {
 	chaveNome,
 	EFEITO_CAMPO,
@@ -18,7 +20,7 @@ import {
 } from "../conversions";
 import { useBairrosRmr } from "../hooks/use-bairros-rmr";
 import { useDecomposicao } from "../hooks/use-decomposicao";
-import type { DecomposicaoLinha, ParPeriodos, Recorte } from "../types";
+import type { DecomposicaoLinha } from "../types";
 
 function indexar(linhas: DecomposicaoLinha[] | undefined) {
 	const porNome = new Map<string, DecomposicaoLinha>();
@@ -45,6 +47,7 @@ export function MapaRecorte({
 	className?: string;
 }) {
 	const router = useRouter();
+	const { searchPara } = useFiltrosPortal();
 	const municipios = useDecomposicao(par, { classe: recorte.classe });
 	const bairros = useDecomposicao(
 		par,
@@ -53,11 +56,14 @@ export function MapaRecorte({
 	);
 	const geoBairros = useBairrosRmr(Boolean(recorte.municipio));
 
-	const linhasMunicipio = indexar(municipios.data);
+	// Troca de período/recorte mantém as linhas antigas na tela enquanto a nova consulta
+	// carrega; elas não podem habilitar cliques nem alimentar cores do novo recorte.
+	const atual = !municipios.isPlaceholderData && !bairros.isPlaceholderData;
+	const linhasMunicipio = indexar(atual ? municipios.data : undefined);
 	// Enquanto os bairros do novo município não chegam, os do anterior não valem. Sem
 	// município, a chave da consulta é a mesma dos municípios e `data` traz as linhas deles.
 	const linhasBairro = indexar(
-		recorte.municipio && !bairros.isPlaceholderData ? bairros.data : undefined,
+		atual && recorte.municipio ? bairros.data : undefined,
 	);
 
 	const municipio = recorte.municipio
@@ -82,7 +88,7 @@ export function MapaRecorte({
 		const nome = linhaDe(forma)?.segmento ?? forma.nome;
 		return idsBairro.has(forma.id)
 			? { municipio: recorte.municipio, bairro: nome }
-			: { municipio: nome };
+			: { municipio: nome, bairro: undefined };
 	};
 
 	const formas = [...RMR_MUNICIPIOS, ...formasBairro];
@@ -136,12 +142,16 @@ export function MapaRecorte({
 				const { municipio, bairro } = recorteDe(f);
 				return router.buildLocation({
 					to: "/receita",
-					search: (atual) => ({ ...atual, municipio, bairro }),
+					search: searchPara("/receita", { municipio, bairro }) as never,
 				}).href;
 			}}
 			onSelect={(f) => onChange(recorteDe(f))}
 			onClear={() =>
-				onChange(recorte.bairro ? { municipio: recorte.municipio } : {})
+				onChange(
+					recorte.bairro
+						? { bairro: undefined }
+						: { municipio: undefined },
+				)
 			}
 			clearLabel={
 				recorte.bairro

@@ -29,6 +29,16 @@ export const MAX_ORDENS_POR_PEDIDO = 200;
 
 export type VisaoOrdens = "kanban" | "tabela";
 
+/** Colunas de ordenação que a API da fila aceita, na ordem do contrato de `/fila-suspeitas`. */
+export const ORDENACAO_FILA = [
+	"prioridade",
+	"queda",
+	"energia",
+	"ordem_ativa",
+] as const;
+
+export type OrdenacaoFila = (typeof ORDENACAO_FILA)[number];
+
 export type FiltrosFila = {
 	queda: [number, number] | null;
 	medidorEletromecanico: boolean;

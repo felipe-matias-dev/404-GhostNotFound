@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { lerFiltrosCompartilhados } from "#/lib/filtros";
 import { redeSearchSchema } from "../search";
 
 describe("redeSearchSchema", () => {
@@ -9,7 +10,7 @@ describe("redeSearchSchema", () => {
 		expect(search.visao).toBeUndefined();
 	});
 
-	it("limpa a geografia quando a visão global é explícita", () => {
+	it("preserva a geografia quando a visão global é explícita", () => {
 		const search = redeSearchSchema.parse({
 			visao: "alimentadores",
 			municipio: "Recife",
@@ -17,8 +18,8 @@ describe("redeSearchSchema", () => {
 		});
 
 		expect(search.visao).toBe("alimentadores");
-		expect(search.municipio).toBeUndefined();
-		expect(search.bairro).toBeUndefined();
+		expect(search.municipio).toBe("Recife");
+		expect(search.bairro).toBe("Boa Viagem");
 	});
 
 	it("infere localidades a partir de um município com bairro", () => {
@@ -42,8 +43,8 @@ describe("redeSearchSchema", () => {
 			fim: "2025-12",
 		});
 
-		expect(mesTreze.inicio).toBeUndefined();
-		expect(mesCurto.inicio).toBeUndefined();
+		expect(lerFiltrosCompartilhados("/rede", mesTreze).periodo_atual).toBeUndefined();
+		expect(lerFiltrosCompartilhados("/rede", mesCurto).periodo_atual).toBeUndefined();
 	});
 
 	it("remove as duas pontas de um período incompleto ou invertido", () => {
@@ -53,10 +54,8 @@ describe("redeSearchSchema", () => {
 			fim: "2025-01",
 		});
 
-		expect(soInicio.inicio).toBeUndefined();
-		expect(soInicio.fim).toBeUndefined();
-		expect(invertido.inicio).toBeUndefined();
-		expect(invertido.fim).toBeUndefined();
+		expect(lerFiltrosCompartilhados("/rede", soInicio).periodo_atual).toBeUndefined();
+		expect(lerFiltrosCompartilhados("/rede", invertido).periodo_atual).toBeUndefined();
 	});
 
 	it("mantém um período completo e em ordem", () => {
@@ -103,5 +102,40 @@ describe("redeSearchSchema", () => {
 		expect(
 			redeSearchSchema.parse({ criterio: "ruim" }).criterio,
 		).toBeUndefined();
+	});
+
+	it("preserva a classe conhecida e descarta a desconhecida", () => {
+		expect(redeSearchSchema.parse({ classe: "B1" }).classe).toBe("B1");
+		expect(redeSearchSchema.parse({ classe: "C1" }).classe).toBeUndefined();
+	});
+
+	it("preserva o par base com meses reais e em ordem", () => {
+		const search = redeSearchSchema.parse({
+			periodo_base: "2024-01/2024-12",
+		});
+
+		expect(search.periodo_base).toBe("2024-01/2024-12");
+	});
+
+	it("descarta o par base com mês inválido ou invertido", () => {
+		const mesTreze = redeSearchSchema.parse({
+			periodo_base: "2024-13/2024-12",
+		});
+		const invertido = redeSearchSchema.parse({
+			periodo_base: "2024-12/2024-01",
+		});
+
+		expect(lerFiltrosCompartilhados("/rede", mesTreze).periodo_base).toBeUndefined();
+		expect(lerFiltrosCompartilhados("/rede", invertido).periodo_base).toBeUndefined();
+	});
+
+	it("mantém a classe ao remover um bairro órfão de município", () => {
+		const search = redeSearchSchema.parse({
+			bairro: "Boa Viagem",
+			classe: "B3",
+		});
+
+		expect(search.bairro).toBeUndefined();
+		expect(search.classe).toBe("B3");
 	});
 });

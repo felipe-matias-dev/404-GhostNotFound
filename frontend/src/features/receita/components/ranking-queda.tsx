@@ -13,7 +13,8 @@ import {
 	rankingDaQueda,
 } from "../conversions";
 import { useDecomposicao } from "../hooks/use-decomposicao";
-import type { DecomposicaoLinha, ParPeriodos, Recorte } from "../types";
+import type { ParPeriodos, Recorte } from "#/lib/filtros";
+import type { DecomposicaoLinha } from "../types";
 
 const MEDIDAS: { id: Medida; rotulo: string; nome: string }[] = [
 	{ id: "brl", rotulo: "R$", nome: "Ranquear pelo valor em reais" },

@@ -18,7 +18,8 @@ import {
 	sobreABase,
 } from "../conversions";
 import { useDecomposicao } from "../hooks/use-decomposicao";
-import type { DecomposicaoLinha, ParPeriodos, Recorte } from "../types";
+import type { ParPeriodos, Recorte } from "#/lib/filtros";
+import type { DecomposicaoLinha } from "../types";
 
 function tomDoSinal(n: number) {
 	return n < 0 ? "text-danger" : n > 0 ? "text-success" : undefined;

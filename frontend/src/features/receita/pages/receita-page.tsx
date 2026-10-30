@@ -1,65 +1,59 @@
 import { getRouteApi } from "@tanstack/react-router";
 import { useState } from "react";
 import { Pagina } from "#/components/layout/pagina";
-import { ClassePicker } from "../components/classe-picker";
+import { Button } from "#/components/ui/button";
+import { useFiltrosPortal } from "#/features/filtros";
+import { usePeriodosDecomposicao } from "#/features/filtros/api";
+import type { ParPeriodos, Recorte } from "#/lib/filtros";
 import { DecomposicaoTable } from "../components/decomposicao-table";
 import { MapaRecorte } from "../components/mapa-recorte";
-import { PeriodoPicker } from "../components/periodo-picker";
 import { PonteWaterfall } from "../components/ponte-waterfall";
 import { RankingQueda } from "../components/ranking-queda";
-import { RecorteTrilha } from "../components/recorte-trilha";
-import { type Efeito, parPadrao } from "../conversions";
-import { usePeriodosDecomposicao } from "../hooks/use-decomposicao";
-import type { Classe, DecomposicaoLinha, ParPeriodos, Recorte } from "../types";
+import { type Efeito } from "../conversions";
+import type { DecomposicaoLinha } from "../types";
 
 const route = getRouteApi("/receita");
 
 export function ReceitaPage() {
-	const { municipio, bairro, classe, periodo_base, periodo_atual, efeito } =
-		route.useSearch();
+	const { efeito } = route.useSearch();
+	const { filtros, alterar } = useFiltrosPortal();
+	const navigate = route.useNavigate();
 	// A causa escolhida na ponte acompanha o drill-down e a troca de período.
 	const causa: Efeito = efeito ?? "variacao";
-	const navigate = route.useNavigate();
 	// Bairro sem município é recusado pela API (o mesmo nome existe em mais de um município).
 	// A classe não é um nível: filtra todos ("como foi a B1 na RMR inteira?").
 	const recorte: Recorte = {
-		municipio,
-		bairro: municipio ? bairro : undefined,
-		classe,
+		municipio: filtros.municipio,
+		bairro: filtros.municipio ? filtros.bairro : undefined,
+		classe: filtros.classe,
 	};
+	// O período da URL é soberano: a tela não troca por outro par gravado.
+	const par: ParPeriodos | undefined =
+		filtros.periodo_base && filtros.periodo_atual
+			? {
+					periodo_base: filtros.periodo_base,
+					periodo_atual: filtros.periodo_atual,
+				}
+			: undefined;
 
-	// O par da URL só vale se a Gold o gravou; senão, o padrão.
+	// O catálogo diz se a Gold gravou o par; sem ele não há ponte, mapa nem tabela.
 	const periodos = usePeriodosDecomposicao();
-	const par =
-		periodos.data?.find(
-			(p) =>
-				p.periodo_base === periodo_base && p.periodo_atual === periodo_atual,
-		) ?? (periodos.data ? parPadrao(periodos.data) : undefined);
+	const parGravado = par
+		? periodos.data?.some(
+				(p) =>
+					p.periodo_base === par.periodo_base &&
+					p.periodo_atual === par.periodo_atual,
+			) === true
+		: false;
 
-	// Mapa, trilha e tabela só conhecem município e bairro: classe e causa seguem da URL.
-	const navegar = (proximo: Recorte, comPar: ParPeriodos | undefined) =>
-		navigate({
-			search: {
-				municipio: proximo.municipio,
-				bairro: proximo.bairro,
-				classe,
-				periodo_base: comPar?.periodo_base,
-				periodo_atual: comPar?.periodo_atual,
-				efeito,
-			},
-		});
-	const mudar = (proximo: Recorte) => navegar(proximo, par);
+	// Mapa, ranking e tabela alteram o recorte compartilhado; período e `efeito` ficam como
+	// estão. O provider limpa o bairro quando o município muda.
 	const escolherCausa = (proxima: Efeito) =>
 		navigate({
 			search: (atual) => ({
 				...atual,
 				efeito: proxima === "variacao" ? undefined : proxima,
 			}),
-			resetScroll: false,
-		});
-	const escolherClasse = (proxima: Classe | undefined) =>
-		navigate({
-			search: (atual) => ({ ...atual, classe: proxima }),
 			resetScroll: false,
 		});
 
@@ -73,14 +67,62 @@ export function ReceitaPage() {
 		setDestaque(null);
 	}
 
-	// Sem pares, a consulta da decomposição nunca liga e a tabela ficaria carregando.
-	if (periodos.isError || periodos.data?.length === 0) {
+	if (periodos.isPending) {
+		return (
+			<Pagina className="max-w-none">
+				<p className="text-text-muted">Carregando os períodos da receita…</p>
+			</Pagina>
+		);
+	}
+
+	if (periodos.isError) {
+		return (
+			<Pagina className="max-w-none">
+				<div className="flex flex-col items-start gap-2">
+					<p className="text-text-muted">
+						Não foi possível carregar os períodos da decomposição de receita.
+					</p>
+					<Button
+						variant="outline"
+						size="sm"
+						onClick={() => {
+							void periodos.refetch();
+						}}
+					>
+						Tentar novamente
+					</Button>
+				</div>
+			</Pagina>
+		);
+	}
+
+	if (!periodos.data?.length) {
 		return (
 			<Pagina className="max-w-none">
 				<p className="text-text-muted">
-					{periodos.isError
-						? "Não foi possível carregar os períodos da decomposição de receita."
-						: "Sem dados de decomposição de receita: a Gold não tem nenhum par de períodos gravado."}
+					Sem dados de decomposição de receita: a Gold não tem nenhum par de
+					períodos gravado.
+				</p>
+			</Pagina>
+		);
+	}
+
+	if (!par) {
+		return (
+			<Pagina className="max-w-none">
+				<p className="text-text-muted">
+					Selecione um período para ver a decomposição de receita.
+				</p>
+			</Pagina>
+		);
+	}
+
+	if (!parGravado) {
+		return (
+			<Pagina className="max-w-none">
+				<p className="text-text-muted">
+					A decomposição de receita não está disponível para os períodos
+					selecionados.
 				</p>
 			</Pagina>
 		);
@@ -88,33 +130,22 @@ export function ReceitaPage() {
 
 	return (
 		<Pagina className="max-w-none">
-			<RecorteTrilha par={par} recorte={recorte} onChange={mudar} />
 			<div className="grid gap-5 lg:grid-cols-[clamp(20rem,26%,28rem)_minmax(0,1fr)] lg:items-start">
 				<MapaRecorte
 					par={par}
 					recorte={recorte}
 					efeito={causa}
 					destaque={destaque}
-					onChange={mudar}
+					onChange={alterar}
 					className="h-96 lg:sticky lg:top-5 lg:h-[calc(100svh-8rem)]"
 				/>
 				<section
 					aria-labelledby="ponte-titulo"
 					className="@container flex min-w-0 flex-col gap-3"
 				>
-					<div className="flex flex-wrap items-center justify-between gap-2">
-						<h2 id="ponte-titulo" className="text-heading">
-							Ponte de receita
-						</h2>
-						<div className="flex flex-wrap items-center gap-2">
-							<ClassePicker classe={classe} onEscolher={escolherClasse} />
-							<PeriodoPicker
-								pares={periodos.data ?? []}
-								par={par}
-								onEscolher={(escolhido) => navegar(recorte, escolhido)}
-							/>
-						</div>
-					</div>
+					<h2 id="ponte-titulo" className="text-heading">
+						Ponte de receita
+					</h2>
 					{/* Largo: ponte e ranking lado a lado, sem a ponte esticar por toda a largura. */}
 					<div className="grid gap-3 @4xl:grid-cols-[minmax(0,1fr)_minmax(22rem,0.8fr)]">
 						<PonteWaterfall
@@ -128,7 +159,7 @@ export function ReceitaPage() {
 							recorte={recorte}
 							efeito={causa}
 							onEfeito={escolherCausa}
-							onAbrir={mudar}
+							onAbrir={alterar}
 							onDestaque={setDestaque}
 						/>
 					</div>
@@ -136,7 +167,7 @@ export function ReceitaPage() {
 						par={par}
 						filtro={recorte}
 						efeito={causa}
-						onAbrir={mudar}
+						onAbrir={alterar}
 						onDestaque={setDestaque}
 					/>
 				</section>

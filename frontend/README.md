@@ -53,6 +53,18 @@ uma opção de tentar novamente, sem confundir indisponibilidade com credencial 
 Sair ou trocar de usuário limpa as consultas em memória; as UCs recentes ficam
 separadas por login no navegador, sem migrar o histórico compartilhado anterior.
 
+### Filtros das análises
+
+Visão geral, Receita, Rede e Perdas compartilham período, município, bairro e classe
+pela URL. Os filtros próprios de cada tela são lembrados enquanto a sessão do portal
+estiver aberta; atualizar a página preserva apenas os filtros presentes na URL.
+Na Rede, `inicio` e `fim` representam o período atual. Um par válido que não conste
+na decomposição permanece selecionado, com aviso de indisponibilidade da ponte.
+Períodos inválidos recebidos por URL são removidos antes das consultas, com aviso visível.
+Em Perdas, município, bairro e classe filtram fila e ordens, mas o período é só
+contexto: a fila usa a janela fixa da Gold e as ordens não são filtradas por data.
+Na consulta individual de UC, o histórico e as dívidas não são limitados pelo recorte.
+
 A entrada reaproveita `Logo`, `Button`, `FloatingLabelInput` e os tokens de
 `src/styles.css`, inclusive o tema salvo. A marca sobe antes de revelar o formulário;
 o fundo em Canvas 2D representa conexões de distribuição e UCs, não dados ao vivo.

@@ -8,15 +8,20 @@ import type { ReactNode } from "react";
 import { Button, buttonVariants } from "#/components/ui/button";
 import { KpiDelta, KpiValue } from "#/components/ui/kpi-card";
 import { TrendChart } from "#/components/ui/trend-chart";
-import { usePeriodosDecomposicao } from "#/features/receita";
+import { useFiltrosPortal } from "#/features/filtros";
 import {
 	formatBRL,
 	formatKWh,
 	formatPct,
 	formatPeriodoCurto,
 } from "#/lib/format";
+import type { ParPeriodos, Recorte } from "#/lib/filtros";
 import { cn } from "#/lib/utils";
-import { type Janelas, leitura } from "../conversions";
+import {
+	leitura,
+	MESES_MAX_JANELA,
+	mesesDoPeriodo,
+} from "../conversions";
 import { useComparacaoIndicadores, useTesoura } from "../hooks/use-indicadores";
 import { DEFINICOES, type DefinicaoIndicador } from "../indicadores";
 
@@ -67,35 +72,27 @@ function Molde() {
 }
 
 /**
- * A pergunta da diretoria numa tela: a receita e a energia faturadas dos 12 meses mais
- * recentes contra os 12 primeiros da base, e a tesoura entre as duas ao longo da série. O
- * porquê fica na ponte de receita, aberta no mesmo par de janelas.
+ * A pergunta da diretoria na tela: a receita e a energia faturadas do período atual contra a
+ * base escolhida na barra comum, e a tesoura entre as duas ao longo da série. O porquê fica na
+ * ponte de receita, aberta no mesmo par.
  */
 export function ResumoReceita({
-	janelas,
-	semJanelas,
-	erroSerie,
-	onRetrySerie,
+	par,
+	recorte,
+	semPeriodo,
 }: {
-	janelas: Janelas | undefined;
-	/** Não há duas janelas completas de 12 meses sem sobreposição. */
-	semJanelas: boolean;
-	erroSerie: boolean;
-	onRetrySerie: () => void;
+	par: ParPeriodos | undefined;
+	recorte: Recorte;
+	/** A Gold não tem dois meses para comparar: o período ainda não foi escolhido. */
+	semPeriodo: boolean;
 }) {
-	const comparacao = useComparacaoIndicadores(
-		janelas
-			? { periodo_base: janelas.base, periodo_atual: janelas.atual }
-			: undefined,
-	);
-	const tesoura = useTesoura();
-	const periodos = usePeriodosDecomposicao();
-	const par = janelas
-		? periodos.data?.find(
-				(p) =>
-					p.periodo_base === janelas.base && p.periodo_atual === janelas.atual,
-			)
-		: undefined;
+	const { searchPara } = useFiltrosPortal();
+	const comparacao = useComparacaoIndicadores(par, recorte);
+	const serie = useTesoura(par, recorte);
+	const meses = par ? mesesDoPeriodo(par.periodo_atual) : undefined;
+	const janela = meses === 1 ? "mês" : "meses";
+	const corridos = meses === 1 ? "mês corrido" : "meses corridos";
+	const acimaDoLimite = meses !== undefined && meses > MESES_MAX_JANELA;
 	const dados = comparacao.data;
 	const frase = leitura(
 		dados?.variacao_pct.receita_faturada,
@@ -103,7 +100,7 @@ export function ResumoReceita({
 	);
 
 	let numeros: ReactNode;
-	if (erroSerie || comparacao.isError) {
+	if (comparacao.isError) {
 		numeros = (
 			<div className="flex flex-col items-start gap-2">
 				<p className="flex items-center gap-1.5 text-body">
@@ -114,20 +111,18 @@ export function ResumoReceita({
 					variant="ghost"
 					size="xs"
 					className="-ml-1.5"
-					onClick={() =>
-						erroSerie ? onRetrySerie() : void comparacao.refetch()
-					}
+					onClick={() => void comparacao.refetch()}
 				>
 					<ArrowsClockwiseIcon aria-hidden />
 					Tentar de novo
 				</Button>
 			</div>
 		);
-	} else if (semJanelas) {
+	} else if (semPeriodo) {
 		numeros = (
-			<p className="text-body text-text-muted text-pretty">
-				A comparação precisa de duas janelas completas de 12 meses sem
-				sobreposição.
+			<p className="text-pretty text-body text-text-muted">
+				Escolha um período na barra de filtros para comparar a receita e a
+				energia.
 			</p>
 		);
 	} else if (!dados) {
@@ -153,21 +148,21 @@ export function ResumoReceita({
 		);
 	}
 
-	const somas = tesoura.data?.somas;
+	const somas = serie.data?.somas;
 	return (
 		<section
 			aria-labelledby="resumo-titulo"
-			aria-busy={comparacao.isFetching || undefined}
+			aria-busy={comparacao.isFetching || serie.isFetching || undefined}
 			className="@container flex flex-col gap-5 rounded-md border border-border bg-surface-1 p-5 shadow-edge"
 		>
 			<header className="flex flex-col gap-1.5">
 				<h2 id="resumo-titulo" className="text-balance font-display text-title">
 					{frase ?? "Receita e energia faturadas"}
 				</h2>
-				{janelas ? (
+				{par ? (
 					<p className="text-pretty text-body text-text-muted">
-						Últimos 12 meses ({formatPeriodoCurto(janelas.atual)}) contra os 12
-						primeiros da base ({formatPeriodoCurto(janelas.base)}).
+						{formatPeriodoCurto(par.periodo_atual)} vs{" "}
+						{formatPeriodoCurto(par.periodo_base)}.
 					</p>
 				) : null}
 			</header>
@@ -177,7 +172,7 @@ export function ResumoReceita({
 					{par ? (
 						<Link
 							to="/receita"
-							search={par}
+							search={searchPara("/receita") as never}
 							className={buttonVariants({
 								variant: "outline",
 								size: "sm",
@@ -189,31 +184,42 @@ export function ResumoReceita({
 						</Link>
 					) : null}
 				</div>
-				<TrendChart
-					label="Receita e energia faturadas em 12 meses corridos, variação sobre a primeira janela"
-					categories={tesoura.data?.categories}
-					series={tesoura.data?.series}
-					formatValue={variacao}
-					categoryLabel="Janela de 12 meses"
-					summary="Soma de 12 meses corridos, em variação sobre a primeira janela da série."
-					reference={0}
-					endLabels
-					band={TESOURA}
-					tooltipFooter={(indice) => {
-						const soma = somas?.[indice];
-						return soma ? (
-							<p className="text-text-muted tabular-nums">
-								{receita(soma.receita)} · {energia(soma.kwh)}
-							</p>
-						) : null;
-					}}
-					loading={tesoura.isFetching}
-					error={tesoura.isError ? "Não foi possível carregar a série." : null}
-					onRetry={() => tesoura.refetch()}
-					emptyMessage="A tesoura precisa de pelo menos duas janelas completas de 12 meses."
-					height={240}
-					className="rounded-none border-0 bg-transparent p-0 shadow-none lg:border-border lg:border-l lg:pl-6"
-				/>
+				{par && meses !== undefined ? (
+					acimaDoLimite ? (
+						<p className="text-pretty text-body text-text-muted lg:border-border lg:border-l lg:pl-6">
+							A tesoura vai até {MESES_MAX_JANELA} meses. Os totais do período
+							continuam disponíveis.
+						</p>
+					) : (
+						<TrendChart
+							label={`Receita e energia faturadas em ${meses} ${corridos}, variação sobre a primeira janela`}
+							categories={serie.data?.categories}
+							series={serie.data?.series}
+							formatValue={variacao}
+							categoryLabel={`Janela de ${meses} ${janela}`}
+							summary={`Soma de ${meses} ${corridos}, em variação sobre a primeira janela da série.`}
+							reference={0}
+							endLabels
+							band={TESOURA}
+							tooltipFooter={(indice) => {
+								const soma = somas?.[indice];
+								return soma ? (
+									<p className="text-text-muted tabular-nums">
+										{receita(soma.receita)} · {energia(soma.kwh)}
+									</p>
+								) : null;
+							}}
+							loading={serie.isFetching}
+							error={
+								serie.isError ? "Não foi possível carregar a série." : null
+							}
+							onRetry={() => serie.refetch()}
+							emptyMessage={`A tesoura precisa de pelo menos duas janelas completas de ${meses} ${janela} no intervalo selecionado.`}
+							height={240}
+							className="rounded-none border-0 bg-transparent p-0 shadow-none lg:border-border lg:border-l lg:pl-6"
+						/>
+					)
+				) : null}
 			</div>
 		</section>
 	);

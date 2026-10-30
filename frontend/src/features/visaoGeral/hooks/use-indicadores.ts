@@ -1,47 +1,57 @@
-import { queryOptions, skipToken, useQuery } from "@tanstack/react-query";
+import { skipToken, useQuery } from "@tanstack/react-query";
+import type { ParPeriodos, Recorte } from "#/lib/filtros";
 import {
 	buscarComparacaoIndicadores,
+	buscarIndicadoresMensais,
 	buscarJanelas,
-	buscarKpisMensais,
 	visaoGeralKeys,
 } from "../api";
-import { tesoura } from "../conversions";
-import type { KpisMensais, ParPeriodos } from "../types";
+import {
+	intervaloDoPar,
+	janelasDoIntervalo,
+	MESES_MAX_JANELA,
+	mesesDoPeriodo,
+	tesoura,
+} from "../conversions";
 
-const kpisMensaisQuery = queryOptions({
-	queryKey: visaoGeralKeys.mensal(),
-	queryFn: buscarKpisMensais,
-});
-
-/** A série mensal da Gold, inteira: a forma de cada indicador nas sparklines. */
-export function useKpisMensais() {
-	return useQuery(kpisMensaisQuery);
-}
-
-const competencias = (linhas: KpisMensais[]) =>
-	linhas.map((linha) => linha.competencia);
-
-/** Os meses que a Gold tem: o que o seletor de mês e as janelas de 12 meses podem usar. */
-export function useCompetencias() {
-	return useQuery({ ...kpisMensaisQuery, select: competencias });
-}
-
-const janelasQuery = queryOptions({
-	queryKey: visaoGeralKeys.janelas(),
-	queryFn: buscarJanelas,
-});
-
-export function useJanelas() {
-	return useQuery(janelasQuery);
-}
-
-export function useComparacaoIndicadores(par: ParPeriodos | undefined) {
+/** A série mensal do recorte no intervalo dos dois períodos: a forma de cada sparkline. */
+export function useIndicadoresMensais(
+	par: ParPeriodos | undefined,
+	recorte: Recorte,
+) {
 	return useQuery({
-		queryKey: visaoGeralKeys.comparacao(par),
-		queryFn: par ? () => buscarComparacaoIndicadores(par) : skipToken,
+		queryKey: visaoGeralKeys.mensal(par, recorte),
+		queryFn: par ? () => buscarIndicadoresMensais(par, recorte) : skipToken,
 	});
 }
 
-export function useTesoura() {
-	return useQuery({ ...janelasQuery, select: tesoura });
+export function useComparacaoIndicadores(
+	par: ParPeriodos | undefined,
+	recorte: Recorte,
+) {
+	return useQuery({
+		queryKey: visaoGeralKeys.comparacao(par, recorte),
+		queryFn: par ? () => buscarComparacaoIndicadores(par, recorte) : skipToken,
+	});
+}
+
+/**
+ * A tesoura do par: janelas do tamanho do período atual, recortadas ao intervalo dos dois
+ * períodos. Acima do limite do gráfico, a consulta nem sai.
+ */
+export function useTesoura(par: ParPeriodos | undefined, recorte: Recorte) {
+	const meses = par ? mesesDoPeriodo(par.periodo_atual) : 0;
+	const intervalo = par ? intervaloDoPar(par) : undefined;
+	return useQuery({
+		queryKey: visaoGeralKeys.janelas(meses, recorte),
+		queryFn:
+			meses > 0 && meses <= MESES_MAX_JANELA
+				? () => buscarJanelas(meses, recorte)
+				: skipToken,
+		select: (linhas) =>
+			tesoura(
+				intervalo ? janelasDoIntervalo(linhas, intervalo) : [],
+				meses,
+			),
+	});
 }

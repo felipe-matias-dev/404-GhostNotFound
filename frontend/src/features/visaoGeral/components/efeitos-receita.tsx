@@ -11,17 +11,16 @@ import {
 	PopoverContent,
 	PopoverTrigger,
 } from "#/components/ui/popover";
+import { useFiltrosPortal, usePeriodosDecomposicao } from "#/features/filtros";
 import {
 	EFEITOS,
 	passosDaPonte,
 	useDecomposicao,
-	usePeriodosDecomposicao,
 } from "#/features/receita";
 import { formatPct, formatPeriodoCurto } from "#/lib/format";
+import type { ParPeriodos, Recorte } from "#/lib/filtros";
 import { cn } from "#/lib/utils";
-import { efeitosDaReceita, type Janelas } from "../conversions";
-
-const SEM_RECORTE = {};
+import { efeitosDaReceita } from "../conversions";
 
 // Rótulo, barra e valor juntos: a barra não atravessa a coluna até o número.
 const LINHA =
@@ -45,22 +44,50 @@ function Molde() {
 	);
 }
 
+function Falha({ texto, retry }: { texto: string; retry: () => void }) {
+	return (
+		<div className="flex flex-col items-start gap-2">
+			<p className="flex items-center gap-1.5 text-body">
+				<XCircleIcon aria-hidden className="size-4 shrink-0 text-danger" />
+				{texto}
+			</p>
+			<Button variant="ghost" size="xs" className="-ml-1.5" onClick={retry}>
+				<ArrowsClockwiseIcon aria-hidden />
+				Tentar de novo
+			</Button>
+		</div>
+	);
+}
+
 /**
  * O porquê da tesoura: o peso de cada efeito da ponte de receita (tarifa, bandeira, volume e mix)
- * no mesmo par de 12 meses do resumo. Cada linha abre a ponte com o efeito escolhido. Sem o par
- * gravado na Gold, o bloco não aparece.
+ * no mesmo par e recorte da barra comum. Cada linha abre a ponte com o efeito escolhido. Sem o
+ * par gravado na Gold, o bloco explica a indisponibilidade; falha de rede continua sendo erro.
  */
-export function EfeitosReceita({ janelas }: { janelas: Janelas | undefined }) {
+export function EfeitosReceita({
+	par,
+	recorte,
+	carregando,
+	semPeriodo,
+}: {
+	par: ParPeriodos | undefined;
+	recorte: Recorte;
+	/** O período padrão ainda não foi resolvido pela barra comum. */
+	carregando: boolean;
+	/** A Gold não tem dois meses para comparar: o período ainda não foi escolhido. */
+	semPeriodo: boolean;
+}) {
+	const { searchPara } = useFiltrosPortal();
 	const periodos = usePeriodosDecomposicao();
-	const par = janelas
-		? periodos.data?.find(
+	const gravado = Boolean(
+		par &&
+			periodos.data?.some(
 				(p) =>
-					p.periodo_base === janelas.base && p.periodo_atual === janelas.atual,
-			)
-		: undefined;
-	const decomposicao = useDecomposicao(par, SEM_RECORTE);
-
-	if (!janelas || (periodos.data && !par)) return null;
+					p.periodo_base === par.periodo_base &&
+					p.periodo_atual === par.periodo_atual,
+			),
+	);
+	const decomposicao = useDecomposicao(gravado ? par : undefined, recorte);
 
 	const efeitos = decomposicao.data
 		? efeitosDaReceita(passosDaPonte(decomposicao.data))
@@ -68,28 +95,43 @@ export function EfeitosReceita({ janelas }: { janelas: Janelas | undefined }) {
 	const maior = Math.max(...(efeitos ?? []).map((e) => Math.abs(e.pct ?? 0)));
 
 	let corpo: ReactNode;
-	if (periodos.isError || decomposicao.isError) {
+	if (semPeriodo) {
 		corpo = (
-			<div className="flex flex-col items-start gap-2">
-				<p className="flex items-center gap-1.5 text-body">
-					<XCircleIcon aria-hidden className="size-4 shrink-0 text-danger" />
-					Não foi possível carregar os efeitos da receita.
-				</p>
-				<Button
-					variant="ghost"
-					size="xs"
-					className="-ml-1.5"
-					onClick={() =>
-						periodos.isError ? periodos.refetch() : decomposicao.refetch()
-					}
-				>
-					<ArrowsClockwiseIcon aria-hidden />
-					Tentar de novo
-				</Button>
-			</div>
+			<p className="text-pretty text-body text-text-muted">
+				Escolha um período na barra de filtros para ver os efeitos da receita.
+			</p>
 		);
-	} else if (!efeitos) {
+	} else if (periodos.isError) {
+		corpo = (
+			<Falha
+				texto="Não foi possível carregar os efeitos da receita."
+				retry={() => void periodos.refetch()}
+			/>
+		);
+	} else if (carregando || periodos.isPending) {
 		corpo = <Molde />;
+	} else if (!gravado) {
+		corpo = (
+			<p className="text-pretty text-body text-text-muted">
+				A decomposição de receita não está disponível para os períodos
+				selecionados.
+			</p>
+		);
+	} else if (decomposicao.isError) {
+		corpo = (
+			<Falha
+				texto="Não foi possível carregar os efeitos da receita."
+				retry={() => void decomposicao.refetch()}
+			/>
+		);
+	} else if (decomposicao.isPlaceholderData || !efeitos) {
+		corpo = <Molde />;
+	} else if (efeitos.length === 0) {
+		corpo = (
+			<p className="text-pretty text-body text-text-muted">
+				Sem efeitos de receita para o recorte selecionado.
+			</p>
+		);
 	} else {
 		corpo = (
 			<ul className="grid gap-x-12 gap-y-1 md:grid-cols-2">
@@ -106,11 +148,11 @@ export function EfeitosReceita({ janelas }: { janelas: Janelas | undefined }) {
 						<li key={efeito.id}>
 							<Link
 								to="/receita"
-								search={{
-									periodo_base: janelas.base,
-									periodo_atual: janelas.atual,
-									efeito: EFEITOS.find((e) => e === efeito.id),
-								}}
+								search={
+									searchPara("/receita", {
+										efeito: EFEITOS.find((e) => e === efeito.id),
+									}) as never
+								}
 								aria-label={`${efeito.rotulo}: ${texto} sobre a receita base. Abrir na ponte de receita`}
 								className={cn(
 									LINHA,
@@ -177,8 +219,8 @@ export function EfeitosReceita({ janelas }: { janelas: Janelas | undefined }) {
 					</PopoverTrigger>
 					<PopoverContent className="max-w-64 p-3 text-body">
 						Peso de cada efeito sobre a receita de energia de{" "}
-						{formatPeriodoCurto(janelas.base)}. Clique num efeito para vê-lo na
-						ponte de receita.
+						{formatPeriodoCurto(par?.periodo_base)}. Clique num efeito para vê-lo
+						na ponte de receita.
 					</PopoverContent>
 				</Popover>
 			</header>

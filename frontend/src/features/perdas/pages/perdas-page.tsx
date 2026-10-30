@@ -1,6 +1,7 @@
 import { getRouteApi } from "@tanstack/react-router";
 import { Pagina } from "#/components/layout/pagina";
 import { useSession } from "#/features/auth";
+import type { Recorte } from "#/lib/filtros";
 import { useMediaQuery } from "#/lib/use-media-query";
 import { AcoesOrdemProvider, useAcoesOrdem } from "../components/acoes-ordem";
 import { FilaSuspeitas } from "../components/fila-suspeitas";
@@ -11,6 +12,7 @@ import { StatusFilter } from "../components/status-filter";
 import { VisaoToggle } from "../components/visao-toggle";
 import { useOrdens } from "../hooks/use-ordens";
 import { useVisaoOrdens } from "../hooks/use-visao-ordens";
+import { recorteDaBusca } from "../search";
 import type { StatusOrdem } from "../types";
 
 const route = getRouteApi("/perdas");
@@ -24,8 +26,10 @@ export function PerdasPage() {
 }
 
 function OrdensSecao() {
-	const { status, secao: secaoParam } = route.useSearch();
+	const search = route.useSearch();
+	const { status, secao: secaoParam } = search;
 	const { data: user } = useSession();
+	const recorte = recorteDaBusca(search);
 	const canEdit = user?.perfil === "perdas";
 	const navigate = route.useNavigate();
 	const secao = secaoParam ?? (status ? "ordens" : "fila");
@@ -44,6 +48,11 @@ function OrdensSecao() {
 	return (
 		<Pagina className="min-h-full max-w-none">
 			<h1 className="sr-only">Perdas</h1>
+			<p className="max-w-prose text-small text-text-muted" role="note">
+				O período é mantido para as outras análises. A fila de suspeitas usa a
+				janela fixa de 12 meses da Gold; as inspeções não são filtradas por
+				período. Município, bairro e classe se aplicam às duas seções.
+			</p>
 			<nav
 				aria-label="Seções de perdas"
 				className="flex items-center gap-2 border-b border-border pb-4"
@@ -95,13 +104,14 @@ function OrdensSecao() {
 					</div>
 					{kanban ? (
 						<KanbanDasOrdens
+							recorte={recorte}
 							onVerTodas={(finalizada) => {
 								definirVisao("tabela");
 								filtrar(finalizada);
 							}}
 						/>
 					) : (
-						<OrdensTable status={status} />
+						<OrdensTable status={status} recorte={recorte} />
 					)}
 				</section>
 			</div>
@@ -110,11 +120,13 @@ function OrdensSecao() {
 }
 
 function KanbanDasOrdens({
+	recorte,
 	onVerTodas,
 }: {
+	recorte: Recorte;
 	onVerTodas: (status: "CONCLUIDA" | "CANCELADA") => void;
 }) {
-	const { data, isPending, isError, refetch } = useOrdens(undefined);
+	const { data, isPending, isError, refetch } = useOrdens(undefined, recorte);
 	const { abrir, abrirHistorico, pendente } = useAcoesOrdem();
 
 	return (

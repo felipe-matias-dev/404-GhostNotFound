@@ -22,7 +22,11 @@ import {
 	periodoDe,
 	trechoDe,
 } from "../conversions";
-import type { ParPeriodos } from "../types";
+import { anoAnterior, type ParPeriodos } from "#/lib/filtros";
+
+const MES = /^\d{4}-(0[1-9]|1[0-2])$/;
+
+const mesValido = (mes: string) => MES.test(mes);
 
 /**
  * Escolhe o período atual num calendário de meses (mês inicial, depois o final) e compara
@@ -32,18 +36,57 @@ export function PeriodoPicker({
 	pares,
 	par,
 	onEscolher,
+	erro,
+	retry,
+	carregando,
 }: {
 	pares: ParPeriodos[];
 	par: ParPeriodos | undefined;
 	onEscolher: (par: ParPeriodos) => void;
+	erro?: boolean;
+	retry?: () => void;
+	carregando?: boolean;
 }) {
 	const [aberto, setAberto] = useState(false);
+	const [manual, setManual] = useState(false);
+	const [baseEditada, setBaseEditada] = useState(false);
+	const [rascunho, setRascunho] = useState(["", "", "", ""]);
 	const [ancora, setAncora] = useState<number | null>(null);
 	const [sobre, setSobre] = useState<number | null>(null);
 	const selecionado = par ? trechoDe(par.periodo_atual) : undefined;
 	const [ano, setAno] = useState(() =>
 		selecionado ? Math.floor(selecionado.fim / 12) : 0,
 	);
+	const valido =
+		rascunho.every(mesValido) &&
+		rascunho[0] <= rascunho[1] &&
+		rascunho[2] <= rascunho[3];
+	const incompleto = rascunho.some((mes) => mes !== "");
+
+	const mudarMes = (indice: number, valor: string) => {
+		if (indice >= 2) setBaseEditada(true);
+		setRascunho((anterior) => {
+			const proximo = [...anterior];
+			proximo[indice] = valor;
+			const [inicio, fim] = proximo;
+			// Enquanto a base não foi editada à mão, ela espelha o atual um ano antes.
+			if (
+				indice < 2 &&
+				!baseEditada &&
+				mesValido(inicio) &&
+				mesValido(fim) &&
+				inicio <= fim
+			) {
+				const inicioBase = anoAnterior(inicio);
+				const fimBase = anoAnterior(fim);
+				if (inicioBase && fimBase) {
+					proximo[2] = inicioBase;
+					proximo[3] = fimBase;
+				}
+			}
+			return proximo;
+		});
+	};
 
 	const { atuais, inicios, anoMin, anoMax } = useMemo(() => {
 		const atuais = new Set(pares.map((p) => p.periodo_atual));
@@ -62,7 +105,18 @@ export function PeriodoPicker({
 		setAberto(proximo);
 		setAncora(null);
 		setSobre(null);
-		if (proximo && selecionado) setAno(Math.floor(selecionado.fim / 12));
+		if (!proximo) return;
+		setManual(false);
+		setBaseEditada(false);
+		setRascunho(
+			par
+				? [...par.periodo_atual.split("/"), ...par.periodo_base.split("/")]
+				: ["", "", "", ""],
+		);
+		const ultimo =
+			selecionado ??
+			(pares.length ? trechoDe(pares[pares.length - 1].periodo_atual) : undefined);
+		if (ultimo) setAno(Math.floor(ultimo.fim / 12));
 	};
 	const aplicar = (atual: string, base?: string) => {
 		const escolhido = parDoAtual(pares, atual, base);
@@ -89,12 +143,11 @@ export function PeriodoPicker({
 
 	const atual = par
 		? `${formatPeriodoCurto(par.periodo_atual)} vs ${formatPeriodoCurto(par.periodo_base)}`
-		: "Carregando…";
+		: "Selecionar período";
 	return (
 		<Popover open={aberto} onOpenChange={abrir}>
 			<PopoverTrigger
 				aria-label={`Períodos comparados: ${atual}. Trocar`}
-				disabled={!par}
 				className="flex h-7 min-w-0 cursor-pointer items-center gap-1.5 rounded-md border border-border-strong px-2 text-small text-text-muted outline-none transition-colors hover:bg-hover hover:text-text focus-visible:border-focus-ring focus-visible:ring-3 focus-visible:ring-focus-ring/50 data-popup-open:bg-hover data-popup-open:text-text"
 			>
 				<CalendarBlankIcon aria-hidden className="size-3.5 shrink-0" />
@@ -105,7 +158,7 @@ export function PeriodoPicker({
 				align="end"
 				className="w-[30rem] max-w-[calc(100vw-2rem)]"
 			>
-				<div className="flex">
+				{pares.length > 0 && !erro && !manual && <div className="flex">
 					{listaAtalhos.length > 0 && (
 						<ul className="flex w-44 shrink-0 flex-col gap-0.5 border-border-strong border-r p-1.5">
 							{listaAtalhos.map((a) => {
@@ -212,6 +265,78 @@ export function PeriodoPicker({
 								: `De ${formatCompetencia(competenciaDe(ancora))}: escolha o mês final.`}
 						</p>
 					</div>
+				</div>}
+				{carregando && pares.length === 0 && (
+					<div className="p-3 text-small text-text-muted" role="status">
+						Carregando períodos gravados…
+					</div>
+				)}
+				{!carregando && (erro || pares.length === 0) && (
+					<div className="p-3 text-small text-text-muted" role="status">
+						{erro
+							? "Não foi possível carregar os períodos gravados."
+							: "Não há períodos gravados."}
+						{erro && retry && (
+							<button type="button" className="ml-2 underline" onClick={retry}>
+								Tentar novamente
+							</button>
+						)}
+					</div>
+				)}
+				<div className="border-border-strong border-t p-3">
+					<button
+						type="button"
+						className="text-small underline"
+						onClick={() => setManual(!manual)}
+						aria-expanded={manual}
+					>
+						Personalizar
+					</button>
+					{manual && (
+						<form
+							className="mt-2 grid grid-cols-2 gap-2"
+							onSubmit={(event) => {
+								event.preventDefault();
+								if (!valido) return;
+								onEscolher({
+									periodo_atual: `${rascunho[0]}/${rascunho[1]}`,
+									periodo_base: `${rascunho[2]}/${rascunho[3]}`,
+								});
+								abrir(false);
+							}}
+						>
+							{["Início atual", "Fim atual", "Início base", "Fim base"].map(
+								(rotulo, indice) => (
+									<label
+										key={rotulo}
+										className="flex flex-col gap-1 text-small text-text-muted"
+									>
+										{rotulo}
+										<input
+											type="month"
+											required
+											value={rascunho[indice]}
+											onChange={(event) => mudarMes(indice, event.target.value)}
+											className="min-w-0 rounded-md border border-border-strong bg-surface px-2 py-1 text-text"
+										/>
+									</label>
+								),
+							)}
+							{incompleto && !valido && (
+								<p className="col-span-2 text-small text-text-muted" role="status">
+									Preencha os quatro meses, com o início antes do fim em cada
+									intervalo.
+								</p>
+							)}
+							<button
+								type="submit"
+								disabled={!valido}
+								className="col-span-2 rounded-md border border-border-strong px-2 py-1 text-small disabled:opacity-50"
+							>
+								Aplicar
+							</button>
+						</form>
+					)}
 				</div>
 
 				{par && (

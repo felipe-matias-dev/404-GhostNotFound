@@ -20,6 +20,8 @@ import {
 	useSession,
 	useSessionExpiry,
 } from "#/features/auth";
+import { FiltrosProvider, useFiltrosPortal } from "#/features/filtros/components/filtros-provider";
+import { FiltrosPortal } from "#/features/filtros/components/filtros-portal";
 import {
 	ConsultaUcProvider,
 	useConsultaUc,
@@ -134,14 +136,17 @@ function RootLayout() {
 		return <Navigate to={PROFILES[session.data.perfil].home} replace />;
 
 	return (
-		<ConsultaUcProvider key={session.data.login} usuario={session.data.login}>
-			<Portal />
-		</ConsultaUcProvider>
+		<FiltrosProvider key={session.data.login}>
+			<ConsultaUcProvider usuario={session.data.login}>
+				<Portal />
+			</ConsultaUcProvider>
+		</FiltrosProvider>
 	);
 }
 
 function Portal() {
 	const { abrir } = useConsultaUc();
+	const { searchPara } = useFiltrosPortal();
 	const { data: user } = useSession();
 	const itens = organizarNavegacao(
 		NAVEGACAO,
@@ -149,7 +154,8 @@ function Portal() {
 	);
 	return (
 		<>
-			<AppShell onConsultarUc={abrir} itens={itens} conta={<SessionControls />}>
+			<AppShell onConsultarUc={abrir} itens={itens} conta={<SessionControls />} searchPara={searchPara}>
+				<FiltrosPortal />
 				<Outlet />
 			</AppShell>
 			<TanStackDevtools

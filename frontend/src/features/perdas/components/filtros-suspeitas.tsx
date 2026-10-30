@@ -3,29 +3,28 @@ import { useQuery } from "@tanstack/react-query";
 import { type ReactNode, useId, useState } from "react";
 import { Button, buttonVariants } from "#/components/ui/button";
 import { Checkbox } from "#/components/ui/checkbox";
-import {
-	Popover,
-	PopoverContent,
-	PopoverTrigger,
-} from "#/components/ui/popover";
-import { distribuicaoQueda } from "../api";
+import { Popover, PopoverContent, PopoverTrigger } from "#/components/ui/popover";
+import type { Recorte } from "#/lib/filtros";
+import { distribuicaoQueda, distribuicaoQuedaKey } from "../api";
 import { FILTROS_FILA_INICIAIS, type FiltrosFila } from "../types";
 
 export function FiltrosSuspeitas({
 	value,
 	onChange,
 	disabled,
+	recorte,
 }: {
 	value: FiltrosFila;
 	onChange: (value: FiltrosFila) => void;
 	disabled: boolean;
+	recorte: Recorte;
 }) {
 	const [aberto, setAberto] = useState(false);
 	const [rascunho, setRascunho] = useState(value);
 	const medidorId = useId();
 	const { data, isPending, isError, refetch } = useQuery({
-		queryKey: ["distribuicao-queda"],
-		queryFn: distribuicaoQueda,
+		queryKey: distribuicaoQuedaKey(recorte),
+		queryFn: () => distribuicaoQueda(recorte),
 	});
 	const bins = Array.from({ length: 21 }, (_, index) => ({
 		inicio: index * 5,
@@ -252,7 +251,7 @@ function DistribuicaoQueda({
 	return (
 		<div className="grid gap-2 px-2 pb-2">
 			<p className="text-small text-text-muted">
-				Distribuição da queda na fila inteira
+				Distribuição da queda no recorte
 			</p>
 			{isPending ? (
 				<p className="text-small text-text-muted">Carregando distribuição…</p>

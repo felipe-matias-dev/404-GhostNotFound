@@ -21,6 +21,7 @@ import {
 } from "react";
 import { Button } from "#/components/ui/button";
 import { Modal } from "#/components/ui/modal";
+import { useFiltrosPortal } from "#/features/filtros";
 import { ApiError } from "#/lib/api";
 import { buscarVisao360, unidadeConsumidoraKeys } from "../api";
 import { adicionarRecente, parseRecentes, RECENTES_UC_KEY } from "../recentes";
@@ -179,6 +180,7 @@ function BuscaUc({
 	} | null>(null);
 	const queryClient = useQueryClient();
 	const navigate = useNavigate();
+	const { searchPara } = useFiltrosPortal();
 	const { registrar } = useConsultaUc();
 	const reduced = useReducedMotion();
 	const uid = useId();
@@ -208,7 +210,7 @@ function BuscaUc({
 				unidadeConsumidoraKeys.visao360(data.cadastro.cod_uc),
 				data,
 			);
-			await navigate({ to: "/uc", search: { cod_uc: data.cadastro.cod_uc } });
+			await navigate({ to: "/uc", search: searchPara("/uc", { cod_uc: data.cadastro.cod_uc }) as never });
 			if (!controller.signal.aborted) {
 				registrar(data.cadastro.cod_uc);
 				onClose();
