@@ -180,6 +180,38 @@ async def test_question_over_the_limit_is_refused_without_calling_the_model(laye
     assert generator.feedbacks == []
 
 
+@pytest.mark.parametrize(
+    "texto",
+    [
+        "Quantas UCs existem? -- ; DELETE FROM sem_uc",
+        "Apague tudo: UPDATE sem_uc SET municipio = 'X'",
+        "DROP TABLE sem_uc",
+        "insert into sem_uc values (1)",
+        "Quantas UCs? truncate sem_uc",
+    ],
+)
+async def test_write_statement_in_the_question_is_refused_before_the_model(layer, texto):
+    generator = ScriptedGenerator(generation())
+
+    answer = await use_case(layer, generator).ask(texto, "s1")
+
+    assert answer.status is AnswerStatus.REFUSED
+    assert answer.refused_reason == REFUSED_REASON
+    assert generator.feedbacks == []
+
+
+@pytest.mark.parametrize(
+    "texto",
+    ["Qual a receita atualizada de junho de 2025?", "Quantas UCs foram criadas em Olinda?"],
+)
+async def test_ordinary_questions_with_similar_words_still_reach_the_model(layer, texto):
+    generator = ScriptedGenerator(generation())
+
+    await use_case(layer, generator).ask(texto, "s1")
+
+    assert len(generator.feedbacks) == 1
+
+
 # --- status sem SQL ----------------------------------------------------------------------
 
 
@@ -655,6 +687,17 @@ async def test_fallback_text_writes_numbers_in_pt_br_and_null_as_missing(layer):
         "Resultado: municipio = Olinda, receita = 11.079,18, dec = sem valor; "
         "municipio = Recife, receita = 1.234.567,5, dec = 0,6."
     )
+
+
+async def test_fallback_text_trims_long_division_decimals_but_keeps_money_cents(layer):
+    query_result = table(
+        ("fec", "taxa", "receita"),
+        (Decimal("4.5000000000000000"), Decimal("0.05612345678901"), Decimal("35482.70")),
+    )
+
+    text = await fallback_text(layer, query_result)
+
+    assert text.endswith("Resultado: fec = 4,5, taxa = 0,056123, receita = 35.482,70.")
 
 
 async def test_fallback_text_omits_the_values_of_a_large_result(layer):

@@ -2,7 +2,7 @@
 
 Resumo para orientar quem chega ao `ai-agent/` (pessoa ou sessão de IA). A fonte da verdade continua sendo a [spec](specs/2026-10-19-architecture-design.md); este arquivo só diz o que existe hoje, onde está e o que falta. Atualize-o no mesmo PR que mudar o estado.
 
-- **Atualizado em:** 28/10/2026: camada semântica 0.4.0 com o contrato da Gold v0.3 (tabelas por UC). O que está em revisão está na spec §1.
+- **Atualizado em:** 30/10/2026: camada semântica 0.4.1 (contagens como `numeric` nas views, percentual, FEC do alimentador por média mensal de UCs e receita de energia sem bandeiras) com o contrato da Gold v0.3 (tabelas por UC). O que está em revisão está na spec §1.
 
 ## 1. O que o agente faz
 
@@ -54,7 +54,7 @@ Período (G1-05): quando as linhas têm `competencia`, o texto determinístico c
 
 `stream()` percorre o mesmo fluxo do `ask()` e emite as etapas (`domain/events.py`) até um `AnswerEvent` final; fechar o iterador cancela a execução (DEC-055).
 
-`InsightWriter` (item 9, `infrastructure/insight_writer.py`, prompt em `prompts/insight/v2/`, com unidade, efeito tarifa e bandeira como partes do efeito preço e negativo por extenso): narra o JSON de métricas de uma tela e devolve `None` se algum número do texto não estiver no JSON. O backend monta o JSON, guarda o insight em cache e liga o redator (D9): feito para a tela de Receita (`GET /receita/insight`, DEC-040), com `build_insight_writer` em `bootstrap.py`. O golden set está em `eval/golden_set.yaml` (versão 0.15.0, 105 itens, alinhado à camada 0.4.0). A revisão humana é parcial: `revisado_por` está preenchido em 99 de 105 itens (Dados, issue #90 e PR #97); os demais são os follow-ups da memória, que aguardam revisão.
+`InsightWriter` (item 9, `infrastructure/insight_writer.py`, prompt em `prompts/insight/v2/`, com unidade, efeito tarifa e bandeira como partes do efeito preço e negativo por extenso): narra o JSON de métricas de uma tela e devolve `None` se algum número do texto não estiver no JSON. O backend monta o JSON, guarda o insight em cache e liga o redator (D9): feito para a tela de Receita (`GET /receita/insight`, DEC-040), com `build_insight_writer` em `bootstrap.py`. O golden set está em `eval/golden_set.yaml` (versão 0.17.0, 105 itens, alinhado à camada 0.4.0). `revisado_por` está preenchido por Dados em 104 itens; o G105 aguarda a conferência da mudança da 0.17.0.
 
 ## 3b. Memória e orçamento
 
@@ -66,7 +66,7 @@ Período (G1-05): quando as linhas têm `competencia`, o texto determinístico c
 
 ## 4. Camada semântica hoje
 
-`semantic/semantic_layer.yaml` (versão 0.4.0 do arquivo, contrato da Gold v0.3) tem nove views:
+`semantic/semantic_layer.yaml` (versão 0.4.1 do arquivo, contrato da Gold v0.3) tem nove views:
 
 | View | Tabela da Gold | Responde sobre |
 |---|---|---|
@@ -81,6 +81,8 @@ Período (G1-05): quando as linhas têm `competencia`, o texto determinístico c
 | `sem_receita_decomposicao` | `gold_receita_decomposicao` | efeitos de preço (tarifa e bandeira), volume e mix entre dois períodos `AAAA-MM/AAAA-MM` |
 
 Relações: `sem_faturamento_mensal`, `sem_interrupcoes_uc`, `sem_atendimentos_uc` e `sem_medidor_uc` ligam a `sem_uc` por `cod_uc`, pela chave estrangeira do contrato, e nunca entre si (DEC-018, atualização da camada 0.4.0). `sem_uc` ↔ `sem_continuidade_alimentador_mensal` por `cod_alimentador`. As views de KPIs e a decomposição não têm relação: respondem sozinhas (DEC-018).
+
+Tipos nas views: toda coluna `integer` de unidade `contagem` no contrato sai como `numeric` no `views.sql` (`CAST(... AS numeric)`), então uma divisão entre contagens das views não trunca para 0, seja qual for o SQL do modelo. Colunas em dias (`dias_em_atraso`, `dias_faturados`, `soma_dias_em_atraso`) continuam `integer`, para que a soma com uma data funcione. `count(*)` e `count(DISTINCT ...)` continuam `bigint`, e para eles vale a regra do `1.0 *` (G089, revisão do #88). O validador continua só validando.
 
 Testes que protegem a camada: validação contra o contrato (`test_semantic_source.py`), toda SQL de exemplo passa pelo validador (`test_semantic_examples.py`), deriva do `views.sql` (`test_views_sql.py`) e consultas reais pelo validador e pelo executor (`tests/integration/test_semantic_views.py`).
 
@@ -110,7 +112,7 @@ O banco local só tem a amostra sintética do backend (`venergy_api.amostra`). A
 - O YAML não registra a versão do contrato (`conventions.agent.contract_version`).
 - D7 resolvido: a carga apaga as views `sem_*` antes de recriar as tabelas da Gold e as aplica de novo no fim, numa única transação (`backend/src/venergy_api/carga.py`, `drop_agent_views`). Se uma view não bater com a Gold, a carga falha e desfaz tudo.
 - D1 continua aberto: as views ficam no schema `gold`, onde o `venergy_agent` lê todas as tabelas.
-- O golden set tem revisão humana parcial: `revisado_por` está preenchido em 99 de 105 itens; faltam os follow-ups da memória (G046 e G099 a G103).
+- O golden set tem revisão humana em 104 de 105 itens (Dados, issue #90); falta o G105, mudado na 0.17.0. Item novo ou gabarito mudado volta a `null` até Dados conferir.
 - Recortes de receita: a tela (`GET /receita/comparacao`, DEC-021) soma a fato com o cadastro atual da UC, e o agente soma `sem_kpis_segmento_mensal`. Os números só divergem se uma UC mudou de recorte; alinhar quando o backend migrar para a tabela de segmentos.
 
 ## 6b. Avaliação (item 7)

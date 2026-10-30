@@ -375,3 +375,11 @@ def test_judge_prompts_reject_a_blank_nonce(blank):
         render_judge_system("x", blank)
     with pytest.raises(ValueError):
         render_judge_user("q", judged_answer(), blank)
+
+
+def test_column_line_shows_the_type_the_view_exposes():
+    count = ColumnSpec(name="n_uc", type="integer", unit="contagem", description="UCs")
+    days = ColumnSpec(name="dias", type="integer", unit="dias", description="dias")
+
+    assert count.view_type == "numeric"
+    assert days.view_type == "integer"

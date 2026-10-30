@@ -43,6 +43,11 @@ from venergy_agent.domain.sql import (
 logger = logging.getLogger("venergy_agent.ask")
 
 TECHNICAL_NAME = re.compile(r"\b[a-zA-Z]+_\w+")
+WRITE_STATEMENT = re.compile(
+    r"\b(delete\s+from|insert\s+into|update\s+\w+\s+set|truncate|"
+    r"(drop|alter|create)\s+(table|schema|view|index))\b",
+    re.IGNORECASE,
+)
 
 EMPTY_QUESTION = "A pergunta está vazia. Escreva o que você quer saber sobre a distribuidora."
 TOO_LONG_QUESTION = (
@@ -90,6 +95,7 @@ MONTH_NAMES = (
 FALLBACK_MAX_ROWS = 5
 FALLBACK_MAX_COLUMNS = 4
 MISSING_VALUE = "sem valor"
+MAX_DECIMAL_PLACES = 6
 TEXT_VALUE_MAX_CHARS = 120
 EMPTY_RESULT = (
     "Nenhum registro atende à consulta. O agente não distingue zero de dado ausente, "
@@ -202,6 +208,11 @@ class AskUseCase:
                 request_id,
                 session_id,
                 started,
+            )
+        if WRITE_STATEMENT.search(question.text):
+            self._log(request_id, session_id, step="pergunta", status="escrita_recusada")
+            return self._unanswered(
+                AnswerStatus.REFUSED, REFUSED_REASON, request_id, session_id, started
             )
 
         try:
@@ -734,7 +745,11 @@ def _pt_br(value: object) -> str:
     if isinstance(value, bool):
         return "sim" if value else "não"
     if isinstance(value, int | float | Decimal):
-        grouped = format(Decimal(str(value)), ",f")
+        number = Decimal(str(value))
+        exponent = number.as_tuple().exponent
+        if isinstance(exponent, int) and exponent < -MAX_DECIMAL_PLACES:
+            number = number.quantize(Decimal(1).scaleb(-MAX_DECIMAL_PLACES)).normalize()
+        grouped = format(number, ",f")
         return grouped.replace(",", "_").replace(".", ",").replace("_", ".")
     return _shorten(str(value))
 
