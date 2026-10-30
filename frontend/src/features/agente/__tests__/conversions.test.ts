@@ -36,6 +36,9 @@ function resposta(answer = "Receita faturada: R$ 1.000,00"): RespostaIa {
 		model: "gemini",
 		prompt_version: "v1",
 		latency_ms: 900,
+		input_tokens: 0,
+		output_tokens: 0,
+		session_id: "sessao-1",
 	};
 }
 
