@@ -58,7 +58,8 @@ export function AppShell({
 						<SidebarInset className="min-h-0 overflow-hidden">
 							<Header
 								titulo={
-									atual && (
+									atual &&
+									atual.to !== "/agente" && (
 										<Link
 											to={atual.to}
 											search={searchPara(atual.to) as never}
@@ -72,16 +73,18 @@ export function AppShell({
 								acoes={<ThemeToggle className="size-7" />}
 								trilhaRef={setTrilha}
 							/>
-							<div
-								id="conteudo"
-								tabIndex={-1}
-								data-scroll-restoration-id="conteudo"
-								className="min-h-0 flex-1 overflow-y-auto outline-none"
-							>
-								<HeaderTrilhaContext value={trilha}>
-									{children}
-								</HeaderTrilhaContext>
-							</div>
+							<LayoutGroup id="conteudo">
+								<div
+									id="conteudo"
+									tabIndex={-1}
+									data-scroll-restoration-id="conteudo"
+									className="min-h-0 flex-1 overflow-y-auto outline-none"
+								>
+									<HeaderTrilhaContext value={trilha}>
+										{children}
+									</HeaderTrilhaContext>
+								</div>
+							</LayoutGroup>
 						</SidebarInset>
 					</LayoutGroup>
 				</MotionConfig>

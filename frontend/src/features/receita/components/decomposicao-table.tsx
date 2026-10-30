@@ -4,6 +4,7 @@ import {
 	type DataTableColumn,
 	type SortState,
 } from "#/components/ui/data-table";
+import type { ParPeriodos, Recorte } from "#/lib/filtros";
 import { formatBRL, formatPct } from "#/lib/format";
 import { cn } from "#/lib/utils";
 import {
@@ -18,7 +19,6 @@ import {
 	sobreABase,
 } from "../conversions";
 import { useDecomposicao } from "../hooks/use-decomposicao";
-import type { ParPeriodos, Recorte } from "#/lib/filtros";
 import type { DecomposicaoLinha } from "../types";
 
 function tomDoSinal(n: number) {

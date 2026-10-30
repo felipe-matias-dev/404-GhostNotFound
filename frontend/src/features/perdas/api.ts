@@ -2,9 +2,9 @@ import type { SortState } from "#/components/ui/data-table";
 import { api, unwrap } from "#/lib/api";
 import type { Recorte } from "#/lib/filtros";
 import {
-	ORDENACAO_FILA,
 	type AtualizarOrdem,
 	type FiltrosFila,
+	ORDENACAO_FILA,
 	type OrdenacaoFila,
 	type StatusOrdem,
 } from "./types";

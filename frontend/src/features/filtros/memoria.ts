@@ -1,9 +1,9 @@
 import {
 	aplicarPatch,
-	gravarFiltrosCompartilhados,
-	lerFiltrosCompartilhados,
 	type DestinoPortal,
 	type FiltrosCompartilhados,
+	gravarFiltrosCompartilhados,
+	lerFiltrosCompartilhados,
 } from "#/lib/filtros";
 
 /**
@@ -108,7 +108,10 @@ export function registrar(
 	};
 }
 
-const mudouRecorte = (antes: FiltrosCompartilhados, agora: FiltrosCompartilhados) =>
+const mudouRecorte = (
+	antes: FiltrosCompartilhados,
+	agora: FiltrosCompartilhados,
+) =>
 	antes.municipio !== agora.municipio ||
 	antes.bairro !== agora.bairro ||
 	antes.classe !== agora.classe;

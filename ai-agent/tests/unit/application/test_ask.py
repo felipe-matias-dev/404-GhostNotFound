@@ -6,6 +6,8 @@ import pytest
 
 from venergy_agent.application.ask import (
     ATTEMPTS_FAILED,
+    BUDGET_EXHAUSTED,
+    BUDGET_UNAVAILABLE,
     CLARIFY_PREFIX,
     DATABASE_FAILED,
     EMPTY_RESULT,
@@ -20,7 +22,9 @@ from venergy_agent.application.ask import (
 )
 from venergy_agent.config import AGENT_ROOT, REPO_ROOT
 from venergy_agent.domain.answer import AnswerStatus, Confidence
-from venergy_agent.domain.errors import ErrorKind, QueryExecutionError
+from venergy_agent.domain.conversation import ConversationTurn
+from venergy_agent.domain.errors import ErrorKind, ModelCallFailed, QueryExecutionError
+from venergy_agent.domain.narration import Narration
 from venergy_agent.domain.sql import DraftStatus, Generation, QueryResult, SqlDraft
 from venergy_agent.infrastructure.semantic_source import YamlSemanticLayerSource
 from venergy_agent.infrastructure.sql_validator import SqlglotValidator
@@ -52,9 +56,11 @@ class ScriptedGenerator:
     def __init__(self, *outcomes):
         self._outcomes = outcomes
         self.feedbacks = []
+        self.histories = []
 
-    async def generate(self, question, layer, feedback):
+    async def generate(self, question, layer, feedback, history=()):
         self.feedbacks.append(feedback)
+        self.histories.append(history)
         outcome = self._outcomes[min(len(self.feedbacks), len(self._outcomes)) - 1]
         if isinstance(outcome, Exception):
             raise outcome
@@ -75,16 +81,47 @@ class ScriptedExecutor:
 
 
 class FixedWriter:
-    def __init__(self, text=None, error=None):
+    def __init__(self, text=None, error=None, input_tokens=0):
         self._text = text
         self._error = error
+        self._input_tokens = input_tokens
         self.calls = 0
 
     async def write(self, question, draft, result):
         self.calls += 1
         if self._error:
             raise self._error
-        return self._text
+        return Narration(text=self._text, input_tokens=self._input_tokens)
+
+
+class FakeHistory:
+    def __init__(self, turns=(), error=None):
+        self._turns = turns
+        self._error = error
+        self.calls = []
+
+    async def recent(self, session_id, limit):
+        self.calls.append((session_id, limit))
+        if self._error:
+            raise self._error
+        return self._turns
+
+
+class FakeUsage:
+    def __init__(self, used=0, error=None):
+        self._used = used
+        self._error = error
+        self.calls = []
+
+    async def tokens_used(self, session_id):
+        self.calls.append(session_id)
+        if self._error:
+            raise self._error
+        return self._used
+
+
+def turn(question, sql=COUNT_SQL, status="answered"):
+    return ConversationTurn(question=question, sql=sql, status=AnswerStatus(status))
 
 
 class BrokenValidator:
@@ -751,3 +788,242 @@ async def test_clarification_naming_a_technical_name_becomes_a_generic_question(
     assert answer.clarification == GENERIC_CLARIFICATION
     assert not TECHNICAL_NAME.search(answer.answer)
     assert "nome_tecnico_no_esclarecimento" in caplog.text
+
+
+# --- memória da conversa -----------------------------------------------------------------
+
+
+async def test_generator_receives_the_turns_from_the_port_oldest_first_on_every_attempt(layer):
+    history = FakeHistory((turn("primeira"), turn("segunda")))
+    generator = ScriptedGenerator(generation(sql="DELETE FROM sem_uc"), generation())
+
+    await use_case(layer, generator, history=history, history_turns=3).ask("e em Olinda?", "s1")
+
+    assert generator.histories == [history._turns, history._turns]
+    assert history.calls == [("s1", 3)]
+
+
+async def test_history_is_not_read_when_disabled_or_missing(layer):
+    history = FakeHistory((turn("antes"),))
+    generator = ScriptedGenerator(generation("unknown"))
+
+    await use_case(layer, generator, history=history, history_turns=0).ask("x", "s1")
+    await use_case(layer, generator, history=None, history_turns=3).ask("x", "s1")
+
+    assert history.calls == []
+    assert generator.histories == [(), ()]
+
+
+async def test_history_port_failure_is_logged_and_the_question_goes_on_without_it(layer, caplog):
+    caplog.set_level(logging.INFO, logger="venergy_agent.ask")
+    history = FakeHistory(error=RuntimeError("auditoria fora"))
+    generator = ScriptedGenerator(generation())
+
+    answer = await use_case(layer, generator, history=history, history_turns=3).ask("x", "s1")
+
+    assert answer.status is AnswerStatus.ANSWERED
+    assert generator.histories == [()]
+    lines = [json.loads(record.getMessage()) for record in caplog.records]
+    assert any(line["status"] == "historico_indisponivel" for line in lines)
+
+
+async def test_history_log_has_the_turn_count_and_never_the_old_questions(layer, caplog):
+    caplog.set_level(logging.INFO, logger="venergy_agent.ask")
+    history = FakeHistory((turn("pergunta-secreta-antiga"), turn("outra-antiga")))
+
+    await use_case(layer, ScriptedGenerator(generation()), history=history, history_turns=3).ask(
+        "x", "s1"
+    )
+
+    lines = [json.loads(record.getMessage()) for record in caplog.records]
+    (line,) = [entry for entry in lines if entry["step"] == "historico"]
+    assert line["turnos"] == 2
+    assert not any("antiga" in record.getMessage() for record in caplog.records)
+
+
+async def test_invalid_questions_do_not_read_the_history(layer):
+    history = FakeHistory((turn("antes"),))
+    agent = use_case(
+        layer,
+        ScriptedGenerator(generation()),
+        history=history,
+        history_turns=3,
+        max_question_chars=5,
+    )
+
+    await agent.ask("   ", "s1")
+    await agent.ask("x" * 6, "s1")
+
+    assert history.calls == []
+
+
+# --- tokens e orçamento ------------------------------------------------------------------
+
+
+async def test_answer_after_a_correction_sums_the_tokens_of_every_generation(layer):
+    generator = ScriptedGenerator(generation(sql="DELETE FROM sem_uc"), generation())
+
+    answer = await use_case(layer, generator).ask("quantas?", "s1")
+
+    assert answer.status is AnswerStatus.ANSWERED
+    assert (answer.input_tokens, answer.output_tokens) == (20, 10)
+
+
+@pytest.mark.parametrize(
+    "draft",
+    [generation("unknown"), generation("refuse"), generation("clarify", clarification="Qual mês?")],
+)
+async def test_statuses_without_sql_carry_the_tokens_of_the_call(layer, draft):
+    answer = await use_case(layer, ScriptedGenerator(draft)).ask("x", "s1")
+
+    assert (answer.input_tokens, answer.output_tokens) == (10, 5)
+
+
+async def test_provider_error_after_an_attempt_keeps_the_tokens_already_spent(layer):
+    generator = ScriptedGenerator(generation(sql="DELETE FROM sem_uc"), RuntimeError("503"))
+
+    answer = await use_case(layer, generator).ask("x", "s1")
+
+    assert answer.status is AnswerStatus.FAILED
+    assert (answer.input_tokens, answer.output_tokens) == (10, 5)
+
+
+async def test_exhausted_attempts_carry_the_tokens_of_all_of_them(layer):
+    generator = ScriptedGenerator(generation(sql="DELETE FROM sem_uc"))
+
+    answer = await use_case(layer, generator, max_correction_attempts=2).ask("x", "s1")
+
+    assert (answer.input_tokens, answer.output_tokens) == (20, 10)
+
+
+async def test_question_barred_before_the_model_spends_no_tokens(layer):
+    answer = await use_case(layer, ScriptedGenerator(generation())).ask("  ", "s1")
+
+    assert (answer.input_tokens, answer.output_tokens) == (0, 0)
+
+
+async def test_exhausted_budget_refuses_without_calling_the_model_or_the_history(layer):
+    generator = ScriptedGenerator(generation())
+    history = FakeHistory((turn("antes"),))
+    usage = FakeUsage(used=1000)
+
+    answer = await use_case(
+        layer, generator, history=history, history_turns=3, usage=usage, session_token_budget=1000
+    ).ask("quantas?", "s1")
+
+    assert answer.status is AnswerStatus.REFUSED
+    assert answer.refused_reason == BUDGET_EXHAUSTED
+    assert (answer.input_tokens, answer.output_tokens) == (0, 0)
+    assert generator.feedbacks == [] and history.calls == []
+    assert usage.calls == ["s1"]
+
+
+async def test_usage_under_the_budget_goes_on_normally(layer):
+    answer = await use_case(
+        layer,
+        ScriptedGenerator(generation()),
+        usage=FakeUsage(used=999),
+        session_token_budget=1000,
+    ).ask("quantas?", "s1")
+
+    assert answer.status is AnswerStatus.ANSWERED
+
+
+@pytest.mark.parametrize("settings", [{"session_token_budget": 0}, {"usage": None}])
+async def test_usage_is_not_read_when_the_budget_is_off_or_the_port_is_missing(layer, settings):
+    usage = FakeUsage(used=10**9)
+    values = {"usage": usage, "session_token_budget": 1000, **settings}
+
+    answer = await use_case(layer, ScriptedGenerator(generation()), **values).ask("x", "s1")
+
+    assert answer.status is AnswerStatus.ANSWERED
+    assert usage.calls == []
+
+
+async def test_unreadable_usage_fails_closed_without_calling_the_model(layer):
+    generator = ScriptedGenerator(generation())
+    usage = FakeUsage(error=RuntimeError("auditoria fora"))
+
+    answer = await use_case(layer, generator, usage=usage, session_token_budget=1000).ask("x", "s1")
+
+    assert answer.status is AnswerStatus.FAILED
+    assert answer.refused_reason == BUDGET_UNAVAILABLE
+    assert generator.feedbacks == []
+
+
+async def test_failed_model_call_keeps_the_tokens_it_already_spent(layer):
+    generator = ScriptedGenerator(ModelCallFailed(input_tokens=100, output_tokens=20))
+
+    answer = await use_case(layer, generator).ask("x", "s1")
+
+    assert answer.status is AnswerStatus.FAILED
+    assert (answer.input_tokens, answer.output_tokens) == (100, 20)
+
+
+async def test_failed_narration_keeps_the_tokens_of_the_generation_and_of_the_attempt(layer):
+    writer = FixedWriter(error=ModelCallFailed(input_tokens=30, output_tokens=5))
+
+    answer = await use_case(layer, ScriptedGenerator(generation()), writer=writer).ask("x", "s1")
+
+    assert answer.status is AnswerStatus.ANSWERED
+    assert (answer.input_tokens, answer.output_tokens) == (10 + 30, 5 + 5)
+
+
+async def test_budget_log_has_numbers_only(layer, caplog):
+    caplog.set_level(logging.INFO, logger="venergy_agent.ask")
+
+    await use_case(
+        layer, ScriptedGenerator(generation()), usage=FakeUsage(used=7), session_token_budget=1000
+    ).ask("quantas?", "s1")
+
+    lines = [json.loads(record.getMessage()) for record in caplog.records]
+    (line,) = [entry for entry in lines if entry["step"] == "orcamento"]
+    assert (line["tokens_usados"], line["orcamento"]) == (7, 1000)
+
+
+async def test_narration_tokens_count_toward_the_answer_usage(layer):
+    writer = FixedWriter(text="Há 3 UCs.", input_tokens=500)
+
+    answer = await use_case(layer, ScriptedGenerator(generation()), writer=writer).ask(
+        "quantas?", "s1"
+    )
+
+    assert answer.answer == "Há 3 UCs."
+    assert answer.input_tokens == generation().input_tokens + 500
+
+
+@pytest.mark.parametrize("turns", [(), None])
+async def test_followup_without_a_previous_turn_asks_back_without_calling_the_model(layer, turns):
+    generator = ScriptedGenerator(generation())
+    history = None if turns is None else FakeHistory(turns)
+
+    answer = await use_case(layer, generator, history=history, history_turns=3).ask(
+        "Agora faça o mesmo para Olinda.", "s1"
+    )
+
+    assert answer.status is AnswerStatus.CLARIFY
+    assert answer.sql is None
+    assert answer.input_tokens == 0
+    assert generator.histories == []
+
+
+async def test_followup_with_a_previous_turn_goes_to_the_model(layer):
+    generator = ScriptedGenerator(generation())
+    history = FakeHistory((turn("Quantas UCs existem em Recife?"),))
+
+    answer = await use_case(
+        layer, generator, ScriptedExecutor(result()), history=history, history_turns=3
+    ).ask("E em Olinda?", "s1")
+
+    assert answer.status is AnswerStatus.ANSWERED
+    assert len(generator.histories) == 1
+
+
+async def test_standalone_question_without_history_goes_to_the_model(layer):
+    generator = ScriptedGenerator(generation())
+
+    await use_case(
+        layer, generator, ScriptedExecutor(result()), history=FakeHistory(()), history_turns=3
+    ).ask("Quantas UCs existem em Olinda?", "s1")
+
+    assert len(generator.histories) == 1

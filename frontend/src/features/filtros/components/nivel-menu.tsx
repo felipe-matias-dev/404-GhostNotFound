@@ -41,7 +41,9 @@ export function NivelMenu({
 				aria-label={`${nivel}: ${rotulo}. Trocar`}
 				className={cn(
 					"flex h-8 min-w-0 cursor-pointer items-center gap-1.5 rounded-md border px-2 text-small outline-none transition-colors hover:bg-hover hover:text-text focus-visible:border-focus-ring focus-visible:ring-3 focus-visible:ring-focus-ring/50 data-popup-open:bg-hover data-popup-open:text-text",
-					valor ? "border-accent bg-accent-subtle text-accent-text" : "border-border-strong text-text-muted",
+					valor
+						? "border-accent bg-accent-subtle text-accent-text"
+						: "border-border-strong text-text-muted",
 				)}
 			>
 				<span className="truncate" aria-current={atual ? "page" : undefined}>

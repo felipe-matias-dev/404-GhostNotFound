@@ -1,12 +1,16 @@
 import { useRouter, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Button } from "#/components/ui/button";
-import { formatPeriodoCurto } from "#/lib/format";
 import {
 	aplicarPeriodoPadrao,
 	gravarFiltrosCompartilhados,
 } from "#/lib/filtros";
-import { useCompetencias, useLocalidades, usePeriodosDecomposicao } from "../api";
+import { formatPeriodoCurto } from "#/lib/format";
+import {
+	useCompetencias,
+	useLocalidades,
+	usePeriodosDecomposicao,
+} from "../api";
 import { CLASSE_ROTULO, parPadrao, parPadraoMensal } from "../conversions";
 import { telaDaNavegacao } from "../memoria";
 import { ClassePicker } from "./classe-picker";
@@ -62,9 +66,11 @@ export function FiltrosPortal() {
 		campos.some((campo) => bruto[campo] !== compartilhados[campo]) ||
 		aliases.some((campo) => bruto[campo] !== undefined);
 	const invalido = campos.some(
-		(campo) => bruto[campo] !== undefined && bruto[campo] !== compartilhados[campo],
+		(campo) =>
+			bruto[campo] !== undefined && bruto[campo] !== compartilhados[campo],
 	);
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: aviso pertence à tela atual.
 	useEffect(() => {
 		setAviso(false);
 	}, [pathname]);
@@ -113,7 +119,10 @@ export function FiltrosPortal() {
 
 	if (pathname === "/uc") {
 		return (
-			<div className="border-b border-border px-3 py-4 text-small text-text-muted lg:px-5" role="note">
+			<div
+				className="border-b border-border px-3 py-4 text-small text-text-muted lg:px-5"
+				role="note"
+			>
 				<p>
 					Contexto da análise:{" "}
 					{par
@@ -125,13 +134,18 @@ export function FiltrosPortal() {
 						? `${filtros.classe} · ${CLASSE_ROTULO[filtros.classe]}`
 						: "Todas as classes"}
 				</p>
-				<p>Consulta individual: o histórico da UC não é limitado pelos filtros da análise.</p>
+				<p>
+					Consulta individual: o histórico da UC não é limitado pelos filtros da
+					análise.
+				</p>
 			</div>
 		);
 	}
 	if (!destino) return null;
 
-	const municipios = ordenar((localidades.data ?? []).map((item) => item.municipio));
+	const municipios = ordenar(
+		(localidades.data ?? []).map((item) => item.municipio),
+	);
 	const bairros = ordenar(
 		(localidades.data ?? [])
 			.filter((item) => item.municipio === filtros.municipio)
@@ -139,12 +153,13 @@ export function FiltrosPortal() {
 	);
 
 	return (
-		<div
+		<fieldset
 			className="flex flex-wrap items-center gap-x-2 gap-y-2 border-b border-border px-3 py-3 lg:px-5"
-			role="group"
 			aria-label="Filtros da análise"
 		>
-			<span className="hidden text-small font-medium text-text-muted sm:inline">Análise</span>
+			<span className="hidden text-small font-medium text-text-muted sm:inline">
+				Análise
+			</span>
 			{pathname !== "/perdas" && (
 				<PeriodoPicker
 					pares={periodos.data ?? []}
@@ -179,18 +194,26 @@ export function FiltrosPortal() {
 					onEscolher={(bairro) => alterar({ bairro })}
 				/>
 			)}
-			<ClassePicker classe={filtros.classe} onEscolher={(classe) => alterar({ classe })} />
-			<Button variant="ghost" size="xs" onClick={limparRecorte} aria-label="Limpar recorte">
+			<ClassePicker
+				classe={filtros.classe}
+				onEscolher={(classe) => alterar({ classe })}
+			/>
+			<Button
+				variant="ghost"
+				size="xs"
+				onClick={limparRecorte}
+				aria-label="Limpar recorte"
+			>
 				<span className="sm:hidden">Limpar</span>
 				<span className="hidden sm:inline">Limpar recorte</span>
 			</Button>
 			{aviso && (
-				<span role="status" className="text-small text-text-muted">
+				<output className="text-small text-text-muted">
 					Filtros inválidos foram ajustados.
-				</span>
+				</output>
 			)}
 			{localidades.isError && (
-				<span role="status" className="text-small text-text-muted">
+				<output className="text-small text-text-muted">
 					Catálogo de localidades indisponível.{" "}
 					<button
 						type="button"
@@ -201,8 +224,8 @@ export function FiltrosPortal() {
 					>
 						Tentar novamente
 					</button>
-				</span>
+				</output>
 			)}
-		</div>
+		</fieldset>
 	);
 }

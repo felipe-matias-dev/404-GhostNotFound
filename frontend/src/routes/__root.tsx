@@ -14,14 +14,18 @@ import { AppShell } from "#/components/layout/app-shell";
 import { NAVEGACAO, organizarNavegacao } from "#/components/layout/app-sidebar";
 import { Logo } from "#/components/layout/logo";
 import { Button } from "#/components/ui/button";
+import { AgenteProvider, AgenteWidget } from "#/features/agente";
 import {
 	PROFILES,
 	SessionControls,
 	useSession,
 	useSessionExpiry,
 } from "#/features/auth";
-import { FiltrosProvider, useFiltrosPortal } from "#/features/filtros/components/filtros-provider";
-import { FiltrosPortal } from "#/features/filtros/components/filtros-portal";
+import {
+	FiltrosPortal,
+	FiltrosProvider,
+	useFiltrosPortal,
+} from "#/features/filtros";
 import {
 	ConsultaUcProvider,
 	useConsultaUc,
@@ -138,7 +142,9 @@ function RootLayout() {
 	return (
 		<FiltrosProvider key={session.data.login}>
 			<ConsultaUcProvider usuario={session.data.login}>
-				<Portal />
+				<AgenteProvider usuario={session.data.login}>
+					<Portal />
+				</AgenteProvider>
 			</ConsultaUcProvider>
 		</FiltrosProvider>
 	);
@@ -154,12 +160,18 @@ function Portal() {
 	);
 	return (
 		<>
-			<AppShell onConsultarUc={abrir} itens={itens} conta={<SessionControls />} searchPara={searchPara}>
+			<AppShell
+				onConsultarUc={abrir}
+				itens={itens}
+				conta={<SessionControls />}
+				searchPara={searchPara}
+			>
 				<FiltrosPortal />
 				<Outlet />
 			</AppShell>
+			<AgenteWidget />
 			<TanStackDevtools
-				config={{ position: "bottom-right" }}
+				config={{ position: "bottom-left" }}
 				plugins={[
 					{ name: "Tanstack Router", render: <TanStackRouterDevtoolsPanel /> },
 					TanStackQueryDevtools,

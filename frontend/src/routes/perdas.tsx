@@ -1,6 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { PerdasPage } from "#/features/perdas";
-import { perdasSearchSchema } from "#/features/perdas/search";
+import { PerdasPage, perdasSearchSchema } from "#/features/perdas";
 
 export const Route = createFileRoute("/perdas")({
 	validateSearch: perdasSearchSchema,

@@ -1,6 +1,7 @@
 import { XIcon } from "@phosphor-icons/react";
 import { useState } from "react";
 import { Button } from "#/components/ui/button";
+import type { ParPeriodos, Recorte } from "#/lib/filtros";
 import { formatBRL, formatPct } from "#/lib/format";
 import { cn } from "#/lib/utils";
 import {
@@ -13,7 +14,6 @@ import {
 	rankingDaQueda,
 } from "../conversions";
 import { useDecomposicao } from "../hooks/use-decomposicao";
-import type { ParPeriodos, Recorte } from "#/lib/filtros";
 import type { DecomposicaoLinha } from "../types";
 
 const MEDIDAS: { id: Medida; rotulo: string; nome: string }[] = [

@@ -49,9 +49,6 @@ export function useTesoura(par: ParPeriodos | undefined, recorte: Recorte) {
 				? () => buscarJanelas(meses, recorte)
 				: skipToken,
 		select: (linhas) =>
-			tesoura(
-				intervalo ? janelasDoIntervalo(linhas, intervalo) : [],
-				meses,
-			),
+			tesoura(intervalo ? janelasDoIntervalo(linhas, intervalo) : [], meses),
 	});
 }

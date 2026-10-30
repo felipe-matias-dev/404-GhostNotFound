@@ -14,9 +14,7 @@ describe("parPadrao", () => {
 			par("2024-01/2024-12", "2025-01/2025-12"),
 			par("2023-05/2023-07", "2024-05/2024-07"),
 		];
-		expect(parPadrao(pares)).toEqual(
-			par("2024-01/2024-12", "2025-01/2025-12"),
-		);
+		expect(parPadrao(pares)).toEqual(par("2024-01/2024-12", "2025-01/2025-12"));
 	});
 
 	it("sem janela anual, usa o período atual mais recente", () => {
@@ -34,9 +32,9 @@ describe("parPadrao", () => {
 
 describe("parPadraoMensal", () => {
 	it("compara o mês mais recente com o mesmo mês do ano anterior", () => {
-		expect(parPadraoMensal(["2024-03", "2024-04", "2025-03", "2025-04"])).toEqual(
-			par("2024-04/2024-04", "2025-04/2025-04"),
-		);
+		expect(
+			parPadraoMensal(["2024-03", "2024-04", "2025-03", "2025-04"]),
+		).toEqual(par("2024-04/2024-04", "2025-04/2025-04"));
 	});
 
 	it("cai no mês anterior quando não há o mesmo mês do ano anterior", () => {

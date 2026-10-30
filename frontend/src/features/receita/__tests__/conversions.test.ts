@@ -1,11 +1,7 @@
 import { describe, expect, it } from "vitest";
-import {
-	passosDaPonte,
-	type Ranking,
-	rankingDaQueda,
-} from "../conversions";
 import { atalhos, parDoAtual } from "#/features/filtros/conversions";
 import type { ParPeriodos } from "#/lib/filtros";
+import { passosDaPonte, type Ranking, rankingDaQueda } from "../conversions";
 import type { DecomposicaoLinha } from "../types";
 
 const par = (periodo_base: string, periodo_atual: string): ParPeriodos => ({

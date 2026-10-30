@@ -43,8 +43,12 @@ describe("redeSearchSchema", () => {
 			fim: "2025-12",
 		});
 
-		expect(lerFiltrosCompartilhados("/rede", mesTreze).periodo_atual).toBeUndefined();
-		expect(lerFiltrosCompartilhados("/rede", mesCurto).periodo_atual).toBeUndefined();
+		expect(
+			lerFiltrosCompartilhados("/rede", mesTreze).periodo_atual,
+		).toBeUndefined();
+		expect(
+			lerFiltrosCompartilhados("/rede", mesCurto).periodo_atual,
+		).toBeUndefined();
 	});
 
 	it("remove as duas pontas de um período incompleto ou invertido", () => {
@@ -54,8 +58,12 @@ describe("redeSearchSchema", () => {
 			fim: "2025-01",
 		});
 
-		expect(lerFiltrosCompartilhados("/rede", soInicio).periodo_atual).toBeUndefined();
-		expect(lerFiltrosCompartilhados("/rede", invertido).periodo_atual).toBeUndefined();
+		expect(
+			lerFiltrosCompartilhados("/rede", soInicio).periodo_atual,
+		).toBeUndefined();
+		expect(
+			lerFiltrosCompartilhados("/rede", invertido).periodo_atual,
+		).toBeUndefined();
 	});
 
 	it("mantém um período completo e em ordem", () => {
@@ -125,8 +133,12 @@ describe("redeSearchSchema", () => {
 			periodo_base: "2024-12/2024-01",
 		});
 
-		expect(lerFiltrosCompartilhados("/rede", mesTreze).periodo_base).toBeUndefined();
-		expect(lerFiltrosCompartilhados("/rede", invertido).periodo_base).toBeUndefined();
+		expect(
+			lerFiltrosCompartilhados("/rede", mesTreze).periodo_base,
+		).toBeUndefined();
+		expect(
+			lerFiltrosCompartilhados("/rede", invertido).periodo_base,
+		).toBeUndefined();
 	});
 
 	it("mantém a classe ao remover um bairro órfão de município", () => {

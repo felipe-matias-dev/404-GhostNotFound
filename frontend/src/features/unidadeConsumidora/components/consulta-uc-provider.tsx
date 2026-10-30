@@ -210,7 +210,10 @@ function BuscaUc({
 				unidadeConsumidoraKeys.visao360(data.cadastro.cod_uc),
 				data,
 			);
-			await navigate({ to: "/uc", search: searchPara("/uc", { cod_uc: data.cadastro.cod_uc }) as never });
+			await navigate({
+				to: "/uc",
+				search: searchPara("/uc", { cod_uc: data.cadastro.cod_uc }) as never,
+			});
 			if (!controller.signal.aborted) {
 				registrar(data.cadastro.cod_uc);
 				onClose();

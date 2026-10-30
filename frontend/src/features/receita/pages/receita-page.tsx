@@ -2,14 +2,13 @@ import { getRouteApi } from "@tanstack/react-router";
 import { useState } from "react";
 import { Pagina } from "#/components/layout/pagina";
 import { Button } from "#/components/ui/button";
-import { useFiltrosPortal } from "#/features/filtros";
-import { usePeriodosDecomposicao } from "#/features/filtros/api";
+import { useFiltrosPortal, usePeriodosDecomposicao } from "#/features/filtros";
 import type { ParPeriodos, Recorte } from "#/lib/filtros";
 import { DecomposicaoTable } from "../components/decomposicao-table";
 import { MapaRecorte } from "../components/mapa-recorte";
 import { PonteWaterfall } from "../components/ponte-waterfall";
 import { RankingQueda } from "../components/ranking-queda";
-import { type Efeito } from "../conversions";
+import type { Efeito } from "../conversions";
 import type { DecomposicaoLinha } from "../types";
 
 const route = getRouteApi("/receita");

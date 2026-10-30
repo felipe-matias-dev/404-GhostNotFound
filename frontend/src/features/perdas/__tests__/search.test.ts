@@ -33,7 +33,9 @@ describe("perdasSearchSchema", () => {
 	});
 
 	it("descarta mês inexistente e faixa fora dos limites", () => {
-		const invalido = perdasSearchSchema.parse({ periodo_atual: "2025-13/2025-12" });
+		const invalido = perdasSearchSchema.parse({
+			periodo_atual: "2025-13/2025-12",
+		});
 		expect(invalido.periodo_atual).toBe("2025-13/2025-12");
 		expect(
 			lerFiltrosCompartilhados("/perdas", invalido).periodo_atual,
@@ -51,9 +53,10 @@ describe("perdasSearchSchema", () => {
 describe("recorteDaBusca", () => {
 	it("não envia bairro órfão, que o backend recusaria com 422", () => {
 		expect(recorteDaBusca({ bairro: "Janga" })).toEqual({});
-		expect(recorteDaBusca({ municipio: "Paulista", bairro: "Janga" })).toEqual(
-			{ municipio: "Paulista", bairro: "Janga" },
-		);
+		expect(recorteDaBusca({ municipio: "Paulista", bairro: "Janga" })).toEqual({
+			municipio: "Paulista",
+			bairro: "Janga",
+		});
 	});
 
 	it("mantém classe sem geografia", () => {
@@ -210,9 +213,7 @@ describe("paginação e ordenação da URL", () => {
 	});
 
 	it("omite defaults e volta à primeira página nos patches", () => {
-		expect(
-			patchDaPagina(1),
-		).toEqual({ pagina: undefined });
+		expect(patchDaPagina(1)).toEqual({ pagina: undefined });
 		expect(patchDaPagina(2)).toEqual({ pagina: 2 });
 		expect(
 			patchDaOrdenacao({ columnId: "energia", direction: "desc" }),

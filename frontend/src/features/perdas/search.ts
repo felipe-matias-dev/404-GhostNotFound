@@ -1,21 +1,15 @@
+import { z } from "zod";
 import type { SortState } from "#/components/ui/data-table";
 import { filtrosCompartilhadosShape, type Recorte } from "#/lib/filtros";
-import { z } from "zod";
 import {
-	ORDENACAO_FILA,
-	STATUS_ORDEM,
 	type FiltrosFila,
+	ORDENACAO_FILA,
 	type OrdenacaoFila,
+	STATUS_ORDEM,
 } from "./types";
 
 const inteiro = (minimo: number, maximo = Number.MAX_SAFE_INTEGER) =>
-	z.coerce
-		.number()
-		.int()
-		.min(minimo)
-		.max(maximo)
-		.optional()
-		.catch(undefined);
+	z.coerce.number().int().min(minimo).max(maximo).optional().catch(undefined);
 
 // A URL traz "true"/"false" como texto; `z.coerce.boolean()` trataria qualquer texto como
 // verdadeiro e perderia o desligamento explícito do filtro.
@@ -213,9 +207,7 @@ export function patchDosFiltros(filtros: FiltrosFila): Partial<PerdasSearch> {
 	return {
 		queda_min: filtros.queda?.[0],
 		queda_max: filtros.queda?.[1],
-		medidor_eletromecanico: filtros.medidorEletromecanico
-			? true
-			: undefined,
+		medidor_eletromecanico: filtros.medidorEletromecanico ? true : undefined,
 		leituras_estimadas_min: filtros.leiturasEstimadas?.[0],
 		leituras_estimadas_max: filtros.leiturasEstimadas?.[1],
 		pagina: undefined,
@@ -223,7 +215,9 @@ export function patchDosFiltros(filtros: FiltrosFila): Partial<PerdasSearch> {
 }
 
 /** Patch de URL da ordenação; `null` volta à ordem da API (`prioridade` ascendente). */
-export function patchDaOrdenacao(sort: SortState | null): Partial<PerdasSearch> {
+export function patchDaOrdenacao(
+	sort: SortState | null,
+): Partial<PerdasSearch> {
 	const coluna: OrdenacaoFila | undefined = ORDENACAO_FILA.find(
 		(opcao) => opcao === sort?.columnId,
 	);

@@ -39,6 +39,8 @@ class AgentAnswer(BaseModel):
     model: NonBlankText
     prompt_version: NonBlankText
     latency_ms: int = Field(ge=0)
+    input_tokens: int = Field(0, ge=0)
+    output_tokens: int = Field(0, ge=0)
 
     @model_validator(mode="after")
     def check_status_invariants(self) -> Self:

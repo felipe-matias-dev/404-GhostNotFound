@@ -423,13 +423,33 @@ def test_monthly_uses_weighted_components_and_global_calendar(
 ) -> None:
     store(
         engine,
-        segment(
-            "2024-01", n_uc=100, horas_interrompidas=200, n_interrupcoes=300,
-            soma_notas=8, n_notas=2, n_chamados=3,
+        KpisMensais(
+            competencia="2024-01",
+            kwh_faturado=0,
+            receita_faturada=0,
+            receita_energia=0,
+            n_chamados=8,
         ),
         segment(
-            "2024-01", bairro="Carmo", n_uc=300, horas_interrompidas=300,
-            n_interrupcoes=100, soma_notas=3, n_notas=1, n_chamados=5,
+            "2024-01",
+            n_uc=100,
+            n_faturas=2,
+            horas_interrompidas=200,
+            n_interrupcoes=300,
+            soma_notas=8,
+            n_notas=2,
+            n_chamados=3,
+        ),
+        segment(
+            "2024-01",
+            bairro="Carmo",
+            n_uc=300,
+            n_faturas=1,
+            horas_interrompidas=300,
+            n_interrupcoes=100,
+            soma_notas=3,
+            n_notas=1,
+            n_chamados=5,
         ),
         segment("2024-02", municipio="Paulista", bairro="Janga"),
         segment("2024-03", municipio="Paulista", bairro="Janga"),
@@ -446,20 +466,82 @@ def test_monthly_uses_weighted_components_and_global_calendar(
     assert first["satisfacao_media"] == pytest.approx(11 / 3)
     assert first["n_chamados"] == 8
     comparison = compare(
-        client, ("2024-01", "2024-01"), ("2024-01", "2024-01"),
-        municipio="Recife", classe="B1",
+        client,
+        ("2024-01", "2024-01"),
+        ("2024-01", "2024-01"),
+        municipio="Recife",
+        classe="B1",
     )["atual"]
     for field in (
-        "dec", "fec", "satisfacao_media", "n_chamados", "kwh_faturado",
-        "receita_faturada", "receita_energia",
+        "dec",
+        "fec",
+        "satisfacao_media",
+        "n_chamados",
+        "kwh_faturado",
+        "receita_faturada",
+        "receita_energia",
     ):
         assert float(first[field]) == pytest.approx(float(comparison[field]))
     assert empty["competencia"] == "2024-02"
+    # Mês sem linha no recorte: nulo, nunca zero (DEC-030).
     for field in ("kwh_faturado", "receita_faturada", "receita_energia", "n_chamados"):
-        assert float(empty[field]) == 0
+        assert empty[field] is None
     assert empty["dec"] is None
     assert empty["fec"] is None
     assert empty["satisfacao_media"] is None
+
+
+def test_monthly_keeps_real_zeros_and_nulls_months_without_invoice(
+    engine: Engine, client: TestClient
+) -> None:
+    store(
+        engine,
+        KpisMensais(
+            competencia="2024-01",
+            kwh_faturado=0,
+            receita_faturada=0,
+            receita_energia=0,
+            n_chamados=None,
+        ),
+        KpisMensais(
+            competencia="2024-02",
+            kwh_faturado=0,
+            receita_faturada=0,
+            receita_energia=0,
+            n_chamados=2,
+        ),
+        # Fatura emitida com energia e receita zeradas: zero é um fato do recorte.
+        segment(
+            "2024-01",
+            n_uc=1,
+            n_faturas=1,
+            kwh_faturado=Decimal("0.000"),
+            receita_faturada=Decimal("0.00"),
+            receita_energia=Decimal("0.00"),
+        ),
+        # Só chamado no mês, sem fatura: as somas de faturamento são nulas (DEC-030),
+        # e o chamado continua contado.
+        segment(
+            "2024-02",
+            n_uc=0,
+            n_faturas=0,
+            n_chamados=2,
+            kwh_faturado=Decimal("0.000"),
+            receita_faturada=Decimal("0.00"),
+            receita_energia=Decimal("0.00"),
+        ),
+    )
+
+    com_fatura, sem_fatura = client.get(MONTHLY).json()
+
+    assert com_fatura["competencia"] == "2024-01"
+    for field in ("kwh_faturado", "receita_faturada", "receita_energia"):
+        assert com_fatura[field] == 0
+    assert com_fatura["n_chamados"] is None
+    assert sem_fatura["competencia"] == "2024-02"
+    for field in ("kwh_faturado", "receita_faturada", "receita_energia"):
+        assert sem_fatura[field] is None
+    assert sem_fatura["n_chamados"] == 2
 
 
 def test_monthly_validates_filters_and_handles_empty_calendar(

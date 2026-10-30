@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { lerFiltrosCompartilhados, type DestinoPortal } from "#/lib/filtros";
+import { type DestinoPortal, lerFiltrosCompartilhados } from "#/lib/filtros";
 import {
+	type BuscaDaTela,
 	buscaPara,
 	destinoDe,
 	registrar,
 	telaDaNavegacao,
-	type BuscaDaTela,
 } from "../memoria";
 
 const par = {
@@ -115,12 +115,9 @@ describe("telaDaNavegacao", () => {
 describe("buscaPara", () => {
 	it("leva de Perdas à Receita só o compartilhado, sem os sinais locais", () => {
 		const memoria = registrar({}, "/perdas", perdas);
-		const receita = buscaPara(
-			"/receita",
-			tela("/perdas", perdas),
-			memoria,
-			{ efeito: "tarifa" },
-		);
+		const receita = buscaPara("/receita", tela("/perdas", perdas), memoria, {
+			efeito: "tarifa",
+		});
 		expect(receita).toMatchObject({
 			...par,
 			municipio: "Paulista",
@@ -232,11 +229,16 @@ describe("buscaPara", () => {
 	});
 
 	it("limpar sinais locais preserva o compartilhado", () => {
-		const limpo = buscaPara("/perdas", tela("/perdas", perdas), {}, {
-			status: undefined,
-			queda_min: undefined,
-			queda_max: undefined,
-		});
+		const limpo = buscaPara(
+			"/perdas",
+			tela("/perdas", perdas),
+			{},
+			{
+				status: undefined,
+				queda_min: undefined,
+				queda_max: undefined,
+			},
+		);
 		expect(limpo.status).toBeUndefined();
 		expect(limpo.queda_min).toBeUndefined();
 		expect(limpo.queda_max).toBeUndefined();
@@ -249,11 +251,16 @@ describe("buscaPara", () => {
 	});
 
 	it("limpar o recorte zera a página, mantém os sinais e o período", () => {
-		const limpo = buscaPara("/perdas", tela("/perdas", perdas), {}, {
-			municipio: undefined,
-			bairro: undefined,
-			classe: undefined,
-		});
+		const limpo = buscaPara(
+			"/perdas",
+			tela("/perdas", perdas),
+			{},
+			{
+				municipio: undefined,
+				bairro: undefined,
+				classe: undefined,
+			},
+		);
 		expect(limpo.municipio).toBeUndefined();
 		expect(limpo.bairro).toBeUndefined();
 		expect(limpo.classe).toBeUndefined();
@@ -275,9 +282,14 @@ describe("buscaPara", () => {
 	});
 
 	it("leva cod_uc à consulta individual sem os filtros exclusivos de Perdas", () => {
-		const uc = buscaPara("/uc", tela("/perdas", perdas), {}, {
-			cod_uc: "0005",
-		});
+		const uc = buscaPara(
+			"/uc",
+			tela("/perdas", perdas),
+			{},
+			{
+				cod_uc: "0005",
+			},
+		);
 		expect(uc.cod_uc).toBe("0005");
 		expect(uc.status).toBeUndefined();
 		expect(uc.pagina).toBeUndefined();

@@ -68,6 +68,8 @@ Cada parte do sistema responde à pergunta de uma pessoa da V-Energy.
 
 Na fila de perdas, **Filtros** combina queda de consumo, medidor eletromecânico e leituras estimadas. A Gold só informa leituras estimadas a partir de 25%; o filtro aceita de 25% a 100% e não inclui percentuais inferiores ou desconhecidos. Os filtros atuam antes da paginação ([DEC-051](docs/decisoes.md#dec-051--filtro-de-queda-na-fila-de-suspeitas)).
 
+As telas de análise compartilham o recorte: a barra superior grava na URL município, bairro, classe e o par de períodos, de modo que Visão geral, Receita, Rede e Perdas descrevem o mesmo recorte e um link reproduz a análise; os filtros próprios de cada tela ficam só na sessão do navegador ([DEC-056](docs/decisoes.md#dec-056--filtros-compartilhados-entre-as-telas-do-portal)). Em Perdas o período é apenas contexto, porque a fila é um retrato da Gold e as ordens de inspeção são estado atual; e a consulta individual de UC mostra o histórico completo, sem o recorte da análise ([DEC-057](docs/decisoes.md#dec-057--período-é-contexto-em-perdas-e-a-consulta-de-uc-não-é-limitada-pelo-recorte)). A ordem de uma UC que saiu do cadastro da Gold continua na lista sem recorte e fica fora quando há recorte, já que a localização só existe no cadastro ([DEC-058](docs/decisoes.md#dec-058--ordem-de-uc-ausente-do-cadastro-da-gold-fica-fora-da-lista-quando-há-recorte)).
+
 <!-- Capturas do portal (João): docs/img/portal-visao-geral.png, docs/img/portal-receita.png, docs/img/portal-perdas.png -->
 
 ## Arquitetura
@@ -190,7 +192,7 @@ saíram da tela porque não estão no contrato aprovado; não são simulados por
 
 ## Decisões que defendemos
 
-O registro completo, com 38 decisões numeradas e as suposições, está em [`docs/decisoes.md`](docs/decisoes.md). Estas são as que mais mudam o produto.
+O registro completo, com 55 decisões numeradas e as suposições, está em [`docs/decisoes.md`](docs/decisoes.md). Estas são as que mais mudam o produto.
 
 **PostgreSQL com schemas `gold` e `app`** · [DEC-002](docs/decisoes.md#dec-002--banco-local-postgresql)
 - **Problema:** o agente precisa de um usuário que só lê, e a recarga da Gold não pode apagar o trabalho de campo.

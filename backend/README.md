@@ -82,7 +82,7 @@ acrescentar `VENERGY_API_JWT_SECRET` (mínimo de 32 caracteres) e `VENERGY_API_S
 | `GET /unidades-consumidoras/{cod_uc}` | Resumo de uma unidade consumidora, ou `404` se ela não existir |
 | `GET /unidades-consumidoras/{cod_uc}/visao-360` | A unidade consumidora numa tela só: cadastro e painel solar, consumo dos 12 meses até a última competência da Gold contra o ano anterior (com `tendencia`: `subiu`, `estavel`, `caiu` ou `sem_comparacao`, faixa de ±10%), faturas não pagas, medidor, interrupções, chamados e inspeções ([DEC-044](../docs/decisoes.md)). `404` se a unidade não existir |
 | `GET /indicadores/comparacao` | Indicadores e variações entre dois períodos, para a empresa ou recorte de município, bairro e classe ([DEC-041](../docs/decisoes.md)) |
-| `GET /indicadores/mensal` | Série mensal do recorte opcional de município, bairro e classe; meses sem linhas no recorte têm somas zero e índices nulos |
+| `GET /indicadores/mensal` | Série mensal do recorte opcional de município, bairro e classe; energia e receita são nulas sem fatura, e chamados são nulos quando não há atendimento carregado na competência ([DEC-030](../docs/decisoes.md#dec-030--regras-aplicadas-na-gold-ucs-ocorrências-gd-e-fila-de-suspeitas)) |
 | `GET /indicadores/janelas` | Indicadores em janelas consecutivas de competências completas, para a empresa ou recorte de município, bairro e classe ([DEC-041](../docs/decisoes.md)) |
 | `GET /receita/mensal?inicio=&fim=` | KPIs de cada competência (`gold_kpis_mensais`), do mês mais antigo ao mais recente, com recorte opcional (`AAAA-MM`, inclusivo) |
 | `GET /receita/comparacao` | kWh e receita de dois períodos (`base_inicio`, `base_fim`, `atual_inicio`, `atual_fim`) e a variação, com filtros opcionais de `municipio`, `bairro` e `classe` |
@@ -97,7 +97,7 @@ acrescentar `VENERGY_API_JWT_SECRET` (mínimo de 32 caracteres) e `VENERGY_API_S
 | `GET /ordens-inspecao?status=` | Lista as ordens, das mais recentes para as mais antigas, opcionalmente por status, município, bairro e classe; não filtra por período |
 | `GET /ordens-inspecao/{id}` | Uma ordem com o histórico de mudanças de status |
 | `PATCH /ordens-inspecao/{id}` | Só o perfil `perdas`. Muda o status (`EM_CAMPO`, `GERADA` na volta de campo, `CONCLUIDA` com `resultado`, `CANCELADA`), com `observacao` opcional: `409` se a mudança não for permitida |
-| `POST /ai/ask` | Pergunta ao agente de IA (`{"question": "...", "session_id": "..."}`) e devolve a resposta com o `audit_id` do registro gravado em `app.ai_auditoria`. Todo status é gravado, e se a gravação falhar a resposta não sai (`500`). Sem a chave do Gemini, `503` ([DEC-034](../docs/decisoes.md)) |
+| `POST /ai/ask` | Pergunta ao agente de IA (`{"question": "...", "session_id": "<uuid>"}`; o `session_id` é opcional: sem ele o servidor gera um UUID4 e o devolve na resposta, e com ele só aceita UUID, senão `422`) e devolve a resposta com o `audit_id` do registro gravado em `app.ai_auditoria`, junto com o usuário logado. Todo status é gravado, e se a gravação falhar a resposta não sai (`500`). Sem a chave do Gemini, `503` ([DEC-034](../docs/decisoes.md)). O limite de perguntas e o orçamento de tokens valem por usuário, em todas as sessões dele: com o usuário no limite da janela, `429` com `Retry-After`, e com um `session_id` que pertence a outro usuário, `403`, nos dois casos sem chamar o agente ([DEC-046](../docs/decisoes.md)) |
 | `GET /ai/audit/{id}` | Só o perfil `ti` (`403` para os outros). A auditoria de uma resposta: pergunta, SQL executado, views, linhas, modelo, versão do prompt, latência e horário. `404` se não existir |
 | `GET /receita/insight?periodo_base=&periodo_atual=&municipio=&bairro=&classe=` | Um insight de IA sobre a ponte de receita do recorte da tela (2 a 4 frases), com as `metricas` que sustentam cada número do texto. Os filtros são os de `/receita/decomposicao`. `texto` vem vazio quando o agente descarta a narração (número fora das métricas) ou o provedor falha: a tela aparece sem insight. O mesmo recorte não paga o modelo duas vezes (cache em memória pelo conteúdo das métricas). `503` sem a chave do Gemini ([DEC-040](../docs/decisoes.md)) |
 
@@ -202,8 +202,13 @@ Variáveis lidas do `.env` (veja `.env.example`):
 | `VENERGY_API_DATABASE_URL` | Endereço do banco. Obrigatória |
 | `VENERGY_API_GOLD_DIR` | Pasta dos CSVs da Gold. Obrigatória |
 | `VENERGY_API_CORS_ORIGINS` | Endereços do frontend autorizados a chamar a API pelo navegador. Padrão: `["http://localhost:3000"]` |
+| `VENERGY_API_AI_LIMITE_PERGUNTAS` | Máximo de perguntas por usuário na janela, no `POST /ai/ask` (`429` ao passar). `0` desliga. Padrão: `20` |
+| `VENERGY_API_AI_JANELA_SEGUNDOS` | Janela do limite acima, em segundos. Padrão: `600` |
+| `VENERGY_API_AI_JANELA_ORCAMENTO_SEGUNDOS` | Janela do orçamento de tokens do agente por usuário, em segundos: só o gasto dentro dela conta. Padrão: `86400` (24 horas) |
 
 Os caminhos são relativos à pasta `backend/`, de onde os comandos rodam.
+
+A auditoria (`app.ai_auditoria`) ganhou as colunas `input_tokens` e `output_tokens`. A API na subida e a carga da Gold as acrescentam sozinhas a um banco antigo (`ALTER TABLE ... ADD COLUMN IF NOT EXISTS`, sem tocar nas linhas): não há passo manual (DEC-046). Com o banco fora do ar na subida, a API sobe e registra um aviso.
 
 ## Testes e qualidade
 

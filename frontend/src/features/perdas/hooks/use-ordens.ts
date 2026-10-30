@@ -21,7 +21,9 @@ export function chaveDoRecorte(recorte: Recorte): string {
 }
 
 /** Recorte de uma query key já emitida; falha fechada (sem chave conhecida não há reaproveitamento). */
-function chaveDoRecorteDaConsulta(queryKey: readonly unknown[]): string | undefined {
+function chaveDoRecorteDaConsulta(
+	queryKey: readonly unknown[],
+): string | undefined {
 	const ultimo = queryKey.at(-1);
 	if (!ehObjeto(ultimo)) return undefined;
 	return juntar(ehObjeto(ultimo.recorte) ? ultimo.recorte : ultimo);

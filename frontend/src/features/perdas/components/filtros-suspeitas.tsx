@@ -3,7 +3,11 @@ import { useQuery } from "@tanstack/react-query";
 import { type ReactNode, useId, useState } from "react";
 import { Button, buttonVariants } from "#/components/ui/button";
 import { Checkbox } from "#/components/ui/checkbox";
-import { Popover, PopoverContent, PopoverTrigger } from "#/components/ui/popover";
+import {
+	Popover,
+	PopoverContent,
+	PopoverTrigger,
+} from "#/components/ui/popover";
 import type { Recorte } from "#/lib/filtros";
 import { distribuicaoQueda, distribuicaoQuedaKey } from "../api";
 import { FILTROS_FILA_INICIAIS, type FiltrosFila } from "../types";

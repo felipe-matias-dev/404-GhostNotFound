@@ -200,7 +200,6 @@ export function RedePage() {
 	const escolherCriterio = (proximo: Criterio) =>
 		void ir({ criterio: proximo === "dec" ? undefined : proximo });
 
-
 	// Abrir a linha grava o nível que a resposta atual oferece, nunca o da resposta anterior.
 	const abrirLinha = (linha: LinhaContinuidade) => {
 		const atual =
@@ -271,7 +270,6 @@ export function RedePage() {
 
 	return (
 		<Pagina className="max-w-none">
-
 			<section
 				aria-labelledby="rede-titulo"
 				className="flex min-w-0 flex-col gap-3"

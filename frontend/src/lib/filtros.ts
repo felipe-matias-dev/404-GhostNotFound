@@ -27,8 +27,12 @@ const PERIODO = new RegExp(`^\\d{4}-${MES}/\\d{4}-${MES}$`);
 const MES_SOZINHO = new RegExp(`^\\d{4}-${MES}$`);
 
 const texto = z.string().trim().min(1).optional().catch(undefined);
-const periodo = z.string().regex(PERIODO)
-	.refine((value) => value.slice(0, 7) <= value.slice(8)).optional().catch(undefined);
+const periodo = z
+	.string()
+	.regex(PERIODO)
+	.refine((value) => value.slice(0, 7) <= value.slice(8))
+	.optional()
+	.catch(undefined);
 
 // Preserva períodos inválidos até o portal avisar e normalizar a URL, antes das consultas.
 export const filtrosCompartilhadosShape = {
@@ -39,7 +43,11 @@ export const filtrosCompartilhadosShape = {
 	periodo_atual: z.string().optional().catch(undefined),
 };
 
-const schema = z.object({ ...filtrosCompartilhadosShape, periodo_base: periodo, periodo_atual: periodo });
+const schema = z.object({
+	...filtrosCompartilhadosShape,
+	periodo_base: periodo,
+	periodo_atual: periodo,
+});
 
 /** "2024-03" um ano antes → "2023-03"; sem ano anterior, o mês fica como está. */
 export function anoAnterior(competencia: string): string | undefined {
@@ -60,7 +68,10 @@ export function periodoAnterior(periodoAtual: string): string | undefined {
 }
 
 /** Período atual da busca da tela: `/rede` o escreve como duas pontas, as demais como par. */
-function periodoDaBusca(destino: DestinoPortal, search: Record<string, unknown>) {
+function periodoDaBusca(
+	destino: DestinoPortal,
+	search: Record<string, unknown>,
+) {
 	if (destino !== "/rede") return search.periodo_atual;
 	const { inicio, fim } = search;
 	if (typeof inicio !== "string" || typeof fim !== "string") return undefined;

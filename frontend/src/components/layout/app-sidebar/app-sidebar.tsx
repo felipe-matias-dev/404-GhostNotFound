@@ -76,7 +76,11 @@ export function AppSidebar({
 														consulta ? undefined : (
 															<Link
 																to={to}
-																search={searchPara(to) as never}
+																search={
+																	to === "/agente"
+																		? undefined
+																		: (searchPara(to) as never)
+																}
 																onClick={() => setOpenMobile(false)}
 															/>
 														)

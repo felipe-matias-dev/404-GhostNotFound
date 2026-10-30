@@ -139,9 +139,9 @@ describe("aplicarPeriodoPadrao", () => {
 	};
 
 	it("usa o padrão só sem período atual", () => {
-		expect(aplicarPeriodoPadrao({ municipio: "Paulista" }, padrao)).toMatchObject(
-			padrao,
-		);
+		expect(
+			aplicarPeriodoPadrao({ municipio: "Paulista" }, padrao),
+		).toMatchObject(padrao);
 	});
 
 	it("não inventa período sem catálogo", () => {

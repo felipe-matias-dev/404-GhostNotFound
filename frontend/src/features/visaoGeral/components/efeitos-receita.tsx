@@ -12,13 +12,9 @@ import {
 	PopoverTrigger,
 } from "#/components/ui/popover";
 import { useFiltrosPortal, usePeriodosDecomposicao } from "#/features/filtros";
-import {
-	EFEITOS,
-	passosDaPonte,
-	useDecomposicao,
-} from "#/features/receita";
-import { formatPct, formatPeriodoCurto } from "#/lib/format";
+import { EFEITOS, passosDaPonte, useDecomposicao } from "#/features/receita";
 import type { ParPeriodos, Recorte } from "#/lib/filtros";
+import { formatPct, formatPeriodoCurto } from "#/lib/format";
 import { cn } from "#/lib/utils";
 import { efeitosDaReceita } from "../conversions";
 
@@ -219,8 +215,8 @@ export function EfeitosReceita({
 					</PopoverTrigger>
 					<PopoverContent className="max-w-64 p-3 text-body">
 						Peso de cada efeito sobre a receita de energia de{" "}
-						{formatPeriodoCurto(par?.periodo_base)}. Clique num efeito para vê-lo
-						na ponte de receita.
+						{formatPeriodoCurto(par?.periodo_base)}. Clique num efeito para
+						vê-lo na ponte de receita.
 					</PopoverContent>
 				</Popover>
 			</header>

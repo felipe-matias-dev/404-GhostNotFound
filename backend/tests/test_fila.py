@@ -323,9 +323,11 @@ def test_distribution_uses_segment_and_includes_unidentified_drop(
     assert response.status_code == 200
     distribution = response.json()
     assert distribution == {"itens": [], "sem_queda_identificada": 1}
-    assert sum(item["total"] for item in distribution["itens"]) + distribution[
-        "sem_queda_identificada"
-    ] == queue(client, **recorte)["total"]
+    assert (
+        sum(item["total"] for item in distribution["itens"])
+        + distribution["sem_queda_identificada"]
+        == queue(client, **recorte)["total"]
+    )
     assert queue(client, **recorte, queda_min=20)["total"] == 0
 
 

@@ -9,8 +9,8 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "#/components/ui/dropdown-menu";
-import { cn } from "#/lib/utils";
 import { CLASSES, type Classe } from "#/lib/filtros";
+import { cn } from "#/lib/utils";
 import { CLASSE_ROTULO } from "../conversions";
 
 const TODAS = "";

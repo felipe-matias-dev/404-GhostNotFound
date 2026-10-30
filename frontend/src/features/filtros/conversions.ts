@@ -151,7 +151,9 @@ export function parDoMes(
  * Par que a tela abre sem escolha na URL: o mês mais recente contra o mesmo mês do ano
  * anterior; sem ele, o mês anterior. A série vem em ordem, do mais antigo ao mais recente.
  */
-export function parPadraoMensal(competencias: string[]): ParPeriodos | undefined {
+export function parPadraoMensal(
+	competencias: string[],
+): ParPeriodos | undefined {
 	for (const atual of [...competencias].reverse()) {
 		const par = parDoMes(competencias, atual);
 		if (par) return par;

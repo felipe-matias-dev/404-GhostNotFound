@@ -1,8 +1,8 @@
 import type { TrendCategory, TrendSeries } from "#/components/ui/trend-chart";
 import type { WaterfallStep } from "#/components/ui/waterfall-chart";
-import { trechoDe } from "#/features/filtros/conversions";
-import { formatCompetencia, formatCompetenciaCurta } from "#/lib/format";
+import { trechoDe } from "#/features/filtros";
 import type { ParPeriodos } from "#/lib/filtros";
+import { formatCompetencia, formatCompetenciaCurta } from "#/lib/format";
 import type { JanelaIndicadores } from "./types";
 
 /** Janela máxima que `/indicadores/janelas` calcula; acima dela o gráfico fica indisponível. */

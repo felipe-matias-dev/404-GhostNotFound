@@ -47,13 +47,10 @@ def _buscar_uc(session: Session, cod_uc: str) -> DimUc:
 @router.get("/localidades")
 def get_localidades(session: SessionDep) -> list[LocalidadeSchema]:
     localidades = session.execute(
-        select(DimUc.municipio, DimUc.bairro)
-        .distinct()
-        .order_by(DimUc.municipio, DimUc.bairro)
+        select(DimUc.municipio, DimUc.bairro).distinct().order_by(DimUc.municipio, DimUc.bairro)
     )
     return [
-        LocalidadeSchema(municipio=municipio, bairro=bairro)
-        for municipio, bairro in localidades
+        LocalidadeSchema(municipio=municipio, bairro=bairro) for municipio, bairro in localidades
     ]
 
 

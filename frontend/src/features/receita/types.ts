@@ -6,4 +6,3 @@ export type DecomposicaoLinha =
 export type DecomposicaoFiltro = NonNullable<
 	operations["get_decomposicao_receita_decomposicao_get"]["parameters"]["query"]
 >;
-

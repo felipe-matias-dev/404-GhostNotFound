@@ -7,12 +7,20 @@ import {
 	LightningSlashIcon,
 } from "@phosphor-icons/react";
 import { useMatches, useMatchRoute } from "@tanstack/react-router";
+import type { ComponentType } from "react";
+import { LogoMark } from "#/components/layout/logo";
 import type { DestinoPortal } from "#/lib/filtros";
 
 export type ItemNavegacao = {
-	to: DestinoPortal;
+	to: DestinoPortal | "/agente";
 	rotulo: string;
-	icone: Icon;
+	icone:
+		| Icon
+		| ComponentType<{
+				"aria-hidden"?: boolean;
+				weight?: "regular" | "fill";
+				className?: string;
+		  }>;
 	grupo: "Minha área" | "Outras consultas";
 };
 
@@ -36,6 +44,12 @@ export const NAVEGACAO: ItemNavegacao[] = [
 		to: "/perdas",
 		rotulo: "Perdas",
 		icone: LightningSlashIcon,
+		grupo: "Minha área",
+	},
+	{
+		to: "/agente",
+		rotulo: "Agente",
+		icone: LogoMark,
 		grupo: "Minha área",
 	},
 ];

@@ -2,22 +2,25 @@ import { useRouter, useRouterState } from "@tanstack/react-router";
 import { createContext, useContext, useEffect, useRef } from "react";
 import {
 	CAMPOS_COMPARTILHADOS,
-	lerFiltrosCompartilhados,
 	type DestinoPortal,
 	type FiltrosCompartilhados,
+	lerFiltrosCompartilhados,
 } from "#/lib/filtros";
 import {
 	buscaPara,
+	type Memoria,
 	registrar,
 	telaDaNavegacao,
-	type Memoria,
 } from "../memoria";
 
 type Contexto = {
 	filtros: FiltrosCompartilhados;
 	alterar: (patch: Partial<FiltrosCompartilhados>) => void;
 	limparRecorte: () => void;
-	searchPara: (destino: DestinoPortal, patch?: Record<string, unknown>) => Record<string, unknown>;
+	searchPara: (
+		destino: DestinoPortal,
+		patch?: Record<string, unknown>,
+	) => Record<string, unknown>;
 };
 
 const Context = createContext<Contexto | null>(null);
@@ -26,6 +29,7 @@ export function FiltrosProvider({ children }: { children: React.ReactNode }) {
 	const router = useRouter();
 	const state = useRouterState();
 	const memoria = useRef<Memoria>({});
+	const ultimoRecorte = useRef<FiltrosCompartilhados>({});
 	// Uma navegação só vale completa: pathname e busca saem da mesma tela, e a memória só grava
 	// depois que ela conclui. Durante a transição o estado misto não vaza.
 	const tela = telaDaNavegacao(state);
@@ -37,10 +41,23 @@ export function FiltrosProvider({ children }: { children: React.ReactNode }) {
 	useEffect(() => {
 		if (state.isLoading || !state.resolvedLocation || !naTela) return;
 		memoria.current = registrar(memoria.current, naTela, search);
+		ultimoRecorte.current = lerFiltrosCompartilhados(naTela, search);
 	}, [state.isLoading, state.resolvedLocation, naTela, search]);
 
-	function searchPara(alvo: DestinoPortal, patch: Record<string, unknown> = {}) {
-		return buscaPara(alvo, { destino: naTela, search, filtros }, memoria.current, patch);
+	function searchPara(
+		alvo: DestinoPortal,
+		patch: Record<string, unknown> = {},
+	) {
+		return buscaPara(
+			alvo,
+			{
+				destino: naTela,
+				search,
+				filtros: naTela ? filtros : ultimoRecorte.current,
+			},
+			memoria.current,
+			patch,
+		);
 	}
 
 	function alterar(patch: Partial<FiltrosCompartilhados>) {
@@ -67,7 +84,11 @@ export function FiltrosProvider({ children }: { children: React.ReactNode }) {
 				filtros,
 				alterar,
 				limparRecorte: () =>
-					alterar({ municipio: undefined, bairro: undefined, classe: undefined }),
+					alterar({
+						municipio: undefined,
+						bairro: undefined,
+						classe: undefined,
+					}),
 				searchPara,
 			}}
 		>
@@ -78,6 +99,9 @@ export function FiltrosProvider({ children }: { children: React.ReactNode }) {
 
 export function useFiltrosPortal() {
 	const context = useContext(Context);
-	if (!context) throw new Error("useFiltrosPortal deve ser usado dentro de FiltrosProvider");
+	if (!context)
+		throw new Error(
+			"useFiltrosPortal deve ser usado dentro de FiltrosProvider",
+		);
 	return context;
 }

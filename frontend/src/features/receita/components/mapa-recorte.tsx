@@ -7,8 +7,8 @@ import {
 	RMR_VIEWBOX,
 } from "#/components/ui/region-map";
 import { useFiltrosPortal } from "#/features/filtros";
-import { formatBRL, formatPct } from "#/lib/format";
 import type { ParPeriodos, Recorte } from "#/lib/filtros";
+import { formatBRL, formatPct } from "#/lib/format";
 import {
 	chaveNome,
 	EFEITO_CAMPO,
@@ -148,9 +148,7 @@ export function MapaRecorte({
 			onSelect={(f) => onChange(recorteDe(f))}
 			onClear={() =>
 				onChange(
-					recorte.bairro
-						? { bairro: undefined }
-						: { municipio: undefined },
+					recorte.bairro ? { bairro: undefined } : { municipio: undefined },
 				)
 			}
 			clearLabel={

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { filtrosCompartilhadosShape, type Classe } from "#/lib/filtros";
+import { type Classe, filtrosCompartilhadosShape } from "#/lib/filtros";
 
 const mes = z.string().optional().catch(undefined);
 const texto = z.string().trim().min(1).optional().catch(undefined);

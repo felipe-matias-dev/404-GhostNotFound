@@ -3,11 +3,12 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Query
-from sqlalchemy import ColumnElement, Double, Integer, cast, distinct, func, or_, select
+from sqlalchemy import ColumnElement, Double, Integer, case, cast, distinct, func, or_, select
 from sqlalchemy.orm import InstrumentedAttribute
 
 from venergy_api.database import SessionDep
 from venergy_api.indices import indices
+from venergy_api.models import KpisMensais
 from venergy_api.models import KpisSegmentoMensal as Segmento
 from venergy_api.schemas import (
     ComparacaoIndicadoresSchema,
@@ -15,8 +16,8 @@ from venergy_api.schemas import (
     IndicadoresJanelaSchema,
     IndicadoresJanelasFiltroSchema,
     IndicadoresMensaisFiltroSchema,
+    IndicadoresMensalSchema,
     IndicadoresPeriodoSchema,
-    KpisMensaisSchema,
     VariacaoIndicadoresSchema,
 )
 
@@ -90,17 +91,23 @@ def _indicadores(inicio: str, fim: str) -> dict[str, ColumnElement]:
     }
 
 
+def _soma_com_fatura(soma: ColumnElement) -> ColumnElement:
+    """A soma só vale no recorte com fatura; sem ela, nula e não zero (DEC-030)."""
+    return case((func.sum(Segmento.n_faturas) > 0, soma))
+
+
 @router.get("/mensal")
 def get_mensal(
     filtro: Annotated[IndicadoresMensaisFiltroSchema, Query()], session: SessionDep
-) -> list[KpisMensaisSchema]:
+) -> list[IndicadoresMensalSchema]:
+    """Série mensal do recorte; mês sem fato no recorte vem nulo, e não zero (DEC-030)."""
     calendario = select(Segmento.competencia).distinct().subquery()
     agregacao = (
         select(
             Segmento.competencia,
-            func.sum(Segmento.kwh_faturado).label("kwh_faturado"),
-            func.sum(Segmento.receita_faturada).label("receita_faturada"),
-            func.sum(Segmento.receita_energia).label("receita_energia"),
+            _soma_com_fatura(func.sum(Segmento.kwh_faturado)).label("kwh_faturado"),
+            _soma_com_fatura(func.sum(Segmento.receita_faturada)).label("receita_faturada"),
+            _soma_com_fatura(func.sum(Segmento.receita_energia)).label("receita_energia"),
             func.sum(Segmento.n_chamados).label("n_chamados"),
             _razao(func.sum(Segmento.soma_notas), func.sum(Segmento.n_notas)).label(
                 "satisfacao_media"
@@ -111,22 +118,28 @@ def get_mensal(
         .group_by(Segmento.competencia)
         .subquery()
     )
-    consulta = select(
-        calendario.c.competencia,
-        func.coalesce(agregacao.c.kwh_faturado, 0).label("kwh_faturado"),
-        func.coalesce(agregacao.c.receita_faturada, 0).label("receita_faturada"),
-        func.coalesce(agregacao.c.receita_energia, 0).label("receita_energia"),
-        func.coalesce(agregacao.c.n_chamados, 0).label("n_chamados"),
-        agregacao.c.dec,
-        agregacao.c.fec,
-        agregacao.c.satisfacao_media,
-    ).outerjoin(agregacao, calendario.c.competencia == agregacao.c.competencia)
+    # O mês sem linha no recorte continua na série, com as somas nulas: o buraco fica visível,
+    # e não vira zero (DEC-030).
+    consulta = (
+        select(
+            calendario.c.competencia,
+            agregacao.c.kwh_faturado,
+            agregacao.c.receita_faturada,
+            agregacao.c.receita_energia,
+            case((KpisMensais.n_chamados.is_not(None), agregacao.c.n_chamados)).label("n_chamados"),
+            agregacao.c.dec,
+            agregacao.c.fec,
+            agregacao.c.satisfacao_media,
+        )
+        .outerjoin(agregacao, calendario.c.competencia == agregacao.c.competencia)
+        .outerjoin(KpisMensais, calendario.c.competencia == KpisMensais.competencia)
+    )
     if filtro.inicio:
         consulta = consulta.where(calendario.c.competencia >= filtro.inicio)
     if filtro.fim:
         consulta = consulta.where(calendario.c.competencia <= filtro.fim)
     return [
-        KpisMensaisSchema(**linha._mapping)
+        IndicadoresMensalSchema(**linha._mapping)
         for linha in session.execute(consulta.order_by(calendario.c.competencia))
     ]
 

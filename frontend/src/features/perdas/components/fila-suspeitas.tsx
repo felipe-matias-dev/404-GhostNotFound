@@ -7,10 +7,7 @@ import {
 } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "#/components/ui/button";
-import {
-	DataTable,
-	type DataTableColumn,
-} from "#/components/ui/data-table";
+import { DataTable, type DataTableColumn } from "#/components/ui/data-table";
 import {
 	Sheet,
 	SheetContent,
@@ -202,6 +199,7 @@ export function FilaSuspeitas({ onVerOrdens }: { onVerOrdens: () => void }) {
 		search.direcao,
 	].join("|");
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: seleção pertence ao recorte e página atuais.
 	useEffect(() => {
 		setSelecionadas([]);
 		setDetalhe(null);
@@ -248,11 +246,7 @@ export function FilaSuspeitas({ onVerOrdens }: { onVerOrdens: () => void }) {
 								? `${data.total} ${data.total === 1 ? "suspeita" : "suspeitas"}`
 								: "Carregando fila…"}
 					</span>
-					{isPlaceholderData && (
-						<span className="ml-2" role="status">
-							Atualizando…
-						</span>
-					)}
+					{isPlaceholderData && <output className="ml-2">Atualizando…</output>}
 					{canEdit && (
 						<span className="ml-2">Selecione UCs sem ordem ativa.</span>
 					)}
@@ -280,14 +274,11 @@ export function FilaSuspeitas({ onVerOrdens }: { onVerOrdens: () => void }) {
 				</div>
 			</div>
 			{avisos.length > 0 && (
-				<div
-					role="status"
-					className="flex flex-col gap-1 text-small text-text-muted"
-				>
+				<output className="flex flex-col gap-1 text-small text-text-muted">
 					{avisos.map((aviso) => (
 						<p key={aviso}>{aviso}</p>
 					))}
-				</div>
+				</output>
 			)}
 			{mensagem && (
 				<div className="flex flex-wrap items-center gap-2">

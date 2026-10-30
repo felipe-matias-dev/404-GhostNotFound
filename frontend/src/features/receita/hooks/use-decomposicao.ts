@@ -3,7 +3,6 @@ import type { ParPeriodos, Recorte } from "#/lib/filtros";
 import { buscarDecomposicao, receitaKeys } from "../api";
 import type { DecomposicaoFiltro } from "../types";
 
-
 export function useDecomposicao(
 	par: ParPeriodos | undefined,
 	recorte: Recorte,

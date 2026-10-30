@@ -1,7 +1,7 @@
 import type { RegionMapProps } from "#/components/ui/region-map";
 import type { WaterfallStep } from "#/components/ui/waterfall-chart";
-import { formatPct } from "#/lib/format";
 import type { Recorte } from "#/lib/filtros";
+import { formatPct } from "#/lib/format";
 import type { DecomposicaoLinha } from "./types";
 
 export type Nivel = DecomposicaoLinha["nivel"];
@@ -11,7 +11,6 @@ export const NIVEL_ROTULO: Record<Nivel, string> = {
 	bairro: "Bairro",
 	classe: "Classe",
 };
-
 
 export function nivelDoFiltro(filtro: Recorte): Nivel {
 	if (filtro.bairro) return "classe";
@@ -29,7 +28,6 @@ export function filtroAoAbrir(
 		return { municipio: filtro.municipio, bairro: linha.segmento };
 	return null;
 }
-
 
 /**
  * Chave para casar o município ou bairro da Gold com o da malha do IBGE: sem acento, caixa
