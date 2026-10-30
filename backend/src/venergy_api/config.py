@@ -6,6 +6,8 @@ from pathlib import Path
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+JANELA_ORCAMENTO_PADRAO_SEGUNDOS = 86400
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="VENERGY_API_", env_file=".env")
@@ -22,12 +24,12 @@ class Settings(BaseSettings):
     senha_demo: str | None = None
     # Endereços do frontend que o navegador deixa chamar a API. O padrão é o do `npm run dev`.
     cors_origins: list[str] = ["http://localhost:3000"]
-    # Limite de perguntas por sessão numa janela de tempo no POST /ai/ask (429 ao passar).
-    # 0 desliga o limite. Sem autenticação, o session_id é escolhido pelo cliente: é uma trava
-    # de custo e de abuso acidental, não de segurança (DEC-046).
+    # Limite de perguntas por usuário logado, numa janela de tempo, no POST /ai/ask (429 ao
+    # passar). Conta em todas as sessões do usuário. 0 desliga o limite. É uma trava de custo e
+    # de abuso acidental, não de segurança (DEC-046).
     ai_limite_perguntas: int = Field(20, ge=0)
     ai_janela_segundos: int = Field(600, gt=0)
-    ai_janela_orcamento_segundos: int = Field(86400, gt=0)
+    ai_janela_orcamento_segundos: int = Field(JANELA_ORCAMENTO_PADRAO_SEGUNDOS, gt=0)
 
 
 @lru_cache

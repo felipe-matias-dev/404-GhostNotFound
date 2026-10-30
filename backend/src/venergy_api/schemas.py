@@ -536,6 +536,41 @@ class FilaFiltroSchema(BaseModel):
     # Mesmo teto do pedido de ordens: uma página inteira cabe num único pedido.
     tamanho: Annotated[int, Field(ge=1, le=MAX_ORDENS_POR_PEDIDO)] = 50
     sem_ordem_ativa: bool = False
+    ordenar_por: Literal["prioridade", "energia", "ordem_ativa", "queda"] = "prioridade"
+    direcao: Literal["asc", "desc"] = "asc"
+    queda_min: Annotated[int | None, Field(ge=0, le=100)] = None
+    queda_max: Annotated[int | None, Field(ge=0, le=100)] = None
+    medidor_eletromecanico: bool = False
+    leituras_estimadas_min: Annotated[int | None, Field(ge=25, le=100)] = None
+    leituras_estimadas_max: Annotated[int | None, Field(ge=25, le=100)] = None
+
+    @model_validator(mode="after")
+    def limites_validos(self) -> "FilaFiltroSchema":
+        if (
+            self.queda_min is not None
+            and self.queda_max is not None
+            and self.queda_min > self.queda_max
+        ):
+            raise ValueError("queda_min deve ser menor ou igual a queda_max")
+        if (
+            self.leituras_estimadas_min is not None
+            and self.leituras_estimadas_max is not None
+            and self.leituras_estimadas_min > self.leituras_estimadas_max
+        ):
+            raise ValueError(
+                "leituras_estimadas_min deve ser menor ou igual a leituras_estimadas_max"
+            )
+        return self
+
+
+class DistribuicaoQuedaItemSchema(BaseModel):
+    queda: int
+    total: int
+
+
+class DistribuicaoQuedaSchema(BaseModel):
+    itens: list[DistribuicaoQuedaItemSchema]
+    sem_queda_identificada: int
 
 
 class OrdemAtivaSchema(BaseModel):
@@ -551,6 +586,7 @@ class FilaItemSchema(FilaSuspeitaSchema):
     """Uma UC da fila e a ordem ativa dela, para a tela não oferecer o que daria 409."""
 
     ordem_ativa: OrdemAtivaSchema | None
+    queda_percentual: int | None
 
 
 class FilaPaginaSchema(BaseModel):
@@ -670,7 +706,8 @@ class RespostaIaBaseSchema(BaseModel):
     model: str
     prompt_version: str
     latency_ms: int
-    # Tokens do gerador de SQL neste pedido (todas as tentativas); 0 quando o modelo não rodou.
+    # Tokens do gerador de SQL (todas as tentativas) e da narração neste pedido; 0 quando o
+    # modelo não rodou.
     input_tokens: int
     output_tokens: int
 

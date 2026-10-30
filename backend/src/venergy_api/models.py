@@ -412,7 +412,7 @@ class AiAuditoria(Base):
     # conexão do backend, e não a do agente, que é somente leitura.
     __table_args__ = (
         Index("ix_ai_auditoria_session_id", "session_id", "id"),
-        Index("ix_ai_auditoria_usuario", "usuario", "id"),
+        Index("ix_ai_auditoria_usuario_criado_em", "usuario", "criado_em"),
         {"schema": "app"},
     )
 
@@ -438,8 +438,8 @@ class AiAuditoria(Base):
     model: Mapped[str]
     prompt_version: Mapped[str]
     latency_ms: Mapped[int]
-    # Tokens do gerador de SQL neste pedido. server_default: as linhas de antes dos campos
-    # existirem valem 0, e a coluna acrescentada por ALTER TABLE preenche o mesmo valor.
+    # Tokens do gerador de SQL e da narração neste pedido. server_default: as linhas de antes
+    # dos campos existirem valem 0, e a coluna acrescentada por ALTER TABLE preenche o mesmo valor.
     input_tokens: Mapped[int] = mapped_column(server_default="0")
     output_tokens: Mapped[int] = mapped_column(server_default="0")
     # Login de quem perguntou: o limite, o orçamento e a posse da sessão valem por usuário

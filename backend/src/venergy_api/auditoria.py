@@ -38,7 +38,9 @@ def contar_perguntas_recentes(session: Session, usuario: str, janela_segundos: i
 
     O relógio é o do banco (o mesmo que preenche `criado_em`) e o contador mora na tabela, e não
     na memória da API: não some no restart e vale com mais de um processo. Conta por usuário, e
-    não por sessão: o cliente escolhe o session_id e trocá-lo não pode zerar o limite.
+    não por sessão: o cliente escolhe o session_id e trocá-lo não pode zerar o limite. A trava
+    que impede pedidos simultâneos do mesmo usuário é outra coisa: ela só vale dentro de um
+    processo (a rota a guarda em `app.state`), e hoje a API sobe com um processo só.
     """
     return (
         session.scalar(
@@ -98,16 +100,20 @@ def garantir_indice_da_sessao(connection: Connection) -> None:
 
 
 def garantir_coluna_do_usuario(connection: Connection) -> None:
-    """Acrescenta a coluna `usuario` e o índice (usuario, id) à auditoria de um banco antigo.
+    """Acrescenta a coluna `usuario` e o índice (usuario, criado_em) à auditoria de um banco antigo.
 
-    O limite de perguntas e o orçamento de tokens filtram por usuário a cada pergunta. As
-    linhas de antes ficam com usuário nulo. Só acrescenta: nunca apaga nem altera dado.
+    O limite de perguntas e o orçamento de tokens filtram por usuário e por janela de tempo a
+    cada pergunta, então o índice acompanha os dois. As linhas de antes ficam com usuário nulo.
+    Só acrescenta: nunca apaga nem altera dado.
     """
     connection.execute(
         text("ALTER TABLE IF EXISTS app.ai_auditoria ADD COLUMN IF NOT EXISTS usuario text")
     )
     connection.execute(
-        text("CREATE INDEX IF NOT EXISTS ix_ai_auditoria_usuario ON app.ai_auditoria (usuario, id)")
+        text(
+            "CREATE INDEX IF NOT EXISTS ix_ai_auditoria_usuario_criado_em "
+            "ON app.ai_auditoria (usuario, criado_em)"
+        )
     )
 
 

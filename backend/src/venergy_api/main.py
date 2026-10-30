@@ -57,8 +57,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # Criado com o app, e não no lifespan: o cache não depende de nada externo, e o app dos
     # testes (sem lifespan) também precisa dele.
     app.state.cache_insights = CacheInsights()
-    app.state.ai_limite_perguntas = settings.ai_limite_perguntas
-    app.state.ai_janela_segundos = settings.ai_janela_segundos
     app.state.ai_travas = {}
     # A dependência de login lê o segredo daqui, e não de get_settings(): os testes montam o
     # app com as próprias configurações.

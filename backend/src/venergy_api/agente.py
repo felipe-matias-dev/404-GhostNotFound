@@ -12,6 +12,7 @@ from venergy_agent.bootstrap import build_agent, build_insight_writer
 from venergy_agent.config import AgentSettings
 from venergy_agent.infrastructure.semantic_source import SemanticLayerError
 
+from venergy_api.config import JANELA_ORCAMENTO_PADRAO_SEGUNDOS
 from venergy_api.database import get_engine
 from venergy_api.historico_ia import HistoricoAuditoria
 
@@ -54,7 +55,7 @@ def _carregar_configuracao(
 async def montar_agente(
     carregar_config: Callable[[], AgentSettings] = AgentSettings,
     obter_engine: Callable[[], Engine] = get_engine,
-    janela_orcamento_segundos: int = 86400,
+    janela_orcamento_segundos: int = JANELA_ORCAMENTO_PADRAO_SEGUNDOS,
 ) -> TextToSqlAgent | None:
     """Monta o agente, ou devolve None se a configuração ou a camada semântica forem inválidas.
 

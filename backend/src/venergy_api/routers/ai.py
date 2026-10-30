@@ -20,8 +20,6 @@ from venergy_api.auditoria import (
 from venergy_api.auth import Perfil, UsuarioLogado
 from venergy_api.database import SessionDep
 from venergy_api.historico_ia import usuario_da_requisicao
-
-# import SessionDep
 from venergy_api.models import AiAuditoria
 from venergy_api.schemas import AuditoriaIaSchema, ErroSchema, PerguntaIaSchema, RespostaIaSchema
 from venergy_api.sessao import UsuarioDep, exigir_perfil
@@ -74,8 +72,8 @@ async def _responder(
     usuario: UsuarioLogado,
 ) -> RespostaIaSchema:
     session_id = str(pedido.session_id or uuid4())
-    limite = request.app.state.ai_limite_perguntas
-    janela = request.app.state.ai_janela_segundos
+    limite = request.app.state.settings.ai_limite_perguntas
+    janela = request.app.state.settings.ai_janela_segundos
     try:
         alheia = await run_in_threadpool(
             sessao_de_outro_usuario, session, session_id, usuario.login

@@ -66,6 +66,8 @@ Cada parte do sistema responde à pergunta de uma pessoa da V-Energy.
 | **Beatriz**, operação | Quais alimentadores e regiões têm o pior DEC e FEC? | `GET /continuidade/alimentadores/ranking`, `/mensal` e `/recortes` ([DEC-033](docs/decisoes.md#dec-033--dec-e-fec-por-período-e-recorte-e-a-fila-de-suspeitas-paginada)) | API pronta, tela em construção |
 | **Patrícia**, diretora de TI | Os dados são confiáveis e seguros? Dá para perguntar em português? | Pipeline com travas de qualidade, agente Text-to-SQL em `POST /ai/ask` com auditoria e insight de IA em `GET /receita/insight` | Pipeline e API prontos; chat no portal em construção |
 
+Na fila de perdas, **Filtros** combina queda de consumo, medidor eletromecânico e leituras estimadas. A Gold só informa leituras estimadas a partir de 25%; o filtro aceita de 25% a 100% e não inclui percentuais inferiores ou desconhecidos. Os filtros atuam antes da paginação ([DEC-051](docs/decisoes.md#dec-051--filtro-de-queda-na-fila-de-suspeitas)).
+
 <!-- Capturas do portal (João): docs/img/portal-visao-geral.png, docs/img/portal-receita.png, docs/img/portal-perdas.png -->
 
 ## Arquitetura

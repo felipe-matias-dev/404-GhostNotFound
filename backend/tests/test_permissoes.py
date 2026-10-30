@@ -1,11 +1,14 @@
 """Quem pode o quê: login em toda rota de dados e perfil nas duas que guardam algo sensível."""
 
 from collections.abc import Callable
+from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine
+from venergy_agent.domain.answer import AgentAnswer, AnswerStatus, Confidence
 
+from venergy_api.agente import get_agente
 from venergy_api.auth import Perfil
 from venergy_api.database import Base
 from venergy_api.usuarios import criar_usuarios_demo
@@ -103,12 +106,36 @@ def test_ti_chega_na_auditoria_do_agente(api: TestClient):
     assert api.get("/ai/audit/1").status_code == 404
 
 
+class AgenteDeTeste:
+    """Responde sem chamar o modelo: o que se testa aqui é a barreira de acesso."""
+
+    async def ask(self, question: str, session_id: str) -> AgentAnswer:
+        return AgentAnswer(
+            answer="Não sei responder com os dados disponíveis.",
+            status=AnswerStatus.UNKNOWN,
+            sql=None,
+            rows=(),
+            row_count=0,
+            truncated=False,
+            confidence=Confidence.UNKNOWN,
+            sources=(),
+            assumptions=(),
+            clarification=None,
+            refused_reason="Sem dados para responder.",
+            request_id="req-teste",
+            model="teste",
+            prompt_version="v2",
+            latency_ms=1,
+        )
+
+
 @pytest.mark.parametrize("perfil", list(Perfil))
 def test_todo_perfil_le_os_dados_e_pergunta_ao_agente(api: TestClient, perfil: Perfil):
     _entrar_como(api, perfil)
+    api.app.dependency_overrides[get_agente] = lambda: AgenteDeTeste()
 
     leitura = api.get("/indicadores/janelas")
-    pergunta = api.post("/ai/ask", json={"question": "Qual a receita?", "session_id": "s1"})
+    pergunta = api.post("/ai/ask", json={"question": "Qual a receita?", "session_id": str(uuid4())})
 
     assert leitura.status_code not in NAO_AUTORIZADO
-    assert pergunta.status_code not in NAO_AUTORIZADO
+    assert pergunta.status_code == 200

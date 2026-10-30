@@ -129,7 +129,7 @@ def test_reload_and_startup_add_the_user_column_and_index_to_an_older_audit_tabl
                 "'high', '[]', '[]', 'r', 'm', 'v2', 1)"
             )
         )
-        connection.execute(text("DROP INDEX app.ix_ai_auditoria_usuario"))
+        connection.execute(text("DROP INDEX app.ix_ai_auditoria_usuario_criado_em"))
         connection.execute(text("ALTER TABLE app.ai_auditoria DROP COLUMN usuario"))
 
     load_gold(gold_dir, engine)
@@ -143,4 +143,4 @@ def test_reload_and_startup_add_the_user_column_and_index_to_an_older_audit_tabl
         indices = connection.execute(
             text("SELECT indexname FROM pg_indexes WHERE schemaname = 'app'")
         ).scalars()
-        assert "ix_ai_auditoria_usuario" in set(indices)
+        assert "ix_ai_auditoria_usuario_criado_em" in set(indices)

@@ -353,9 +353,8 @@ class AskUseCase:
                 error=type(error).__name__,
             )
             return ()
-        kept = tuple(turn for turn in turns if turn.status is not AnswerStatus.REFUSED)
-        self._log(request_id, session_id, step="historico", status="lido", turnos=len(kept))
-        return kept
+        self._log(request_id, session_id, step="historico", status="lido", turnos=len(turns))
+        return turns
 
     async def _generate(
         self,

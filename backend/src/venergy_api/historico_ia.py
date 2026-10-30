@@ -10,6 +10,7 @@ from starlette.concurrency import run_in_threadpool
 from venergy_agent.domain.answer import AnswerStatus
 from venergy_agent.domain.conversation import ConversationTurn
 
+from venergy_api.config import JANELA_ORCAMENTO_PADRAO_SEGUNDOS
 from venergy_api.models import AiAuditoria
 
 STATUS_DO_HISTORICO = [
@@ -34,7 +35,9 @@ class HistoricoAuditoria:
     """
 
     def __init__(
-        self, obter_engine: Callable[[], Engine], janela_orcamento_segundos: int = 86400
+        self,
+        obter_engine: Callable[[], Engine],
+        janela_orcamento_segundos: int = JANELA_ORCAMENTO_PADRAO_SEGUNDOS,
     ) -> None:
         # A engine só é pedida na primeira consulta: na subida da API, as configurações do banco
         # podem nem estar disponíveis (os testes montam o app sem .env).
