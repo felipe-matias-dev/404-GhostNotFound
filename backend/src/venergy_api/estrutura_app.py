@@ -10,6 +10,7 @@ import logging
 from sqlalchemy import Connection, text
 from sqlalchemy.exc import SQLAlchemyError
 
+from venergy_api.auditoria import garantir_estrutura_da_auditoria
 from venergy_api.database import create_db_engine
 
 logger = logging.getLogger(__name__)
@@ -22,6 +23,8 @@ def garantir_estrutura_do_app(connection: Connection) -> None:
     connection.execute(
         text("ALTER TABLE IF EXISTS app.ordem_evento ADD COLUMN IF NOT EXISTS autor_login text")
     )
+    # Auditoria do agente (DEC-046): tokens, usuário e os índices que o limite e o histórico usam.
+    garantir_estrutura_da_auditoria(connection)
 
 
 def garantir_estrutura_na_subida(database_url: str) -> None:
