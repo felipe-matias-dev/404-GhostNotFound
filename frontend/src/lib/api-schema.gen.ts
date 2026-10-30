@@ -378,6 +378,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/ordens-inspecao/planilha": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Enviar Planilha
+         * @description Conclui as OIs em campo com os resultados da planilha preenchida pela equipe.
+         *
+         *     Aplica as linhas válidas e devolve as rejeitadas com o motivo: uma linha escrita errada à
+         *     mão não pode travar o arquivo inteiro. Arquivo inutilizável é 422 e não grava nada.
+         */
+        post: operations["enviar_planilha_ordens_inspecao_planilha_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/ordens-inspecao/{ordem_id}": {
         parameters: {
             query?: never;
@@ -542,6 +565,11 @@ export interface components {
              * Format: date-time
              */
             criado_em: string;
+        };
+        /** Body_enviar_planilha_ordens_inspecao_planilha_post */
+        Body_enviar_planilha_ordens_inspecao_planilha_post: {
+            /** Arquivo */
+            arquivo: string;
         };
         /** ComparacaoIndicadoresSchema */
         ComparacaoIndicadoresSchema: {
@@ -978,6 +1006,29 @@ export interface components {
             /** Satisfacao Media */
             satisfacao_media: number | null;
         };
+        /** LinhaConcluidaSchema */
+        LinhaConcluidaSchema: {
+            /** Aba */
+            aba: string;
+            /** Linha */
+            linha: number;
+            /** Cod Uc */
+            cod_uc: string;
+            /** Ordem Id */
+            ordem_id: number;
+            resultado: components["schemas"]["ResultadoOrdem"];
+        };
+        /** LinhaRejeitadaSchema */
+        LinhaRejeitadaSchema: {
+            /** Aba */
+            aba: string;
+            /** Linha */
+            linha: number;
+            /** Cod Uc */
+            cod_uc: string | null;
+            /** Motivo */
+            motivo: string;
+        };
         /**
          * LoginSchema
          * @description Pedido de login. Os tetos evitam que um corpo gigante vire trabalho para o Argon2.
@@ -1220,6 +1271,18 @@ export interface components {
          * @enum {string}
          */
         ResultadoOrdem: "IRREGULAR_CONFIRMADA" | "REGULAR" | "NAO_REALIZADA";
+        /**
+         * ResultadoPlanilhaSchema
+         * @description O que o envio da planilha de campo fez: ordens concluídas e linhas que ficaram de fora.
+         */
+        ResultadoPlanilhaSchema: {
+            /** Linhas Lidas */
+            linhas_lidas: number;
+            /** Concluidas */
+            concluidas: components["schemas"]["LinhaConcluidaSchema"][];
+            /** Rejeitadas */
+            rejeitadas: components["schemas"]["LinhaRejeitadaSchema"][];
+        };
         /**
          * StatusOrdem
          * @enum {string}
@@ -2000,6 +2063,48 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    enviar_planilha_ordens_inspecao_planilha_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_enviar_planilha_ordens_inspecao_planilha_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResultadoPlanilhaSchema"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErroSchema"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErroSchema"];
                 };
             };
         };

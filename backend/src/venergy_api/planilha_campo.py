@@ -21,6 +21,8 @@ from venergy_api.ordens import ResultadoOrdem
 MAX_BYTES = 5 * 1024 * 1024
 # O arquivo do case tem cerca de 1.400 linhas no ano todo; o teto só barra arquivo errado.
 MAX_LINHAS = 5000
+# Mesmo limite da observação digitada no modal (AtualizarOrdemSchema).
+MAX_OBSERVACAO = 1000
 
 COLUNAS_OBRIGATORIAS = ("id_uc", "resultado")
 
@@ -169,7 +171,7 @@ def _ler_linha(aba: str, numero: int, cod_uc: str, celula: dict[str, object]) ->
     observacao = "Planilha de campo: " + ", ".join(partes)
     if inspecao:
         observacao += f" (inspeção {inspecao})"
-    return LinhaCampo(aba, numero, cod_uc, resultado, observacao)
+    return LinhaCampo(aba, numero, cod_uc, resultado, observacao[:MAX_OBSERVACAO])
 
 
 def _vazio(valor: object) -> bool:

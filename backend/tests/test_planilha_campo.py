@@ -226,3 +226,11 @@ def test_more_rows_than_the_limit_is_invalid(monkeypatch: pytest.MonkeyPatch) ->
 
     with pytest.raises(PlanilhaInvalida, match="linhas"):
         ler_planilha(uma_aba(CONFIRMADA, SEM_IRREGULARIDADE))
+
+
+def test_a_very_long_note_is_cut_at_the_modal_limit() -> None:
+    (linha,) = ler_planilha(
+        uma_aba(["INS-8", "0008", None, "x" * 2000, "SEM IRREGULARIDADE", None, 0])
+    ).validas
+
+    assert len(linha.observacao) == planilha_campo.MAX_OBSERVACAO
