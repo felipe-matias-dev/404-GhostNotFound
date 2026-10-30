@@ -14,11 +14,10 @@ import type { Uc360 } from "../types";
 const GRADE =
 	"grid grid-cols-[auto_minmax(3rem,1fr)_auto] items-center gap-x-3 [&>li]:contents [&>li>*]:flex [&>li>*]:h-8 [&>li>*]:items-center";
 
-// Do ponto de vista do cliente: o que encarece a conta é alerta, o que barateia é alívio.
+// Cor neutra: o sinal diz se a parte encareceu ou barateou a conta. Verde e vermelho aqui
+// contradiriam a tela de Receita, onde verde é a receita da empresa subindo.
 function tom(valor: number) {
-	if (valor > 0) return { texto: "text-danger", barra: "bg-danger" };
-	if (valor < 0) return { texto: "text-success", barra: "bg-success" };
-	return { texto: "text-text-muted", barra: "" };
+	return valor === 0 ? "text-text-muted" : "text-text";
 }
 
 /**
@@ -82,7 +81,6 @@ function CorpoVariacao({
 	const partes = partesDaConta(variacao);
 	const maior = maiorParte(partes);
 	const escala = Math.max(...partes.map((p) => Math.abs(p.valor)));
-	const diferenca = tom(variacao.diferenca);
 
 	return (
 		<>
@@ -99,7 +97,7 @@ function CorpoVariacao({
 				</div>
 				<div>
 					<dt>Diferença</dt>
-					<dd className={cn("text-body", diferenca.texto)}>
+					<dd className={cn("text-body", tom(variacao.diferenca))}>
 						{formatBRL(variacao.diferenca, { sinal: true })}
 					</dd>
 				</div>
@@ -113,7 +111,7 @@ function CorpoVariacao({
 						{" "}
 						O que mais pesou:{" "}
 						<span className="text-text">{maior.rotulo.toLowerCase()}</span>{" "}
-						<span className={tom(maior.valor).texto}>
+						<span className="text-text">
 							({formatBRL(maior.valor, { sinal: true })})
 						</span>
 						.
@@ -122,7 +120,6 @@ function CorpoVariacao({
 			</p>
 			<ul className={GRADE}>
 				{partes.map((parte) => {
-					const t = tom(parte.valor);
 					const largura =
 						escala > 0 ? (Math.abs(parte.valor) / escala) * 50 : 0;
 					return (
@@ -133,7 +130,7 @@ function CorpoVariacao({
 								<span className="absolute inset-y-1.5 left-1/2 w-px bg-border-strong" />
 								{largura > 0 && (
 									<span
-										className={cn("absolute inset-y-2.75 rounded-sm", t.barra)}
+										className="absolute inset-y-2.75 rounded-sm bg-text-muted"
 										style={
 											parte.valor > 0
 												? { left: "50%", width: `${largura}%` }
@@ -145,7 +142,7 @@ function CorpoVariacao({
 							<span
 								className={cn(
 									"justify-end font-mono text-small tabular-nums",
-									t.texto,
+									tom(parte.valor),
 								)}
 							>
 								{formatBRL(parte.valor, { sinal: true })}
