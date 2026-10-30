@@ -135,7 +135,7 @@ function CorpoVariacao({
 		<>
 			{/* Cada conta com o seu mês: o atendente lê ao cliente qual conta é qual, sem depender da seta.
 			    Na coluna estreita, a diferença desce para a linha de baixo. */}
-			<dl className="grid grid-cols-2 gap-3 @sm:grid-cols-3 [&_dd]:mt-1 [&_dd]:font-mono [&_dd]:tabular-nums [&_dt]:text-small [&_dt]:text-text-muted">
+			<dl className="grid grid-cols-2 gap-3 @sm:grid-cols-3 [&_dd]:mt-1 [&_dd]:tabular-nums [&_dt]:text-small [&_dt]:text-text-muted">
 				<div>
 					<dt>Conta de {formatCompetencia(variacao.competencia_comparada)}</dt>
 					<dd className="text-body">{formatBRL(variacao.conta_comparada)}</dd>
@@ -190,7 +190,7 @@ function CorpoVariacao({
 							</span>
 							<span
 								className={cn(
-									"justify-end font-mono text-small tabular-nums",
+									"justify-end text-small tabular-nums",
 									tom(parte.valor),
 								)}
 							>
