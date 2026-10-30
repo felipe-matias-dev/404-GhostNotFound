@@ -58,6 +58,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | 29/10/2026 | DEC-049: login com cookie httpOnly e cinco perfis; só `perdas` escreve nas ordens de inspeção e só `ti` lê a auditoria do agente | Esconder o menu não é segurança: a permissão é checada no backend, onde estão os dados; o agente já lê toda a Gold, então bloquear a leitura por tela daria falsa proteção | Felipe |
 | 29/10/2026 | DEC-050: os eventos das ordens de inspeção guardam o login de quem agiu (`autor_login`), o histórico mostra o nome dele, e a carga e a subida da API acrescentam a coluna sem apagar o histórico | O gerente de perdas é o único que escreve, e a trilha precisa responder quem concluiu ou cancelou uma ordem; recriar a tabela para isso perderia o histórico de quem já usa o portal | Felipe |
 | 29/10/2026 | DEC-051: filtros da fila usam os sinais já informados nos motivos da Gold: queda, medidor eletromecânico e percentual de leituras estimadas | Mantém a fila fiel à Gold, sem recalcular métricas ou tratar ausência como zero; todos os filtros operam antes da paginação | João Euclides |
+| 30/10/2026 | DEC-053: o upload da planilha de campo conclui a ordem em campo da UC da linha, aplica as linhas válidas e devolve as rejeitadas com o motivo; o tipo, o kWh, a data e o inspetor ficam na observação da ordem | O case pede registrar o resultado sem digitar, e a planilha não traz o número da ordem, só a UC; uma linha escrita errada à mão não pode travar o arquivo da equipe inteira | Felipe |
 
 ## DEC-001 · Localização dos arquivos de origem (landing)
 
@@ -1673,3 +1674,36 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Contexto:** turnos recusados não entram no histórico (DEC-046). O G103, "Agora faça o mesmo para Olinda.", ficava sem referência, e o modelo respondia com um palpite, contra o requisito central de não inventar (issue #104).
 - **Decisão:** quando o histórico da sessão está vazio e a pergunta depende de outro turno, o `AskUseCase` devolve `clarify` sem chamar o modelo. A regra está em `domain/followup.py` e cobre dois casos: pedidos de repetição ("faça o mesmo", "repita a mesma consulta", "o mesmo para X") e perguntas elípticas de até 4 palavras que começam com "e" ("E em Olinda?").
 - **Consequências:** o comportamento é determinístico e não gasta cota. Como não muda prompt, modelo nem camada semântica, não exige rodada da DEC-016 para entrar. Uma pergunta completa que começa com "e" segue para o modelo. Follow-ups escritos de outra forma também seguem, e aí vale o que o prompt manda. Se a leitura do histórico falhar, a pergunta dependente também recebe `clarify`.
+
+## DEC-053 · Upload da planilha de campo conclui as ordens em campo
+
+- **Data:** 30/10/2026 · **Área:** Portal e backend · **Autor:** Felipe
+- **Contexto:** o case traz, como diferencial, "subir pelo portal a planilha que a equipe preenche em campo, para que os
+  resultados sejam registrados sem digitação manual" (V1-14). Até aqui cada ordem era concluída à mão, pelo modal (DEC-026). A
+  planilha tem o formato de `inspecoes.xlsx` (`id_inspecao`, `id_uc`, `data`, `inspetor`, `resultado`, `tipo_irregularidade`,
+  `kwh_recuperado`), não traz o número da ordem e chega com as sujeiras já catalogadas em `docs/qualidade-dados.md`
+  (INSP-01 a INSP-07).
+- **Decisão:** `POST /ordens-inspecao/planilha` (`multipart/form-data`, campo `arquivo`, só o perfil `perdas`):
+  - **Ligação por UC.** A linha vale para a ordem ativa da UC, que é única (índice `uq_ordem_inspecao_uc_ativa`, DEC-009);
+  - **Só conclui ordem em campo.** A ordem `GERADA` é rejeitada ("ainda não foi enviada a campo"): a máquina de estados não
+    permite `GERADA → CONCLUIDA`, e o upload não inventa um envio a campo que ninguém fez. A mudança passa pela mesma função do
+    `PATCH` (`_mudar_status`), com o login de quem enviou o arquivo no histórico (DEC-050);
+  - **Aplica o válido e relata o resto.** A resposta traz `linhas_lidas`, as `concluidas` e as `rejeitadas` (aba, linha, UC e
+    motivo). Arquivo que não é XLSX, vazio, sem as colunas `id_uc` e `resultado`, maior que 5 MB ou com mais de 5.000 linhas é
+    `422` e não grava nada;
+  - **Mesmas regras da Silver.** `resultado` aceita as grafias `IRREGULARIDADE CONFIRMADA`, `CONFIRMADA` (→
+    `IRREGULAR_CONFIRMADA`), `SEM IRREGULARIDADE` e `NADA CONSTA` (→ `REGULAR`). Tipo ausente (`-`, `N/A`, `NULL`, vazio),
+    data em quatro formatos e kWh com vírgula são tratados como no pipeline. Confirmada exige tipo e kWh maior que zero; sem
+    irregularidade exige tipo vazio e kWh zero. UC repetida: vale a primeira linha;
+  - **Dados extras na observação.** A ordem só guarda resultado e observação; tipo, kWh, data, inspetor e código da inspeção
+    entram no texto ("Planilha de campo: desvio direto, 120,5 kWh recuperados, inspetor Fulano, 12/08/2025 (inspeção INS-1)").
+- **Descartado:**
+  - **tudo ou nada**, porque uma linha errada travaria o arquivo inteiro e o aceite pede o relatório de rejeitadas;
+  - **enviar a campo e concluir no mesmo upload**, que cria um envio no histórico que ninguém fez;
+  - **colunas novas na ordem** (tipo, kWh, data), que mexem no schema, no contrato e na tela sem o case pedir;
+  - **pandas**, dependência pesada para ler uma planilha pequena: a leitura usa `openpyxl` em modo somente leitura.
+- **Consequências:** reenviar o mesmo arquivo não muda nada (a ordem já está concluída e a linha é rejeitada). O kWh recuperado
+  fica em texto, então não dá para somá-lo no portal; se isso virar necessidade, a saída é a coluna numérica. O formato foi
+  montado a partir do pipeline e do case, não de um arquivo de campo real: a planilha original não estava disponível, e os
+  testes usam planilhas sintéticas. O número da ordem não vem na planilha; se a equipe passar a preenchê-lo, a ligação pode
+  deixar de depender de uma ordem ativa por UC.

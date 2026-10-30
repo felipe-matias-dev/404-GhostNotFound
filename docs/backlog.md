@@ -351,7 +351,7 @@
 - **Aceite:** 5 perfis (diretoria, atendimento, perdas, operação e TI) com menu filtrado e permissão checada no backend ([DEC-049](decisoes.md#dec-049--login-com-cookie-httponly-e-perfis-por-cargo)). **Só entra se todos os Must estiverem em Done.**
 
 #### V1-14 · Upload da planilha de campo
-- **Épico** EP09 · **Backlog (fora do plano)** · **Could (diferencial)** · **3 pts**
+- **Épico** EP09 · **Could (diferencial)** · **3 pts** · backend feito ([DEC-053](decisoes.md#dec-053--upload-da-planilha-de-campo-conclui-as-ordens-em-campo)); tela pendente
 - **História:** Como gerente de perdas, quero subir pelo portal a planilha preenchida em campo, para registrar resultados sem digitação.
 - **Aceite:** upload XLSX no formato de `inspecoes.xlsx` → atualiza as OIs correspondentes, com relatório de linhas rejeitadas.
 
