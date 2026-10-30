@@ -119,8 +119,8 @@ export function ConsumoUc({ data }: { data: Uc360 }) {
 				</dl>
 			</div>
 			<p className="text-small text-text-muted">
-				A comparação de consumo não explica sozinha a variação do valor da
-				conta.
+				O motivo da variação do valor da conta está em "Por que a conta mudou",
+				no topo da tela.
 			</p>
 			<TrendChart
 				label="Consumo faturado comparado ao ano anterior"
