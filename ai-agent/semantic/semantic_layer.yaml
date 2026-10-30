@@ -398,7 +398,7 @@ glossary:
     maps_to: "tipo_leitura = 'estimada' em sem_faturamento_mensal; n_leituras_estimadas e n_leituras em sem_kpis_segmento_mensal"
   - term: "receita de energia sem bandeiras"
     synonyms: ["receita sem bandeiras", "receita sem o acréscimo das bandeiras", "receita só da tarifa"]
-    maps_to: "sum(receita_energia) - sum(receita_bandeira) em sem_faturamento_mensal ou sem_kpis_segmento_mensal: a receita de energia sem o acréscimo das bandeiras. Só use quando a pergunta pedir isso com essas palavras; tarifa média é receita_energia inteira, com bandeira, dividida por kwh_faturado"
+    maps_to: "sum(receita_energia) - sum(receita_bandeira) em sem_faturamento_mensal ou sem_kpis_segmento_mensal: a receita de energia sem o acréscimo das bandeiras. sem_kpis_mensais não tem receita_bandeira: para a empresa inteira, some sem_kpis_segmento_mensal. Responda com ela quando a pergunta pedir esse termo ou um sinônimo. Não a use para calcular tarifa média, que é receita_energia inteira, com bandeira, dividida por kwh_faturado"
   - term: "efeito preço"
     synonyms: ["reajuste", "aumento de tarifa"]
     maps_to: "efeito_preco (efeito_tarifa + efeito_bandeira) em sem_receita_decomposicao"
