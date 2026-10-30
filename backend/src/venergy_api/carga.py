@@ -20,6 +20,7 @@ from sqlalchemy.exc import ProgrammingError
 
 from venergy_api.config import get_settings
 from venergy_api.database import Base, get_engine
+from venergy_api.estrutura_app import garantir_estrutura_do_app
 from venergy_api.models import (
     AtendimentoUc,
     ContinuidadeAlimentadorMensal,
@@ -211,6 +212,8 @@ def load_gold(gold_dir: Path, engine: Engine, tamanho_lote: int = TAMANHO_LOTE) 
         Base.metadata.drop_all(connection, tables=gold_tables)
         # Cria a Gold e o que faltar no schema app, sem mexer no que já está lá.
         Base.metadata.create_all(connection)
+        # Um banco antigo ganha as colunas novas do app, sem tocar nas linhas (DEC-050).
+        garantir_estrutura_do_app(connection)
         for table, csv_path in csv_paths.items():
             rows = iter_rows(csv_path, table.schema)
             written = _inserir_em_lotes(connection, table.model, rows, tamanho_lote)

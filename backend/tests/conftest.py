@@ -81,7 +81,8 @@ def client_for(tmp_path: Path, perfil: Perfil) -> Callable[..., TestClient]:
         # _env_file=None: os testes nunca leem o .env de quem está rodando.
         settings = Settings(
             _env_file=None,
-            database_url=engine.url.render_as_string(),
+            # Com a senha: a subida da API conecta com esta URL (DEC-050), e o padrão põe ***.
+            database_url=engine.url.render_as_string(hide_password=False),
             gold_dir=tmp_path / "gold",
             jwt_secret=JWT_SECRET,
             cors_origins=[FRONTEND_ORIGIN],
