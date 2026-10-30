@@ -248,3 +248,21 @@ def test_the_exported_file_filled_in_comes_back_through_the_upload(client: TestC
     ordem = detalhe(client, primeira)
     assert ordem["resultado"] == "IRREGULAR_CONFIRMADA"
     assert "(inspeção OI-" in ordem["observacao"]
+
+
+def test_the_export_restricts_the_columns_the_field_team_fills(client: TestClient) -> None:
+    gerar_ordem(client, "0001")
+    aba = baixar(client).active
+
+    por_coluna = {str(v.sqref).split(":")[0][0]: v for v in aba.data_validations.dataValidation}
+
+    assert por_coluna["E"].type == "list"
+    assert por_coluna["E"].formula1 == '"CONFIRMADA,SEM IRREGULARIDADE"'
+    assert por_coluna["C"].type == "date"
+    assert por_coluna["G"].type == "decimal"
+
+
+def _salvar(livro: Workbook) -> bytes:
+    arquivo = BytesIO()
+    livro.save(arquivo)
+    return arquivo.getvalue()

@@ -16,6 +16,7 @@ from zipfile import BadZipFile
 
 from openpyxl import Workbook, load_workbook
 from openpyxl.utils.exceptions import InvalidFileException
+from openpyxl.worksheet.datavalidation import DataValidation
 
 from venergy_api.ordens import ResultadoOrdem
 
@@ -252,6 +253,47 @@ COLUNAS_EXPORTACAO = (
 )
 
 
+# Linhas que a validação das colunas cobre: sobra folga para a equipe acrescentar linhas.
+LINHAS_VALIDADAS = 2000
+OPCOES_RESULTADO = ("CONFIRMADA", "SEM IRREGULARIDADE")
+
+
+def _validar_colunas(aba) -> None:
+    """Seleção no lugar de digitação: o Excel barra o que o upload rejeitaria."""
+    fim = LINHAS_VALIDADAS
+    resultado = DataValidation(
+        type="list",
+        formula1='"' + ",".join(OPCOES_RESULTADO) + '"',
+        allow_blank=True,
+        errorTitle="Resultado inválido",
+        error="Escolha CONFIRMADA ou SEM IRREGULARIDADE.",
+        promptTitle="Resultado",
+        prompt="CONFIRMADA: achou irregularidade. SEM IRREGULARIDADE: não achou.",
+    )
+    data = DataValidation(
+        type="date",
+        operator="greaterThan",
+        formula1="36526",
+        allow_blank=True,
+        errorTitle="Data inválida",
+        error="Informe uma data, como 12/08/2025.",
+    )
+    kwh = DataValidation(
+        type="decimal",
+        operator="greaterThanOrEqual",
+        formula1="0",
+        allow_blank=True,
+        errorTitle="kWh inválido",
+        error="Informe um número maior ou igual a zero.",
+    )
+    for validacao, coluna in ((data, "C"), (resultado, "E"), (kwh, "G")):
+        validacao.showErrorMessage = True
+        validacao.showInputMessage = validacao is resultado
+        aba.add_data_validation(validacao)
+        validacao.add(f"{coluna}2:{coluna}{fim}")
+    aba.column_dimensions["C"].number_format = "dd/mm/yyyy"
+
+
 def montar_planilha(ordens: Iterable[tuple[int, str, str | None, str | None]]) -> bytes:
     """Planilha das ordens em campo, no formato que o upload lê de volta.
 
@@ -264,6 +306,7 @@ def montar_planilha(ordens: Iterable[tuple[int, str, str | None, str | None]]) -
     aba.append(list(COLUNAS_EXPORTACAO))
     for ordem_id, cod_uc, municipio, bairro in ordens:
         aba.append([f"OI-{ordem_id}", cod_uc, None, None, None, None, None, municipio, bairro])
+    _validar_colunas(aba)
     saida = BytesIO()
     livro.save(saida)
     return saida.getvalue()
