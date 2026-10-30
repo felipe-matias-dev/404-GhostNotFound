@@ -403,6 +403,27 @@ class ConsumoUcSchema(BaseModel):
     tendencia: Tendencia
 
 
+class VariacaoContaSchema(BaseModel):
+    """Por que a conta do mês de referência mudou, em R$, contra o mesmo mês do ano anterior.
+
+    As cinco partes somam exatamente a `diferenca` entre as duas contas.
+    """
+
+    competencia: Competencia
+    competencia_comparada: Competencia
+    conta: ExactNumber
+    conta_comparada: ExactNumber
+    diferenca: ExactNumber
+    # Vazio quando uma das contas não traz os dias faturados: o volume inteiro vai para o consumo.
+    dias: ExactNumber | None
+    consumo: ExactNumber
+    tarifa: ExactNumber
+    bandeira: ExactNumber
+    tributos: ExactNumber
+    # Leitura estimada numa das contas: a próxima leitura real corrige o consumo.
+    leitura_estimada: bool
+
+
 class FaturaNaoPagaSchema(BaseModel):
     """Uma fatura da UC que ainda não foi paga."""
 
