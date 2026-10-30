@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "V-Energy Grid 360 API",
-    "version": "0.10.0"
+    "version": "0.11.0"
   },
   "paths": {
     "/health": {
@@ -2623,6 +2623,28 @@
             ],
             "title": "Observacao"
           },
+          "autor_login": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Autor Login"
+          },
+          "autor_nome": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Autor Nome"
+          },
           "ocorrido_em": {
             "type": "string",
             "format": "date-time",
@@ -2634,6 +2656,8 @@
           "status_anterior",
           "status_novo",
           "observacao",
+          "autor_login",
+          "autor_nome",
           "ocorrido_em"
         ],
         "title": "EventoSchema"

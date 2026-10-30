@@ -1,11 +1,9 @@
 """Gravação da trilha de auditoria do agente de IA, separada da rota para ser reaproveitada."""
 
 import logging
-from collections.abc import Callable
 from datetime import timedelta
 
-from sqlalchemy import Connection, Engine, exists, func, select, text
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy import Connection, exists, func, select, text
 from sqlalchemy.orm import Session
 from venergy_agent.domain.answer import AgentAnswer
 
@@ -114,23 +112,9 @@ def garantir_coluna_do_usuario(connection: Connection) -> None:
 
 
 def garantir_estrutura_da_auditoria(connection: Connection) -> None:
+    # Banco antes da primeira carga: a tabela ainda não existe, e o create_all a cria completa.
+    if connection.scalar(text("SELECT to_regclass('app.ai_auditoria')")) is None:
+        return
     garantir_colunas_de_tokens(connection)
     garantir_coluna_do_usuario(connection)
     garantir_indice_da_sessao(connection)
-
-
-def garantir_colunas_na_subida(obter_engine: Callable[[], Engine]) -> None:
-    """Garante as colunas na subida da API, para um banco antigo não quebrar o /ai/ask.
-
-    Quem atualiza o código sem rodar a carga não fica com a auditoria quebrada. Banco fora do
-    ar não impede a subida: só o /ai e as telas que usam o banco ficam de fora, como já ficam.
-    """
-    try:
-        with obter_engine().begin() as connection:
-            garantir_estrutura_da_auditoria(connection)
-    except SQLAlchemyError as error:
-        logger.warning(
-            "Não foi possível conferir as colunas da auditoria na subida (%s). "
-            "A carga da Gold também as acrescenta.",
-            type(error).__name__,
-        )

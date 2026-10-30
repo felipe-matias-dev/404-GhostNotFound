@@ -381,11 +381,27 @@ class OrdemEvento(Base):
         _enum_como_texto(StatusOrdem, "ck_ordem_evento_status_novo")
     )
     observacao: Mapped[str | None]
+    # Login de quem agiu, em texto e sem chave estrangeira: um token vale até vencer mesmo se o
+    # usuário for apagado, e a ação não pode falhar nem perder a trilha por isso (DEC-050).
+    # Vazio nos eventos de antes do login, que não têm autor conhecido.
+    autor_login: Mapped[str | None]
     ocorrido_em: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
 
     ordem: Mapped[OrdemInspecao] = relationship(back_populates="eventos")
+    # Só leitura, pelo login e sem chave estrangeira: o nome é buscado na consulta, e não copiado
+    # para o evento. selectin traz os autores de todos os eventos numa consulta só.
+    autor: Mapped["Usuario | None"] = relationship(
+        primaryjoin="foreign(OrdemEvento.autor_login) == Usuario.login",
+        viewonly=True,
+        lazy="selectin",
+    )
+
+    @property
+    def autor_nome(self) -> str | None:
+        """Nome de quem agiu; vazio sem autor ou se o login não está mais em app.usuarios."""
+        return self.autor.nome if self.autor else None
 
 
 class AiAuditoria(Base):

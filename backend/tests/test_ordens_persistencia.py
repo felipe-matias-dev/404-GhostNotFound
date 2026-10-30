@@ -71,3 +71,29 @@ def test_database_rejects_an_unknown_status(gold_dir: Path, engine: Engine) -> N
         connection.execute(
             text("INSERT INTO app.ordem_inspecao (cod_uc, status) VALUES ('0001', 'PERDIDA')")
         )
+
+
+def test_reload_adds_the_author_column_to_an_events_table_that_lacks_it(
+    gold_dir: Path, engine: Engine
+) -> None:
+    # Simula o banco de quem criou as tabelas antes de a coluna existir: o create_all sozinho
+    # não a acrescentaria, e as ordens de inspeção não podem ser apagadas para isso.
+    with engine.begin() as connection:
+        connection.execute(text("ALTER TABLE app.ordem_evento DROP COLUMN autor_login"))
+        connection.execute(
+            text("INSERT INTO app.ordem_inspecao (cod_uc, status) VALUES ('0001', 'GERADA')")
+        )
+        connection.execute(
+            text(
+                "INSERT INTO app.ordem_evento (ordem_id, status_novo) "
+                "SELECT id, 'GERADA' FROM app.ordem_inspecao"
+            )
+        )
+
+    load_gold(gold_dir, engine)
+    load_gold(gold_dir, engine)
+
+    with Session(engine) as session:
+        [evento] = session.scalars(select(OrdemEvento)).all()
+        assert evento.status_novo == StatusOrdem.GERADA
+        assert evento.autor_login is None
