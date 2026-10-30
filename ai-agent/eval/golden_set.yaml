@@ -83,7 +83,9 @@
 #          G099 a G103, conferidos na amostra e na Gold real. G009 e G100 passam de março para maio de 2024: na amostra,
 #          o AL-07 não tem interrupção em março e a referência devolvia DEC e FEC zero, que uma resposta errada (como a
 #          divisão inteira) também devolve. A nota do G046 perde o trecho de antes da memória.
-versao: 0.16.0
+#   0.17.0 GenAI (30/10/2026): a referência do G105 devolve só o município e o bairro, para aceitar a queda com qualquer
+#          sinal. revisado_por do G105 volta a null até Dados conferir.
+versao: 0.17.0
 status: rascunho
 
 itens:
@@ -1184,9 +1186,9 @@ itens:
   - id: G105
     question: "Qual bairro teve a maior queda de energia faturada residencial (B1), em kWh, de julho de 2022 a junho de 2023 para julho de 2025 a junho de 2026?"
     category: case
-    reference_sql: "SELECT municipio, bairro, sum(CASE WHEN competencia BETWEEN '2025-07' AND '2026-06' THEN kwh_faturado ELSE 0 END) - sum(CASE WHEN competencia BETWEEN '2022-07' AND '2023-06' THEN kwh_faturado ELSE 0 END) AS variacao_kwh FROM sem_kpis_segmento_mensal WHERE classe = 'B1' AND (competencia BETWEEN '2022-07' AND '2023-06' OR competencia BETWEEN '2025-07' AND '2026-06') GROUP BY municipio, bairro ORDER BY variacao_kwh ASC LIMIT 1"
+    reference_sql: "SELECT municipio, bairro FROM sem_kpis_segmento_mensal WHERE classe = 'B1' AND (competencia BETWEEN '2022-07' AND '2023-06' OR competencia BETWEEN '2025-07' AND '2026-06') GROUP BY municipio, bairro ORDER BY sum(CASE WHEN competencia BETWEEN '2025-07' AND '2026-06' THEN kwh_faturado ELSE 0 END) - sum(CASE WHEN competencia BETWEEN '2022-07' AND '2023-06' THEN kwh_faturado ELSE 0 END) ASC LIMIT 1"
     expected_status: answered
     datasets: [gold_real]
     follow_up_of: null
-    notes: "Versão answered do G044, a pergunta do Henrique (issue #90, item 5): os dois períodos e a medida (kWh) estão explícitos, como no G057 e no G059. Bairro sempre com o município. O G044 continua clarify. A referência foi executada na Gold oficial pelo caminho do agente e volta com resultado (GenAI, 30/10/2026). Conferido por Dados no PR #97 (Alisson Ramos, 30/10/2026)."
-    revisado_por: "Alisson Ramos"
+    notes: "Versão answered do G044, a pergunta do Henrique (issue #90, item 5): os dois períodos e a medida (kWh) estão explícitos, como no G057 e no G059. Bairro sempre com o município. O G044 continua clarify. A referência foi executada na Gold oficial pelo caminho do agente e volta com resultado (GenAI, 30/10/2026). Conferido por Dados no PR #97 (Alisson Ramos, 30/10/2026). Mudança na 0.17.0 (GenAI, 30/10/2026): a referência devolve só o município e o bairro. Com a variação, uma resposta certa que mostrasse a queda como número positivo era marcada como errada. Revisado_por volta a null até Dados conferir."
+    revisado_por: null
