@@ -4,7 +4,9 @@ from pathlib import Path
 
 from pydantic_ai import Agent
 from pydantic_ai.models import Model
+from pydantic_ai.usage import RunUsage
 
+from venergy_agent.domain.errors import ModelCallFailed
 from venergy_agent.domain.narration import Narration
 from venergy_agent.domain.question import Question
 from venergy_agent.domain.sql import QueryResult, SqlDraft
@@ -30,11 +32,15 @@ class PydanticAiAnswerWriter:
 
     async def write(self, question: Question, draft: SqlDraft, result: QueryResult) -> Narration:
         agent = Agent(self._model, output_type=str, system_prompt=self._system)
-        run = await agent.run(
-            render_answer_user(question, draft, result, self._nonce, self._units),
-            model_settings={"temperature": self._temperature},
-        )
-        usage = run.usage
+        usage = RunUsage()
+        try:
+            run = await agent.run(
+                render_answer_user(question, draft, result, self._nonce, self._units),
+                model_settings={"temperature": self._temperature},
+                usage=usage,
+            )
+        except Exception as error:
+            raise ModelCallFailed(usage.input_tokens, usage.output_tokens) from error
         return Narration(
             text=run.output.strip(),
             input_tokens=usage.input_tokens,

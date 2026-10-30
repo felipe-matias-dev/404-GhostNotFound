@@ -19,7 +19,12 @@ from venergy_agent.application.ports import (
 )
 from venergy_agent.domain.answer import AgentAnswer, AnswerStatus, Confidence
 from venergy_agent.domain.conversation import ConversationTurn
-from venergy_agent.domain.errors import ErrorKind, QueryExecutionError, SqlRejected
+from venergy_agent.domain.errors import (
+    ErrorKind,
+    ModelCallFailed,
+    QueryExecutionError,
+    SqlRejected,
+)
 from venergy_agent.domain.numbers import unsupported_numbers
 from venergy_agent.domain.question import Question
 from venergy_agent.domain.semantic import SemanticLayer
@@ -50,6 +55,7 @@ REFUSED_REASON = (
 BUDGET_EXHAUSTED = (
     "Você atingiu o limite de uso do assistente por enquanto. Tente de novo mais tarde."
 )
+BUDGET_UNAVAILABLE = "Não consegui conferir o seu limite de uso agora. Tente de novo em instantes."
 MODEL_FAILED = "Não consegui consultar o modelo de linguagem agora. Tente de novo em instantes."
 INTERNAL_FAILED = "Algo deu errado do nosso lado. Tente de novo em instantes."
 ATTEMPTS_FAILED = "Não consegui montar uma consulta válida depois de {attempts} tentativas."
@@ -168,7 +174,20 @@ class AskUseCase:
                 started,
             )
 
-        if await self._budget_exhausted(session_id, request_id):
+        try:
+            exhausted = await self._budget_exhausted(session_id, request_id)
+        except Exception as error:
+            self._log(
+                request_id,
+                session_id,
+                step="orcamento",
+                status="indisponivel",
+                error=type(error).__name__,
+            )
+            return self._unanswered(
+                AnswerStatus.FAILED, BUDGET_UNAVAILABLE, request_id, session_id, started
+            )
+        if exhausted:
             return self._unanswered(
                 AnswerStatus.REFUSED, BUDGET_EXHAUSTED, request_id, session_id, started
             )
@@ -179,7 +198,7 @@ class AskUseCase:
         last_sql: str | None = None
         last_model: str | None = None
         for attempt in range(1, self._max_attempts + 1):
-            generation = await self._generate(question, feedback, attempt, history)
+            generation = await self._generate(question, feedback, attempt, history, spent)
             if generation is None:
                 return self._unanswered(
                     AnswerStatus.FAILED,
@@ -362,10 +381,25 @@ class AskUseCase:
         feedback: AttemptFeedback | None,
         attempt: int,
         history: tuple[ConversationTurn, ...],
+        spent: _Spent,
     ) -> Generation | None:
         began = time.perf_counter()
         try:
             generation = await self._generator.generate(question, self._layer, feedback, history)
+        except ModelCallFailed as error:
+            spent.input_tokens += error.input_tokens
+            spent.output_tokens += error.output_tokens
+            self._log(
+                question.request_id,
+                question.session_id,
+                step="geracao",
+                status="erro_do_modelo",
+                attempt=attempt,
+                error="ModelCallFailed",
+                input_tokens=error.input_tokens,
+                output_tokens=error.output_tokens,
+            )
+            return None
         except Exception as error:
             self._log(
                 question.request_id,
@@ -445,6 +479,19 @@ class AskUseCase:
             return fallback
         try:
             narration = await self._answer_writer.write(question, draft, visible)
+        except ModelCallFailed as error:
+            spent.input_tokens += error.input_tokens
+            spent.output_tokens += error.output_tokens
+            self._log(
+                question.request_id,
+                question.session_id,
+                step="resposta",
+                status="narrativa_falhou",
+                error="ModelCallFailed",
+                input_tokens=error.input_tokens,
+                output_tokens=error.output_tokens,
+            )
+            return fallback
         except Exception as error:
             self._log(
                 question.request_id,

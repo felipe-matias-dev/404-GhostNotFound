@@ -3,10 +3,11 @@ from pathlib import Path
 import pytest
 from pydantic_ai.messages import ModelResponse, SystemPromptPart, ToolCallPart, UserPromptPart
 from pydantic_ai.models.function import AgentInfo, FunctionModel
+from pydantic_ai.usage import RequestUsage
 
 from venergy_agent.domain.answer import AnswerStatus
 from venergy_agent.domain.conversation import ConversationTurn
-from venergy_agent.domain.errors import ErrorKind
+from venergy_agent.domain.errors import ErrorKind, ModelCallFailed
 from venergy_agent.domain.question import Question
 from venergy_agent.domain.semantic import ColumnSpec, SemanticLayer, ViewSpec
 from venergy_agent.domain.sql import AttemptFeedback, DraftStatus
@@ -218,3 +219,21 @@ async def test_history_stays_in_the_correction_attempt():
     user = user_prompt(calls)
     assert "SELECT nope FROM sem_uc" in user
     assert "Quantas UCs existem em Recife?" in user
+
+
+async def test_a_generation_that_never_becomes_valid_reports_the_tokens_it_spent():
+    calls = []
+
+    def respond(messages, info: AgentInfo):
+        calls.append(messages)
+        return ModelResponse(
+            parts=[ToolCallPart(tool_name=info.output_tools[0].name, args={"status": "inventado"})],
+            usage=RequestUsage(input_tokens=7, output_tokens=3),
+        )
+
+    with pytest.raises(ModelCallFailed) as failure:
+        await generator(FunctionModel(respond)).generate(QUESTION, LAYER, None)
+
+    assert failure.value.input_tokens == 7 * len(calls)
+    assert failure.value.output_tokens == 3 * len(calls)
+    assert failure.value.input_tokens > 0

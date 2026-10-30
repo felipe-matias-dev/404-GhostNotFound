@@ -7,6 +7,7 @@ import pytest
 from venergy_agent.application.ask import (
     ATTEMPTS_FAILED,
     BUDGET_EXHAUSTED,
+    BUDGET_UNAVAILABLE,
     CLARIFY_PREFIX,
     DATABASE_FAILED,
     EMPTY_RESULT,
@@ -22,7 +23,7 @@ from venergy_agent.application.ask import (
 from venergy_agent.config import AGENT_ROOT, REPO_ROOT
 from venergy_agent.domain.answer import AnswerStatus, Confidence
 from venergy_agent.domain.conversation import ConversationTurn
-from venergy_agent.domain.errors import ErrorKind, QueryExecutionError
+from venergy_agent.domain.errors import ErrorKind, ModelCallFailed, QueryExecutionError
 from venergy_agent.domain.narration import Narration
 from venergy_agent.domain.sql import DraftStatus, Generation, QueryResult, SqlDraft
 from venergy_agent.infrastructure.semantic_source import YamlSemanticLayerSource
@@ -946,8 +947,26 @@ async def test_unreadable_usage_fails_closed_without_calling_the_model(layer):
     answer = await use_case(layer, generator, usage=usage, session_token_budget=1000).ask("x", "s1")
 
     assert answer.status is AnswerStatus.FAILED
-    assert answer.refused_reason == INTERNAL_FAILED
+    assert answer.refused_reason == BUDGET_UNAVAILABLE
     assert generator.feedbacks == []
+
+
+async def test_failed_model_call_keeps_the_tokens_it_already_spent(layer):
+    generator = ScriptedGenerator(ModelCallFailed(input_tokens=100, output_tokens=20))
+
+    answer = await use_case(layer, generator).ask("x", "s1")
+
+    assert answer.status is AnswerStatus.FAILED
+    assert (answer.input_tokens, answer.output_tokens) == (100, 20)
+
+
+async def test_failed_narration_keeps_the_tokens_of_the_generation_and_of_the_attempt(layer):
+    writer = FixedWriter(error=ModelCallFailed(input_tokens=30, output_tokens=5))
+
+    answer = await use_case(layer, ScriptedGenerator(generation()), writer=writer).ask("x", "s1")
+
+    assert answer.status is AnswerStatus.ANSWERED
+    assert (answer.input_tokens, answer.output_tokens) == (10 + 30, 5 + 5)
 
 
 async def test_budget_log_has_numbers_only(layer, caplog):

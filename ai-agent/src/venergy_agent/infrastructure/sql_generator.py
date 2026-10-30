@@ -3,8 +3,10 @@ from pathlib import Path
 
 from pydantic_ai import Agent
 from pydantic_ai.models import Model
+from pydantic_ai.usage import RunUsage
 
 from venergy_agent.domain.conversation import ConversationTurn
+from venergy_agent.domain.errors import ModelCallFailed
 from venergy_agent.domain.question import Question
 from venergy_agent.domain.semantic import SemanticLayer
 from venergy_agent.domain.sql import AttemptFeedback, Generation, SqlDraft
@@ -52,11 +54,15 @@ class PydanticAiSqlGenerator:
         )
         if history and self._history_template is not None:
             prompt = f"{render_history(self._history_template, history, self._nonce)}\n\n{prompt}"
-        result = await agent.run(
-            prompt,
-            model_settings={"temperature": self._temperature},
-        )
-        usage = result.usage
+        usage = RunUsage()
+        try:
+            result = await agent.run(
+                prompt,
+                model_settings={"temperature": self._temperature},
+                usage=usage,
+            )
+        except Exception as error:
+            raise ModelCallFailed(usage.input_tokens, usage.output_tokens) from error
         return Generation(
             draft=result.output,
             model=result.response.model_name or "desconhecido",
