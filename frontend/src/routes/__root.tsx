@@ -1,13 +1,25 @@
+import { SpinnerGapIcon } from "@phosphor-icons/react";
 import { TanStackDevtools } from "@tanstack/react-devtools";
 import type { QueryClient } from "@tanstack/react-query";
 import {
 	createRootRouteWithContext,
 	HeadContent,
+	Navigate,
 	Outlet,
 	Scripts,
+	useLocation,
 } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { AppShell } from "#/components/layout/app-shell";
+import { NAVEGACAO, organizarNavegacao } from "#/components/layout/app-sidebar";
+import { Logo } from "#/components/layout/logo";
+import { Button } from "#/components/ui/button";
+import {
+	PROFILES,
+	SessionControls,
+	useSession,
+	useSessionExpiry,
+} from "#/features/auth";
 import {
 	ConsultaUcProvider,
 	useConsultaUc,
@@ -69,8 +81,60 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 });
 
 function RootLayout() {
+	useSessionExpiry();
+	const session = useSession();
+	const location = useLocation();
+	const loginPage = location.pathname === "/login";
+
+	if (session.isPending || session.isError) {
+		return (
+			<main className="flex min-h-svh flex-col items-center justify-center gap-6 bg-bg px-6 text-center">
+				<Logo />
+				{session.isError ? (
+					<div
+						role="alert"
+						className="flex max-w-sm flex-col items-center gap-4"
+					>
+						<p className="text-body text-text-muted">
+							Não foi possível verificar sua sessão. Confira a conexão e tente
+							novamente.
+						</p>
+						<Button
+							onClick={() => void session.refetch()}
+							disabled={session.isFetching}
+						>
+							{session.isFetching ? "Verificando…" : "Tentar novamente"}
+						</Button>
+					</div>
+				) : (
+					<output className="flex items-center gap-2 text-body text-text-muted">
+						<SpinnerGapIcon
+							aria-hidden="true"
+							className="size-4 motion-safe:animate-spin"
+						/>
+						Verificando sua sessão…
+					</output>
+				)}
+			</main>
+		);
+	}
+
+	if (!session.data) {
+		return loginPage ? (
+			<Outlet />
+		) : (
+			<Navigate
+				to="/login"
+				search={{ redirect: location.href === "/" ? undefined : location.href }}
+				replace
+			/>
+		);
+	}
+	if (loginPage)
+		return <Navigate to={PROFILES[session.data.perfil].home} replace />;
+
 	return (
-		<ConsultaUcProvider>
+		<ConsultaUcProvider key={session.data.login} usuario={session.data.login}>
 			<Portal />
 		</ConsultaUcProvider>
 	);
@@ -78,10 +142,24 @@ function RootLayout() {
 
 function Portal() {
 	const { abrir } = useConsultaUc();
+	const { data: user } = useSession();
+	const itens = organizarNavegacao(
+		NAVEGACAO,
+		user ? PROFILES[user.perfil].primaryRoutes : [],
+	);
 	return (
-		<AppShell onConsultarUc={abrir}>
-			<Outlet />
-		</AppShell>
+		<>
+			<AppShell onConsultarUc={abrir} itens={itens} conta={<SessionControls />}>
+				<Outlet />
+			</AppShell>
+			<TanStackDevtools
+				config={{ position: "bottom-right" }}
+				plugins={[
+					{ name: "Tanstack Router", render: <TanStackRouterDevtoolsPanel /> },
+					TanStackQueryDevtools,
+				]}
+			/>
+		</>
 	);
 }
 
@@ -94,18 +172,6 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 			</head>
 			<body>
 				{children}
-				<TanStackDevtools
-					config={{
-						position: "bottom-right",
-					}}
-					plugins={[
-						{
-							name: "Tanstack Router",
-							render: <TanStackRouterDevtoolsPanel />,
-						},
-						TanStackQueryDevtools,
-					]}
-				/>
 				<Scripts />
 			</body>
 		</html>

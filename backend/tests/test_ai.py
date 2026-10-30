@@ -11,6 +11,7 @@ from venergy_agent.domain.answer import AgentAnswer, AnswerStatus, Confidence
 
 from venergy_api.agente import get_agente
 from venergy_api.auditoria import gravar_auditoria
+from venergy_api.auth import Perfil
 from venergy_api.database import Base
 from venergy_api.models import AiAuditoria
 from venergy_api.schemas import MAX_PERGUNTA_IA, MAX_SESSAO_IA
@@ -74,6 +75,12 @@ def refused_answer() -> AgentAnswer:
         prompt_version="v2",
         latency_ms=210,
     )
+
+
+@pytest.fixture
+def perfil() -> Perfil:
+    # Os testes deste arquivo leem a auditoria, e só a TI pode (DEC-049).
+    return Perfil.TI
 
 
 @pytest.fixture(autouse=True)

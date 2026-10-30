@@ -42,7 +42,10 @@ uv run python -m venergy_api.amostra
 # 6. Carrega os CSVs de data/gold/ no schema gold do banco
 uv run python -m venergy_api.carga
 
-# 7. Sobe a API em http://127.0.0.1:8000 (Ctrl+C para parar)
+# 7. Cria os 5 usuários de demonstração do login (senha em VENERGY_API_SENHA_DEMO)
+uv run python -m venergy_api.usuarios
+
+# 8. Sobe a API em http://127.0.0.1:8000 (Ctrl+C para parar)
 uv run uvicorn venergy_api.main:create_app --factory --reload --reload-dir src
 ```
 
@@ -51,14 +54,30 @@ código, para que mudanças em `.venv` (como logo após o `uv sync`) não a rein
 
 Se você mudar senha ou porta no `.env` da raiz, ajuste também a URL no `.env` de `backend/`.
 
-A documentação interativa fica em http://127.0.0.1:8000/docs. Para conferir, busque
-a UC `0003` em `GET /unidades-consumidoras/{cod_uc}`.
+A documentação interativa fica em http://127.0.0.1:8000/docs. Quase toda rota exige login
+([DEC-049](../docs/decisoes.md)): faça `POST /auth/login` com um dos usuários abaixo e o
+navegador guarda o cookie de sessão, que vale para as demais chamadas do `/docs`. Para
+conferir, busque a UC `0003` em `GET /unidades-consumidoras/{cod_uc}`.
+
+| Login | Perfil | Pode além de ler os dados e perguntar ao agente |
+|---|---|---|
+| `henrique` | `diretoria` | só leitura |
+| `camila` | `atendimento` | só leitura |
+| `rafael` | `perdas` | gerar e atualizar ordens de inspeção |
+| `beatriz` | `operacao` | só leitura |
+| `patricia` | `ti` | ler a auditoria do agente |
+
+A senha é a de `VENERGY_API_SENHA_DEMO` (a mesma para todos). Quem tem um `.env` antigo precisa
+acrescentar `VENERGY_API_JWT_SECRET` (mínimo de 32 caracteres) e `VENERGY_API_SENHA_DEMO`: veja o `.env.example`.
 
 ## Rotas
 
 | Rota | O que faz |
 |---|---|
-| `GET /health` | `200` se a API alcança o banco, `503` se não alcança |
+| `GET /health` | `200` se a API alcança o banco, `503` se não alcança. Não exige login |
+| `POST /auth/login` | Confere `{"login": "...", "senha": "..."}` e grava o cookie `venergy_sessao` (`HttpOnly`, `SameSite=Lax`, 8 horas). `401` com a mesma mensagem para login inexistente e senha errada |
+| `GET /auth/me` | Quem está logado (`login`, `nome`, `perfil`): o portal chama ao abrir para montar o menu. `401` sem sessão |
+| `POST /auth/logout` | Apaga o cookie de sessão. `204`, com ou sem sessão |
 | `GET /unidades-consumidoras/{cod_uc}` | Resumo de uma unidade consumidora, ou `404` se ela não existir |
 | `GET /unidades-consumidoras/{cod_uc}/visao-360` | A unidade consumidora numa tela só: cadastro e painel solar, consumo dos 12 meses até a última competência da Gold contra o ano anterior (com `tendencia`: `subiu`, `estavel`, `caiu` ou `sem_comparacao`, faixa de ±10%), faturas não pagas, medidor, interrupções, chamados e inspeções ([DEC-044](../docs/decisoes.md)). `404` se a unidade não existir |
 | `GET /indicadores/comparacao` | Indicadores e variações entre dois períodos, para a empresa ou recorte de município, bairro e classe ([DEC-041](../docs/decisoes.md)) |
@@ -71,12 +90,12 @@ a UC `0003` em `GET /unidades-consumidoras/{cod_uc}`.
 | `GET /continuidade/alimentadores/ranking?inicio=&fim=&criterio=` | Os alimentadores do pior para o melhor num período obrigatório, por `dec` (padrão) ou `fec`. DEC do período = soma das horas ÷ média mensal das UCs atendidas, e `n_meses` diz quantos meses entraram na média ([DEC-033](../docs/decisoes.md)) |
 | `GET /continuidade/recortes?inicio=&fim=&criterio=&municipio=&bairro=&classe=` | DEC e FEC do nível abaixo do filtro, do pior para o melhor: sem filtro, por município; com `municipio`, por bairro; com `municipio` e `bairro`, por alimentador. `classe` filtra em qualquer nível, e `bairro` sem `municipio` dá `422` |
 | `GET /fila-suspeitas?pagina=&tamanho=&sem_ordem_ativa=` | A fila de suspeitas pela posição no ranking (1 = mais suspeita), com motivos, energia recuperável e a `ordem_ativa` da UC, se houver. `tamanho` vai até 200; `sem_ordem_ativa=true` esconde as UCs que já têm ordem, e o `total` acompanha o filtro |
-| `POST /ordens-inspecao` | Gera uma ordem de inspeção por UC (`{"cod_ucs": [...]}`), tudo ou nada: `404` se uma UC não existir, `409` se já tiver ordem ativa |
+| `POST /ordens-inspecao` | Só o perfil `perdas` (`403` para os outros). Gera uma ordem de inspeção por UC (`{"cod_ucs": [...]}`), tudo ou nada: `404` se uma UC não existir, `409` se já tiver ordem ativa |
 | `GET /ordens-inspecao?status=` | Lista as ordens, das mais recentes para as mais antigas, opcionalmente por status |
 | `GET /ordens-inspecao/{id}` | Uma ordem com o histórico de mudanças de status |
-| `PATCH /ordens-inspecao/{id}` | Muda o status (`EM_CAMPO`, `CONCLUIDA` com `resultado`, `CANCELADA`), com `observacao` opcional: `409` se a mudança não for permitida |
+| `PATCH /ordens-inspecao/{id}` | Só o perfil `perdas`. Muda o status (`EM_CAMPO`, `GERADA` na volta de campo, `CONCLUIDA` com `resultado`, `CANCELADA`), com `observacao` opcional: `409` se a mudança não for permitida |
 | `POST /ai/ask` | Pergunta ao agente de IA (`{"question": "...", "session_id": "..."}`) e devolve a resposta com o `audit_id` do registro gravado em `app.ai_auditoria`. Todo status é gravado, e se a gravação falhar a resposta não sai (`500`). Sem a chave do Gemini, `503` ([DEC-034](../docs/decisoes.md)) |
-| `GET /ai/audit/{id}` | A auditoria de uma resposta: pergunta, SQL executado, views, linhas, modelo, versão do prompt, latência e horário. `404` se não existir |
+| `GET /ai/audit/{id}` | Só o perfil `ti` (`403` para os outros). A auditoria de uma resposta: pergunta, SQL executado, views, linhas, modelo, versão do prompt, latência e horário. `404` se não existir |
 | `GET /receita/insight?periodo_base=&periodo_atual=&municipio=&bairro=&classe=` | Um insight de IA sobre a ponte de receita do recorte da tela (2 a 4 frases), com as `metricas` que sustentam cada número do texto. Os filtros são os de `/receita/decomposicao`. `texto` vem vazio quando o agente descarta a narração (número fora das métricas) ou o provedor falha: a tela aparece sem insight. O mesmo recorte não paga o modelo duas vezes (cache em memória pelo conteúdo das métricas). `503` sem a chave do Gemini ([DEC-040](../docs/decisoes.md)) |
 
 Com filtro de segmento, a receita e o kWh são somados da fatura de cada UC. DEC e FEC só

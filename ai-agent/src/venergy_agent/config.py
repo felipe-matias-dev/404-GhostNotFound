@@ -37,9 +37,13 @@ class AgentSettings(BaseSettings):
     semantic_layer_path: Path = AGENT_ROOT / "semantic" / "semantic_layer.yaml"
     gold_contract_path: Path = REPO_ROOT / "contracts" / "gold_schema.yaml"
 
+    @property
+    def fallback_models(self) -> tuple[str, ...]:
+        return tuple(m.strip() for m in (self.fallback_model or "").split(",") if m.strip())
+
     @model_validator(mode="after")
     def check_provider_keys(self) -> Self:
-        for model in filter(None, (self.llm_model, self.fallback_model)):
+        for model in (self.llm_model, *self.fallback_models):
             provider, _, name = model.partition(":")
             key = PROVIDER_KEYS.get(provider)
             if key is None:

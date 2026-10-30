@@ -20,6 +20,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from venergy_api.auth import Perfil
 from venergy_api.database import Base
 from venergy_api.ordens import STATUS_ATIVOS, ResultadoOrdem, StatusOrdem
 
@@ -417,3 +418,16 @@ class AiAuditoria(Base):
     model: Mapped[str]
     prompt_version: Mapped[str]
     latency_ms: Mapped[int]
+
+
+class Usuario(Base):
+    """Quem pode entrar no portal. Schema app: a carga da Gold nunca apaga esta tabela."""
+
+    __tablename__ = "usuarios"
+    __table_args__ = {"schema": "app"}
+
+    login: Mapped[str] = mapped_column(primary_key=True)
+    nome: Mapped[str]
+    perfil: Mapped[Perfil] = mapped_column(_enum_como_texto(Perfil, "ck_usuarios_perfil"))
+    # Só o hash Argon2: com a tabela vazada, ninguém lê as senhas.
+    senha_hash: Mapped[str]
