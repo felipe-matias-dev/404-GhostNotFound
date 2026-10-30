@@ -193,6 +193,9 @@ export function AgenteTurnoItem({
 									<span className="font-mono text-small text-text-muted">
 										#{resposta.audit_id}
 									</span>
+									<span className="font-mono text-small text-text-muted">
+										{resposta.model} · {resposta.prompt_version}
+									</span>
 								</div>
 							)}
 						</div>
