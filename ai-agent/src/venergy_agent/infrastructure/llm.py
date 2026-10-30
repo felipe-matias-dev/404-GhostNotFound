@@ -13,9 +13,10 @@ TRANSIENT_STATUS_CODES = [429, 503]
 
 def build_model(settings: AgentSettings) -> Model:
     primary = _build(settings.llm_model, settings)
-    if settings.fallback_model is None:
+    fallbacks = [_build(model, settings) for model in settings.fallback_models]
+    if not fallbacks:
         return primary
-    return FallbackModel(primary, _build(settings.fallback_model, settings))
+    return FallbackModel(primary, *fallbacks)
 
 
 def build_judge_model(settings: AgentSettings) -> Model:
@@ -27,7 +28,7 @@ def build_judge_model(settings: AgentSettings) -> Model:
         )
     if not name:
         raise ValueError(f"judge_model {settings.judge_model!r} has no model name")
-    generators = filter(None, (settings.llm_model, settings.fallback_model))
+    generators = (settings.llm_model, *settings.fallback_models)
     if _base_name(settings.judge_model) in {_base_name(model) for model in generators}:
         raise ValueError("judge_model must be a different model from llm_model and fallback_model")
     secret = getattr(settings, variable)

@@ -39,6 +39,28 @@ def test_fallback_can_use_the_other_provider():
     assert [type(m) for m in model.models] == [GoogleModel, OpenRouterModel]
 
 
+def test_a_comma_separated_fallback_builds_the_chain_in_order():
+    model = build_model(
+        settings(fallback_model="google-gla:gemini-3.5-flash, openrouter:nvidia/x:free")
+    )
+
+    assert isinstance(model, FallbackModel)
+    assert [m.model_name for m in model.models] == [
+        "gemini-3.1-flash-lite",
+        "gemini-3.5-flash",
+        "nvidia/x:free",
+    ]
+
+
+def test_judge_equal_to_any_model_of_the_fallback_chain_is_refused():
+    chained = settings(
+        fallback_model="google-gla:gemini-3.5-flash,openrouter:google/gemini-3.5-flash-lite"
+    )
+
+    with pytest.raises(ValueError, match="judge_model"):
+        build_judge_model(chained)
+
+
 def test_unknown_provider_is_never_routed_to_openrouter():
     unchecked = AgentSettings.model_construct(
         llm_model="anthropic:claude-x", fallback_model=None, openrouter_api_key="sk-test"

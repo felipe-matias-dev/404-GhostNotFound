@@ -157,7 +157,19 @@ O OpenRouter continua disponível pelo prefixo `openrouter:` (veja `.env.example
 
 ### Modelo reserva
 
-Na API do `docker compose`, o agente sobe com um modelo reserva: `VENERGY_AGENT_FALLBACK_MODEL`, padrão `google-gla:gemini-3.5-flash` (troque por `GEMINI_FALLBACK_MODEL` no `.env` da raiz). Se o modelo principal falhar com 429 (cota) ou 503 (sobrecarga) depois das retentativas, a mesma pergunta vai para o reserva, com a mesma chave. No plano gratuito a cota é contada por modelo, então o reserva tem cota própria. O reserva precisa ser diferente do modelo do juiz (`VENERGY_AGENT_JUDGE_MODEL`, padrão `gemini-3.5-flash-lite`). Fora do compose (`python -m venergy_agent`, avaliação), o reserva só entra se a variável estiver no `ai-agent/.env`.
+Na API do `docker compose`, o agente sobe com um modelo reserva: `VENERGY_AGENT_FALLBACK_MODEL`, padrão `google-gla:gemini-3.5-flash` (troque por `GEMINI_FALLBACK_MODEL` no `.env` da raiz). Se o modelo principal falhar com 429 (cota) ou 503 (sobrecarga) depois das retentativas, a mesma pergunta vai para o reserva. No plano gratuito a cota é contada por modelo, então o reserva tem cota própria.
+
+A variável aceita uma **cadeia**, separada por vírgula, tentada em ordem. Com a chave do OpenRouter (`OPENROUTER_API_KEY` no `.env` da raiz), a cadeia pode seguir para outro provedor e cobrir uma queda do Gemini inteiro:
+
+```
+GEMINI_FALLBACK_MODEL=google-gla:gemini-3.5-flash,openrouter:nvidia/nemotron-3.5-super-vl:free,openrouter:google/gemma-4-31b-it:free
+```
+
+- Os modelos `:free` do OpenRouter têm limite de 50 chamadas por dia por conta e são instáveis (no teste de 29/10, `gemma-4-31b` deu 429 e outros deram 503); por isso a cadeia tem mais de um. O `nemotron-3.5-super-vl` acertou o SQL das perguntas de teste, mas leva cerca de 40 s por chamada: serve de última linha, não de reserva do dia a dia.
+- Só entram modelos com *tool calling* (o agente devolve saída estruturada).
+- Um modelo `openrouter:` na cadeia exige a chave do OpenRouter: sem ela, o agente não sobe (o `/ai` responde 503). O padrão do compose é só Gemini por isso.
+- Nenhum modelo da cadeia pode ser igual ao do juiz (`VENERGY_AGENT_JUDGE_MODEL`, padrão `gemini-3.5-flash-lite`).
+- Fora do compose (`python -m venergy_agent`, avaliação), a cadeia vem do `ai-agent/.env`.
 
 ### Dia da apresentação
 
