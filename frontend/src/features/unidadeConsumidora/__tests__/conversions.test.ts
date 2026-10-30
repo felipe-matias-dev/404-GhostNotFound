@@ -71,9 +71,20 @@ describe("partesDaConta", () => {
 });
 
 describe("maiorParte", () => {
-	it("picks the largest absolute value, even when it lowers the bill", () => {
+	it("picks the largest part that raised the bill when the bill went up", () => {
 		const partes = partesDaConta({ ...variacao, consumo: 100, bandeira: -900 });
-		expect(maiorParte(partes)?.id).toBe("bandeira");
+		expect(maiorParte(partes, 30.5)?.id).toBe("consumo");
+	});
+
+	it("picks the largest part that lowered the bill when the bill went down", () => {
+		const partes = partesDaConta({
+			...variacao,
+			consumo: 300,
+			tarifa: -200,
+			bandeira: -250,
+			tributos: 30,
+		});
+		expect(maiorParte(partes, -120)?.id).toBe("bandeira");
 	});
 
 	it("keeps the first part of the card order on a tie", () => {
@@ -81,20 +92,20 @@ describe("maiorParte", () => {
 			...variacao,
 			consumo: 0,
 			tarifa: 50,
-			bandeira: -50,
+			bandeira: 50,
 			tributos: 0,
 		});
-		expect(maiorParte(partes)?.id).toBe("tarifa");
+		expect(maiorParte(partes, 100)?.id).toBe("tarifa");
 	});
 
-	it("returns null when nothing changed the bill", () => {
+	it("returns null when the bill did not change", () => {
 		const partes = partesDaConta({
 			...variacao,
-			consumo: 0,
-			tarifa: 0,
+			consumo: 50,
+			tarifa: -50,
 			bandeira: 0,
 			tributos: 0,
 		});
-		expect(maiorParte(partes)).toBeNull();
+		expect(maiorParte(partes, 0)).toBeNull();
 	});
 });

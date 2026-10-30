@@ -79,7 +79,7 @@ function CorpoVariacao({
 	variacao: NonNullable<Uc360["variacao_conta"]>;
 }) {
 	const partes = partesDaConta(variacao);
-	const maior = maiorParte(partes);
+	const maior = maiorParte(partes, variacao.diferenca);
 	const escala = Math.max(...partes.map((p) => Math.abs(p.valor)));
 
 	return (

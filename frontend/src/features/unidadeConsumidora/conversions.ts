@@ -61,11 +61,19 @@ export function partesDaConta(variacao: VariacaoConta): ParteDaConta[] {
 	return partes;
 }
 
-/** A parte que mais pesou, em valor absoluto; no empate, a primeira da ordem do card. */
-export function maiorParte(partes: ParteDaConta[]): ParteDaConta | null {
+/**
+ * A parte que mais pesou na direção da conta: com a conta subindo, a maior que encareceu; com a
+ * conta caindo, a maior que barateou. Uma parte no sentido contrário não explica a variação. No
+ * empate, a primeira da ordem do card; com a conta igual, nenhuma.
+ */
+export function maiorParte(
+	partes: ParteDaConta[],
+	diferenca: number,
+): ParteDaConta | null {
 	let maior: ParteDaConta | null = null;
 	for (const parte of partes) {
-		if (parte.valor === 0) continue;
+		if (Math.sign(parte.valor) !== Math.sign(diferenca) || parte.valor === 0)
+			continue;
 		if (maior === null || Math.abs(parte.valor) > Math.abs(maior.valor)) {
 			maior = parte;
 		}
