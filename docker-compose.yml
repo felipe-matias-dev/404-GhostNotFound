@@ -41,9 +41,11 @@ services:
       # Agente de IA: usuário somente leitura e chave do Gemini de cada integrante (.env da raiz).
       VENERGY_AGENT_DATABASE_URL: postgresql://venergy_agent:${AGENT_DB_PASSWORD}@db:5432/venergy
       VENERGY_AGENT_GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
-      # Modelo reserva: entra sozinho se o principal falhar (429 ou 503) depois das retentativas.
-      # No plano gratuito a cota é por modelo, então o reserva tem cota própria.
+      # Modelos reserva, em ordem: entram sozinhos se o anterior falhar (429 ou 503) depois das
+      # retentativas. No plano gratuito a cota é por modelo. Pode ser uma lista separada por vírgula,
+      # inclusive com modelos openrouter:, que usam a OPENROUTER_API_KEY.
       VENERGY_AGENT_FALLBACK_MODEL: ${GEMINI_FALLBACK_MODEL:-google-gla:gemini-3.5-flash}
+      VENERGY_AGENT_OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       # Detecção de mudanças por varredura: eventos do sistema de arquivos não atravessam
       # o volume no Docker Desktop do Windows.
       WATCHFILES_FORCE_POLLING: "true"

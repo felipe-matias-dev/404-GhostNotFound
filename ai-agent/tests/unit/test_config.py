@@ -26,6 +26,17 @@ def test_prefixed_env_overrides_default(required_env, monkeypatch):
     assert AgentSettings(_env_file=None).max_rows == 50
 
 
+def test_key_of_a_provider_used_only_later_in_the_chain_is_required(monkeypatch):
+    monkeypatch.setenv("VENERGY_AGENT_GOOGLE_API_KEY", "k")
+
+    with pytest.raises(ValidationError, match="OPENROUTER"):
+        AgentSettings(
+            _env_file=None,
+            llm_model=GEMINI,
+            fallback_model=f"google-gla:gemini-3.5-flash,{OPENROUTER}",
+        )
+
+
 @pytest.mark.parametrize(
     ("llm_model", "fallback_model", "present_key"),
     [
