@@ -44,7 +44,8 @@ Todos os perfis encontram todas as telas existentes na sidebar, sem duplicaçõe
 **Minha área** vem primeiro e **Outras consultas** reúne as demais telas. Grupos
 vazios não aparecem. `PROFILES.primaryRoutes` define prioridade, não permissão.
 O menu dá foco, não restringe leituras (DEC-049). Só Perdas vê a geração e as
-ações das ordens; os demais consultam a tabela e o histórico.
+ações das ordens; os demais consultam a tabela e o histórico, que mostra quem fez
+cada mudança ([DEC-050](../docs/decisoes.md#dec-050--autoria-nos-eventos-das-ordens-de-inspeção)).
 Um link de dados aberto sem sessão é retomado após o login. Retornos externos,
 desconhecidos ou para o próprio login são descartados. Um `401` durante o uso
 volta à entrada; `403` não encerra a sessão. Falha ao verificar a sessão mostra

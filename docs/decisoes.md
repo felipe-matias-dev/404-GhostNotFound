@@ -55,7 +55,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | 29/10/2026 | DEC-047: avaliação comparativa sobre os itens em comum, aviso quando `failed` passa de 5%, e juiz (LLM as a judge) só em respostas `answered` narradas da amostra, com modelo diferente do gerador | Rodadas com versões diferentes do golden set só se comparam no que têm em comum, e o juiz não pode enviar linhas da Gold real a um modelo | Perylo |
 | 28/10/2026 | DEC-048: ordem de inspeção em campo pode voltar para gerada; a observação da volta fica só no histórico | Uma OI enviada a campo sem querer não precisa ser cancelada e gerada de novo, o que sujaria a métrica de visita desnecessária | Felipe |
 | 29/10/2026 | DEC-049: login com cookie httpOnly e cinco perfis; só `perdas` escreve nas ordens de inspeção e só `ti` lê a auditoria do agente | Esconder o menu não é segurança: a permissão é checada no backend, onde estão os dados; o agente já lê toda a Gold, então bloquear a leitura por tela daria falsa proteção | Felipe |
-| 29/10/2026 | DEC-050: os eventos das ordens de inspeção guardam o login de quem agiu (`autor_login`), e a carga acrescenta a coluna sem apagar o histórico | O gerente de perdas é o único que escreve, e a trilha precisa responder quem concluiu ou cancelou uma ordem; recriar a tabela para isso perderia o histórico de quem já usa o portal | Felipe |
+| 29/10/2026 | DEC-050: os eventos das ordens de inspeção guardam o login de quem agiu (`autor_login`), o histórico mostra o nome dele, e a carga acrescenta a coluna sem apagar o histórico | O gerente de perdas é o único que escreve, e a trilha precisa responder quem concluiu ou cancelou uma ordem; recriar a tabela para isso perderia o histórico de quem já usa o portal | Felipe |
 
 ## DEC-001 · Localização dos arquivos de origem (landing)
 
@@ -795,7 +795,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   - gerar OIs por códigos de UC digitados (repetidos ignorados, até 200 por pedido), enquanto não existe endpoint da fila de suspeitas;
   - Vitest no frontend só para funções puras (`src/**/__tests__/*.test.ts`, sem DOM).
 - **Motivo:** cobre o ciclo de vida da OI sem regra de negócio nova no frontend; o Kanban dá a visão do trabalho em andamento sem a lista de finalizadas crescer sem limite.
-- **Em aberto:** (1) gerar a partir da fila de suspeitas quando houver `GET` da `gold_fila_suspeitas`; (2) mostrar o autor de cada mudança no histórico da tela: o backend grava e devolve `autor_login` desde a DEC-050.
+- **Em aberto:** gerar a partir da fila de suspeitas quando houver `GET` da `gold_fila_suspeitas`. A autoria das mudanças, que também estava aqui, foi resolvida na DEC-050: o histórico mostra quem fez cada mudança.
 
 ## DEC-027 · Contrato da Gold v0.3: UC 360, inspeções e recortes completos
 
@@ -1552,8 +1552,10 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   perdas escreve, e a trilha passa a responder "quem cancelou esta ordem?".
 - **Decisão:**
   - `app.ordem_evento` ganha `autor_login` (texto, pode ser nulo), preenchido com o login de quem chamou
-    `POST /ordens-inspecao` ou `PATCH /ordens-inspecao/{id}`. `GET /ordens-inspecao/{id}` devolve `autor_login` em cada
-    evento. API 0.11.0;
+    `POST /ordens-inspecao` ou `PATCH /ordens-inspecao/{id}`. `GET /ordens-inspecao/{id}` devolve em cada evento o
+    `autor_login` e o `autor_nome`, este lido de `app.usuarios` na hora da consulta (nulo se o login não existe mais lá). API
+    0.11.0;
+  - o histórico da ordem, na tela de Perdas, mostra o autor ao lado da data: o nome, ou o login se o usuário não existe mais;
   - a rota recebe o usuário da mesma dependência (`exigir_perfil(Perfil.PERDAS)`) que já barra os outros perfis com 403: uma
     checagem só, que também entrega o autor;
   - a carga roda `ALTER TABLE app.ordem_evento ADD COLUMN IF NOT EXISTS autor_login text` logo depois do `create_all`, na mesma
@@ -1561,7 +1563,9 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
     que traz a coluna sem apagar o histórico. A carga continua sem apagar nem alterar linha do `app`: cria o que falta e
     acrescenta colunas novas.
 - **Texto, sem chave estrangeira para `app.usuarios`:** um token vale até vencer mesmo que o usuário seja apagado (DEC-049). Com a
-  chave estrangeira, a ação daria erro e a trilha se perderia. Só o login, e não o nome: o nome vem de `GET /auth/me`.
+  chave estrangeira, a ação daria erro e a trilha se perderia. O evento guarda só o login; o nome é buscado em `app.usuarios`
+  quando o histórico é lido, numa relação só de leitura. O front não teria de onde tirá-lo: o `GET /auth/me` só dá o nome de
+  quem está logado, e o histórico mostra o de quem agiu.
 - **Alternativas descartadas:**
   - Alembic: ferramenta nova a poucos dias da entrega, para uma coluna.
   - `ALTER` na subida da API: mudança de schema escondida num efeito colateral de subir o servidor.
@@ -1570,6 +1574,6 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Limitações conhecidas:**
   - os eventos de antes do login ficam com `autor_login` nulo: não se inventa autor;
   - o valor é o do token, sem conferência contra `app.usuarios` no momento da gravação;
-  - o histórico da tela de perdas ainda não mostra o autor (tela do João).
+  - o nome mostrado é o atual de `app.usuarios`, e não o do momento da ação; os nomes das personas não mudam.
 - **Em aberto:** a autoria da auditoria do agente (`app.ai_auditoria`). Fica para depois do PR #86 (memória de conversa), que
   mexe nos mesmos arquivos. A leitura continua só da TI até o portal ter um painel de auditoria.
