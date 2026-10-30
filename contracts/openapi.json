@@ -1621,6 +1621,99 @@
         }
       }
     },
+    "/ordens-inspecao/planilha": {
+      "get": {
+        "tags": [
+          "ordens de inspeção"
+        ],
+        "summary": "Exportar Planilha",
+        "description": "Baixa as OIs em campo na planilha que a equipe preenche e o upload lê de volta.",
+        "operationId": "exportar_planilha_ordens_inspecao_planilha_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErroSchema"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "ordens de inspeção"
+        ],
+        "summary": "Enviar Planilha",
+        "description": "Conclui as OIs em campo com os resultados da planilha preenchida pela equipe.\n\nAplica as linhas válidas e devolve as rejeitadas com o motivo: uma linha escrita errada à\nmão não pode travar o arquivo inteiro. Arquivo inutilizável é 422 e não grava nada.",
+        "operationId": "enviar_planilha_ordens_inspecao_planilha_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_enviar_planilha_ordens_inspecao_planilha_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultadoPlanilhaSchema"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErroSchema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErroSchema"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ]
+      }
+    },
     "/ordens-inspecao/{ordem_id}": {
       "get": {
         "tags": [
@@ -2177,6 +2270,20 @@
         ],
         "title": "AuditoriaIaSchema",
         "description": "O registro completo da auditoria: a resposta com a pergunta e o momento em que veio."
+      },
+      "Body_enviar_planilha_ordens_inspecao_planilha_post": {
+        "properties": {
+          "arquivo": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "Arquivo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "arquivo"
+        ],
+        "title": "Body_enviar_planilha_ordens_inspecao_planilha_post"
       },
       "ComparacaoIndicadoresSchema": {
         "properties": {
@@ -3480,6 +3587,73 @@
         "title": "KpisMensaisSchema",
         "description": "Indicadores executivos de uma competência."
       },
+      "LinhaConcluidaSchema": {
+        "properties": {
+          "aba": {
+            "type": "string",
+            "title": "Aba"
+          },
+          "linha": {
+            "type": "integer",
+            "title": "Linha"
+          },
+          "cod_uc": {
+            "type": "string",
+            "title": "Cod Uc"
+          },
+          "ordem_id": {
+            "type": "integer",
+            "title": "Ordem Id"
+          },
+          "resultado": {
+            "$ref": "#/components/schemas/ResultadoOrdem"
+          }
+        },
+        "type": "object",
+        "required": [
+          "aba",
+          "linha",
+          "cod_uc",
+          "ordem_id",
+          "resultado"
+        ],
+        "title": "LinhaConcluidaSchema"
+      },
+      "LinhaRejeitadaSchema": {
+        "properties": {
+          "aba": {
+            "type": "string",
+            "title": "Aba"
+          },
+          "linha": {
+            "type": "integer",
+            "title": "Linha"
+          },
+          "cod_uc": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cod Uc"
+          },
+          "motivo": {
+            "type": "string",
+            "title": "Motivo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "aba",
+          "linha",
+          "cod_uc",
+          "motivo"
+        ],
+        "title": "LinhaRejeitadaSchema"
+      },
       "LoginSchema": {
         "properties": {
           "login": {
@@ -4136,6 +4310,36 @@
           "NAO_REALIZADA"
         ],
         "title": "ResultadoOrdem"
+      },
+      "ResultadoPlanilhaSchema": {
+        "properties": {
+          "linhas_lidas": {
+            "type": "integer",
+            "title": "Linhas Lidas"
+          },
+          "concluidas": {
+            "items": {
+              "$ref": "#/components/schemas/LinhaConcluidaSchema"
+            },
+            "type": "array",
+            "title": "Concluidas"
+          },
+          "rejeitadas": {
+            "items": {
+              "$ref": "#/components/schemas/LinhaRejeitadaSchema"
+            },
+            "type": "array",
+            "title": "Rejeitadas"
+          }
+        },
+        "type": "object",
+        "required": [
+          "linhas_lidas",
+          "concluidas",
+          "rejeitadas"
+        ],
+        "title": "ResultadoPlanilhaSchema",
+        "description": "O que o envio da planilha de campo fez: ordens concluídas e linhas que ficaram de fora."
       },
       "StatusOrdem": {
         "type": "string",

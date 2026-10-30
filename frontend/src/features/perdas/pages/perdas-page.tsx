@@ -7,6 +7,7 @@ import { FilaSuspeitas } from "../components/fila-suspeitas";
 import { GerarOrdens } from "../components/gerar-ordens";
 import { OrdensKanban } from "../components/ordens-kanban";
 import { OrdensTable } from "../components/ordens-table";
+import { PlanilhaCampo } from "../components/planilha-campo";
 import { StatusFilter } from "../components/status-filter";
 import { VisaoToggle } from "../components/visao-toggle";
 import { useOrdens } from "../hooks/use-ordens";
@@ -85,6 +86,7 @@ function OrdensSecao() {
 								Ordens de inspeção
 							</h2>
 							{canEdit && <GerarOrdens />}
+							{canEdit && <PlanilhaCampo />}
 							{largo && canEdit && (
 								<VisaoToggle value={visao} onChange={definirVisao} />
 							)}

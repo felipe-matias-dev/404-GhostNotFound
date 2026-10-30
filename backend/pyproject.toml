@@ -6,10 +6,12 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.148.0",
+    "openpyxl>=3.1.5",
     "psycopg[binary]>=3.3.6",
     "pwdlib[argon2]>=0.3.1",
     "pydantic-settings>=2.16.0",
     "pyjwt>=2.15.1",
+    "python-multipart>=0.0.32",
     "sqlalchemy>=2.1.5",
     "uvicorn[standard]>=0.54.0",
     "venergy-agent",
