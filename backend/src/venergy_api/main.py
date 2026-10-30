@@ -15,6 +15,7 @@ from venergy_api.agente import (
     montar_redator_insights,
 )
 from venergy_api.config import Settings, get_settings
+from venergy_api.estrutura_app import garantir_estrutura_na_subida
 from venergy_api.insights import CacheInsights
 from venergy_api.routers import (
     ai,
@@ -37,6 +38,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     # trocarem o agente por um falso (dependency_overrides), sem chamar o Gemini.
     # Os logs entram aqui, e não no create_app: os testes não mexem no log do processo.
     configurar_logs_do_agente()
+    # Antes de atender: uma API nova sobre um banco antigo gravaria colunas que ainda não
+    # existem (DEC-050). Só acrescenta o que falta, nunca apaga nem altera dado.
+    garantir_estrutura_na_subida(app.state.settings.database_url)
     app.state.agente = await montar_agente()
     app.state.redator_insights = await montar_redator_insights()
     yield
