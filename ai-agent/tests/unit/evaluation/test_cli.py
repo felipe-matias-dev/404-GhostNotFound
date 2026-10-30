@@ -106,18 +106,16 @@ def test_matching_database_passes_the_check(dataset, uc_count):
 
 
 def test_judge_is_off_unless_requested():
-    assert judges("amostra", judge=False, sql_only=False) is False
-    assert judges("gold_real", judge=False, sql_only=False) is False
+    assert judges(judge=False, sql_only=False) is False
 
 
-@pytest.mark.parametrize("dataset", ["amostra", "gold_real"])
-def test_judge_runs_on_both_datasets_when_requested(dataset):
-    assert judges(dataset, judge=True, sql_only=False) is True
+def test_judge_runs_when_requested_with_the_narrative():
+    assert judges(judge=True, sql_only=False) is True
 
 
 def test_judge_is_refused_without_the_narrative():
     with pytest.raises(JudgeNotAllowed, match="--sql-only"):
-        judges("amostra", judge=True, sql_only=True)
+        judges(judge=True, sql_only=True)
 
 
 def test_judge_mean_score_is_a_number_and_not_a_percentage():

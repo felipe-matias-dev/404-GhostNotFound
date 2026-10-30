@@ -48,7 +48,7 @@ def narrates(sql_only: bool) -> bool:
     return not sql_only
 
 
-def judges(dataset: str, judge: bool, sql_only: bool) -> bool:
+def judges(judge: bool, sql_only: bool) -> bool:
     if not judge:
         return False
     if sql_only:
@@ -120,7 +120,7 @@ def _build_judge(settings: AgentSettings) -> PydanticAiAnswerJudge:
 async def _evaluate(
     only: str | None, pause_seconds: float, dataset: str, sql_only: bool, judge: bool
 ) -> tuple[Path, list[str]]:
-    with_judge = judges(dataset, judge, sql_only)
+    with_judge = judges(judge, sql_only)
     settings = AgentSettings()
     layer = await YamlSemanticLayerSource(
         settings.semantic_layer_path, settings.gold_contract_path
