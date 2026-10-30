@@ -321,7 +321,7 @@
 - **História:** Como gerente de perdas, quero gerar OIs a partir da fila, atualizar o status, registrar o resultado e cancelar, para controlar a operação de campo.
 - **Aceite:**
   - `app.ordem_inspecao` + `app.ordem_evento` (histórico).
-  - Máquina de estados `GERADA → EM_CAMPO → CONCLUIDA | CANCELADA`; transição inválida retorna 409.
+  - Máquina de estados `GERADA → EM_CAMPO → CONCLUIDA | CANCELADA`, com volta de `EM_CAMPO` para `GERADA` (DEC-048); transição inválida retorna 409.
   - Resultado obrigatório ao concluir.
   - Sobrevive a um reload da Gold.
 
@@ -348,7 +348,7 @@
 #### V1-13 · Login com perfil por cargo
 - **Épico** EP13 · **Sprint** S3 (stretch) · **Could (diferencial)** · **3 pts**
 - **História:** Como usuário, quero entrar com meu perfil e ver as telas do meu cargo, para focar no meu trabalho.
-- **Aceite:** 4 perfis (diretoria, atendimento, perdas, operação) com menu filtrado. **Só entra se todos os Must estiverem em Done.**
+- **Aceite:** 5 perfis (diretoria, atendimento, perdas, operação e TI) com menu filtrado e permissão checada no backend ([DEC-049](decisoes.md#dec-049--login-com-cookie-httponly-e-perfis-por-cargo)). **Só entra se todos os Must estiverem em Done.**
 
 #### V1-14 · Upload da planilha de campo
 - **Épico** EP09 · **Backlog (fora do plano)** · **Could (diferencial)** · **3 pts**

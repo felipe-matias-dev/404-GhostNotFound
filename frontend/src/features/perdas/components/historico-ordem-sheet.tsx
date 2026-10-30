@@ -10,6 +10,7 @@ import {
 import { ApiError } from "#/lib/api";
 import { formatDataHora } from "#/lib/format";
 import {
+	autorEvento,
 	RESULTADO_ORDEM_ROTULO,
 	STATUS_ORDEM_VISUAL,
 	tituloEvento,
@@ -116,6 +117,7 @@ export function HistoricoOrdemSheet({
 							>
 								{data.eventos.map((evento, indice) => {
 									const { origem, destino } = tituloEvento(evento);
+									const autor = autorEvento(evento);
 									return (
 										<li
 											// biome-ignore lint/suspicious/noArrayIndexKey: eventos sem id próprio na API.
@@ -138,12 +140,18 @@ export function HistoricoOrdemSheet({
 														`Criada como ${destino}`
 													)}
 												</p>
-												<time
-													dateTime={evento.ocorrido_em}
-													className="text-small text-text-muted"
-												>
-													{formatDataHora(evento.ocorrido_em)}
-												</time>
+												<p className="text-small text-text-muted">
+													<time dateTime={evento.ocorrido_em}>
+														{formatDataHora(evento.ocorrido_em)}
+													</time>
+													{autor && (
+														<>
+															<span aria-hidden> · </span>
+															<span className="sr-only"> por </span>
+															{autor}
+														</>
+													)}
+												</p>
 												{evento.observacao && (
 													<p className="text-body text-text-muted">
 														{evento.observacao}

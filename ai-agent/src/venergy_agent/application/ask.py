@@ -52,6 +52,21 @@ UNITS_WITHOUT_SUFFIX = frozenset({"contagem", "nota"})
 GENERIC_CLARIFICATION = (
     "Pode dizer o período e o recorte (município, bairro ou classe) que você quer consultar?"
 )
+COMPETENCIA = re.compile(r"\d{4}-\d{2}")
+MONTH_NAMES = (
+    "janeiro",
+    "fevereiro",
+    "março",
+    "abril",
+    "maio",
+    "junho",
+    "julho",
+    "agosto",
+    "setembro",
+    "outubro",
+    "novembro",
+    "dezembro",
+)
 FALLBACK_MAX_ROWS = 5
 FALLBACK_MAX_COLUMNS = 4
 MISSING_VALUE = "sem valor"
@@ -313,8 +328,12 @@ class AskUseCase:
     ) -> AgentAnswer:
         sample = result.rows[: self._sample_rows]
         visible = result.model_copy(update={"rows": sample})
-        text = self._deterministic_text(result, draft, validated)
-        text = await self._narrate(question, draft, visible, text)
+        text = self._deterministic_text(
+            result, draft, validated, _period(result) or _endpoints(validated.periods)
+        )
+        text = await self._narrate(
+            question, draft, visible, text, _period(visible), validated.periods
+        )
 
         return AgentAnswer(
             answer=text,
@@ -340,6 +359,8 @@ class AskUseCase:
         draft: SqlDraft,
         visible: QueryResult,
         fallback: str,
+        period: tuple[str, str] | None,
+        filtered_periods: tuple[str, ...],
     ) -> str:
         if self._answer_writer is None:
             return fallback
@@ -364,7 +385,21 @@ class AskUseCase:
             )
             return fallback
 
-        values = [visible.row_count, *(value for row in visible.rows for value in row.values())]
+        required = period if period is not None else _endpoints(filtered_periods)
+        if required is not None and not all(_mentions(narrative, value) for value in required):
+            self._log(
+                question.request_id,
+                question.session_id,
+                step="resposta",
+                status="periodo_ausente_na_resposta",
+            )
+            return fallback
+
+        values = [
+            visible.row_count,
+            *filtered_periods,
+            *(value for row in visible.rows for value in row.values()),
+        ]
         unsupported = unsupported_numbers(narrative, values)
         if unsupported:
             self._log(
@@ -379,12 +414,18 @@ class AskUseCase:
         return narrative
 
     def _deterministic_text(
-        self, result: QueryResult, draft: SqlDraft, validated: ValidatedQuery
+        self,
+        result: QueryResult,
+        draft: SqlDraft,
+        validated: ValidatedQuery,
+        period: tuple[str, str] | None,
     ) -> str:
         if result.row_count == 0:
             text = EMPTY_RESULT
         else:
             text = f"A consulta devolveu {result.row_count} linha(s)."
+            if period is not None:
+                text += _period_sentence(period)
             if (
                 len(result.rows) <= FALLBACK_MAX_ROWS
                 and len(result.columns) <= FALLBACK_MAX_COLUMNS
@@ -513,3 +554,38 @@ def _shorten(text: str) -> str:
 
 def _elapsed_ms(since: float) -> int:
     return int((time.perf_counter() - since) * 1000)
+
+
+def _period(result: QueryResult) -> tuple[str, str] | None:
+    found = sorted(
+        {
+            str(row["competencia"])
+            for row in result.rows
+            if COMPETENCIA.fullmatch(str(row.get("competencia", "")))
+        }
+    )
+    if not found:
+        return None
+    return found[0], found[-1]
+
+
+def _endpoints(periods: tuple[str, ...]) -> tuple[str, str] | None:
+    if not periods:
+        return None
+    return periods[0], periods[-1]
+
+
+def _period_sentence(period: tuple[str, str]) -> str:
+    first, last = period
+    if first == last:
+        return f" Período: {first}."
+    return f" Período: {first} a {last}."
+
+
+def _mentions(text: str, competencia: str) -> bool:
+    year, month = competencia.split("-")
+    name = MONTH_NAMES[int(month) - 1]
+    lowered = text.lower()
+    if any(form in lowered for form in (competencia, f"{month}/{year}", f"{name[:3]}/{year}")):
+        return True
+    return re.search(rf"\b{name}(?:/|\b[^.;]{{0,40}}?\b){year}\b", lowered) is not None

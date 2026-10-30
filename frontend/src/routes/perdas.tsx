@@ -4,6 +4,7 @@ import { PerdasPage, STATUS_ORDEM } from "#/features/perdas";
 
 const searchSchema = z.object({
 	status: z.enum(STATUS_ORDEM).optional().catch(undefined),
+	secao: z.enum(["fila", "ordens"]).optional().catch(undefined),
 });
 
 export const Route = createFileRoute("/perdas")({

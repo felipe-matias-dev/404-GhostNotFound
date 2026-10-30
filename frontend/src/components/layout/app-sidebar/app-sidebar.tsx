@@ -3,11 +3,14 @@
 // O item ativo vem de `useItemAtivo`, o mesmo do título do Header.
 import { Link } from "@tanstack/react-router";
 import { motion } from "motion/react";
+import type { ReactNode } from "react";
 import { Logo } from "#/components/layout/logo";
 import {
 	Sidebar,
 	SidebarContent,
+	SidebarFooter,
 	SidebarGroup,
+	SidebarGroupLabel,
 	SidebarHeader,
 	SidebarMenu,
 	SidebarMenuButton,
@@ -18,9 +21,31 @@ import {
 } from "#/components/ui/sidebar";
 import { type ItemNavegacao, useItemAtivo } from "./navegacao";
 
-export function AppSidebar({ itens }: { itens: ItemNavegacao[] }) {
+export function AppSidebar({
+	itens,
+	onConsultarUc,
+	conta,
+}: {
+	itens: ItemNavegacao[];
+	onConsultarUc: () => void;
+	conta?: ReactNode;
+}) {
 	const ativoAtual = useItemAtivo(itens);
-	const { setOpenMobile } = useSidebar();
+	const { setOpenMobile, isMobile } = useSidebar();
+
+	function abrirConsulta() {
+		if (!isMobile) {
+			onConsultarUc();
+			return;
+		}
+		setOpenMobile(false);
+		requestAnimationFrame(() => {
+			document
+				.querySelector<HTMLButtonElement>('[data-sidebar="trigger"]')
+				?.focus();
+			onConsultarUc();
+		});
+	}
 
 	return (
 		<Sidebar variant="inset" collapsible="icon">
@@ -30,31 +55,51 @@ export function AppSidebar({ itens }: { itens: ItemNavegacao[] }) {
 					<GatilhoNavegacao local="sidebar" />
 				</div>
 			</SidebarHeader>
-			<SidebarContent>
-				<SidebarGroup>
-					<nav aria-label="Navegação principal">
-						<SidebarMenu>
-							{itens.map(({ to, rotulo, icone: Icone }) => {
-								const ativo = ativoAtual?.to === to;
-								return (
-									<SidebarMenuItem key={to}>
-										<SidebarMenuButton
-											render={
-												<Link to={to} onClick={() => setOpenMobile(false)} />
-											}
-											isActive={ativo}
-											tooltip={rotulo}
-										>
-											<Icone aria-hidden weight={ativo ? "fill" : "regular"} />
-											<span>{rotulo}</span>
-										</SidebarMenuButton>
-									</SidebarMenuItem>
-								);
-							})}
-						</SidebarMenu>
-					</nav>
-				</SidebarGroup>
+			<SidebarContent className="gap-4 pt-3">
+				{[...new Set(itens.map((item) => item.grupo))].map((grupo) => (
+					<SidebarGroup key={grupo}>
+						<SidebarGroupLabel>{grupo}</SidebarGroupLabel>
+						<nav aria-label={grupo}>
+							<SidebarMenu>
+								{itens
+									.filter((item) => item.grupo === grupo)
+									.map(({ to, rotulo, icone: Icone }) => {
+										const ativo = ativoAtual?.to === to;
+										const consulta = to === "/uc";
+										return (
+											<SidebarMenuItem key={to}>
+												<SidebarMenuButton
+													render={
+														consulta ? undefined : (
+															<Link
+																to={to}
+																onClick={() => setOpenMobile(false)}
+															/>
+														)
+													}
+													onClick={consulta ? abrirConsulta : undefined}
+													isActive={ativo}
+													tooltip={rotulo}
+													aria-haspopup={consulta ? "dialog" : undefined}
+													aria-keyshortcuts={
+														consulta ? "Control+k Meta+k" : undefined
+													}
+												>
+													<Icone
+														aria-hidden
+														weight={ativo ? "fill" : "regular"}
+													/>
+													<span>{rotulo}</span>
+												</SidebarMenuButton>
+											</SidebarMenuItem>
+										);
+									})}
+							</SidebarMenu>
+						</nav>
+					</SidebarGroup>
+				))}
 			</SidebarContent>
+			{conta && <SidebarFooter>{conta}</SidebarFooter>}
 			<SidebarRail />
 		</Sidebar>
 	);

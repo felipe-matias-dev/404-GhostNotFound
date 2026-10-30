@@ -2,6 +2,7 @@ import json
 import re
 from collections.abc import Mapping
 
+from venergy_agent.domain.answer import AgentAnswer
 from venergy_agent.domain.question import Question
 from venergy_agent.domain.semantic import (
     ColumnSpec,
@@ -165,4 +166,32 @@ def render_insight_user(screen: str, metrics: Mapping[str, object], nonce: str) 
     data = json.dumps(metrics, ensure_ascii=False, default=str, sort_keys=True)
     return "\n\n".join(
         [delimited("pergunta", f"tela: {screen}", nonce), delimited("dados", data, nonce)]
+    )
+
+
+def render_judge_system(template: str, nonce: str) -> str:
+    _require(nonce)
+    return _fill(template, nonce=nonce)
+
+
+def render_judge_user(question: str, answer: AgentAnswer, nonce: str) -> str:
+    _require(nonce)
+    rows = "\n".join(json.dumps(row, ensure_ascii=False, default=str) for row in answer.rows)
+    assumptions = "\n".join(f"- {item}" for item in answer.assumptions) or "(nenhuma)"
+    data = "\n".join(
+        [
+            f"total de linhas: {answer.row_count}",
+            f"truncado: {'sim' if answer.truncated else 'não'}",
+            "suposições declaradas:",
+            assumptions,
+            "linhas:",
+            rows,
+        ]
+    )
+    return "\n\n".join(
+        [
+            delimited("pergunta", question, nonce),
+            delimited("resposta", answer.answer, nonce),
+            delimited("dados", data, nonce),
+        ]
     )

@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { atualizarOrdem, ordensKeys } from "../api";
+import { atualizarOrdem, filaKey, ordensKeys } from "../api";
 import type { AtualizarOrdem } from "../types";
 
 export function useAtualizarOrdem() {
@@ -9,6 +9,9 @@ export function useAtualizarOrdem() {
 			atualizarOrdem(id, mudanca),
 		// Também no erro: um 409 quer dizer que a OI mudou em outro lugar, e a tela precisa do status atual.
 		onSettled: () =>
-			queryClient.invalidateQueries({ queryKey: ordensKeys.all }),
+			Promise.all([
+				queryClient.invalidateQueries({ queryKey: ordensKeys.all }),
+				queryClient.invalidateQueries({ queryKey: filaKey }),
+			]),
 	});
 }

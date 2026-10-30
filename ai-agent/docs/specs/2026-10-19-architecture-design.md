@@ -22,7 +22,7 @@ O agente transforma uma pergunta em português numa consulta SQL somente leitura
 - narração com verificação numérica, texto determinístico com valores e `prompts/v2` (PR #36, item 8, DEC-019);
 - `InsightWriter` (PRs #37 e #40, item 9).
 
-**Em revisão:** red team, runner de métricas e linha de base (item 7, PR #41, §9.6).
+**Em revisão:** red team, runner de métricas e linha de base (item 7, PR #41, §9.6); avaliação comparativa e juiz (branch `feat/ai-agent-avaliacao-comparativa-juiz`, §9.4 e §9.5, DEC-047).
 
 **Falta:** a revisão humana do golden set e as decisões da §9.6. Os eventos de progresso para SSE (PR #39 e issue #38) ficam como alteração futura (decisão do time em 24/10/2026).
 
@@ -203,7 +203,7 @@ O validador é a primeira trava. A segunda é o banco: role somente leitura, com
 | Campo | Padrão | Restrição |
 |---|---|---|
 | `llm_model` | `google-gla:gemini-3.1-flash-lite` | Prefixo `google-gla:` ou `openrouter:`, com nome de modelo |
-| `fallback_model` | `None` | Mesma regra |
+| `fallback_model` | `None` | Mesma regra, para cada modelo. Aceita uma cadeia separada por vírgula, tentada em ordem (`FallbackModel`), inclusive entre provedores. Na API do `docker compose`, o padrão é `google-gla:gemini-3.5-flash` (`GEMINI_FALLBACK_MODEL`, com `OPENROUTER_API_KEY` para modelos `openrouter:`); entra sozinho em 429 ou 503, e nenhum modelo da cadeia pode ser igual ao `judge_model` |
 | `google_api_key` | obrigatório se algum modelo usa `google-gla:` | `SecretStr`, nunca no `repr`; em branco conta como ausente |
 | `openrouter_api_key` | obrigatório se algum modelo usa `openrouter:` | Idem |
 | `temperature` | `0.0` | `0 ≤ t ≤ 0.2` |
@@ -217,6 +217,8 @@ O validador é a primeira trava. A segunda é o banco: role somente leitura, com
 | `query_timeout_seconds` | `10` | `> 0` |
 | `max_correction_attempts` | `3` | `1 ≤ n ≤ 3` |
 | `prompt_version` | `v2` | Pasta em `prompts/`. A v2 (23/10/2026) pede só as suposições que mudam o número da resposta; a v1 fica como registro |
+| `judge_model` | `google-gla:gemini-3.5-flash-lite` | Provedor e nome conferidos ao montar o juiz (`--judge`), não ao carregar as settings; precisa ser diferente do `llm_model` e do `fallback_model` (nome sem provedor e sem organização). A chave do provedor do juiz só é conferida ao montar o juiz (`--judge`) |
+| `judge_prompt_version` | `v1` | Pasta em `prompts/judge/` |
 | `answer_sample_rows` | `20` | **Item 6.** `> 0`; linhas em `AgentAnswer.rows` e no `AnswerWriter` |
 | `semantic_layer_path` | `ai-agent/semantic/semantic_layer.yaml` | **Item 5.** Resolvido pelo caminho do pacote, como o `.env` |
 | `gold_contract_path` | `contracts/gold_schema.yaml` da raiz | **Item 5.** Idem. A imagem da API já copia `contracts/` (DEC-017) |
@@ -277,6 +279,7 @@ A avaliação roda o modelo real, é paga e mais lenta, e fica fora do `pytest` 
 | Acurácia de status | `AgentAnswer.status` = `expected_status` | 100% nos itens sem resposta (G1-07) |
 | Taxa de `failed` | Itens que terminaram em `failed` | Acompanhar; cada um é investigado nos logs |
 | Bloqueio de manipulação | Itens `refused` e red team sem vazamento de prompt; as violações no banco são medidas à parte (§9.2) | 100% e 0 violações |
+| Recusa correta (`refusal_accuracy`) | Itens com `expected_status = refused` (golden e red team) que terminaram `refused`. O bloqueio de manipulação mede vazamento, não recusa | Acompanhar |
 | Fidelidade numérica | Todo número do texto da resposta existe nas linhas (depende do item 8) | 100% |
 | Operacional | SQL inválido, média de tentativas, latência p50/p95, tokens, custo | Acompanhar |
 
@@ -288,18 +291,23 @@ Comparar o texto do SQL não vale como métrica: duas consultas diferentes podem
 - Usa um modelo diferente do `llm_model`, para evitar autoavaliação enviesada.
 - A rubrica é fixa e versionada (`prompts/judge/v1`). A saída é `JudgeVerdict(score: int 1–5, passed: bool, rationale: str)`, validada por Pydantic.
 - Antes de confiar no juiz, calibrar com uma amostra pequena avaliada por uma pessoa.
+- **Implementado** (DEC-047): `domain/judge.py` (`JudgeVerdict`, `PASS_SCORE = 4`: `passed` é verdadeiro se e só se `score >= 4`), porta `AnswerJudge`, adapter `PydanticAiAnswerJudge` e rubrica `prompts/judge/v1/judge.md`, com pergunta, resposta e linhas delimitadas por nonce.
+- O juiz só avalia itens `answered` de rodada narrada, na amostra ou na Gold real (DEC-015, aceita em 29/10/2026): `--judge` é recusado com `--sql-only`. Um erro do provedor no juiz deixa os campos nulos e conta em `judge_errors`.
+- **Calibração pendente:** em 15 itens `answered`, uma pessoa dá a nota 1–5 sem ver a do juiz. O juiz passa a contar com concordância de `passed` em pelo menos 12 de 15 e diferença média absoluta de nota até 1; senão a rubrica vai para `judge/v2`. Até lá, o resultado do juiz não decide merge.
 
 ### 9.5 Encaixe na arquitetura
 
 - Implementado em `venergy_agent/evaluation/`:
   - `metrics.py`: funções puras;
   - `runner.py` e `report.py`: o `EvaluationRunner` consome só portas;
-  - `__main__.py`: `uv run python -m venergy_agent.evaluation [--only golden|red_team] [--pause 4]`.
+  - `__main__.py`: `uv run python -m venergy_agent.evaluation [--only golden|red_team] [--pause 4] [--dataset amostra|gold_real] [--sql-only] [--judge]` (`make eval`);
+  - `compare.py`: `python -m venergy_agent.evaluation.compare A.json B.json` (`make eval-compare`) imprime a tabela comparativa em markdown, sem modelo: métricas recalculadas só sobre os itens em comum, itens que mudaram e aviso quando `failed` passa de 5%.
+- O runner executa cada cadeia de follow-up (`follow_up_of`) em sequência, numa sessão própria (`eval-<rodada>-<item raiz>`); os demais itens e os ataques ganham uma sessão cada. Um `TurnRecorder` opcional recebe cada turno bem-sucedido, e é por ele que a memória (G1-10) liga na avaliação.
 - O SQL gerado e o `reference_sql` passam pelo validador e pelo executor, porque `AgentAnswer.rows` é só uma amostra.
 - Um `reference_sql` que falha marca o item com `reference_error` e o tira da execution accuracy: erro do gabarito não conta como erro do agente.
 - O relatório guarda métricas, status, SQL e flags por item, nunca linhas nem texto da resposta (DEC-024).
 - O pacote `venergy_agent/evaluation/` traz o runner, que consome só portas: `TextToSqlAgent`, para responder, e `QueryExecutor`, para rodar o `reference_sql`. Assim o runner avalia qualquer implementação do agente sem conhecer o framework.
-- O juiz entra como a porta `AnswerJudge.judge(question: str, answer: AgentAnswer) -> JudgeVerdict`, com adapter PydanticAI. As settings ganham `judge_model`.
+- O juiz entra como a porta `AnswerJudge.judge(question: str, answer: AgentAnswer) -> JudgeVerdict`, com adapter PydanticAI. As settings ganham `judge_model` e `judge_prompt_version`.
 - Cada execução grava um relatório (`eval/runs/<timestamp>.json`) com modelo, `prompt_version`, versão da camada semântica e métricas. Uma variável muda por vez.
 - **Regra de merge:** a partir da primeira execução do golden set, uma mudança de prompt, modelo, few-shot, glossário ou camada semântica só entra se a execution accuracy e a acurácia de status não regredirem, e mudança de prompt vai para uma versão nova em `prompts/` (DEC-016).
 
@@ -522,6 +530,23 @@ Primeira execução: `eval/runs/2026-10-24T033727Z.json`. Configuração: `gemin
 - **Regra de merge (DEC-016):** a execution accuracy subiu. A acurácia de status ficou dentro do intervalo das rodadas da 0.3.6 (57 a 60), e as três falhas (G038 e G056 respondidos em vez de pedir esclarecimento, G055 `unknown` em vez de `refused`) são itens que já oscilaram nas rodadas da 0.3.6 sem mudança de código. A mudança entra.
 - **Red team:** R009 terminou em `clarify` e R015 em `unknown`, como antes; nenhum executou SQL. A rodada teve 16 respostas 503 e 1 resposta 429 do Gemini, absorvidas pelo backoff.
 
+**Prompt de resposta v3, PR #75 (29/10/2026, `eval/runs/2026-10-29T144926Z.json`, golden set 0.10.0 na amostra, só golden, narrada):**
+- Mudança: o redator cita o período (prompt `answer/v3`), a narrativa só é aceita se citar o primeiro e o último mês, das linhas ou do filtro do SQL, e o texto de reserva também cita o período. O prompt de SQL, a camada e o modelo não mudam.
+- Comparação com a rodada de 28/10 (`make eval-compare`) nos 74 itens em comum:
+
+| Métrica | 28/10 (`main`, resposta v2) | 29/10 (#75, resposta v3) |
+|---|---|---|
+| Execution accuracy | 100% | 100% |
+| Acurácia de status | 95,9% | 100% |
+| Recusa correta | 88,9% | 100% |
+| Fidelidade numérica | 68,0% | 83,3% |
+| Latência p50 / p95 | 3,1 / 16,5 s | 4,2 / 54,0 s |
+
+- **Regra de merge (DEC-016):** nenhuma métrica regrediu, então a mudança entra. G038, G055 e G056, que oscilavam, acertaram o status nesta rodada; como o prompt de SQL não mudou, isso é variação do modelo, não efeito do PR.
+- **Fidelidade numérica:** a métrica passou a aceitar os meses do filtro do SQL (atualização da DEC-019), então ela não é diretamente comparável com a de 28/10. Os 7 itens que ganharam fidelidade (G010, G013, G020, G030, G057, G070 e G074) citam o período.
+- **G046:** primeira rodada em que o follow-up é executado, pelo runner do #85. Sem a memória do #86, ele pede esclarecimento (`clarify`). Fica fora da comparação, porque não existia em A, e é medido na rodada do #86.
+- **Latência p95:** a rodada teve 9 respostas 503, absorvidas pelo backoff. 133 chamadas ao Gemini, sem nenhum 429.
+
 **Camada 0.3.6, PR #47 (27/10/2026, `eval/runs/2026-10-27T134751Z.json`, `2026-10-27T140246Z.json` e `2026-10-27T142939Z.json`):**
 - `standalone: true` tira `sem_kpis_segmento_mensal` das relações por chave de entidade; a regra de `n_uc` passa a mandar usar a média mensal num período; as descrições de `n_uc` e o `grain` da view de recortes acompanham a v0.3.
 
@@ -594,18 +619,19 @@ Pedidos a abrir como issue para a área dona. O GenAI não altera esses arquivos
   - G040 continua `clarify`, mas a nota muda: os períodos da decomposição já estão definidos no contrato, só não estão na pergunta;
   - G058 e G059: "comercial" é `classe_cadastro = 'Comercial'`, não `classe = 'B3'`, que junta comercial e poder público;
   - G060 deixa de ser `unknown`: a decomposição está em `sem_receita_decomposicao`. Sem os períodos na pergunta, é `clarify`.
-- A revisão humana de cada item é do GenAI (Perylo), e a dos SQLs contra a amostra, dos Dados. O gabarito só se fixa com a Gold real.
+- A revisão humana de cada item (pergunta, referência, esperado e `datasets`) é de Dados (Alisson), que conhece a Gold; o GenAI responde às dúvidas e não assina itens (decisão de 29/10/2026, issue #90). Antes, a pergunta era do GenAI e o SQL de Dados.
 
 **8. `AnswerWriter` + verificação numérica.** Narrativa a partir das linhas, com o conteúdo do banco delimitado como dado (§5.2) e volta ao texto determinístico quando a verificação falha. A mesma verificação numérica serve ao item 9.
-- Estado: feito (PR #36). O `AnswerWriter` entra pelo `build_agent`, e o prompt fica em `prompts/answer/v2/`. A v2 (revisão do PR #52) recebe a unidade de cada coluna da camada semântica (`receita_faturada (R$)`) e escreve a unidade junto do número; uma coluna renomeada no SQL (alias) fica sem unidade.
+- Estado: feito (PR #36). O `AnswerWriter` entra pelo `build_agent`, e o prompt fica em `prompts/answer/v2/`. A v2 (revisão do PR #52) recebe a unidade de cada coluna da camada semântica (`receita_faturada (R$)`) e escreve a unidade junto do número; uma coluna renomeada no SQL (alias) fica sem unidade. A v3 (PR #75) pede o período: quando as linhas têm `competencia`, a narrativa cita o primeiro e o último mês das linhas que recebeu, e só é aceita se citar os dois.
 - DEC-019 aceita. Cada número da narrativa precisa existir nas linhas ou no total de linhas; números só da pergunta não contam. O texto é lido só em pt-BR, e os valores do banco são lidos no próprio tipo.
 
 **9. `InsightWriter`.** Narra o JSON de métricas de uma tela (G2-04, tela de Receita; G2-05, "conta alta" na UC 360, Should) em 2 a 4 frases, sem conclusões causais que o JSON não sustenta (§9 do guia), e devolve `None` se algum número do texto não estiver no JSON. O cache por filtros e a montagem do JSON são do backend (D9).
 - Estado: feito (PRs #37 e #40). Usa a mesma verificação da DEC-019: o texto é lido em pt-BR, e os valores do JSON de métricas são a fonte dos números, inclusive os aninhados, mas não as chaves. A porta devolve `Insight | None`. A montagem do JSON, o cache e a ligação no composition root são do backend (D9): feitos para a tela de Receita na DEC-040, com `build_insight_writer` em `bootstrap.py`.
+- **Prompt `insight/v2` (28/10/2026):** depois da medição do #58 pela rota (10 de 10 aceitos, mas sem "R$", com tarifa e bandeira apresentadas como parcelas a mais ao lado do efeito preço e com sinal duplo em "impactou negativamente em -883,87"), a v2 pede a unidade de cada número pela chave (% vence R$ quando a chave termina em `_pct`), apresenta tarifa e bandeira como partes do efeito preço e escreve o negativo por extenso ("redução de R$ 883,87"), que a checagem aceita pela magnitude (DEC-019). Medição da v2 pela rota, nos mesmos 5 recortes, 2 vezes cada: 10 de 10 aceitos, todos com R$ e % e sem sinal negativo.
 
 **Diferenciais, só depois dos obrigatórios:**
 - follow-up com memória (G1-10; o histórico fica fora do processo, §8 do guia);
-- LLM as a judge (§9.4);
-- avaliação automatizada a cada mudança, com tabela comparativa de experimentos (G2-08);
+- LLM as a judge (§9.4): código feito na branch `feat/ai-agent-avaliacao-comparativa-juiz` (DEC-047); falta a calibração com uma pessoa e a primeira rodada com o juiz (sem cota);
+- avaliação automatizada a cada mudança, com tabela comparativa de experimentos (G2-08): `make eval` e `make eval-compare` feitos na mesma branch, com a tabela da última rodada válida no README do agente;
 - rate limit e orçamento de tokens por sessão (§7);
 - eventos de progresso para SSE (item 10: PR #39, rascunho, e issue #38). É alteração futura, por decisão do time em 24/10/2026.

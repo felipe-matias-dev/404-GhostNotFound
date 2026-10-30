@@ -26,6 +26,17 @@ def test_prefixed_env_overrides_default(required_env, monkeypatch):
     assert AgentSettings(_env_file=None).max_rows == 50
 
 
+def test_key_of_a_provider_used_only_later_in_the_chain_is_required(monkeypatch):
+    monkeypatch.setenv("VENERGY_AGENT_GOOGLE_API_KEY", "k")
+
+    with pytest.raises(ValidationError, match="OPENROUTER"):
+        AgentSettings(
+            _env_file=None,
+            llm_model=GEMINI,
+            fallback_model=f"google-gla:gemini-3.5-flash,{OPENROUTER}",
+        )
+
+
 @pytest.mark.parametrize(
     ("llm_model", "fallback_model", "present_key"),
     [
@@ -121,3 +132,15 @@ def test_semantic_layer_and_contract_paths_resolve_inside_the_repository(require
     assert (
         settings.prompts_dir / "insight" / settings.insight_prompt_version / "insight.md"
     ).exists()
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"llm_model": "google-gla:gemini-3.5-flash-lite"},
+        {"fallback_model": "google-gla:gemini-3.5-flash-lite"},
+        {"judge_model": "anthropic:claude-x"},
+    ],
+)
+def test_settings_load_without_judging_whatever_the_judge_model_is(required_env, overrides):
+    assert AgentSettings(_env_file=None, **overrides).judge_model

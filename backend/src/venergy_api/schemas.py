@@ -535,6 +535,41 @@ class FilaFiltroSchema(BaseModel):
     # Mesmo teto do pedido de ordens: uma página inteira cabe num único pedido.
     tamanho: Annotated[int, Field(ge=1, le=MAX_ORDENS_POR_PEDIDO)] = 50
     sem_ordem_ativa: bool = False
+    ordenar_por: Literal["prioridade", "energia", "ordem_ativa", "queda"] = "prioridade"
+    direcao: Literal["asc", "desc"] = "asc"
+    queda_min: Annotated[int | None, Field(ge=0, le=100)] = None
+    queda_max: Annotated[int | None, Field(ge=0, le=100)] = None
+    medidor_eletromecanico: bool = False
+    leituras_estimadas_min: Annotated[int | None, Field(ge=25, le=100)] = None
+    leituras_estimadas_max: Annotated[int | None, Field(ge=25, le=100)] = None
+
+    @model_validator(mode="after")
+    def limites_validos(self) -> "FilaFiltroSchema":
+        if (
+            self.queda_min is not None
+            and self.queda_max is not None
+            and self.queda_min > self.queda_max
+        ):
+            raise ValueError("queda_min deve ser menor ou igual a queda_max")
+        if (
+            self.leituras_estimadas_min is not None
+            and self.leituras_estimadas_max is not None
+            and self.leituras_estimadas_min > self.leituras_estimadas_max
+        ):
+            raise ValueError(
+                "leituras_estimadas_min deve ser menor ou igual a leituras_estimadas_max"
+            )
+        return self
+
+
+class DistribuicaoQuedaItemSchema(BaseModel):
+    queda: int
+    total: int
+
+
+class DistribuicaoQuedaSchema(BaseModel):
+    itens: list[DistribuicaoQuedaItemSchema]
+    sem_queda_identificada: int
 
 
 class OrdemAtivaSchema(BaseModel):
@@ -550,6 +585,7 @@ class FilaItemSchema(FilaSuspeitaSchema):
     """Uma UC da fila e a ordem ativa dela, para a tela não oferecer o que daria 409."""
 
     ordem_ativa: OrdemAtivaSchema | None
+    queda_percentual: int | None
 
 
 class FilaPaginaSchema(BaseModel):
@@ -616,6 +652,10 @@ class EventoSchema(BaseModel):
     status_anterior: StatusOrdem | None
     status_novo: StatusOrdem
     observacao: str | None
+    # Login de quem agiu; vazio nos eventos de antes do login (DEC-050).
+    autor_login: str | None
+    # Nome para a tela, lido de app.usuarios; vazio se o login não existe mais lá.
+    autor_nome: str | None
     ocorrido_em: datetime
 
 
@@ -680,3 +720,94 @@ class ErroSchema(BaseModel):
     """Corpo das respostas de erro do FastAPI (HTTPException), documentado no OpenAPI."""
 
     detail: str
+
+
+class IndicadoresComparacaoFiltroSchema(ComparacaoFiltroSchema):
+    """Dois períodos e, se quiser, o recorte: os mesmos filtros da comparação de receita."""
+
+
+class IndicadoresJanelasFiltroSchema(BaseModel):
+    """Tamanho da janela corrida, em competências, e o recorte opcional."""
+
+    meses: int = Field(default=12, ge=1, le=24)
+    municipio: RequiredText | None = None
+    bairro: RequiredText | None = None
+    classe: Classe | None = None
+
+    @model_validator(mode="after")
+    def recorte_valido(self) -> "IndicadoresJanelasFiltroSchema":
+        if self.bairro and not self.municipio:
+            raise ValueError("Informe o município junto com o bairro")
+        return self
+
+
+class IndicadoresPeriodoSchema(BaseModel):
+    """Os indicadores da diretoria somados num período, todos calculados no banco."""
+
+    inicio: Competencia
+    fim: Competencia
+    # Competências com dado na tabela inteira dentro do período: o divisor de n_uc_medio.
+    n_meses: int
+    receita_faturada: ExactNumber
+    receita_energia: ExactNumber
+    tributos: ExactNumber
+    kwh_faturado: ExactNumber
+    n_uc_medio: float | None
+    n_uc_fim: int
+    tarifa_media: float | None
+    tarifa_base_media: float | None
+    horas_interrompidas: float
+    n_interrupcoes: int
+    dec: float | None
+    fec: float | None
+    n_chamados: int
+    n_notas: int
+    satisfacao_media: float | None
+
+
+class VariacaoIndicadoresSchema(BaseModel):
+    """Variação em % de cada indicador (8.0 = +8,0%); nula sem base ou com base zero."""
+
+    receita_faturada: float | None
+    receita_energia: float | None
+    tributos: float | None
+    kwh_faturado: float | None
+    n_uc_medio: float | None
+    n_uc_fim: float | None
+    tarifa_media: float | None
+    tarifa_base_media: float | None
+    horas_interrompidas: float | None
+    n_interrupcoes: float | None
+    dec: float | None
+    fec: float | None
+    n_chamados: float | None
+    n_notas: float | None
+    satisfacao_media: float | None
+
+
+class ComparacaoIndicadoresSchema(BaseModel):
+    base: IndicadoresPeriodoSchema
+    atual: IndicadoresPeriodoSchema
+    variacao_pct: VariacaoIndicadoresSchema
+
+
+class IndicadoresJanelaSchema(BaseModel):
+    """Uma janela corrida completa: `meses` competências seguidas, todas com dado."""
+
+    inicio: Competencia
+    fim: Competencia
+    receita_faturada: ExactNumber
+    receita_energia: ExactNumber
+    kwh_faturado: ExactNumber
+    n_uc_medio: float | None
+    tarifa_media: float | None
+    tarifa_base_media: float | None
+
+
+class LoginSchema(BaseModel):
+    """Pedido de login. Os tetos evitam que um corpo gigante vire trabalho para o Argon2."""
+
+    login: Annotated[
+        str, StringConstraints(strip_whitespace=True, to_lower=True, min_length=1, max_length=50)
+    ]
+    senha: Annotated[str, StringConstraints(min_length=1, max_length=200)]

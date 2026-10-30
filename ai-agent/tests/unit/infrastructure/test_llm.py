@@ -5,7 +5,7 @@ from pydantic_ai.models.openrouter import OpenRouterModel
 
 from venergy_agent.config import AgentSettings
 from venergy_agent.infrastructure import llm
-from venergy_agent.infrastructure.llm import build_model
+from venergy_agent.infrastructure.llm import build_judge_model, build_model
 
 
 def settings(**overrides):
@@ -39,6 +39,28 @@ def test_fallback_can_use_the_other_provider():
     assert [type(m) for m in model.models] == [GoogleModel, OpenRouterModel]
 
 
+def test_a_comma_separated_fallback_builds_the_chain_in_order():
+    model = build_model(
+        settings(fallback_model="google-gla:gemini-3.5-flash, openrouter:nvidia/x:free")
+    )
+
+    assert isinstance(model, FallbackModel)
+    assert [m.model_name for m in model.models] == [
+        "gemini-3.1-flash-lite",
+        "gemini-3.5-flash",
+        "nvidia/x:free",
+    ]
+
+
+def test_judge_equal_to_any_model_of_the_fallback_chain_is_refused():
+    chained = settings(
+        fallback_model="google-gla:gemini-3.5-flash,openrouter:google/gemini-3.5-flash-lite"
+    )
+
+    with pytest.raises(ValueError, match="judge_model"):
+        build_judge_model(chained)
+
+
 def test_unknown_provider_is_never_routed_to_openrouter():
     unchecked = AgentSettings.model_construct(
         llm_model="anthropic:claude-x", fallback_model=None, openrouter_api_key="sk-test"
@@ -64,3 +86,46 @@ def test_gemini_client_retries_transient_errors_with_backoff(monkeypatch):
     assert options.attempts == 4
     assert options.initial_delay == 0.5
     assert sorted(options.http_status_codes) == [429, 503]
+
+
+def test_builds_the_judge_model_from_its_own_setting():
+    model = build_judge_model(settings())
+
+    assert isinstance(model, GoogleModel)
+    assert model.model_name == "gemini-3.5-flash-lite"
+
+
+def test_judge_without_its_provider_key_names_the_variable_and_not_a_key():
+    only_openrouter = AgentSettings(
+        _env_file=None,
+        llm_model="openrouter:google/gemma-4-31b-it:free",
+        openrouter_api_key="sk-secret-999",
+        database_url="postgresql://x@localhost/db",
+    )
+
+    with pytest.raises(ValueError, match="VENERGY_AGENT_GOOGLE_API_KEY") as error:
+        build_judge_model(only_openrouter)
+
+    assert "sk-secret-999" not in str(error.value)
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"llm_model": "google-gla:gemini-3.5-flash-lite"},
+        {"fallback_model": "google-gla:gemini-3.5-flash-lite"},
+        {
+            "llm_model": "google-gla:gemini-3.1-flash-lite",
+            "judge_model": "openrouter:google/gemini-3.1-flash-lite",
+        },
+    ],
+)
+def test_judge_equal_to_the_generator_or_fallback_is_refused_when_built(overrides):
+    with pytest.raises(ValueError, match="judge_model"):
+        build_judge_model(settings(**overrides))
+
+
+@pytest.mark.parametrize("judge_model", ["anthropic:claude-x", "google-gla:", ""])
+def test_judge_needs_a_known_provider_and_a_name_when_built(judge_model):
+    with pytest.raises(ValueError, match="judge_model"):
+        build_judge_model(settings(judge_model=judge_model))

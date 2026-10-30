@@ -6,8 +6,9 @@ from httpx2 import Response
 from sqlalchemy import Engine, update
 from sqlalchemy.orm import Session
 
+from venergy_api.auth import Perfil
 from venergy_api.database import Base
-from venergy_api.models import DimUc, OrdemInspecao
+from venergy_api.models import DimUc, OrdemEvento, OrdemInspecao, Usuario
 from venergy_api.ordens import StatusOrdem
 from venergy_api.schemas import MAX_ORDENS_POR_PEDIDO
 
@@ -202,6 +203,66 @@ def test_cancelled_order_cannot_be_reopened(client: TestClient) -> None:
     assert client.get(f"/ordens-inspecao/{ordem['id']}").json()["status"] == "CANCELADA"
 
 
+def test_order_sent_to_the_field_by_mistake_goes_back_to_generated_keeping_the_history(
+    client: TestClient,
+) -> None:
+    [ordem] = create_orders(client, "0001")
+    change(client, ordem["id"], status="EM_CAMPO")
+
+    response = change(client, ordem["id"], status="GERADA", observacao="Enviada por engano")
+
+    assert response.status_code == 200
+    devolvida = response.json()
+    assert devolvida["status"] == "GERADA"
+    assert [(e["status_anterior"], e["status_novo"]) for e in devolvida["eventos"]] == [
+        (None, "GERADA"),
+        ("GERADA", "EM_CAMPO"),
+        ("EM_CAMPO", "GERADA"),
+    ]
+    assert devolvida["eventos"][-1]["observacao"] == "Enviada por engano"
+
+
+def test_reason_for_going_back_stays_only_in_the_history(client: TestClient) -> None:
+    [ordem] = create_orders(client, "0001")
+    change(client, ordem["id"], status="EM_CAMPO")
+
+    response = change(client, ordem["id"], status="GERADA", observacao="Enviada por engano")
+
+    assert response.json()["observacao"] is None
+
+
+def test_going_back_does_not_overwrite_the_existing_observation(client: TestClient) -> None:
+    [ordem] = create_orders(client, "0001")
+    change(client, ordem["id"], status="EM_CAMPO", observacao="Equipe 3 a caminho")
+
+    response = change(client, ordem["id"], status="GERADA", observacao="Enviada por engano")
+
+    assert response.json()["observacao"] == "Equipe 3 a caminho"
+
+
+def test_order_that_went_back_to_generated_can_be_sent_to_the_field_again(
+    client: TestClient,
+) -> None:
+    [ordem] = create_orders(client, "0001")
+    change(client, ordem["id"], status="EM_CAMPO")
+    change(client, ordem["id"], status="GERADA")
+
+    response = change(client, ordem["id"], status="EM_CAMPO")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "EM_CAMPO"
+
+
+def test_order_that_went_back_to_generated_still_holds_the_uc(client: TestClient) -> None:
+    [ordem] = create_orders(client, "0001")
+    change(client, ordem["id"], status="EM_CAMPO")
+    assert change(client, ordem["id"], status="GERADA").status_code == 200
+
+    response = client.post("/ordens-inspecao", json={"cod_ucs": ["0001"]})
+
+    assert response.status_code == 409
+
+
 def test_cancelling_keeps_the_reason_and_frees_the_uc_for_a_new_order(
     client: TestClient,
 ) -> None:
@@ -218,3 +279,43 @@ def test_changing_an_unknown_order_returns_404(client: TestClient) -> None:
     response = change(client, 999, status="EM_CAMPO")
 
     assert response.status_code == 404
+
+
+def test_every_event_of_an_order_records_who_acted(client: TestClient) -> None:
+    [ordem] = create_orders(client, "0001")
+    change(client, ordem["id"], status="EM_CAMPO")
+    change(client, ordem["id"], status="CANCELADA", observacao="Gerada por engano")
+
+    eventos = client.get(f"/ordens-inspecao/{ordem['id']}").json()["eventos"]
+
+    assert [e["autor_login"] for e in eventos] == ["teste", "teste", "teste"]
+
+
+def test_an_event_from_before_the_login_has_no_author(client: TestClient, engine: Engine) -> None:
+    [ordem] = create_orders(client, "0001")
+    with Session(engine) as session, session.begin():
+        session.execute(update(OrdemEvento).values(autor_login=None))
+
+    [evento] = client.get(f"/ordens-inspecao/{ordem['id']}").json()["eventos"]
+
+    assert evento["autor_login"] is None
+
+
+def test_history_shows_the_name_of_who_acted(client: TestClient, engine: Engine) -> None:
+    with Session(engine) as session, session.begin():
+        session.add(Usuario(login="teste", nome="Teste", perfil=Perfil.PERDAS, senha_hash="x"))
+    [ordem] = create_orders(client, "0001")
+
+    enviada = change(client, ordem["id"], status="EM_CAMPO").json()
+
+    assert [e["autor_nome"] for e in enviada["eventos"]] == ["Teste", "Teste"]
+
+
+def test_author_no_longer_in_the_users_table_keeps_the_login_without_a_name(
+    client: TestClient,
+) -> None:
+    [ordem] = create_orders(client, "0001")
+
+    [evento] = client.get(f"/ordens-inspecao/{ordem['id']}").json()["eventos"]
+
+    assert (evento["autor_login"], evento["autor_nome"]) == ("teste", None)

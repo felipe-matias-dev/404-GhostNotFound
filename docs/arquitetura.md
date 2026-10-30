@@ -29,7 +29,7 @@ O case define o objetivo: "A plataforma é o meio. A resposta é o que o cliente
 | Ordens de Inspeção | Supporting | Gerar, atualizar status, registrar resultado e cancelar OIs; único modelo de escrita do sistema | Rafael (Perdas) |
 | Consulta em Linguagem Natural e Insights | Supporting | Text-to-SQL e insights embutidos nas telas | Patrícia (Dir. TI) |
 | Ingestão e Qualidade de Dados | Generic | Arquitetura Medalhão (Bronze/Silver/Gold) | Patrícia (Dir. TI) |
-| Identidade e Acesso | Generic | Perfis por cargo | — |
+| Identidade e Acesso | Generic | Login com cookie httpOnly e cinco perfis por cargo ([DEC-049](decisoes.md#dec-049--login-com-cookie-httponly-e-perfis-por-cargo)) | — |
 
 Esforço de modelagem e validação vai para os subdomínios Core. Nos Generic, usa-se a solução mais simples que atenda.
 
@@ -120,7 +120,7 @@ Estes termos são usados com o mesmo significado no código, no banco, no portal
 | Motivo da suspeita | Regra ou feature que mais contribui para o score, em texto legível | `motivos[]` |
 | Energia recuperável | kWh/mês estimados a recuperar se a irregularidade for confirmada | `kwh_recuperavel_est` |
 | Ordem de Inspeção (OI) | Pedido de vistoria em campo para uma UC | `ordem_inspecao` |
-| Status da OI | `GERADA → EM_CAMPO → CONCLUIDA`, ou `CANCELADA` | `status` |
+| Status da OI | `GERADA → EM_CAMPO → CONCLUIDA`, ou `CANCELADA`; `EM_CAMPO` pode voltar para `GERADA` | `status` |
 | Resultado da OI | `IRREGULAR_CONFIRMADA`, `REGULAR` ou `NAO_REALIZADA` | `resultado` |
 | DEC / FEC | Duração e frequência equivalentes de interrupção por UC (definição simplificada do case) | `dec`, `fec` |
 | GD | UC com geração própria (solar); a potência é a de pico, em kWp | `possui_gd`, `potencia_kwp` |

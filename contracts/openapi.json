@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "V-Energy Grid 360 API",
-    "version": "0.9.0"
+    "version": "0.11.0"
   },
   "paths": {
     "/health": {
@@ -30,6 +30,109 @@
         }
       }
     },
+    "/auth/login": {
+      "post": {
+        "tags": [
+          "autenticação"
+        ],
+        "summary": "Entrar",
+        "operationId": "entrar_auth_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginSchema"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsuarioLogado"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErroSchema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/me": {
+      "get": {
+        "tags": [
+          "autenticação"
+        ],
+        "summary": "Quem Sou Eu",
+        "description": "Quem está logado. O portal chama ao abrir, para saber o perfil e montar o menu.",
+        "operationId": "quem_sou_eu_auth_me_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsuarioLogado"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErroSchema"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ]
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "tags": [
+          "autenticação"
+        ],
+        "summary": "Sair",
+        "description": "Apaga o cookie. Sem sessão também responde 204: sair duas vezes não é erro.",
+        "operationId": "sair_auth_logout_post",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        }
+      }
+    },
     "/unidades-consumidoras/{cod_uc}": {
       "get": {
         "tags": [
@@ -37,6 +140,11 @@
         ],
         "summary": "Get Unidade Consumidora",
         "operationId": "get_unidade_consumidora_unidades_consumidoras__cod_uc__get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
         "parameters": [
           {
             "name": "cod_uc",
@@ -90,6 +198,11 @@
         "summary": "Get Visao 360",
         "description": "Cadastro, medidor e histórico da UC: o que o atendente precisa com o cliente na linha.",
         "operationId": "get_visao_360_unidades_consumidoras__cod_uc__visao_360_get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
         "parameters": [
           {
             "name": "cod_uc",
@@ -143,6 +256,11 @@
         "summary": "Get Receita Mensal",
         "description": "Indicadores de cada competência do período, do mês mais antigo ao mais recente.",
         "operationId": "get_receita_mensal_receita_mensal_get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
         "parameters": [
           {
             "name": "inicio",
@@ -215,6 +333,11 @@
         "summary": "Get Comparacao",
         "description": "kWh e receita de dois períodos, da empresa inteira ou de um segmento, e a variação.",
         "operationId": "get_comparacao_receita_comparacao_get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
         "parameters": [
           {
             "name": "base_inicio",
@@ -360,7 +483,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ]
       }
     },
     "/receita/decomposicao": {
@@ -371,6 +499,11 @@
         "summary": "Get Decomposicao",
         "description": "Ponte de receita de um par de períodos, por município, por bairro ou por classe.\n\nOrdenada da maior queda para a maior alta: o topo é onde a receita mais caiu.",
         "operationId": "get_decomposicao_receita_decomposicao_get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
         "parameters": [
           {
             "name": "periodo_base",
@@ -485,6 +618,11 @@
         "summary": "Get Insight",
         "description": "Um insight de IA sobre a ponte de receita do recorte que a tela está mostrando.",
         "operationId": "get_insight_receita_insight_get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
         "parameters": [
           {
             "name": "periodo_base",
@@ -605,6 +743,11 @@
         "summary": "Get Serie Alimentadores",
         "description": "DEC e FEC de cada alimentador por competência, como a Gold calculou.",
         "operationId": "get_serie_alimentadores_continuidade_alimentadores_mensal_get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
         "parameters": [
           {
             "name": "inicio",
@@ -690,6 +833,11 @@
         "summary": "Get Ranking Alimentadores",
         "description": "Os piores alimentadores do período, pelo DEC ou pelo FEC.",
         "operationId": "get_ranking_alimentadores_continuidade_alimentadores_ranking_get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
         "parameters": [
           {
             "name": "inicio",
@@ -758,6 +906,11 @@
         "summary": "Get Recortes",
         "description": "DEC e FEC por município, por bairro de um município ou por alimentador de um bairro.",
         "operationId": "get_recortes_continuidade_recortes_get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
         "parameters": [
           {
             "name": "inicio",
@@ -874,6 +1027,278 @@
         }
       }
     },
+    "/indicadores/comparacao": {
+      "get": {
+        "tags": [
+          "indicadores"
+        ],
+        "summary": "Get Comparacao",
+        "description": "Os indicadores da diretoria em dois períodos, da empresa inteira ou de um recorte.",
+        "operationId": "get_comparacao_indicadores_comparacao_get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "base_inicio",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+              "title": "Base Inicio"
+            }
+          },
+          {
+            "name": "base_fim",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+              "title": "Base Fim"
+            }
+          },
+          {
+            "name": "atual_inicio",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+              "title": "Atual Inicio"
+            }
+          },
+          {
+            "name": "atual_fim",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+              "title": "Atual Fim"
+            }
+          },
+          {
+            "name": "municipio",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Municipio"
+            }
+          },
+          {
+            "name": "bairro",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Bairro"
+            }
+          },
+          {
+            "name": "classe",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "B1",
+                    "B2",
+                    "B3",
+                    "A4"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Classe"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ComparacaoIndicadoresSchema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/indicadores/janelas": {
+      "get": {
+        "tags": [
+          "indicadores"
+        ],
+        "summary": "Get Janelas",
+        "description": "Janelas corridas de `meses` competências, da mais antiga para a mais recente.",
+        "operationId": "get_janelas_indicadores_janelas_get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "meses",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 24,
+              "minimum": 1,
+              "default": 12,
+              "title": "Meses"
+            }
+          },
+          {
+            "name": "municipio",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Municipio"
+            }
+          },
+          {
+            "name": "bairro",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Bairro"
+            }
+          },
+          {
+            "name": "classe",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "B1",
+                    "B2",
+                    "B3",
+                    "A4"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Classe"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/IndicadoresJanelaSchema"
+                  },
+                  "title": "Response Get Janelas Indicadores Janelas Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/fila-suspeitas/distribuicao-queda": {
+      "get": {
+        "tags": [
+          "fila de suspeitas"
+        ],
+        "summary": "Get Distribuicao Queda",
+        "operationId": "get_distribuicao_queda_fila_suspeitas_distribuicao_queda_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DistribuicaoQuedaSchema"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ]
+      }
+    },
     "/fila-suspeitas": {
       "get": {
         "tags": [
@@ -882,6 +1307,11 @@
         "summary": "Get Fila",
         "description": "A fila da mais para a menos suspeita, com a ordem ativa de cada UC.",
         "operationId": "get_fila_fila_suspeitas_get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
         "parameters": [
           {
             "name": "pagina",
@@ -914,6 +1344,118 @@
               "type": "boolean",
               "default": false,
               "title": "Sem Ordem Ativa"
+            }
+          },
+          {
+            "name": "ordenar_por",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "prioridade",
+                "energia",
+                "ordem_ativa",
+                "queda"
+              ],
+              "type": "string",
+              "default": "prioridade",
+              "title": "Ordenar Por"
+            }
+          },
+          {
+            "name": "direcao",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string",
+              "default": "asc",
+              "title": "Direcao"
+            }
+          },
+          {
+            "name": "queda_min",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 100,
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Queda Min"
+            }
+          },
+          {
+            "name": "queda_max",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 100,
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Queda Max"
+            }
+          },
+          {
+            "name": "medidor_eletromecanico",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Medidor Eletromecanico"
+            }
+          },
+          {
+            "name": "leituras_estimadas_min",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 100,
+                  "minimum": 25
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Leituras Estimadas Min"
+            }
+          },
+          {
+            "name": "leituras_estimadas_max",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 100,
+                  "minimum": 25
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Leituras Estimadas Max"
             }
           }
         ],
@@ -949,6 +1491,11 @@
         "summary": "Criar Ordens",
         "description": "Gera uma OI por UC, tudo ou nada: se uma UC falhar, nenhuma OI é criada.",
         "operationId": "criar_ordens_ordens_inspecao_post",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -973,6 +1520,16 @@
                 }
               }
             }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErroSchema"
+                }
+              }
+            },
+            "description": "Forbidden"
           },
           "404": {
             "content": {
@@ -1013,6 +1570,11 @@
         "summary": "Listar Ordens",
         "description": "Lista as OIs, das mais recentes para as mais antigas, opcionalmente por status.",
         "operationId": "listar_ordens_ordens_inspecao_get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
         "parameters": [
           {
             "name": "status",
@@ -1066,6 +1628,11 @@
         ],
         "summary": "Obter Ordem",
         "operationId": "obter_ordem_ordens_inspecao__ordem_id__get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
         "parameters": [
           {
             "name": "ordem_id",
@@ -1117,6 +1684,11 @@
         "summary": "Atualizar Ordem",
         "description": "Muda o status da OI (inclusive cancelar) e registra a mudança no histórico.",
         "operationId": "atualizar_ordem_ordens_inspecao__ordem_id__patch",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
         "parameters": [
           {
             "name": "ordem_id",
@@ -1148,6 +1720,16 @@
                 }
               }
             }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErroSchema"
+                }
+              }
+            },
+            "description": "Forbidden"
           },
           "404": {
             "content": {
@@ -1231,7 +1813,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ]
       }
     },
     "/ai/audit/{audit_id}": {
@@ -1242,6 +1829,11 @@
         "summary": "Obter Auditoria",
         "description": "O registro completo de uma resposta: pergunta, SQL, views, linhas, modelo e horário.",
         "operationId": "obter_auditoria_ai_audit__audit_id__get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
         "parameters": [
           {
             "name": "audit_id",
@@ -1265,6 +1857,16 @@
                 }
               }
             }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErroSchema"
+                }
+              }
+            },
+            "description": "Forbidden"
           },
           "404": {
             "content": {
@@ -1550,6 +2152,26 @@
         ],
         "title": "AuditoriaIaSchema",
         "description": "O registro completo da auditoria: a resposta com a pergunta e o momento em que veio."
+      },
+      "ComparacaoIndicadoresSchema": {
+        "properties": {
+          "base": {
+            "$ref": "#/components/schemas/IndicadoresPeriodoSchema"
+          },
+          "atual": {
+            "$ref": "#/components/schemas/IndicadoresPeriodoSchema"
+          },
+          "variacao_pct": {
+            "$ref": "#/components/schemas/VariacaoIndicadoresSchema"
+          }
+        },
+        "type": "object",
+        "required": [
+          "base",
+          "atual",
+          "variacao_pct"
+        ],
+        "title": "ComparacaoIndicadoresSchema"
       },
       "ComparacaoReceitaSchema": {
         "properties": {
@@ -2074,6 +2696,45 @@
         ],
         "title": "DimUcSchema"
       },
+      "DistribuicaoQuedaItemSchema": {
+        "properties": {
+          "queda": {
+            "type": "integer",
+            "title": "Queda"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "queda",
+          "total"
+        ],
+        "title": "DistribuicaoQuedaItemSchema"
+      },
+      "DistribuicaoQuedaSchema": {
+        "properties": {
+          "itens": {
+            "items": {
+              "$ref": "#/components/schemas/DistribuicaoQuedaItemSchema"
+            },
+            "type": "array",
+            "title": "Itens"
+          },
+          "sem_queda_identificada": {
+            "type": "integer",
+            "title": "Sem Queda Identificada"
+          }
+        },
+        "type": "object",
+        "required": [
+          "itens",
+          "sem_queda_identificada"
+        ],
+        "title": "DistribuicaoQuedaSchema"
+      },
       "ErroSchema": {
         "properties": {
           "detail": {
@@ -2114,6 +2775,28 @@
             ],
             "title": "Observacao"
           },
+          "autor_login": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Autor Login"
+          },
+          "autor_nome": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Autor Nome"
+          },
           "ocorrido_em": {
             "type": "string",
             "format": "date-time",
@@ -2125,6 +2808,8 @@
           "status_anterior",
           "status_novo",
           "observacao",
+          "autor_login",
+          "autor_nome",
           "ocorrido_em"
         ],
         "title": "EventoSchema"
@@ -2243,6 +2928,17 @@
                 "type": "null"
               }
             ]
+          },
+          "queda_percentual": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queda Percentual"
           }
         },
         "type": "object",
@@ -2251,7 +2947,8 @@
           "score_suspeita",
           "motivos",
           "kwh_recuperavel_est",
-          "ordem_ativa"
+          "ordem_ativa",
+          "queda_percentual"
         ],
         "title": "FilaItemSchema",
         "description": "Uma UC da fila e a ordem ativa dela, para a tela não oferecer o que daria 409."
@@ -2300,6 +2997,221 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "IndicadoresJanelaSchema": {
+        "properties": {
+          "inicio": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+            "title": "Inicio"
+          },
+          "fim": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+            "title": "Fim"
+          },
+          "receita_faturada": {
+            "type": "number",
+            "title": "Receita Faturada"
+          },
+          "receita_energia": {
+            "type": "number",
+            "title": "Receita Energia"
+          },
+          "kwh_faturado": {
+            "type": "number",
+            "title": "Kwh Faturado"
+          },
+          "n_uc_medio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "N Uc Medio"
+          },
+          "tarifa_media": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tarifa Media"
+          },
+          "tarifa_base_media": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tarifa Base Media"
+          }
+        },
+        "type": "object",
+        "required": [
+          "inicio",
+          "fim",
+          "receita_faturada",
+          "receita_energia",
+          "kwh_faturado",
+          "n_uc_medio",
+          "tarifa_media",
+          "tarifa_base_media"
+        ],
+        "title": "IndicadoresJanelaSchema",
+        "description": "Uma janela corrida completa: `meses` competências seguidas, todas com dado."
+      },
+      "IndicadoresPeriodoSchema": {
+        "properties": {
+          "inicio": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+            "title": "Inicio"
+          },
+          "fim": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+            "title": "Fim"
+          },
+          "n_meses": {
+            "type": "integer",
+            "title": "N Meses"
+          },
+          "receita_faturada": {
+            "type": "number",
+            "title": "Receita Faturada"
+          },
+          "receita_energia": {
+            "type": "number",
+            "title": "Receita Energia"
+          },
+          "tributos": {
+            "type": "number",
+            "title": "Tributos"
+          },
+          "kwh_faturado": {
+            "type": "number",
+            "title": "Kwh Faturado"
+          },
+          "n_uc_medio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "N Uc Medio"
+          },
+          "n_uc_fim": {
+            "type": "integer",
+            "title": "N Uc Fim"
+          },
+          "tarifa_media": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tarifa Media"
+          },
+          "tarifa_base_media": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tarifa Base Media"
+          },
+          "horas_interrompidas": {
+            "type": "number",
+            "title": "Horas Interrompidas"
+          },
+          "n_interrupcoes": {
+            "type": "integer",
+            "title": "N Interrupcoes"
+          },
+          "dec": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dec"
+          },
+          "fec": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fec"
+          },
+          "n_chamados": {
+            "type": "integer",
+            "title": "N Chamados"
+          },
+          "n_notas": {
+            "type": "integer",
+            "title": "N Notas"
+          },
+          "satisfacao_media": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Satisfacao Media"
+          }
+        },
+        "type": "object",
+        "required": [
+          "inicio",
+          "fim",
+          "n_meses",
+          "receita_faturada",
+          "receita_energia",
+          "tributos",
+          "kwh_faturado",
+          "n_uc_medio",
+          "n_uc_fim",
+          "tarifa_media",
+          "tarifa_base_media",
+          "horas_interrompidas",
+          "n_interrupcoes",
+          "dec",
+          "fec",
+          "n_chamados",
+          "n_notas",
+          "satisfacao_media"
+        ],
+        "title": "IndicadoresPeriodoSchema",
+        "description": "Os indicadores da diretoria somados num período, todos calculados no banco."
       },
       "InsightReceitaSchema": {
         "properties": {
@@ -2543,6 +3455,29 @@
         "title": "KpisMensaisSchema",
         "description": "Indicadores executivos de uma competência."
       },
+      "LoginSchema": {
+        "properties": {
+          "login": {
+            "type": "string",
+            "maxLength": 50,
+            "minLength": 1,
+            "title": "Login"
+          },
+          "senha": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Senha"
+          }
+        },
+        "type": "object",
+        "required": [
+          "login",
+          "senha"
+        ],
+        "title": "LoginSchema",
+        "description": "Pedido de login. Os tetos evitam que um corpo gigante vire trabalho para o Argon2."
+      },
       "MedidorUcSchema": {
         "properties": {
           "cod_uc": {
@@ -2779,6 +3714,17 @@
         ],
         "title": "ParPeriodosSchema",
         "description": "Um par de períodos que a Gold gravou na decomposição (DEC-028)."
+      },
+      "Perfil": {
+        "type": "string",
+        "enum": [
+          "diretoria",
+          "atendimento",
+          "perdas",
+          "operacao",
+          "ti"
+        ],
+        "title": "Perfil"
       },
       "PerguntaIaSchema": {
         "properties": {
@@ -3243,6 +4189,28 @@
         "title": "Uc360Schema",
         "description": "Tudo o que o atendente precisa de uma UC numa tela só."
       },
+      "UsuarioLogado": {
+        "properties": {
+          "login": {
+            "type": "string",
+            "title": "Login"
+          },
+          "nome": {
+            "type": "string",
+            "title": "Nome"
+          },
+          "perfil": {
+            "$ref": "#/components/schemas/Perfil"
+          }
+        },
+        "type": "object",
+        "required": [
+          "login",
+          "nome",
+          "perfil"
+        ],
+        "title": "UsuarioLogado"
+      },
       "ValidationError": {
         "properties": {
           "loc": {
@@ -3282,6 +4250,202 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "VariacaoIndicadoresSchema": {
+        "properties": {
+          "receita_faturada": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receita Faturada"
+          },
+          "receita_energia": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receita Energia"
+          },
+          "tributos": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tributos"
+          },
+          "kwh_faturado": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kwh Faturado"
+          },
+          "n_uc_medio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "N Uc Medio"
+          },
+          "n_uc_fim": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "N Uc Fim"
+          },
+          "tarifa_media": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tarifa Media"
+          },
+          "tarifa_base_media": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tarifa Base Media"
+          },
+          "horas_interrompidas": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Horas Interrompidas"
+          },
+          "n_interrupcoes": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "N Interrupcoes"
+          },
+          "dec": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dec"
+          },
+          "fec": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fec"
+          },
+          "n_chamados": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "N Chamados"
+          },
+          "n_notas": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "N Notas"
+          },
+          "satisfacao_media": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Satisfacao Media"
+          }
+        },
+        "type": "object",
+        "required": [
+          "receita_faturada",
+          "receita_energia",
+          "tributos",
+          "kwh_faturado",
+          "n_uc_medio",
+          "n_uc_fim",
+          "tarifa_media",
+          "tarifa_base_media",
+          "horas_interrompidas",
+          "n_interrupcoes",
+          "dec",
+          "fec",
+          "n_chamados",
+          "n_notas",
+          "satisfacao_media"
+        ],
+        "title": "VariacaoIndicadoresSchema",
+        "description": "Variação em % de cada indicador (8.0 = +8,0%); nula sem base ou com base zero."
+      }
+    },
+    "securitySchemes": {
+      "APIKeyCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "venergy_sessao"
       }
     }
   }

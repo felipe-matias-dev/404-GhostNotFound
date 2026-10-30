@@ -1,5 +1,6 @@
 import { Badge } from "#/components/ui/badge";
 import { DataTable, type DataTableColumn } from "#/components/ui/data-table";
+import { useSession } from "#/features/auth";
 import { formatDataHora } from "#/lib/format";
 import { RESULTADO_ORDEM_ROTULO, STATUS_ORDEM_VISUAL } from "../conversions";
 import { useOrdens } from "../hooks/use-ordens";
@@ -61,6 +62,7 @@ const COLUNAS: DataTableColumn<Ordem>[] = [
 ];
 
 export function OrdensTable({ status }: { status: StatusOrdem | undefined }) {
+	const { data: user } = useSession();
 	const { data, isPending, isPlaceholderData, isError, refetch } =
 		useOrdens(status);
 	const { abrir, abrirHistorico, pendente } = useAcoesOrdem();
@@ -79,9 +81,17 @@ export function OrdensTable({ status }: { status: StatusOrdem | undefined }) {
 			}
 			onRetry={() => refetch()}
 			onRowClick={abrirHistorico}
-			rowActions={(o) => (
-				<OrdemAcoesBotoes ordem={o} onAcao={abrir} pendente={pendente(o.id)} />
-			)}
+			rowActions={
+				user?.perfil === "perdas"
+					? (o) => (
+							<OrdemAcoesBotoes
+								ordem={o}
+								onAcao={abrir}
+								pendente={pendente(o.id)}
+							/>
+						)
+					: undefined
+			}
 			rowActionsWidth="13rem"
 			emptyMessage={
 				status

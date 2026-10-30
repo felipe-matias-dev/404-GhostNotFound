@@ -21,6 +21,63 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Entrar */
+        post: operations["entrar_auth_login_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Quem Sou Eu
+         * @description Quem está logado. O portal chama ao abrir, para saber o perfil e montar o menu.
+         */
+        get: operations["quem_sou_eu_auth_me_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sair
+         * @description Apaga o cookie. Sem sessão também responde 204: sair duas vezes não é erro.
+         */
+        post: operations["sair_auth_logout_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/unidades-consumidoras/{cod_uc}": {
         parameters: {
             query?: never;
@@ -212,6 +269,63 @@ export interface paths {
          * @description DEC e FEC por município, por bairro de um município ou por alimentador de um bairro.
          */
         get: operations["get_recortes_continuidade_recortes_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/indicadores/comparacao": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Comparacao
+         * @description Os indicadores da diretoria em dois períodos, da empresa inteira ou de um recorte.
+         */
+        get: operations["get_comparacao_indicadores_comparacao_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/indicadores/janelas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Janelas
+         * @description Janelas corridas de `meses` competências, da mais antiga para a mais recente.
+         */
+        get: operations["get_janelas_indicadores_janelas_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/fila-suspeitas/distribuicao-queda": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Distribuicao Queda */
+        get: operations["get_distribuicao_queda_fila_suspeitas_distribuicao_queda_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -421,6 +535,12 @@ export interface components {
              */
             criado_em: string;
         };
+        /** ComparacaoIndicadoresSchema */
+        ComparacaoIndicadoresSchema: {
+            base: components["schemas"]["IndicadoresPeriodoSchema"];
+            atual: components["schemas"]["IndicadoresPeriodoSchema"];
+            variacao_pct: components["schemas"]["VariacaoIndicadoresSchema"];
+        };
         /**
          * ComparacaoReceitaSchema
          * @description Totais de dois períodos e quanto o atual variou sobre a base.
@@ -588,6 +708,20 @@ export interface components {
             /** Energia Injetada Kwh Mes */
             energia_injetada_kwh_mes: number | null;
         };
+        /** DistribuicaoQuedaItemSchema */
+        DistribuicaoQuedaItemSchema: {
+            /** Queda */
+            queda: number;
+            /** Total */
+            total: number;
+        };
+        /** DistribuicaoQuedaSchema */
+        DistribuicaoQuedaSchema: {
+            /** Itens */
+            itens: components["schemas"]["DistribuicaoQuedaItemSchema"][];
+            /** Sem Queda Identificada */
+            sem_queda_identificada: number;
+        };
         /**
          * ErroSchema
          * @description Corpo das respostas de erro do FastAPI (HTTPException), documentado no OpenAPI.
@@ -602,6 +736,10 @@ export interface components {
             status_novo: components["schemas"]["StatusOrdem"];
             /** Observacao */
             observacao: string | null;
+            /** Autor Login */
+            autor_login: string | null;
+            /** Autor Nome */
+            autor_nome: string | null;
             /**
              * Ocorrido Em
              * Format: date-time
@@ -656,6 +794,8 @@ export interface components {
             /** Kwh Recuperavel Est */
             kwh_recuperavel_est: number | null;
             ordem_ativa: components["schemas"]["OrdemAtivaSchema"] | null;
+            /** Queda Percentual */
+            queda_percentual: number | null;
         };
         /**
          * FilaPaginaSchema
@@ -675,6 +815,70 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /**
+         * IndicadoresJanelaSchema
+         * @description Uma janela corrida completa: `meses` competências seguidas, todas com dado.
+         */
+        IndicadoresJanelaSchema: {
+            /** Inicio */
+            inicio: string;
+            /** Fim */
+            fim: string;
+            /** Receita Faturada */
+            receita_faturada: number;
+            /** Receita Energia */
+            receita_energia: number;
+            /** Kwh Faturado */
+            kwh_faturado: number;
+            /** N Uc Medio */
+            n_uc_medio: number | null;
+            /** Tarifa Media */
+            tarifa_media: number | null;
+            /** Tarifa Base Media */
+            tarifa_base_media: number | null;
+        };
+        /**
+         * IndicadoresPeriodoSchema
+         * @description Os indicadores da diretoria somados num período, todos calculados no banco.
+         */
+        IndicadoresPeriodoSchema: {
+            /** Inicio */
+            inicio: string;
+            /** Fim */
+            fim: string;
+            /** N Meses */
+            n_meses: number;
+            /** Receita Faturada */
+            receita_faturada: number;
+            /** Receita Energia */
+            receita_energia: number;
+            /** Tributos */
+            tributos: number;
+            /** Kwh Faturado */
+            kwh_faturado: number;
+            /** N Uc Medio */
+            n_uc_medio: number | null;
+            /** N Uc Fim */
+            n_uc_fim: number;
+            /** Tarifa Media */
+            tarifa_media: number | null;
+            /** Tarifa Base Media */
+            tarifa_base_media: number | null;
+            /** Horas Interrompidas */
+            horas_interrompidas: number;
+            /** N Interrupcoes */
+            n_interrupcoes: number;
+            /** Dec */
+            dec: number | null;
+            /** Fec */
+            fec: number | null;
+            /** N Chamados */
+            n_chamados: number;
+            /** N Notas */
+            n_notas: number;
+            /** Satisfacao Media */
+            satisfacao_media: number | null;
         };
         /**
          * InsightReceitaSchema
@@ -765,6 +969,16 @@ export interface components {
             n_chamados: number | null;
             /** Satisfacao Media */
             satisfacao_media: number | null;
+        };
+        /**
+         * LoginSchema
+         * @description Pedido de login. Os tetos evitam que um corpo gigante vire trabalho para o Argon2.
+         */
+        LoginSchema: {
+            /** Login */
+            login: string;
+            /** Senha */
+            senha: string;
         };
         /**
          * MedidorUcSchema
@@ -860,6 +1074,11 @@ export interface components {
             /** Periodo Atual */
             periodo_atual: string;
         };
+        /**
+         * Perfil
+         * @enum {string}
+         */
+        Perfil: "diretoria" | "atendimento" | "perdas" | "operacao" | "ti";
         /**
          * PerguntaIaSchema
          * @description Pergunta em português para o agente de IA, dentro de uma conversa.
@@ -1021,6 +1240,14 @@ export interface components {
             /** Inspecoes */
             inspecoes: components["schemas"]["InspecaoUcSchema"][];
         };
+        /** UsuarioLogado */
+        UsuarioLogado: {
+            /** Login */
+            login: string;
+            /** Nome */
+            nome: string;
+            perfil: components["schemas"]["Perfil"];
+        };
         /** ValidationError */
         ValidationError: {
             /** Location */
@@ -1033,6 +1260,42 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /**
+         * VariacaoIndicadoresSchema
+         * @description Variação em % de cada indicador (8.0 = +8,0%); nula sem base ou com base zero.
+         */
+        VariacaoIndicadoresSchema: {
+            /** Receita Faturada */
+            receita_faturada: number | null;
+            /** Receita Energia */
+            receita_energia: number | null;
+            /** Tributos */
+            tributos: number | null;
+            /** Kwh Faturado */
+            kwh_faturado: number | null;
+            /** N Uc Medio */
+            n_uc_medio: number | null;
+            /** N Uc Fim */
+            n_uc_fim: number | null;
+            /** Tarifa Media */
+            tarifa_media: number | null;
+            /** Tarifa Base Media */
+            tarifa_base_media: number | null;
+            /** Horas Interrompidas */
+            horas_interrompidas: number | null;
+            /** N Interrupcoes */
+            n_interrupcoes: number | null;
+            /** Dec */
+            dec: number | null;
+            /** Fec */
+            fec: number | null;
+            /** N Chamados */
+            n_chamados: number | null;
+            /** N Notas */
+            n_notas: number | null;
+            /** Satisfacao Media */
+            satisfacao_media: number | null;
         };
     };
     responses: never;
@@ -1062,6 +1325,95 @@ export interface operations {
                         [key: string]: string;
                     };
                 };
+            };
+        };
+    };
+    entrar_auth_login_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoginSchema"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UsuarioLogado"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErroSchema"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    quem_sou_eu_auth_me_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UsuarioLogado"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErroSchema"];
+                };
+            };
+        };
+    };
+    sair_auth_logout_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -1415,12 +1767,110 @@ export interface operations {
             };
         };
     };
+    get_comparacao_indicadores_comparacao_get: {
+        parameters: {
+            query: {
+                base_inicio: string;
+                base_fim: string;
+                atual_inicio: string;
+                atual_fim: string;
+                municipio?: string | null;
+                bairro?: string | null;
+                classe?: ("B1" | "B2" | "B3" | "A4") | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ComparacaoIndicadoresSchema"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_janelas_indicadores_janelas_get: {
+        parameters: {
+            query?: {
+                meses?: number;
+                municipio?: string | null;
+                bairro?: string | null;
+                classe?: ("B1" | "B2" | "B3" | "A4") | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IndicadoresJanelaSchema"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_distribuicao_queda_fila_suspeitas_distribuicao_queda_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DistribuicaoQuedaSchema"];
+                };
+            };
+        };
+    };
     get_fila_fila_suspeitas_get: {
         parameters: {
             query?: {
                 pagina?: number;
                 tamanho?: number;
                 sem_ordem_ativa?: boolean;
+                ordenar_por?: "prioridade" | "energia" | "ordem_ativa" | "queda";
+                direcao?: "asc" | "desc";
+                queda_min?: number | null;
+                queda_max?: number | null;
+                medidor_eletromecanico?: boolean;
+                leituras_estimadas_min?: number | null;
+                leituras_estimadas_max?: number | null;
             };
             header?: never;
             path?: never;
@@ -1499,6 +1949,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OrdemSchema"][];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErroSchema"];
                 };
             };
             /** @description Not Found */
@@ -1594,6 +2053,15 @@ export interface operations {
                     "application/json": components["schemas"]["OrdemDetalheSchema"];
                 };
             };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErroSchema"];
+                };
+            };
             /** @description Not Found */
             404: {
                 headers: {
@@ -1683,6 +2151,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AuditoriaIaSchema"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErroSchema"];
                 };
             };
             /** @description Not Found */

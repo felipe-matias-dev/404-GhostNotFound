@@ -66,6 +66,8 @@ Cada parte do sistema responde à pergunta de uma pessoa da V-Energy.
 | **Beatriz**, operação | Quais alimentadores e regiões têm o pior DEC e FEC? | `GET /continuidade/alimentadores/ranking`, `/mensal` e `/recortes` ([DEC-033](docs/decisoes.md#dec-033--dec-e-fec-por-período-e-recorte-e-a-fila-de-suspeitas-paginada)) | API pronta, tela em construção |
 | **Patrícia**, diretora de TI | Os dados são confiáveis e seguros? Dá para perguntar em português? | Pipeline com travas de qualidade, agente Text-to-SQL em `POST /ai/ask` com auditoria e insight de IA em `GET /receita/insight` | Pipeline e API prontos; chat no portal em construção |
 
+Na fila de perdas, **Filtros** combina queda de consumo, medidor eletromecânico e leituras estimadas. A Gold só informa leituras estimadas a partir de 25%; o filtro aceita de 25% a 100% e não inclui percentuais inferiores ou desconhecidos. Os filtros atuam antes da paginação ([DEC-051](docs/decisoes.md#dec-051--filtro-de-queda-na-fila-de-suspeitas)).
+
 <!-- Capturas do portal (João): docs/img/portal-visao-geral.png, docs/img/portal-receita.png, docs/img/portal-perdas.png -->
 
 ## Arquitetura
@@ -98,7 +100,7 @@ flowchart LR
 Três regras sustentam o desenho ([arquitetura e domínio](docs/arquitetura.md)):
 
 - **Contrato antes de implementação.** Portal e agente trabalham contra o contrato da Gold ([`contracts/gold_schema.yaml`](contracts/gold_schema.yaml), v0.3.0) e uma amostra sintética desde o primeiro dia, sem esperar o dado real nem expor o dataset ([DEC-003](docs/decisoes.md#dec-003--walking-skeleton-com-amostra-sintética)). O frontend gera o client a partir de [`contracts/openapi.json`](contracts/openapi.json) e quebra na compilação se a API mudar ([DEC-005](docs/decisoes.md#dec-005--contrato-openapi-entre-api-e-frontend)).
-- **A Gold é descartável; o trabalho do usuário, não.** A carga recria o schema `gold` a cada execução e nunca toca o `app`, onde ficam as ordens de inspeção e a auditoria do agente ([DEC-002](docs/decisoes.md#dec-002--banco-local-postgresql)).
+- **A Gold é descartável; o trabalho do usuário, não.** A carga recria o schema `gold` a cada execução e nunca apaga nem altera uma linha do `app`, onde ficam as ordens de inspeção e a auditoria do agente: ela só cria as tabelas que faltam e acrescenta colunas novas ([DEC-002](docs/decisoes.md#dec-002--banco-local-postgresql), [DEC-050](docs/decisoes.md#dec-050--autoria-nos-eventos-das-ordens-de-inspeção)).
 - **Um número, uma fonte.** Cálculos de negócio (PVM, DEC/FEC, score de suspeita) ficam na Gold e no backend. O frontend só exibe, e o agente lê as métricas prontas em vez de recalculá-las.
 
 | Camada | Tecnologia | Por que |
@@ -145,19 +147,46 @@ A segurança mora no banco e no validador, nunca no prompt:
 5. **Os números do texto são conferidos com as linhas.** Se a narrativa citar um número que não está no resultado, a resposta volta a um texto determinístico com os valores ([spec §5.1](ai-agent/docs/specs/2026-10-19-architecture-design.md)).
 6. **Toda resposta é auditada.** Fica gravada em `app.ai_auditoria` (pergunta, SQL, linhas, modelo, versão do prompt, latência) e pode ser lida em `GET /ai/audit/{id}` ([DEC-034](docs/decisoes.md#dec-034--auditoria-do-agente-de-ia-gravação-leitura-e-subida-sem-a-chave)).
 
-**Avaliação.** Usamos um golden set de 93 perguntas e 17 ataques de red team. Toda mudança de prompt, modelo ou camada semântica só entra se o golden set não regredir ([DEC-016](docs/decisoes.md)). Última rodada (28/10/2026, [`eval/runs/2026-10-28T113557Z.json`](ai-agent/eval/runs/2026-10-28T113557Z.json)), sobre a amostra sintética:
+**Avaliação.** Usamos um golden set de 98 perguntas e 17 ataques de red team. Toda mudança de prompt, modelo ou camada semântica só entra se o golden set não regredir ([DEC-016](docs/decisoes.md)). Últimas rodadas (29/10/2026):
 
-| Métrica | Resultado |
-|---|---|
-| SQL com o resultado certo (execution accuracy) | 100% (48 de 48) |
-| Status certo (respondeu, não sei, esclarecer, recusar) | 95,9% (71 de 74) |
-| Red team: escritas aceitas, views alteradas, vazamentos de prompt | 0, 0, 0 |
-| Latência p50 / p95 | 3,3 s / 15,3 s |
+| Métrica | Gold real (linha de base 2, três rodadas) | Amostra sintética |
+|---|---|---|
+| SQL com o resultado certo (execution accuracy) | 88,9% a 92,1% (56 a 58 de 63) | 100% (48 de 48) |
+| Status certo (respondeu, não sei, esclarecer, recusar) | 94,4% a 96,6% | 100% (74 de 74) |
+| Fidelidade numérica do texto | — (rodada só SQL, sem narração) | 83,3% |
+| Red team: escritas aceitas, views alteradas, vazamentos de prompt | — | 0, 0, 0 (rodada de 28/10) |
+
+A coluna da Gold real reúne três rodadas da camada 0.4.0 com o golden 0.11.0 (uma do GenAI e duas do Lucas, 29/10/2026): a variação vem sobretudo do G089, em que o modelo às vezes fazia divisão inteira e devolvia 0. As duas colunas não são a mesma rodada: a da Gold real foi **só SQL** (mede o SQL e o status, sem o texto), e a da amostra foi **narrada** (mede também o texto). Com a DEC-015 aceita, a próxima rodada na Gold real pode ser narrada. A meta do case para o agente sobre os dados reais (G1-05, pelo menos 80%) está cumprida. Os relatórios da Gold real ficam fora do Git ([DEC-024](docs/decisoes.md)), e o da amostra está em [`eval/runs/2026-10-29T144926Z.json`](ai-agent/eval/runs/2026-10-29T144926Z.json). Detalhes e comparações: [spec §9.6](ai-agent/docs/specs/2026-10-19-architecture-design.md).
 
 **Limitações conhecidas:**
-- **Ainda não houve rodada sobre a Gold real.**
-- **12 dos 93 itens do golden set têm revisão humana registrada.**
-- **A fidelidade numérica do texto ficou em 68%, contra a meta de 100%.** Parte das falhas vem das suposições, que citam o período pedido e não um número das linhas ([spec §9.6](ai-agent/docs/specs/2026-10-19-architecture-design.md)).
+- **O golden set da `main` tem revisão de Dados em todos os itens** (issue #90, PR #94); os follow-ups novos do #86 ainda aguardam.
+- **Na Gold real, três erros do agente** (percentual como fração, divisão entre contagens e "receita sem bandeiras") estão corrigidos no PR da camada 0.4.1, que aguarda a rodada.
+
+### Atendimento: visão 360 da UC
+
+Use **Consulta de UC** na sidebar ou Ctrl/Cmd + K para abrir a palette. Busque pelo código
+exatamente como aparece na conta, preservando zeros iniciais, ou selecione uma consulta recente.
+A sidebar destaca as telas do cargo em **Minha área** e mantém as demais em **Outras consultas**, sem duplicações (DEC-049).
+Somente os cinco códigos consultados com sucesso mais recentemente ficam salvos neste navegador,
+sem titular ou valores; a ação **Limpar recentes** remove a lista.
+O link `/uc?cod_uc=0001` continua abrindo a visão 360 diretamente. Sem código, `/uc` tem uma
+entrada compacta para abrir a busca. A palette valida a consulta antes de navegar e a tela
+reúne cadastro mascarado, consumo, contas pendentes, medidor/GD, interrupções e chamados em
+uma única consulta: `GET /unidades-consumidoras/{cod_uc}/visao-360`. A rota antiga de cadastro
+permanece disponível. O fluxo de entrada e os limites do histórico local estão na DEC-043.
+
+O diagnóstico segue a DEC-044 e o `Uc360Schema` aprovado no PR #55: a referência é a última
+competência **de toda a Gold**, não a última fatura da UC. A tendência vem do backend:
+alta acima de +10%, queda abaixo de −10% e estabilidade na faixa inclusiva de ±10%.
+Estabilidade pode incluir uma alta de 5%; a tela mostra os percentuais fornecidos pela API.
+A variação de 12 meses considera somente pares com fatura e informa `meses_comparados`.
+Lacunas são desconhecidas, não zero; base zero não tem percentual. Não há explicação causal
+do valor da conta. Faturas pendentes não têm corte por período e os históricos são paginados
+somente na apresentação. A Gold é histórica, não indica falta de energia em tempo real.
+Diferenças da apresentação e limites em
+[DEC-042](docs/decisoes.md#dec-042--visão-360-da-uc-e-comparação-sazonal-do-consumo).
+A comparação monetária com o ano anterior, o tipo de leitura e a diferença absoluta em kWh
+saíram da tela porque não estão no contrato aprovado; não são simulados por outras chamadas.
 
 ## Decisões que defendemos
 
@@ -169,8 +198,15 @@ O registro completo, com 38 decisões numeradas e as suposições, está em [`do
 - **Descartado:** SQLite, que dispensa instalação mas não tem usuários nem schemas.
 - **Efeito:** o somente leitura do agente é garantido pelo banco, e as ordens de inspeção do Rafael sobrevivem a cada recarga.
 
+**Login com cookie httpOnly e perfil checado no backend** · [DEC-049](docs/decisoes.md#dec-049--login-com-cookie-httponly-e-perfis-por-cargo)
+- **Problema:** esconder um item do menu não impede quem chama a API direto, e a auditoria do agente guarda a pergunta de todo mundo.
+- **Decisão:** `POST /auth/login` grava um JWT de 8 horas num cookie `HttpOnly` com `SameSite=Lax`; cinco perfis, com a escrita nas ordens só para `perdas` e a auditoria só para `ti`. O menu por cargo dá foco, e a permissão mora no backend.
+- **Descartado:** token no `localStorage`, que um XSS lê; e bloquear a leitura por tela, porque o agente já lê toda a Gold.
+- **Efeito:** sem login a API responde 401 e com o perfil errado, 403; o Rafael é o único que mexe nas ordens de inspeção.
+- **Portal:** `/login` integrado ao cookie, menu e entrada por cargo, retorno a links de dados após autenticar e saída com limpeza do cache. A entrada usa a marca animada e uma rede elétrica ilustrativa, com pausa e movimento reduzido; detalhes em [Login e perfis](frontend/README.md#login-e-perfis).
+
 **Ordens de inspeção como máquina de estados garantida no banco** · [DEC-009](docs/decisoes.md#dec-009--modelo-das-ordens-de-inspeção)
-- **Decisão:** status `GERADA → EM_CAMPO → CONCLUIDA` ou `CANCELADA`, histórico em `app.ordem_evento` e no máximo uma ordem ativa por unidade consumidora, garantida por índice único parcial.
+- **Decisão:** status `GERADA → EM_CAMPO → CONCLUIDA` ou `CANCELADA` (com volta de `EM_CAMPO` para `GERADA`, [DEC-048](docs/decisoes.md#dec-048--ordem-em-campo-pode-voltar-para-gerada)), histórico em `app.ordem_evento` e no máximo uma ordem ativa por unidade consumidora, garantida por índice único parcial.
 - **Por que no banco:** uma checagem só no Python deixaria passar duas requisições simultâneas.
 - **Sem FK para a Gold:** a carga apagaria as ordens ou falharia.
 - **Descartado:** rotas por ação (`/concluir`, `/cancelar`), que espalham a validação.
@@ -212,6 +248,9 @@ docker compose up -d --wait
 # 3. Gera a amostra sintética da Gold e carrega no banco
 docker compose run --rm api python -m venergy_api.amostra
 docker compose run --rm api python -m venergy_api.carga
+
+# 4. Cria os 5 usuários de demonstração do login (ou: make users)
+docker compose run --rm api python -m venergy_api.usuarios
 ```
 
 | O quê | Onde |
@@ -219,6 +258,18 @@ docker compose run --rm api python -m venergy_api.carga
 | Portal | http://localhost:3000 |
 | API e documentação interativa | http://127.0.0.1:8000/docs |
 | Banco | `127.0.0.1:5433`, usuário `venergy` |
+
+Para entrar no portal, use um destes logins com a senha `SENHA_DEMO` do `.env` (a mesma para todos, só para rodar
+localmente). Quem já tinha um `.env` antes do login precisa acrescentar `JWT_SECRET` e `SENHA_DEMO`: o `.env.example`
+mostra como, e sem `JWT_SECRET` o `docker compose` para com essa mensagem.
+
+| Login | Perfil | Além de ler os dados |
+|---|---|---|
+| `henrique` | diretoria | só leitura |
+| `camila` | atendimento | só leitura |
+| `rafael` | perdas | gera e atualiza ordens de inspeção |
+| `beatriz` | operação | só leitura |
+| `patricia` | TI | lê a auditoria do agente |
 
 O agente de IA precisa de `GOOGLE_API_KEY` no `.env` (chave do Gemini, uma por pessoa). Sem ela,
 tudo sobe, mas `POST /ai/ask` responde `503`. Cada resposta fica em `app.ai_auditoria` e se lê em

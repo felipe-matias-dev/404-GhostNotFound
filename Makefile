@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help setup env up down db sample load test test-backend test-agent lint frontend-check openapi ci
+.PHONY: help setup env up down db sample load test test-backend test-agent eval eval-compare lint frontend-check openapi ci
 
 help:
 	@echo Alvos do V-Energy Grid 360, use: make alvo
@@ -9,9 +9,12 @@ help:
 	@echo make db - sobe so o banco
 	@echo make sample - gera a amostra sintetica da Gold
 	@echo make load - carrega a Gold no banco
+	@echo make users - cria os 5 usuarios de demonstracao do login
 	@echo make test - testes do backend e do agente, sobe o banco antes
 	@echo make test-backend - testes do backend
 	@echo make test-agent - testes do agente de IA
+	@echo make eval - avalia o agente e grava eval/runs/, usa o modelo: DATASET ONLY JUDGE SQL_ONLY
+	@echo make eval-compare - compara duas rodadas, sem modelo: A=eval/runs/x.json B=eval/runs/y.json, caminhos relativos a ai-agent/
 	@echo make lint - hooks do pre-commit em todos os arquivos, igual ao CI, requer make setup
 	@echo make frontend-check - checagem de tipos e build do frontend
 	@echo make openapi - regera contracts/openapi.json e os tipos do client
@@ -40,6 +43,9 @@ sample: env
 load: env
 	docker compose run --rm api python -m venergy_api.carga
 
+users: env
+	docker compose run --rm api python -m venergy_api.usuarios
+
 test: test-backend test-agent
 
 test-backend: db
@@ -47,6 +53,12 @@ test-backend: db
 
 test-agent: db
 	uv --directory ai-agent run --frozen pytest
+
+eval: db
+	uv --directory ai-agent run --frozen python -m venergy_agent.evaluation --dataset $(or $(DATASET),amostra) $(if $(ONLY),--only $(ONLY)) $(if $(JUDGE),--judge) $(if $(SQL_ONLY),--sql-only)
+
+eval-compare:
+	uv --directory ai-agent run --frozen python -m venergy_agent.evaluation.compare $(A) $(B)
 
 lint:
 	uvx pre-commit run --all-files

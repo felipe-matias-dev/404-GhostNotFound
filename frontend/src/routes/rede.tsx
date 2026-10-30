@@ -1,4 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { RedePage } from "#/features/operacao";
+import { RedePage, redeSearchSchema } from "#/features/operacao";
 
-export const Route = createFileRoute("/rede")({ component: RedePage });
+export const Route = createFileRoute("/rede")({
+	validateSearch: redeSearchSchema,
+	component: RedePage,
+});

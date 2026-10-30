@@ -29,15 +29,21 @@ class AgentSettings(BaseSettings):
     max_correction_attempts: int = Field(3, ge=1, le=3)
     prompt_version: str = "v2"
     prompts_dir: Path = AGENT_ROOT / "prompts"
-    answer_prompt_version: str = "v2"
-    insight_prompt_version: str = "v1"
+    answer_prompt_version: str = "v3"
+    insight_prompt_version: str = "v2"
+    judge_model: str = "google-gla:gemini-3.5-flash-lite"
+    judge_prompt_version: str = "v1"
     answer_sample_rows: int = Field(20, gt=0)
     semantic_layer_path: Path = AGENT_ROOT / "semantic" / "semantic_layer.yaml"
     gold_contract_path: Path = REPO_ROOT / "contracts" / "gold_schema.yaml"
 
+    @property
+    def fallback_models(self) -> tuple[str, ...]:
+        return tuple(m.strip() for m in (self.fallback_model or "").split(",") if m.strip())
+
     @model_validator(mode="after")
     def check_provider_keys(self) -> Self:
-        for model in filter(None, (self.llm_model, self.fallback_model)):
+        for model in (self.llm_model, *self.fallback_models):
             provider, _, name = model.partition(":")
             key = PROVIDER_KEYS.get(provider)
             if key is None:

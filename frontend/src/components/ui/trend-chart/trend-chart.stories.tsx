@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
 import { SegmentedControl } from "#/components/ui/segmented-control";
-import { formatBRL, formatHoras, formatPct } from "#/lib/format";
+import { formatBRL, formatHoras, formatNumero, formatPct } from "#/lib/format";
 import {
 	type TrendCategory,
 	TrendChart,
@@ -91,8 +91,40 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-// Uma série: ela é o destaque (área e ponto final). Passe o mouse ou use as setas.
+// Uma série: ela é o destaque (ponto final; área só com `zeroBaseline`). Passe o mouse ou use
+// as setas.
 export const Padrao: Story = {};
+
+// Duas séries em índice que se afastam: linha de referência em 100, rótulo no fim de cada linha
+// no lugar da legenda e a faixa entre as duas, que é o dado do gráfico.
+export const Tesoura: Story = {
+	args: {
+		label: "Receita e energia em índice",
+		categories: CONTINUA,
+		series: [
+			{
+				id: "receita",
+				label: "Receita faturada",
+				shortLabel: "receita",
+				values: CONTINUA.map((_, i) => 100 + i * 0.25),
+				color: 1,
+				emphasis: true,
+			},
+			{
+				id: "energia",
+				label: "Energia faturada",
+				shortLabel: "energia",
+				values: CONTINUA.map((_, i) => 100 - i * 0.11),
+				color: 2,
+				emphasis: true,
+			},
+		],
+		formatValue: formatNumero,
+		reference: 100,
+		endLabels: true,
+		band: ["receita", "energia"],
+	},
+};
 
 // Um ano por linha sobre jan–dez: o ano atual em destaque, o anterior em comparação e os
 // mais antigos como contexto.
