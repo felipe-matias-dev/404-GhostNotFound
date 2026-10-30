@@ -12,6 +12,12 @@ export const ordensKeys = {
 export const filaKey = ["fila-suspeitas"] as const;
 export const TAMANHO_PAGINA = 20;
 
+const ORDENACAO_FILA: Record<string, "queda" | "energia" | "ordem_ativa"> = {
+	queda: "queda",
+	energia: "energia",
+	ordem_ativa: "ordem_ativa",
+};
+
 export function distribuicaoQueda() {
 	return unwrap(api.GET("/fila-suspeitas/distribuicao-queda"));
 }
@@ -32,14 +38,7 @@ export function listarFila(
 					medidor_eletromecanico: filtros.medidorEletromecanico,
 					leituras_estimadas_min: filtros.leiturasEstimadas?.[0],
 					leituras_estimadas_max: filtros.leiturasEstimadas?.[1],
-					ordenar_por:
-						sort?.columnId === "queda"
-							? "queda"
-							: sort?.columnId === "energia"
-								? "energia"
-								: sort?.columnId === "ordem_ativa"
-									? "ordem_ativa"
-									: "prioridade",
+					ordenar_por: ORDENACAO_FILA[sort?.columnId ?? ""] ?? "prioridade",
 					direcao: sort?.direction ?? "asc",
 				},
 			},
