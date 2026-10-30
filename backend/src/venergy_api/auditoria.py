@@ -88,8 +88,9 @@ def garantir_colunas_de_tokens(connection: Connection) -> None:
 def garantir_indice_da_sessao(connection: Connection) -> None:
     """Acrescenta o índice (session_id, id) à auditoria de um banco criado antes dele.
 
-    O contador do limite, a soma de tokens e o histórico filtram por sessão a cada pergunta.
-    Sem o índice, isso lê a tabela inteira, que só cresce.
+    O histórico filtra por sessão a cada pergunta, e a verificação de posse da sessão também. O
+    contador do limite e a soma de tokens filtram por usuário, com o índice (usuario, criado_em).
+    Sem este índice, o histórico lê a tabela inteira, que só cresce.
     """
     connection.execute(
         text(

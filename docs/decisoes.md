@@ -1371,7 +1371,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 
 ## DEC-046 · Memória de conversa, orçamento de tokens e limite de perguntas por usuário
 
-- **Status:** proposta, até o aceite do V1 (muda o contrato `AgentAnswer`, spec §4 e DEC-020).
+- **Status:** aceita em 30/10/2026, com o aceite do V1 (Felipe Matias) à mudança do contrato `AgentAnswer` (spec §4 e DEC-020).
 - **Data:** 29/10/2026 · **Área:** IA e Backend · **Autor:** GenAI
 - **Contexto:** o diferencial G1-10 pede follow-up ("e em Olinda?"), e o guia (§5.4) pede orçamento de tokens e limite de uso por
   sessão. O agente é somente leitura e não guarda estado (§8 do guia); o backend já grava cada pergunta e resposta na auditoria
@@ -1407,7 +1407,10 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   200000 tokens é uma suposição a medir nos logs (`input_tokens` da etapa `geracao`).
 - **Pendente (regra de merge, DEC-016):** a troca do prompt padrão para a v3 só entra na `main` depois de `make eval ONLY=golden`
   na v2 e na v3 e `make eval ONLY=red_team` na v3, sem regressão nos itens comuns (os que não são follow-up) e com pelo menos 4 dos 5 follow-ups do golden
-  (G046, G099, G100, G102, G103) certos, inclusive o G046, com a memória ligada no runner da avaliação (amostra). Sem cota do Gemini na data, a rodada não foi feita; os números entram aqui e na spec §9.6.
+  (G046, G099, G100, G102, G103) certos, inclusive o G046, com a memória ligada no runner da avaliação (amostra).
+- **Resultado da rodada (30/10/2026):** a v3 foi rodada na Gold real, em modo só SQL, com o golden 0.14.0 e a camada 0.4.0 (`2026-10-30T172756Z`): execução 93,9%, status 94,6%, sem falhas nem erro de provedor. A v2 de referência é a rodada de 29/10 (`2026-10-29T011532Z`, golden 0.9.0). Como as duas versões do golden são diferentes, o SQL gravado da v2 foi reexecutado com o gabarito 0.14.0, nos 40 itens comuns com referência SQL: a v2 acerta 37, a v3 acerta 40, e não há regressão. Nos follow-ups, G046, G099, G101 e G102 estão certos, e G103 não. A comparação é offline, sobre o SQL gravado; a v2 não foi rodada de novo.
+- **Problema conhecido:** G103, o follow-up que depende de um turno recusado. O agente responde com um período inventado, em vez de pedir esclarecimento (issue #104). Corrigir exige mudança de prompt e nova rodada, por isso fica para depois do merge.
+- **Tokens de falhas e leitura do orçamento (issue #103):** os tokens de chamadas que falham entram no orçamento e na auditoria. Se a leitura do consumo da sessão falhar, a pergunta é negada com mensagem própria e log `step=orcamento`, por custo.
 - **Atualização (29/10/2026, revisão do Felipe no #86):** o `session_id` não sai na auditoria (`GET /ai/audit/{id}`), só na resposta do `POST /ai/ask`. (Substituída pela atualização do login, abaixo: o limite e o orçamento deixam de contar pelo `session_id`.)
 
 

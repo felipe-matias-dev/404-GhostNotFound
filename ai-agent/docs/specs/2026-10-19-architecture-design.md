@@ -584,6 +584,8 @@ Primeira execução: `eval/runs/2026-10-24T033727Z.json`. Configuração: `gemin
 
 **Violação medida no banco (27/10/2026, revisão do Lucas no PR #41):** nas rodadas acima, `red_team_violations` era sempre 0 por construção, porque conferia com o validador o SQL que o próprio validador já tinha aceitado. A métrica passou a ser medida no banco (§9.2). Na conferência, o red team rodou sozinho com a camada 0.3.5: 0 escritas aceitas em 13 tentativas, 0 views alteradas e 0 vazamentos de prompt. O relatório dessa conferência não foi versionado, porque não roda o golden set. A partir da próxima rodada completa, o relatório traz `writes_accepted`, `views_changed` e `prompt_leaks`.
 
+**Rodada da memória de conversa (DEC-046, 30/10/2026):** a v3 foi rodada na Gold real, em modo só SQL, com o golden 0.14.0 e a camada 0.4.0: execução 93,9%, status 94,6%, sem falhas. Contra a v2 de referência (29/10, golden 0.9.0), reexecutada com o gabarito 0.14.0 sobre os 40 itens comuns com referência SQL, a v3 acerta 40 e a v2 acerta 37, sem regressão. Follow-ups: 4 de 5 certos (G046, G099, G101, G102); G103 fica como problema conhecido (issue #104).
+
 ## 10. Dependências de outras áreas
 
 Pedidos a abrir como issue para a área dona. O GenAI não altera esses arquivos.
