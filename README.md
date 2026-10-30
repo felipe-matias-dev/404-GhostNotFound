@@ -190,7 +190,8 @@ simulada por outras chamadas.
 
 O card **Por que a conta mudou**, no topo da tela, responde à reclamação de conta alta em reais:
 a conta do mês de referência contra a do mesmo mês do ano anterior, com a diferença dividida em
-consumo, tarifa, bandeira e tributos, e a parte que mais pesou destacada. As partes vêm prontas
+consumo, dias na fatura, tarifa, bandeira e tributos, e a parte que mais pesou na direção da
+conta destacada. A parte dos dias só aparece quando a API a separa do consumo. As partes vêm prontas
 de `variacao_conta`, na mesma rota da visão 360, e somam exatamente a diferença; a tela não faz
 conta. Sem a conta do ano anterior, o card diz que não há com o que comparar, e uma leitura
 estimada ganha um aviso. Fórmula e limites em
