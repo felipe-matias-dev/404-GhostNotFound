@@ -203,7 +203,7 @@ O validador é a primeira trava. A segunda é o banco: role somente leitura, com
 | Campo | Padrão | Restrição |
 |---|---|---|
 | `llm_model` | `google-gla:gemini-3.1-flash-lite` | Prefixo `google-gla:` ou `openrouter:`, com nome de modelo |
-| `fallback_model` | `None` | Mesma regra. Na API do `docker compose`, o padrão é `google-gla:gemini-3.5-flash` (`GEMINI_FALLBACK_MODEL`); entra sozinho em 429 ou 503 e precisa ser diferente do `judge_model` |
+| `fallback_model` | `None` | Mesma regra, para cada modelo. Aceita uma cadeia separada por vírgula, tentada em ordem (`FallbackModel`), inclusive entre provedores. Na API do `docker compose`, o padrão é `google-gla:gemini-3.5-flash` (`GEMINI_FALLBACK_MODEL`, com `OPENROUTER_API_KEY` para modelos `openrouter:`); entra sozinho em 429 ou 503, e nenhum modelo da cadeia pode ser igual ao `judge_model` |
 | `google_api_key` | obrigatório se algum modelo usa `google-gla:` | `SecretStr`, nunca no `repr`; em branco conta como ausente |
 | `openrouter_api_key` | obrigatório se algum modelo usa `openrouter:` | Idem |
 | `temperature` | `0.0` | `0 ≤ t ≤ 0.2` |
