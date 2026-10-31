@@ -372,6 +372,8 @@ async def perguntar_em_stream(
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
 def _exigir_sessao(session: Session, session_id: str, login: str) -> None:
     # 404 também para a sessão de outra pessoa: a resposta não revela que o id existe.
     if not sessao_disponivel(session, session_id, login):
