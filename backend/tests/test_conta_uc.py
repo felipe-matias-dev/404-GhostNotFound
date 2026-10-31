@@ -38,7 +38,6 @@ def fatura(competencia: str, **changes: object) -> FatoFaturamentoMensal:
 
 def partes(variacao) -> list[Decimal]:
     return [
-        variacao.dias or Decimal(0),
         variacao.consumo,
         variacao.tarifa,
         variacao.bandeira,
@@ -110,7 +109,6 @@ def test_a_bandeira_increase_goes_entirely_to_the_bandeira() -> None:
     assert variacao is not None
     assert variacao.bandeira == Decimal("1.90")
     assert [variacao.consumo, variacao.tarifa, variacao.tributos] == [0, 0, 0]
-    assert variacao.dias == 0
 
 
 def test_a_tariff_increase_goes_to_the_tariff_and_the_taxes_to_the_taxes() -> None:
@@ -126,11 +124,12 @@ def test_a_tariff_increase_goes_to_the_tariff_and_the_taxes_to_the_taxes() -> No
 
     assert variacao is not None
     assert (variacao.tarifa, variacao.tributos) == (Decimal("5.60"), Decimal("1.00"))
-    assert [variacao.consumo, variacao.bandeira, variacao.dias] == [0, 0, 0]
+    assert [variacao.consumo, variacao.bandeira] == [0, 0]
 
 
-def test_more_days_with_the_same_daily_consumption_move_only_the_days() -> None:
-    # 3 kWh por dia nos dois meses, a R$ 0,70 por kWh: 31 dias custam 3 × 0,70 a mais.
+def test_a_different_number_of_days_does_not_split_the_volume() -> None:
+    # Na Gold real o kWh não acompanha os dias faturados: 10 dias a mais com 3 kWh a mais.
+    # Todo o volume é consumo, a R$ 0,70 por kWh do ano anterior.
     anterior = fatura(
         MESMO_MES_DO_ANO_ANTERIOR,
         kwh_faturado=Decimal("90"),
@@ -143,14 +142,14 @@ def test_more_days_with_the_same_daily_consumption_move_only_the_days() -> None:
         kwh_faturado=Decimal("93"),
         receita_energia=Decimal("65.10"),
         receita_faturada=Decimal("85.10"),
-        dias_faturados=31,
+        dias_faturados=40,
     )
 
     variacao = montar_variacao_conta(REFERENCIA, [anterior, atual])
 
     assert variacao is not None
-    assert variacao.dias == Decimal("2.10")
-    assert [variacao.consumo, variacao.tarifa, variacao.bandeira, variacao.tributos] == [0, 0, 0, 0]
+    assert variacao.consumo == Decimal("2.10")
+    assert [variacao.tarifa, variacao.bandeira, variacao.tributos] == [0, 0, 0]
 
 
 def test_more_energy_in_the_same_days_goes_to_the_consumption() -> None:
@@ -166,10 +165,20 @@ def test_more_energy_in_the_same_days_goes_to_the_consumption() -> None:
 
     assert variacao is not None
     assert variacao.consumo == Decimal("14.00")
-    assert [variacao.dias, variacao.tarifa, variacao.bandeira, variacao.tributos] == [0, 0, 0, 0]
+    assert [variacao.tarifa, variacao.bandeira, variacao.tributos] == [0, 0, 0]
 
 
-def test_without_the_days_of_a_bill_all_the_volume_goes_to_the_consumption() -> None:
+def test_reports_the_days_each_bill_covered() -> None:
+    anterior = fatura(MESMO_MES_DO_ANO_ANTERIOR, dias_faturados=29)
+    atual = fatura(REFERENCIA, dias_faturados=33)
+
+    variacao = montar_variacao_conta(REFERENCIA, [anterior, atual])
+
+    assert variacao is not None
+    assert (variacao.dias_faturados, variacao.dias_faturados_comparada) == (33, 29)
+
+
+def test_a_bill_without_the_days_reports_them_empty_and_still_adds_up() -> None:
     anterior = fatura(MESMO_MES_DO_ANO_ANTERIOR, dias_faturados=None)
     atual = fatura(
         REFERENCIA,
@@ -182,7 +191,7 @@ def test_without_the_days_of_a_bill_all_the_volume_goes_to_the_consumption() -> 
     variacao = montar_variacao_conta(REFERENCIA, [anterior, atual])
 
     assert variacao is not None
-    assert variacao.dias is None
+    assert (variacao.dias_faturados, variacao.dias_faturados_comparada) == (31, None)
     assert variacao.consumo == Decimal("7.00")
     assert sum(partes(variacao)) == variacao.diferenca
 
