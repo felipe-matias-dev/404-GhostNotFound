@@ -56,6 +56,8 @@ Período (G1-05): quando as linhas têm `competencia`, o texto determinístico c
 
 `InsightWriter` (item 9, `infrastructure/insight_writer.py`, prompt em `prompts/insight/v2/`, com unidade, efeito tarifa e bandeira como partes do efeito preço e negativo por extenso): narra o JSON de métricas de uma tela e devolve `None` se algum número do texto não estiver no JSON. O backend monta o JSON, guarda o insight em cache e liga o redator (D9): feito para a tela de Receita (`GET /receita/insight`, DEC-040), com `build_insight_writer` em `bootstrap.py`. O golden set está em `eval/golden_set.yaml` (versão 0.17.0, 105 itens, alinhado à camada 0.4.0). `revisado_por` está preenchido por Dados em 104 itens; o G105 aguarda a conferência da mudança da 0.17.0.
 
+**Queda do provedor (DEC-060):** `GuardedModel` limita cada chamada a 15 s e, depois de uma falha, pula o modelo por 60 s, exceto o último da cadeia. A pergunta tem prazo de 30 s: estourado, volta `failed`; se a demora for na narração, a resposta sai com o texto determinístico.
+
 ## 3b. Memória e orçamento
 
 - O histórico e o consumo de tokens vêm das portas `ConversationHistory` e `SessionUsage`. Quem as implementa é o backend (`HistoricoAuditoria`, sobre `app.ai_auditoria`): o `venergy_agent` nunca lê `app` e o agente continua sem gravar nada.

@@ -21,14 +21,14 @@ def settings(**overrides):
 def test_builds_gemini_direct_by_default():
     model = build_model(settings())
 
-    assert isinstance(model, GoogleModel)
+    assert isinstance(model.wrapped, GoogleModel)
     assert model.model_name == "gemini-3.1-flash-lite"
 
 
 def test_builds_openrouter_model_from_its_prefix():
     model = build_model(settings(llm_model="openrouter:google/gemma-4-31b-it:free"))
 
-    assert isinstance(model, OpenRouterModel)
+    assert isinstance(model.wrapped, OpenRouterModel)
     assert model.model_name == "google/gemma-4-31b-it:free"
 
 
@@ -36,7 +36,7 @@ def test_fallback_can_use_the_other_provider():
     model = build_model(settings(fallback_model="openrouter:google/gemini-3.1-flash-lite"))
 
     assert isinstance(model, FallbackModel)
-    assert [type(m) for m in model.models] == [GoogleModel, OpenRouterModel]
+    assert [type(m.wrapped) for m in model.models] == [GoogleModel, OpenRouterModel]
 
 
 def test_a_comma_separated_fallback_builds_the_chain_in_order():

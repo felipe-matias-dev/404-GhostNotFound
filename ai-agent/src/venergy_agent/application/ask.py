@@ -42,6 +42,8 @@ from venergy_agent.domain.sql import (
 
 logger = logging.getLogger("venergy_agent.ask")
 
+NARRATION_MARGIN_SECONDS = 1.0
+
 TECHNICAL_NAME = re.compile(r"\b[a-zA-Z]+_\w+")
 WRITE_STATEMENT = re.compile(
     r"\b(delete\s+from|insert\s+into|update\s+\w+\s+set|truncate|"
@@ -69,6 +71,7 @@ BUDGET_EXHAUSTED = (
 )
 BUDGET_UNAVAILABLE = "Não consegui conferir o seu limite de uso agora. Tente de novo em instantes."
 MODEL_FAILED = "Não consegui consultar o modelo de linguagem agora. Tente de novo em instantes."
+DEADLINE_FAILED = "A resposta demorou mais do que o esperado. Tente de novo em instantes."
 INTERNAL_FAILED = "Algo deu errado do nosso lado. Tente de novo em instantes."
 ATTEMPTS_FAILED = "Não consegui montar uma consulta válida depois de {attempts} tentativas."
 DATABASE_FAILED = "Não consegui consultar o banco agora. Tente de novo em instantes."
@@ -131,6 +134,7 @@ class AskUseCase:
         history_turns: int = 0,
         usage: SessionUsage | None = None,
         session_token_budget: int = 0,
+        answer_deadline_seconds: float = 30.0,
     ) -> None:
         self._layer = layer
         self._generator = generator
@@ -146,6 +150,7 @@ class AskUseCase:
         self._history_turns = history_turns
         self._usage = usage
         self._session_token_budget = session_token_budget
+        self._answer_deadline_seconds = answer_deadline_seconds
 
     async def ask(self, question: str, session_id: str) -> AgentAnswer:
         return await self._run(question, session_id, lambda _: None)
@@ -169,7 +174,16 @@ class AskUseCase:
         started = time.perf_counter()
         request_id = uuid4().hex
         try:
-            return await self._answer(question, session_id, request_id, started, emit)
+            async with asyncio.timeout(self._answer_deadline_seconds):
+                return await self._answer(question, session_id, request_id, started, emit)
+        except TimeoutError:
+            return self._unanswered(
+                AnswerStatus.FAILED,
+                DEADLINE_FAILED,
+                request_id=request_id,
+                session_id=session_id,
+                started=started,
+            )
         except Exception as error:
             self._log(
                 request_id, session_id, step="ask", status="internal_error", error=repr(error)
@@ -502,7 +516,7 @@ class AskUseCase:
             result, draft, validated, _period(result) or _endpoints(validated.periods)
         )
         text = await self._narrate(
-            question, draft, visible, text, _period(visible), validated.periods, spent
+            question, draft, visible, text, _period(visible), validated.periods, spent, started
         )
 
         return AgentAnswer(
@@ -534,11 +548,20 @@ class AskUseCase:
         period: tuple[str, str] | None,
         filtered_periods: tuple[str, ...],
         spent: _Spent,
+        started: float,
     ) -> str:
         if self._answer_writer is None:
             return fallback
+        remaining = (
+            self._answer_deadline_seconds
+            - NARRATION_MARGIN_SECONDS
+            - (time.perf_counter() - started)
+        )
+        if remaining <= 0:
+            return fallback
         try:
-            narration = await self._answer_writer.write(question, draft, visible)
+            async with asyncio.timeout(remaining):
+                narration = await self._answer_writer.write(question, draft, visible)
         except ModelCallFailed as error:
             spent.input_tokens += error.input_tokens
             spent.output_tokens += error.output_tokens
