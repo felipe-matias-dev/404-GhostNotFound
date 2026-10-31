@@ -406,7 +406,7 @@ class ConsumoUcSchema(BaseModel):
 class VariacaoContaSchema(BaseModel):
     """Por que a conta do mês de referência mudou, em R$, contra o mesmo mês do ano anterior.
 
-    As cinco partes somam exatamente a `diferenca` entre as duas contas.
+    As quatro partes somam exatamente a `diferenca` entre as duas contas.
     """
 
     competencia: Competencia
@@ -414,8 +414,10 @@ class VariacaoContaSchema(BaseModel):
     conta: ExactNumber
     conta_comparada: ExactNumber
     diferenca: ExactNumber
-    # Vazio quando uma das contas não traz os dias faturados: o volume inteiro vai para o consumo.
-    dias: ExactNumber | None
+    # Só informativos, não entram na divisão: na Gold real o kWh não acompanha os dias da fatura.
+    # Vazios quando a conta não traz os dias.
+    dias_faturados: int | None
+    dias_faturados_comparada: int | None
     consumo: ExactNumber
     tarifa: ExactNumber
     bandeira: ExactNumber

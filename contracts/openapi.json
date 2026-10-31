@@ -4286,16 +4286,27 @@
             "type": "number",
             "title": "Diferenca"
           },
-          "dias": {
+          "dias_faturados": {
             "anyOf": [
               {
-                "type": "number"
+                "type": "integer"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Dias"
+            "title": "Dias Faturados"
+          },
+          "dias_faturados_comparada": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dias Faturados Comparada"
           },
           "consumo": {
             "type": "number",
@@ -4325,7 +4336,8 @@
           "conta",
           "conta_comparada",
           "diferenca",
-          "dias",
+          "dias_faturados",
+          "dias_faturados_comparada",
           "consumo",
           "tarifa",
           "bandeira",
@@ -4333,7 +4345,7 @@
           "leitura_estimada"
         ],
         "title": "VariacaoContaSchema",
-        "description": "Por que a conta do mês de referência mudou, em R$, contra o mesmo mês do ano anterior.\n\nAs cinco partes somam exatamente a `diferenca` entre as duas contas."
+        "description": "Por que a conta do mês de referência mudou, em R$, contra o mesmo mês do ano anterior.\n\nAs quatro partes somam exatamente a `diferenca` entre as duas contas."
       },
       "VariacaoIndicadoresSchema": {
         "properties": {

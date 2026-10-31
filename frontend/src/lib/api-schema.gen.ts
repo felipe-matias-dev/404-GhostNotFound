@@ -1266,7 +1266,7 @@ export interface components {
          * VariacaoContaSchema
          * @description Por que a conta do mês de referência mudou, em R$, contra o mesmo mês do ano anterior.
          *
-         *     As cinco partes somam exatamente a `diferenca` entre as duas contas.
+         *     As quatro partes somam exatamente a `diferenca` entre as duas contas.
          */
         VariacaoContaSchema: {
             /** Competencia */
@@ -1279,8 +1279,10 @@ export interface components {
             conta_comparada: number;
             /** Diferenca */
             diferenca: number;
-            /** Dias */
-            dias: number | null;
+            /** Dias Faturados */
+            dias_faturados: number | null;
+            /** Dias Faturados Comparada */
+            dias_faturados_comparada: number | null;
             /** Consumo */
             consumo: number;
             /** Tarifa */

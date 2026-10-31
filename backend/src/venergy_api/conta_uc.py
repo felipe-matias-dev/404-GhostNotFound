@@ -36,30 +36,19 @@ def montar_variacao_conta(
         return None
 
     preco_anterior = anterior.receita_energia / anterior.kwh_faturado
-    # Mais ou menos energia, ao preço do ano anterior.
-    volume = (atual.kwh_faturado - anterior.kwh_faturado) * preco_anterior
-    # Parte do volume que vem só de a conta cobrir mais ou menos dias, no consumo diário do
-    # ano anterior. O resto do volume é a pessoa ter gasto mais ou menos por dia.
-    tem_dias = bool(anterior.dias_faturados) and atual.dias_faturados is not None
-    dias = (
-        (atual.dias_faturados - anterior.dias_faturados)
-        * (anterior.kwh_faturado / anterior.dias_faturados)
-        * preco_anterior
-        if tem_dias
-        else None
-    )
+    # Mais ou menos energia, ao preço do ano anterior. Os dias faturados não dividem esse
+    # volume: na Gold real o kWh não acompanha os dias da fatura, e a divisão por dia dava
+    # partes de dezenas de milhares de reais para uma conta que mudou menos de mil.
+    consumo = _centavos((atual.kwh_faturado - anterior.kwh_faturado) * preco_anterior)
     # O acréscimo da bandeira além do que a conta do ano anterior já trazia por kWh.
-    bandeira = atual.receita_bandeira - atual.kwh_faturado * (
-        anterior.receita_bandeira / anterior.kwh_faturado
+    bandeira = _centavos(
+        atual.receita_bandeira
+        - atual.kwh_faturado * (anterior.receita_bandeira / anterior.kwh_faturado)
     )
-
-    dias_em_centavos = _centavos(dias) if dias is not None else None
-    consumo = _centavos(volume - (dias or Decimal(0)))
-    bandeira = _centavos(bandeira)
     variacao_da_energia = atual.receita_energia - anterior.receita_energia
     # A tarifa fica com a sobra do arredondamento: assim as partes somam exatamente a
     # diferença que o atendente vê nas duas contas, sem uma linha "arredondamento".
-    tarifa = variacao_da_energia - (dias_em_centavos or Decimal(0)) - consumo - bandeira
+    tarifa = variacao_da_energia - consumo - bandeira
     tributos = (atual.receita_faturada - anterior.receita_faturada) - variacao_da_energia
 
     return VariacaoContaSchema(
@@ -68,7 +57,8 @@ def montar_variacao_conta(
         conta=atual.receita_faturada,
         conta_comparada=anterior.receita_faturada,
         diferenca=atual.receita_faturada - anterior.receita_faturada,
-        dias=dias_em_centavos,
+        dias_faturados=atual.dias_faturados,
+        dias_faturados_comparada=anterior.dias_faturados,
         consumo=consumo,
         tarifa=tarifa,
         bandeira=bandeira,
