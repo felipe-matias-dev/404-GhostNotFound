@@ -2,8 +2,6 @@ import type { components } from "#/lib/api-schema.gen";
 
 export type KpisMensais = components["schemas"]["KpisMensaisSchema"];
 
-export type ParPeriodos = components["schemas"]["ParPeriodosSchema"];
-
 /** Os seis indicadores dos cards; o nome é o da coluna da `gold_kpis_mensais`. */
 export type Indicador = Extract<
 	keyof KpisMensais,

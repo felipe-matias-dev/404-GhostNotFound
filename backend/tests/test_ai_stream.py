@@ -116,6 +116,21 @@ def test_session_of_someone_else_answers_403_without_opening_the_stream(
     assert agente.chamadas == 0
 
 
+def test_deleted_session_answers_409_without_opening_the_stream(
+    api: TestClient, engine: Engine
+) -> None:
+    agente = AgenteFalso()
+    api.app.dependency_overrides[get_agente] = lambda: agente
+    with Session(engine) as session:
+        gravar_auditoria(session, "x", SESSAO, resposta(), "teste")
+    assert api.delete(f"/ai/sessions/{SESSAO}").status_code == 204
+
+    resposta_http = api.post(URL, json={"question": "Mais uma", "session_id": SESSAO})
+
+    assert resposta_http.status_code == 409
+    assert agente.chamadas == 0
+
+
 def test_limit_answers_429_without_opening_the_stream(
     engine: Engine, client_for: Callable[..., TestClient]
 ) -> None:

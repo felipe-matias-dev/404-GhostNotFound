@@ -6,7 +6,7 @@ export type VisaoRede = "alimentadores" | "localidades";
 
 export type Periodo = { inicio: string; fim: string };
 
-export type Recorte = { municipio?: string; bairro?: string };
+export type { Recorte } from "#/lib/filtros";
 
 export type AlimentadorMensal =
 	components["schemas"]["ContinuidadeAlimentadorMensalSchema"];

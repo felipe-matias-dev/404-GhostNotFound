@@ -14,6 +14,7 @@ from sqlalchemy import (
     Index,
     Numeric,
     Text,
+    false,
     func,
     text,
 )
@@ -458,3 +459,24 @@ class Usuario(Base):
     perfil: Mapped[Perfil] = mapped_column(_enum_como_texto(Perfil, "ck_usuarios_perfil"))
     # Só o hash Argon2: com a tabela vazada, ninguém lê as senhas.
     senha_hash: Mapped[str]
+
+
+class AiSessao(Base):
+    """O que o usuário decidiu sobre uma conversa do agente: título, estrela e exclusão.
+
+    Os turnos continuam só na auditoria, que é imutável. A linha nasce na primeira alteração:
+    conversa sem linha aqui é uma conversa sem título próprio, não favorita e não excluída.
+    """
+
+    __tablename__ = "ai_sessao"
+    __table_args__ = {"schema": "app"}
+
+    session_id: Mapped[str] = mapped_column(primary_key=True)
+    usuario: Mapped[str]
+    titulo: Mapped[str | None]
+    favorita: Mapped[bool] = mapped_column(server_default=false())
+    criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    atualizado_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    excluido_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

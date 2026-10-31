@@ -1,6 +1,6 @@
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import Engine
+from sqlalchemy import Engine, delete
 from sqlalchemy.orm import Session
 
 from venergy_api.database import Base
@@ -43,6 +43,43 @@ def stored_uc(engine: Engine) -> None:
     Base.metadata.create_all(engine)
     with Session(engine) as session, session.begin():
         session.add_all([DimUc(**STORED_UC), DimUc(**UC_WITHOUT_READING)])
+
+
+def test_localidades_are_distinct_ordered_and_only_expose_location(
+    client: TestClient, engine: Engine
+) -> None:
+    with Session(engine) as session, session.begin():
+        session.add_all(
+            [
+                DimUc(
+                    **{**STORED_UC, "cod_uc": "0003", "municipio": "Paulista", "bairro": "Centro"}
+                ),
+                DimUc(**{**STORED_UC, "cod_uc": "0004", "municipio": "Recife", "bairro": "Centro"}),
+                DimUc(
+                    **{**STORED_UC, "cod_uc": "0005", "municipio": "Paulista", "bairro": "Janga"}
+                ),
+            ]
+        )
+
+    response = client.get("/unidades-consumidoras/localidades")
+
+    assert response.status_code == 200
+    assert response.json() == [
+        {"municipio": "Paulista", "bairro": "Centro"},
+        {"municipio": "Paulista", "bairro": "Janga"},
+        {"municipio": "Recife", "bairro": "Boa Viagem"},
+        {"municipio": "Recife", "bairro": "Centro"},
+    ]
+
+
+def test_localidades_are_empty_without_units(client: TestClient, engine: Engine) -> None:
+    with Session(engine) as session, session.begin():
+        session.execute(delete(DimUc))
+
+    response = client.get("/unidades-consumidoras/localidades")
+
+    assert response.status_code == 200
+    assert response.json() == []
 
 
 def test_returns_the_consumer_unit_when_it_exists(client: TestClient) -> None:

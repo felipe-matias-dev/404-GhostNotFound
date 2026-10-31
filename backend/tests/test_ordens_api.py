@@ -127,6 +127,34 @@ def test_unknown_status_filter_returns_422(client: TestClient) -> None:
     assert response.status_code == 422
 
 
+def test_filters_orders_by_segment_and_status_without_changing_them(
+    client: TestClient, engine: Engine
+) -> None:
+    first, _, _ = create_orders(client, "0001", "0002", "0003")
+    set_status(engine, first["id"], StatusOrdem.EM_CAMPO)
+    with Session(engine) as session, session.begin():
+        session.execute(
+            update(DimUc)
+            .where(DimUc.cod_uc == "0002")
+            .values(municipio="Paulista", bairro="Janga", classe="B3")
+        )
+        session.delete(session.get(DimUc, "0003"))
+
+    before = client.get("/ordens-inspecao").json()
+    assert {order["cod_uc"] for order in before} == {"0001", "0002", "0003"}
+    params = {"municipio": "Recife", "bairro": "Boa Viagem", "classe": "B1", "status": "EM_CAMPO"}
+    response = client.get("/ordens-inspecao", params=params)
+    assert response.status_code == 200
+    assert [order["cod_uc"] for order in response.json()] == ["0001"]
+    response = client.get(
+        "/ordens-inspecao", params={"municipio": "Paulista", "bairro": "Janga", "classe": "B3"}
+    )
+    assert [order["cod_uc"] for order in response.json()] == ["0002"]
+    assert client.get("/ordens-inspecao", params={"municipio": "Inexistente"}).json() == []
+    assert client.get("/ordens-inspecao", params={"bairro": "Janga"}).status_code == 422
+    assert client.get("/ordens-inspecao").json() == before
+
+
 def test_unknown_order_returns_404(client: TestClient) -> None:
     response = client.get("/ordens-inspecao/999")
 

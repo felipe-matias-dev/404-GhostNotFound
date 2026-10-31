@@ -17,6 +17,7 @@ from venergy_api.schemas import (
     ErroSchema,
     OrdemDetalheSchema,
     OrdemSchema,
+    OrdensFiltroSchema,
 )
 from venergy_api.sessao import exigir_perfil
 
@@ -93,15 +94,25 @@ def criar_ordens(
 @router.get("")
 def listar_ordens(
     session: SessionDep,
-    # Na URL continua ?status=; o nome interno evita esconder o módulo status do FastAPI.
-    filtro_status: Annotated[StatusOrdem | None, Query(alias="status")] = None,
+    filtro: Annotated[OrdensFiltroSchema, Query()],
 ) -> list[OrdemSchema]:
     """Lista as OIs, das mais recentes para as mais antigas, opcionalmente por status."""
     # Pelo id, e não por criada_em: OIs do mesmo lote têm o mesmo horário (now() da
     # transação), e o id desempata de forma estável.
     consulta = select(OrdemInspecao).order_by(OrdemInspecao.id.desc())
-    if filtro_status is not None:
-        consulta = consulta.where(OrdemInspecao.status == filtro_status)
+    if filtro.status is not None:
+        consulta = consulta.where(OrdemInspecao.status == filtro.status)
+    predicados = [
+        coluna == valor
+        for coluna, valor in (
+            (DimUc.municipio, filtro.municipio),
+            (DimUc.bairro, filtro.bairro),
+            (DimUc.classe, filtro.classe),
+        )
+        if valor is not None
+    ]
+    if predicados:
+        consulta = consulta.join(DimUc, DimUc.cod_uc == OrdemInspecao.cod_uc).where(*predicados)
     return [OrdemSchema.model_validate(ordem) for ordem in session.scalars(consulta)]
 
 

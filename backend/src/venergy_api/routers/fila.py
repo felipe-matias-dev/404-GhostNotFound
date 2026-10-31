@@ -6,7 +6,7 @@ from fastapi import APIRouter, Query
 from sqlalchemy import Integer, and_, any_, case, cast, func, select
 
 from venergy_api.database import SessionDep
-from venergy_api.models import FilaSuspeita, OrdemInspecao
+from venergy_api.models import DimUc, FilaSuspeita, OrdemInspecao
 from venergy_api.ordens import STATUS_ATIVOS
 from venergy_api.schemas import (
     DistribuicaoQuedaItemSchema,
@@ -15,6 +15,7 @@ from venergy_api.schemas import (
     FilaItemSchema,
     FilaPaginaSchema,
     OrdemAtivaSchema,
+    RecorteFiltroSchema,
 )
 
 router = APIRouter(prefix="/fila-suspeitas", tags=["fila de suspeitas"])
@@ -38,10 +39,28 @@ def leituras_estimadas_percentual():
     return case((numero.between(0, 100), numero), else_=None)
 
 
+def _predicados_recorte(filtro: RecorteFiltroSchema):
+    return [
+        coluna == valor
+        for coluna, valor in (
+            (DimUc.municipio, filtro.municipio),
+            (DimUc.bairro, filtro.bairro),
+            (DimUc.classe, filtro.classe),
+        )
+        if valor is not None
+    ]
+
+
 @router.get("/distribuicao-queda")
-def get_distribuicao_queda(session: SessionDep) -> DistribuicaoQuedaSchema:
+def get_distribuicao_queda(
+    filtro: Annotated[RecorteFiltroSchema, Query()], session: SessionDep
+) -> DistribuicaoQuedaSchema:
     queda = queda_percentual()
-    rows = session.execute(select(queda, func.count()).group_by(queda)).all()
+    consulta = select(queda, func.count()).group_by(queda)
+    predicados = _predicados_recorte(filtro)
+    if predicados:
+        consulta = consulta.join(DimUc, DimUc.cod_uc == FilaSuspeita.cod_uc).where(*predicados)
+    rows = session.execute(consulta).all()
     return DistribuicaoQuedaSchema(
         itens=[
             DistribuicaoQuedaItemSchema(queda=valor, total=total)
@@ -81,6 +100,10 @@ def get_fila(filtro: Annotated[FilaFiltroSchema, Query()], session: SessionDep) 
         .offset((filtro.pagina - 1) * filtro.tamanho)
         .limit(filtro.tamanho)
     )
+    predicados = _predicados_recorte(filtro)
+    if predicados:
+        total_consulta = total_consulta.join(DimUc, DimUc.cod_uc == fila.cod_uc).where(*predicados)
+        consulta = consulta.join(DimUc, DimUc.cod_uc == fila.cod_uc).where(*predicados)
     if filtro.sem_ordem_ativa:
         total_consulta = total_consulta.where(OrdemInspecao.id.is_(None))
         consulta = consulta.where(OrdemInspecao.id.is_(None))

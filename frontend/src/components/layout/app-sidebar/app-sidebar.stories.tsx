@@ -11,7 +11,7 @@ const meta = {
 	title: "Layout/AppSidebar",
 	component: AppSidebar,
 	tags: ["autodocs"],
-	args: { itens: NAVEGACAO, onConsultarUc: fn() },
+	args: { itens: NAVEGACAO, onConsultarUc: fn(), searchPara: () => ({}) },
 	parameters: { layout: "fullscreen", rota: "/" },
 	decorators: [
 		(Story, { parameters }) => (

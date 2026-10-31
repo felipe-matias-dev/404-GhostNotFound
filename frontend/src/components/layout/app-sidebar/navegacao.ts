@@ -6,16 +6,13 @@ import {
 	type Icon,
 	LightningSlashIcon,
 } from "@phosphor-icons/react";
-import {
-	type LinkProps,
-	useMatches,
-	useMatchRoute,
-} from "@tanstack/react-router";
+import { useMatches, useMatchRoute } from "@tanstack/react-router";
 import type { ComponentType } from "react";
 import { LogoMark } from "#/components/layout/logo";
+import type { DestinoPortal } from "#/lib/filtros";
 
 export type ItemNavegacao = {
-	to: NonNullable<LinkProps["to"]>;
+	to: DestinoPortal | "/agente";
 	rotulo: string;
 	icone:
 		| Icon
