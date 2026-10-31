@@ -1734,6 +1734,13 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Impacto:** campo novo na rota existente, sem quebra de contrato; API 0.12.0, com `contracts/openapi.json` e os tipos do client
   regenerados. Nenhuma mudança na Gold nem no agente. A tela da visão 360 pode exibir o campo com o tipo gerado do OpenAPI.
 
+## DEC-055 · Etapas do agente por SSE em `POST /ai/ask/stream`
+
+- **Data:** 30/10/2026
+- **Contexto:** o time adiou os eventos de progresso em 24/10 (PR #39, fechado sem merge). A tela de chat já existe, e o time pediu a rota agora (issue #38).
+- **Decisão:** o agente ganha `stream()`, com as etapas e a resposta final, e `ask()` continua igual. A rota emite `stage` e termina em `answer`, com `audit_id` e `session_id`, ou em `error`. A cada 15 s sem evento vai um comentário `: ping`. O texto não chega por partes, porque os números são conferidos antes (DEC-019). Verificações falhas antes do stream respondem com o status HTTP. Depois de aberto o stream, a verificação repete com a trava do usuário, e uma recusa nesse momento vira `error`.
+- **Cliente que desconecta:** o agente é cancelado, e a pergunta entra na auditoria como `failed`, para contar no limite e no orçamento por usuário. As etapas levam internamente os tokens já gastos, fora do JSON do SSE, e o registro os soma ao orçamento. Só os de uma chamada ao modelo ainda em curso ficam de fora, porque o provedor os informa ao terminar.
+- **Consequências:** `POST /ai/ask` segue disponível. O portal ainda precisa ler o stream para mostrar as etapas.
 ## DEC-053 · Conversas do agente por usuário no banco
 
 - **Data:** 30/10/2026

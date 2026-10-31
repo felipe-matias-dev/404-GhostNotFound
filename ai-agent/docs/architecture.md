@@ -52,6 +52,8 @@ pergunta → Question → SemanticLayer (carregada uma vez)
 
 Período (G1-05): quando as linhas têm `competencia`, o texto determinístico cita o primeiro e o último mês do resultado, e a narrativa só é aceita se citar os dois extremos das linhas que o redator viu (por exemplo "junho de 2025", "06/2025", "jun/2025" ou "entre junho e dezembro de 2025"); senão, o log registra `periodo_ausente_na_resposta`. Os meses usados como literal no SQL (`competencia = '2025-06'`) também valem na checagem de números (DEC-019); quando as linhas não têm `competencia`, são eles o período que a narrativa precisa citar e que o texto determinístico mostra. Pedido de esclarecimento que cita nome técnico vira uma pergunta genérica sobre período e recorte. Detalhes, confiança e logs: spec §5.1. O backend monta o agente uma vez por processo com `build_agent(AgentSettings())`.
 
+`stream()` percorre o mesmo fluxo do `ask()` e emite as etapas (`domain/events.py`) até um `AnswerEvent` final; fechar o iterador cancela a execução (DEC-055).
+
 `InsightWriter` (item 9, `infrastructure/insight_writer.py`, prompt em `prompts/insight/v2/`, com unidade, efeito tarifa e bandeira como partes do efeito preço e negativo por extenso): narra o JSON de métricas de uma tela e devolve `None` se algum número do texto não estiver no JSON. O backend monta o JSON, guarda o insight em cache e liga o redator (D9): feito para a tela de Receita (`GET /receita/insight`, DEC-040), com `build_insight_writer` em `bootstrap.py`. O golden set está em `eval/golden_set.yaml` (versão 0.17.0, 105 itens, alinhado à camada 0.4.0). `revisado_por` está preenchido por Dados em 104 itens; o G105 aguarda a conferência da mudança da 0.17.0.
 
 ## 3b. Memória e orçamento

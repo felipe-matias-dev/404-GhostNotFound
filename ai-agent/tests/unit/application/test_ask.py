@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 from decimal import Decimal
@@ -24,6 +25,7 @@ from venergy_agent.config import AGENT_ROOT, REPO_ROOT
 from venergy_agent.domain.answer import AnswerStatus, Confidence
 from venergy_agent.domain.conversation import ConversationTurn
 from venergy_agent.domain.errors import ErrorKind, ModelCallFailed, QueryExecutionError
+from venergy_agent.domain.events import AnswerEvent, Stage, StageEvent
 from venergy_agent.domain.narration import Narration
 from venergy_agent.domain.sql import DraftStatus, Generation, QueryResult, SqlDraft
 from venergy_agent.infrastructure.semantic_source import YamlSemanticLayerSource
@@ -1070,3 +1072,91 @@ async def test_standalone_question_without_history_goes_to_the_model(layer):
     ).ask("Quantas UCs existem em Olinda?", "s1")
 
     assert len(generator.histories) == 1
+
+
+class BlockingGenerator:
+    def __init__(self):
+        self.release = asyncio.Event()
+        self.cancelled = False
+
+    async def generate(self, question, layer, feedback, history=()):
+        try:
+            await self.release.wait()
+        except asyncio.CancelledError:
+            self.cancelled = True
+            raise
+        return generation()
+
+
+async def collect(agent, question="quantas UCs?"):
+    return [event async for event in agent.stream(question, "s1")]
+
+
+def stages(events):
+    return [event.stage for event in events if isinstance(event, StageEvent)]
+
+
+async def test_stream_emits_stages_then_the_answer(layer):
+    events = await collect(
+        use_case(layer, ScriptedGenerator(generation()), ScriptedExecutor(result()))
+    )
+
+    assert stages(events) == [Stage.UNDERSTANDING, Stage.QUERYING, Stage.WRITING]
+    assert isinstance(events[-1], AnswerEvent)
+    assert events[-1].answer.status is AnswerStatus.ANSWERED
+
+
+async def test_stream_emits_correcting_before_a_new_attempt(layer):
+    generator = ScriptedGenerator(generation(sql="DELETE FROM sem_uc"), generation())
+
+    events = await collect(use_case(layer, generator, ScriptedExecutor(result())))
+
+    assert stages(events) == [
+        Stage.UNDERSTANDING,
+        Stage.QUERYING,
+        Stage.CORRECTING,
+        Stage.QUERYING,
+        Stage.WRITING,
+    ]
+    assert events[-1].answer.status is AnswerStatus.ANSWERED
+
+
+async def test_stream_of_an_invalid_question_has_only_the_answer(layer):
+    events = await collect(use_case(layer, ScriptedGenerator(generation())), "   ")
+
+    assert len(events) == 1
+    assert events[0].answer.status is AnswerStatus.REFUSED
+
+
+async def test_stream_ends_with_a_failed_answer_on_an_unexpected_error(layer):
+    agent = use_case(layer, ScriptedGenerator(generation()))
+    agent._validator = BrokenValidator()
+
+    events = await collect(agent)
+
+    assert isinstance(events[-1], AnswerEvent)
+    assert events[-1].answer.status is AnswerStatus.FAILED
+
+
+async def test_closing_the_stream_cancels_the_run(layer):
+    generator = BlockingGenerator()
+    executor = ScriptedExecutor(result())
+    events = use_case(layer, generator, executor).stream("quantas UCs?", "s1")
+
+    async with asyncio.timeout(1):
+        first = await anext(events)
+        await events.aclose()
+
+    assert first.stage is Stage.UNDERSTANDING
+    assert generator.cancelled is True
+    assert executor.queries == []
+
+
+async def test_stage_events_carry_the_tokens_spent_so_far_outside_the_serialized_event(layer):
+    events = await collect(
+        use_case(layer, ScriptedGenerator(generation()), ScriptedExecutor(result()))
+    )
+
+    assert events[0].input_tokens == 0
+    assert events[1].input_tokens == generation().input_tokens
+    assert "input_tokens" not in events[1].model_dump_json()

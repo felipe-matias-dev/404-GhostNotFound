@@ -1,8 +1,9 @@
+import asyncio
 import json
 import logging
 import re
 import time
-from collections.abc import Mapping
+from collections.abc import AsyncIterator, Callable, Mapping
 from dataclasses import dataclass
 from decimal import Decimal
 from uuid import uuid4
@@ -25,6 +26,7 @@ from venergy_agent.domain.errors import (
     QueryExecutionError,
     SqlRejected,
 )
+from venergy_agent.domain.events import AgentEvent, AnswerEvent, Stage, StageEvent
 from venergy_agent.domain.followup import depends_on_previous_turn
 from venergy_agent.domain.numbers import unsupported_numbers
 from venergy_agent.domain.question import Question
@@ -146,10 +148,28 @@ class AskUseCase:
         self._session_token_budget = session_token_budget
 
     async def ask(self, question: str, session_id: str) -> AgentAnswer:
+        return await self._run(question, session_id, lambda _: None)
+
+    async def stream(self, question: str, session_id: str) -> AsyncIterator[AgentEvent]:
+        queue: asyncio.Queue[StageEvent | None] = asyncio.Queue()
+        task = asyncio.create_task(self._run(question, session_id, queue.put_nowait))
+        task.add_done_callback(lambda _: queue.put_nowait(None))
+        try:
+            while (event := await queue.get()) is not None:
+                yield event
+            yield AnswerEvent(answer=await task)
+        finally:
+            if not task.done():
+                task.cancel()
+                await asyncio.gather(task, return_exceptions=True)
+
+    async def _run(
+        self, question: str, session_id: str, emit: Callable[[StageEvent], None]
+    ) -> AgentAnswer:
         started = time.perf_counter()
         request_id = uuid4().hex
         try:
-            return await self._answer(question, session_id, request_id, started)
+            return await self._answer(question, session_id, request_id, started, emit)
         except Exception as error:
             self._log(
                 request_id, session_id, step="ask", status="internal_error", error=repr(error)
@@ -163,7 +183,12 @@ class AskUseCase:
             )
 
     async def _answer(
-        self, text: str, session_id: str, request_id: str, started: float
+        self,
+        text: str,
+        session_id: str,
+        request_id: str,
+        started: float,
+        emit: Callable[[StageEvent], None],
     ) -> AgentAnswer:
         if not text.strip():
             return self._unanswered(
@@ -229,6 +254,8 @@ class AskUseCase:
         last_sql: str | None = None
         last_model: str | None = None
         for attempt in range(1, self._max_attempts + 1):
+            stage = Stage.UNDERSTANDING if attempt == 1 else Stage.CORRECTING
+            emit(_stage_event(stage, attempt, spent))
             generation = await self._generate(question, feedback, attempt, history, spent)
             if generation is None:
                 return self._unanswered(
@@ -281,6 +308,7 @@ class AskUseCase:
                     clarification, request_id, started, model=generation.model, spent=spent
                 )
 
+            emit(_stage_event(Stage.QUERYING, attempt, spent))
             began = time.perf_counter()
             try:
                 validated = self._validator.validate(draft.sql, self._layer.allowed_views)
@@ -360,6 +388,7 @@ class AskUseCase:
                 truncated=result.truncated,
                 latency_ms=_elapsed_ms(began),
             )
+            emit(_stage_event(Stage.WRITING, attempt, spent))
             return await self._answered(
                 question, draft, validated, result, generation, attempt, started, spent
             )
@@ -685,6 +714,15 @@ class AskUseCase:
         line = {"request_id": request_id, "session_id": session_id, "step": step, "status": status}
         line.update(fields)
         logger.info(json.dumps(line, ensure_ascii=False, default=str))
+
+
+def _stage_event(stage: Stage, attempt: int, spent: _Spent) -> StageEvent:
+    return StageEvent(
+        stage=stage,
+        attempt=attempt,
+        input_tokens=spent.input_tokens,
+        output_tokens=spent.output_tokens,
+    )
 
 
 def _row_text(columns: tuple[str, ...], row: dict[str, object], units: Mapping[str, str]) -> str:
