@@ -42,7 +42,7 @@ export type ParteDaConta = {
 };
 
 /**
- * Partes da variação da conta na ordem fixa do card (DEC-052). "Dias" só entra quando a API a
+ * Partes da variação da conta na ordem fixa do card (DEC-057). "Dias" só entra quando a API a
  * separa do consumo; vazia, todo o volume já está em "consumo". Os valores vêm prontos do
  * backend e somam a `diferenca`: a tela não recalcula nada.
  */

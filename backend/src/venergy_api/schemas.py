@@ -453,7 +453,7 @@ class Uc360Schema(BaseModel):
     cadastro: DimUcSchema
     consumo: ConsumoUcSchema
     # Vazia sem a conta do mês de referência ou a do mesmo mês do ano anterior, ou quando essa
-    # conta não tem energia: sem base não há como dizer por que a conta mudou (DEC-052).
+    # conta não tem energia: sem base não há como dizer por que a conta mudou (DEC-057).
     variacao_conta: VariacaoContaSchema | None
     faturas_nao_pagas: FaturasNaoPagasSchema
     # Vazio na UC sem medidor instalado: não há linha em gold_medidor_uc.

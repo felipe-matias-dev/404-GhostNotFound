@@ -57,7 +57,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | 29/10/2026 | DEC-049: login com cookie httpOnly e cinco perfis; só `perdas` escreve nas ordens de inspeção e só `ti` lê a auditoria do agente | Esconder o menu não é segurança: a permissão é checada no backend, onde estão os dados; o agente já lê toda a Gold, então bloquear a leitura por tela daria falsa proteção | Felipe |
 | 29/10/2026 | DEC-050: os eventos das ordens de inspeção guardam o login de quem agiu (`autor_login`), o histórico mostra o nome dele, e a carga e a subida da API acrescentam a coluna sem apagar o histórico | O gerente de perdas é o único que escreve, e a trilha precisa responder quem concluiu ou cancelou uma ordem; recriar a tabela para isso perderia o histórico de quem já usa o portal | Felipe |
 | 29/10/2026 | DEC-051: filtros da fila usam os sinais já informados nos motivos da Gold: queda, medidor eletromecânico e percentual de leituras estimadas | Mantém a fila fiel à Gold, sem recalcular métricas ou tratar ausência como zero; todos os filtros operam antes da paginação | João Euclides |
-| 30/10/2026 | DEC-052: a visão 360 devolve `variacao_conta`, a diferença da conta contra o mesmo mês do ano anterior dividida em consumo, tarifa, bandeira e tributos, com a fórmula da decomposição da receita (DEC-029); as partes somam exatamente a diferença; os dias faturados de cada conta vêm só como informação; API 0.12.0 | A atendente consegue dizer ao cliente por que a conta subiu, e não só se o consumo subiu; calculado no backend e sem IA, porque o número precisa ser exato e imediato com o cliente na linha | Felipe |
+| 30/10/2026 | DEC-057: a visão 360 devolve `variacao_conta`, a diferença da conta contra o mesmo mês do ano anterior dividida em consumo, tarifa, bandeira e tributos, com a fórmula da decomposição da receita (DEC-029); as partes somam exatamente a diferença; os dias faturados de cada conta vêm só como informação; API 0.12.0 | A atendente consegue dizer ao cliente por que a conta subiu, e não só se o consumo subiu; calculado no backend e sem IA, porque o número precisa ser exato e imediato com o cliente na linha | Felipe |
 
 ## DEC-001 · Localização dos arquivos de origem (landing)
 
@@ -1605,7 +1605,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Extensão (29/10/2026):** o painel combina queda com `medidor_eletromecanico=true` e os limites inclusivos `leituras_estimadas_min/max`, extraídos do motivo completo de leituras estimadas. A Gold só emite esse motivo para percentuais a partir de 25%; o filtro aceita limites de 25 a 100 e não abrange valores inferiores nem ausentes. A ausência também pode indicar dados indisponíveis, nunca é interpretada como zero. Os três sinais são combinados com AND antes da paginação.
 - **Limite:** o valor é o percentual inteiro já arredondado pela Gold, não uma nova conta. Alterar a redação do motivo exige atualizar o extrator; uma coluna numérica na Gold eliminaria essa dependência.
 
-## DEC-052 · Variação da conta da unidade consumidora dividida por motivo
+## DEC-057 · Variação da conta da unidade consumidora dividida por motivo
 
 - **Data:** 30/10/2026 · **Área:** Portal · **Autor:** Felipe
 - **Contexto:** o case pede que o atendente responda ao cliente na hora, "inclusive quando ele reclama de conta alta". A visão 360

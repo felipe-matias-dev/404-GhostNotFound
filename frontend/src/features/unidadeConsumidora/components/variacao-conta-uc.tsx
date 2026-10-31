@@ -22,7 +22,7 @@ function tom(valor: number) {
 
 /**
  * Por que a conta do mês de referência mudou contra a do mesmo mês do ano anterior, em R$
- * (DEC-052). As partes e a diferença vêm prontas da API e somam a diferença: a tela só mostra.
+ * (DEC-057). As partes e a diferença vêm prontas da API e somam a diferença: a tela só mostra.
  */
 export function VariacaoContaUc({ data }: { data: Uc360 }) {
 	const variacao = data.variacao_conta;
@@ -71,7 +71,7 @@ export function VariacaoContaUc({ data }: { data: Uc360 }) {
 }
 
 /**
- * O que é cada parte, como na DEC-052. Com "dias" separada, o consumo é o gasto por dia; sem
+ * O que é cada parte, como na DEC-057. Com "dias" separada, o consumo é o gasto por dia; sem
  * ela, o consumo leva toda a energia a mais ou a menos.
  */
 function AjudaDasPartes({ comDias }: { comDias: boolean }) {
