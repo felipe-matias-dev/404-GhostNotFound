@@ -11,6 +11,7 @@ from venergy_agent.application.ask import (
     BUDGET_UNAVAILABLE,
     CLARIFY_PREFIX,
     DATABASE_FAILED,
+    DEADLINE_FAILED,
     EMPTY_RESULT,
     GENERIC_CLARIFICATION,
     INTERNAL_FAILED,
@@ -1160,3 +1161,34 @@ async def test_stage_events_carry_the_tokens_spent_so_far_outside_the_serialized
     assert events[0].input_tokens == 0
     assert events[1].input_tokens == generation().input_tokens
     assert "input_tokens" not in events[1].model_dump_json()
+
+
+class HangingWriter:
+    async def write(self, question, draft, result):
+        await asyncio.Event().wait()
+
+
+async def test_a_question_past_the_deadline_fails_with_its_own_message(layer):
+    agent = use_case(layer, BlockingGenerator(), answer_deadline_seconds=0.01)
+
+    async with asyncio.timeout(1):
+        answer = await agent.ask("quantas UCs?", "s1")
+
+    assert answer.status is AnswerStatus.FAILED
+    assert answer.refused_reason == DEADLINE_FAILED
+
+
+async def test_a_slow_narration_keeps_the_result_with_the_deterministic_text(layer):
+    agent = use_case(
+        layer,
+        ScriptedGenerator(generation()),
+        ScriptedExecutor(result()),
+        HangingWriter(),
+        answer_deadline_seconds=1.05,
+    )
+
+    async with asyncio.timeout(1):
+        answer = await agent.ask("quantas UCs?", "s1")
+
+    assert answer.status is AnswerStatus.ANSWERED
+    assert answer.rows == ({"total": 3},)
