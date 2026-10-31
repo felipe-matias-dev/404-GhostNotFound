@@ -1734,6 +1734,13 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Impacto:** campo novo na rota existente, sem quebra de contrato; API 0.12.0, com `contracts/openapi.json` e os tipos do client
   regenerados. Nenhuma mudança na Gold nem no agente. A tela da visão 360 pode exibir o campo com o tipo gerado do OpenAPI.
 
+## DEC-053 · Conversas do agente por usuário no banco
+
+- **Data:** 30/10/2026
+- **Contexto:** o portal guarda as conversas no `localStorage`, então elas não acompanham o usuário entre navegadores (issue #98). A auditoria já grava cada turno com o login, na coluna `usuario` (DEC-046), e é imutável.
+- **Decisão:** os turnos são lidos de `app.ai_auditoria`, sem cópia. A nova tabela `app.ai_sessao` guarda só título, estrela e exclusão lógica, e a linha nasce na primeira alteração, o que também cobre as conversas antigas. A issue propunha a coluna `usuario_login` e um upsert a cada pergunta; os dois ficaram de fora por serem desnecessários. Sem título próprio, vale a primeira pergunta, cortada em 80 caracteres.
+- **Regras:** sessão de outra pessoa, sem dono ou já excluída responde `404` em `PATCH` e `DELETE`. `POST /ai/ask` numa conversa excluída responde `409`, porque o turno novo ficaria invisível. `GET /ai/sessions` devolve no máximo 50 conversas, com as favoritas primeiro. O `DELETE` usa a trava do usuário e espera a pergunta em andamento terminar, para o turno não ser gravado numa conversa já escondida.
+- **Consequências:** excluir não apaga a auditoria, que segue legível pela TI. As linhas gravadas antes da coluna `usuario` não têm dono e não aparecem para ninguém. O frontend ainda precisa trocar o `localStorage` por essas rotas.
 ## DEC-056 · Views do agente no schema `semantic` (D1)
 
 - **Data:** 30/10/2026

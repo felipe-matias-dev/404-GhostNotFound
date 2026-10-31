@@ -7,7 +7,7 @@ from sqlalchemy import Connection, exists, func, select, text
 from sqlalchemy.orm import Session
 from venergy_agent.domain.answer import AgentAnswer
 
-from venergy_api.models import AiAuditoria
+from venergy_api.models import AiAuditoria, AiSessao
 
 logger = logging.getLogger(__name__)
 
@@ -125,3 +125,5 @@ def garantir_estrutura_da_auditoria(connection: Connection) -> None:
     garantir_colunas_de_tokens(connection)
     garantir_coluna_do_usuario(connection)
     garantir_indice_da_sessao(connection)
+    # Tabela nova: quem atualiza o código sem rodar a carga também precisa dela.
+    AiSessao.__table__.create(connection, checkfirst=True)

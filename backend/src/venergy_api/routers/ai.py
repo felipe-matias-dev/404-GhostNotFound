@@ -3,7 +3,7 @@
 import asyncio
 import logging
 from typing import Annotated
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Path, Request, status
 from fastapi.concurrency import run_in_threadpool
@@ -21,8 +21,22 @@ from venergy_api.auth import Perfil, UsuarioLogado
 from venergy_api.database import SessionDep
 from venergy_api.historico_ia import usuario_da_requisicao
 from venergy_api.models import AiAuditoria
-from venergy_api.schemas import AuditoriaIaSchema, ErroSchema, PerguntaIaSchema, RespostaIaSchema
+from venergy_api.schemas import (
+    AlteracaoSessaoIaSchema,
+    AuditoriaIaSchema,
+    ErroSchema,
+    PerguntaIaSchema,
+    RespostaIaSchema,
+    SessaoIaSchema,
+)
 from venergy_api.sessao import UsuarioDep, exigir_perfil
+from venergy_api.sessoes_ia import (
+    alterar_sessao,
+    excluir_sessao,
+    listar_sessoes,
+    sessao_disponivel,
+    sessao_excluida,
+)
 
 router = APIRouter(prefix="/ai", tags=["agente de IA"])
 
@@ -39,6 +53,7 @@ def trava_do_usuario(app: FastAPI, login: str) -> asyncio.Lock:
     "/ask",
     responses={
         status.HTTP_403_FORBIDDEN: {"model": ErroSchema},
+        status.HTTP_409_CONFLICT: {"model": ErroSchema},
         status.HTTP_429_TOO_MANY_REQUESTS: {"model": ErroSchema},
         status.HTTP_503_SERVICE_UNAVAILABLE: {"model": ErroSchema},
     },
@@ -83,6 +98,7 @@ async def _responder(
             if limite > 0 and not alheia
             else 0
         )
+        excluida = await run_in_threadpool(sessao_excluida, session, session_id)
     except SQLAlchemyError as error:
         # Só o tipo do erro vai para o log: a mensagem do SQLAlchemy traz os parâmetros.
         logger.error("Falha ao verificar a sessão e o limite (%s)", type(error).__name__)
@@ -97,6 +113,11 @@ async def _responder(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Esta sessão pertence a outro usuário. Comece uma conversa nova.",
+        )
+    if excluida:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Esta conversa foi excluída. Comece uma conversa nova.",
         )
     if feitas >= limite > 0:
         raise HTTPException(
@@ -133,6 +154,58 @@ async def _responder(
             detail="Não foi possível gravar a auditoria, então a resposta não foi entregue.",
         ) from error
     return RespostaIaSchema.model_validate(auditoria)
+
+
+def _exigir_sessao(session: Session, session_id: str, login: str) -> None:
+    # 404 também para a sessão de outra pessoa: a resposta não revela que o id existe.
+    if not sessao_disponivel(session, session_id, login):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversa não encontrada")
+
+
+@router.get("/sessions")
+def obter_sessoes(session: SessionDep, usuario: UsuarioDep) -> list[SessaoIaSchema]:
+    """As conversas não excluídas do usuário: favoritas primeiro, depois as mais recentes."""
+    return listar_sessoes(session, usuario.login)
+
+
+@router.patch(
+    "/sessions/{session_id}",
+    responses={status.HTTP_404_NOT_FOUND: {"model": ErroSchema}},
+)
+def patch_sessao(
+    session_id: UUID,
+    alteracao: AlteracaoSessaoIaSchema,
+    session: SessionDep,
+    usuario: UsuarioDep,
+) -> SessaoIaSchema:
+    """Renomeia ou favorita uma conversa do usuário."""
+    _exigir_sessao(session, str(session_id), usuario.login)
+    alterar_sessao(
+        session, str(session_id), usuario.login, alteracao.model_dump(exclude_unset=True)
+    )
+    sessoes = listar_sessoes(session, usuario.login, str(session_id))
+    # Um DELETE simultâneo pode ter escondido a conversa depois da verificação.
+    if not sessoes:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversa não encontrada")
+    return sessoes[0]
+
+
+@router.delete(
+    "/sessions/{session_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses={status.HTTP_404_NOT_FOUND: {"model": ErroSchema}},
+)
+async def delete_sessao(
+    session_id: UUID, session: SessionDep, request: Request, usuario: UsuarioDep
+) -> None:
+    """Esconde a conversa do usuário. A auditoria dela continua intacta para a TI.
+
+    Espera a pergunta em andamento do usuário terminar: sem a trava, o turno seria gravado
+    numa conversa já escondida.
+    """
+    async with trava_do_usuario(request.app, usuario.login):
+        await run_in_threadpool(_exigir_sessao, session, str(session_id), usuario.login)
+        await run_in_threadpool(excluir_sessao, session, str(session_id), usuario.login)
 
 
 @router.get(
