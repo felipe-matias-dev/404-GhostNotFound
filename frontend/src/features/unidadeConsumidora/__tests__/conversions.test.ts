@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { maiorParte, partesDaConta, toConsumoChart } from "../conversions";
+import {
+	maiorParte,
+	partesDaConta,
+	textoDosDias,
+	toConsumoChart,
+} from "../conversions";
 import type { VariacaoConta } from "../types";
 
 describe("toConsumoChart", () => {
@@ -40,7 +45,8 @@ const variacao: VariacaoConta = {
 	conta: 230.5,
 	conta_comparada: 200,
 	diferenca: 30.5,
-	dias: null,
+	dias_faturados: 31,
+	dias_faturados_comparada: 30,
 	consumo: 40,
 	tarifa: -5,
 	bandeira: -8,
@@ -49,7 +55,7 @@ const variacao: VariacaoConta = {
 };
 
 describe("partesDaConta", () => {
-	it("keeps the card order and leaves out days when the API merges them into consumption", () => {
+	it("keeps the fixed card order, without a part for the days", () => {
 		expect(partesDaConta(variacao).map((p) => [p.id, p.valor])).toEqual([
 			["consumo", 40],
 			["tarifa", -5],
@@ -57,16 +63,46 @@ describe("partesDaConta", () => {
 			["tributos", 3.5],
 		]);
 	});
+});
 
-	it("shows days right after consumption when the API separates them", () => {
-		const partes = partesDaConta({ ...variacao, dias: 12, consumo: 28 });
-		expect(partes.map((p) => p.id)).toEqual([
-			"consumo",
-			"dias",
-			"tarifa",
-			"bandeira",
-			"tributos",
-		]);
+describe("textoDosDias", () => {
+	it("says how many days each bill covered", () => {
+		expect(
+			textoDosDias({
+				...variacao,
+				dias_faturados: 33,
+				dias_faturados_comparada: 29,
+			}),
+		).toBe("Esta conta cobriu 33 dias; a do ano anterior, 29.");
+	});
+
+	it("uses the singular for one day", () => {
+		expect(
+			textoDosDias({
+				...variacao,
+				dias_faturados: 1,
+				dias_faturados_comparada: 30,
+			}),
+		).toBe("Esta conta cobriu 1 dia; a do ano anterior, 30.");
+	});
+
+	it("says only what is known when a bill does not bring the days", () => {
+		expect(textoDosDias({ ...variacao, dias_faturados_comparada: null })).toBe(
+			"Esta conta cobriu 31 dias.",
+		);
+		expect(textoDosDias({ ...variacao, dias_faturados: null })).toBe(
+			"A conta do ano anterior cobriu 30 dias.",
+		);
+	});
+
+	it("is empty when neither bill brings the days", () => {
+		expect(
+			textoDosDias({
+				...variacao,
+				dias_faturados: null,
+				dias_faturados_comparada: null,
+			}),
+		).toBeNull();
 	});
 });
 
