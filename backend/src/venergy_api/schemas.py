@@ -404,6 +404,29 @@ class ConsumoUcSchema(BaseModel):
     tendencia: Tendencia
 
 
+class VariacaoContaSchema(BaseModel):
+    """Por que a conta do mês de referência mudou, em R$, contra o mesmo mês do ano anterior.
+
+    As quatro partes somam exatamente a `diferenca` entre as duas contas.
+    """
+
+    competencia: Competencia
+    competencia_comparada: Competencia
+    conta: ExactNumber
+    conta_comparada: ExactNumber
+    diferenca: ExactNumber
+    # Só informativos, não entram na divisão: na Gold real o kWh não acompanha os dias da fatura.
+    # Vazios quando a conta não traz os dias.
+    dias_faturados: int | None
+    dias_faturados_comparada: int | None
+    consumo: ExactNumber
+    tarifa: ExactNumber
+    bandeira: ExactNumber
+    tributos: ExactNumber
+    # Leitura estimada numa das contas: a próxima leitura real corrige o consumo.
+    leitura_estimada: bool
+
+
 class FaturaNaoPagaSchema(BaseModel):
     """Uma fatura da UC que ainda não foi paga."""
 
@@ -430,6 +453,9 @@ class Uc360Schema(BaseModel):
 
     cadastro: DimUcSchema
     consumo: ConsumoUcSchema
+    # Vazia sem a conta do mês de referência ou a do mesmo mês do ano anterior, ou quando essa
+    # conta não tem energia: sem base não há como dizer por que a conta mudou (DEC-057).
+    variacao_conta: VariacaoContaSchema | None
     faturas_nao_pagas: FaturasNaoPagasSchema
     # Vazio na UC sem medidor instalado: não há linha em gold_medidor_uc.
     medidor: MedidorUcSchema | None
