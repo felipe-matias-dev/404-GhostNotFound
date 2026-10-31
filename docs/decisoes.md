@@ -1855,4 +1855,3 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   testes usam planilhas sintéticas. O número da ordem não vem na planilha; se a equipe passar a preenchê-lo, a ligação pode
   deixar de depender de uma ordem ativa por UC.
 - **Ordem da planilha:** a linha com `OI-<id>`, exportada pelo portal, só conclui essa ordem. Uma planilha antiga é rejeitada se a UC tiver outra ordem em campo. O `id_inspecao` do formato do case não aponta para ordem, então só a UC e o status valem nesse caso.
-
