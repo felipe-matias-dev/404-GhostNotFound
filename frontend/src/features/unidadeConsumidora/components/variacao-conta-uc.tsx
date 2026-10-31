@@ -6,7 +6,7 @@ import {
 } from "#/components/ui/popover";
 import { formatBRL, formatCompetencia } from "#/lib/format";
 import { cn } from "#/lib/utils";
-import { maiorParte, partesDaConta } from "../conversions";
+import { maiorParte, partesDaConta, textoDosDias } from "../conversions";
 import type { Uc360 } from "../types";
 
 // Uma grade para todas as linhas: rótulo e valor na largura do maior, e a barra fica com o resto.
@@ -47,7 +47,7 @@ export function VariacaoContaUc({ data }: { data: Uc360 }) {
 							<InfoIcon aria-hidden className="size-3.5" />
 						</PopoverTrigger>
 						<PopoverContent className="max-w-80 p-3 text-body">
-							<AjudaDasPartes comDias={variacao?.dias != null} />
+							<AjudaDasPartes />
 						</PopoverContent>
 					</Popover>
 				</div>
@@ -71,10 +71,10 @@ export function VariacaoContaUc({ data }: { data: Uc360 }) {
 }
 
 /**
- * O que é cada parte, como na DEC-057. Com "dias" separada, o consumo é o gasto por dia; sem
- * ela, o consumo leva toda a energia a mais ou a menos.
+ * O que é cada parte, como na DEC-057. Os dias faturados não são uma parte: o consumo leva toda
+ * a energia a mais ou a menos, e os dias de cada conta aparecem à parte, como texto.
  */
-function AjudaDasPartes({ comDias }: { comDias: boolean }) {
+function AjudaDasPartes() {
 	return (
 		<>
 			<p className="mb-2">
@@ -85,20 +85,10 @@ function AjudaDasPartes({ comDias }: { comDias: boolean }) {
 				<div>
 					<dt>Consumo</dt>
 					<dd className="text-text-muted">
-						{comDias
-							? "O cliente gastou mais ou menos energia por dia, ao preço do ano anterior."
-							: "O cliente gastou mais ou menos energia, ao preço do ano anterior."}
+						O cliente gastou mais ou menos energia, ao preço do ano anterior. Os
+						dias que cada conta cobriu aparecem abaixo, só como informação.
 					</dd>
 				</div>
-				{comDias && (
-					<div>
-						<dt>Dias na fatura</dt>
-						<dd className="text-text-muted">
-							A conta cobriu mais ou menos dias, no consumo diário do ano
-							anterior.
-						</dd>
-					</div>
-				)}
 				<div>
 					<dt>Tarifa</dt>
 					<dd className="text-text-muted">
@@ -130,6 +120,7 @@ function CorpoVariacao({
 	const partes = partesDaConta(variacao);
 	const maior = maiorParte(partes, variacao.diferenca);
 	const escala = Math.max(...partes.map((p) => Math.abs(p.valor)));
+	const dias = textoDosDias(variacao);
 
 	return (
 		<>
@@ -202,6 +193,7 @@ function CorpoVariacao({
 					);
 				})}
 			</ul>
+			{dias && <p className="text-small text-text-muted">{dias}</p>}
 			{variacao.leitura_estimada && (
 				<p className="flex items-start gap-1.5 text-small text-warning">
 					<WarningCircleIcon aria-hidden className="mt-0.5 size-4 shrink-0" />

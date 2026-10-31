@@ -35,30 +35,46 @@ export function toConsumoChart(consumo: ConsumoMesUc[]): {
 }
 
 export type ParteDaConta = {
-	id: "consumo" | "dias" | "tarifa" | "bandeira" | "tributos";
+	id: "consumo" | "tarifa" | "bandeira" | "tributos";
 	rotulo: string;
 	/** Quanto esta parte somou (positivo) ou tirou (negativo) da conta, em R$. */
 	valor: number;
 };
 
 /**
- * Partes da variação da conta na ordem fixa do card (DEC-057). "Dias" só entra quando a API a
- * separa do consumo; vazia, todo o volume já está em "consumo". Os valores vêm prontos do
- * backend e somam a `diferenca`: a tela não recalcula nada.
+ * Partes da variação da conta na ordem fixa do card (DEC-057). Os dias faturados não são uma
+ * parte: o consumo leva todo o volume. Os valores vêm prontos do backend e somam a `diferenca`:
+ * a tela não recalcula nada.
  */
 export function partesDaConta(variacao: VariacaoConta): ParteDaConta[] {
-	const partes: ParteDaConta[] = [
+	return [
 		{ id: "consumo", rotulo: "Consumo", valor: variacao.consumo },
-	];
-	if (variacao.dias !== null) {
-		partes.push({ id: "dias", rotulo: "Dias na fatura", valor: variacao.dias });
-	}
-	partes.push(
 		{ id: "tarifa", rotulo: "Tarifa", valor: variacao.tarifa },
 		{ id: "bandeira", rotulo: "Bandeira", valor: variacao.bandeira },
 		{ id: "tributos", rotulo: "Tributos", valor: variacao.tributos },
-	);
-	return partes;
+	];
+}
+
+function diasPorExtenso(dias: number): string {
+	return `${dias} ${dias === 1 ? "dia" : "dias"}`;
+}
+
+/**
+ * Quantos dias cada conta cobriu, só como informação: o kWh não acompanha os dias faturados, por
+ * isso eles não entram na divisão (DEC-057). A atendente vê quando uma conta cobriu bem mais dias
+ * que a outra. Vazio quando nenhuma das contas traz os dias.
+ */
+export function textoDosDias(variacao: VariacaoConta): string | null {
+	const { dias_faturados: atual, dias_faturados_comparada: comparada } =
+		variacao;
+	if (atual !== null && comparada !== null) {
+		return `Esta conta cobriu ${diasPorExtenso(atual)}; a do ano anterior, ${comparada}.`;
+	}
+	if (atual !== null) return `Esta conta cobriu ${diasPorExtenso(atual)}.`;
+	if (comparada !== null) {
+		return `A conta do ano anterior cobriu ${diasPorExtenso(comparada)}.`;
+	}
+	return null;
 }
 
 /**
