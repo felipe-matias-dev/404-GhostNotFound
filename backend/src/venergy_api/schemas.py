@@ -794,6 +794,12 @@ class ErroSchema(BaseModel):
 class IndicadoresComparacaoFiltroSchema(ComparacaoFiltroSchema):
     """Dois períodos e, se quiser, o recorte: os mesmos filtros da comparação de receita."""
 
+    @model_validator(mode="after")
+    def base_antes_do_atual(self) -> "IndicadoresComparacaoFiltroSchema":
+        if self.base_fim >= self.atual_inicio:
+            raise ValueError("O período base precisa terminar antes do início do período atual")
+        return self
+
 
 class IndicadoresJanelasFiltroSchema(BaseModel):
     """Tamanho da janela corrida, em competências, e o recorte opcional."""
@@ -835,7 +841,10 @@ class IndicadoresPeriodoSchema(BaseModel):
 
 
 class VariacaoIndicadoresSchema(BaseModel):
-    """Variação em % de cada indicador (8.0 = +8,0%); nula sem base ou com base zero."""
+    """Variação em % de cada indicador (8.0 = +8,0%).
+
+    Nula com base zero ou se faltar algum mês em um dos períodos (DEC-054).
+    """
 
     receita_faturada: float | None
     receita_energia: float | None

@@ -3,7 +3,18 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Query
-from sqlalchemy import ColumnElement, Double, Integer, case, cast, distinct, func, or_, select
+from sqlalchemy import (
+    ColumnElement,
+    Double,
+    Integer,
+    and_,
+    case,
+    cast,
+    distinct,
+    func,
+    or_,
+    select,
+)
 from sqlalchemy.orm import InstrumentedAttribute
 
 from venergy_api.database import SessionDep
@@ -36,6 +47,12 @@ def _recorte(
         ]
         if valor is not None
     ]
+
+
+def _meses_no_calendario(inicio: str, fim: str) -> int:
+    ano_inicio, mes_inicio = map(int, inicio.split("-"))
+    ano_fim, mes_fim = map(int, fim.split("-"))
+    return (ano_fim - ano_inicio) * 12 + mes_fim - mes_inicio + 1
 
 
 def _razao(numerador: ColumnElement, denominador: ColumnElement) -> ColumnElement:
@@ -151,9 +168,19 @@ def get_comparacao(
     """Os indicadores da diretoria em dois períodos, da empresa inteira ou de um recorte."""
     base = _indicadores(filtro.base_inicio, filtro.base_fim)
     atual = _indicadores(filtro.atual_inicio, filtro.atual_fim)
-    # Variação em % calculada no banco, sobre as mesmas expressões; sem base ou base zero, nula.
+    # Variação em % calculada no banco, sobre as mesmas expressões. Nula com base zero e com mês
+    # faltando em um dos lados: 6 meses contra 12 pareceria uma queda de 50% que não existiu.
+    completos = and_(
+        base["n_meses"] == _meses_no_calendario(filtro.base_inicio, filtro.base_fim),
+        atual["n_meses"] == _meses_no_calendario(filtro.atual_inicio, filtro.atual_fim),
+    )
     variacao = {
-        nome: cast((atual[nome] - base[nome]) / func.nullif(base[nome], 0) * 100, Double)
+        nome: case(
+            (
+                completos,
+                cast((atual[nome] - base[nome]) / func.nullif(base[nome], 0) * 100, Double),
+            )
+        )
         for nome in VariacaoIndicadoresSchema.model_fields
     }
     colunas = [

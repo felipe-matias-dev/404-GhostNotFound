@@ -1776,3 +1776,10 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Decisão:** sem recorte, `GET /ordens-inspecao` continua devolvendo todas as ordens, inclusive as de UCs que não estão no cadastro. Com `municipio`, `bairro` ou `classe`, a consulta junta `gold_dim_uc` e as ordens dessas UCs ficam fora da resposta. `bairro` sem `municipio` continua `422`.
 - **Alternativas descartadas:** `LEFT JOIN` com uma localidade sentinela "Sem cadastro", que inventaria uma localização que a Gold não afirma (e uma UC pode ter mudado de bairro); e manter essas ordens em todo recorte, o que faria o total do recorte não fechar com a soma das ordens que ele descreve.
 - **Consequências:** para achar uma ordem cuja UC saiu do cadastro, o gerente limpa o recorte; a tela não avisa quantas ordens ficaram de fora. A fila de suspeitas não tem esse caso: é recalculada pela Gold a cada carga e o recorte também é `INNER JOIN` com o cadastro. O comportamento está coberto por `test_filters_orders_by_segment_and_status_without_changing_them`, que apaga uma UC do cadastro e confere a lista com e sem recorte.
+
+## DEC-054 · Comparação de indicadores exige períodos completos e em ordem
+
+- **Data:** 30/10/2026
+- **Contexto:** a issue #66 pedia uma rota nova para comparar os indicadores entre dois períodos de vários meses, mas `GET /indicadores/comparacao` (DEC-041) já faz essa conta com os componentes somados (DEC-033). Faltavam duas regras: um período sem dado virava variação de -100%, e nada impedia base depois do atual ou sobreposta a ele.
+- **Decisão:** não criar outra rota, nem mudar os parâmetros `base_inicio`, `base_fim`, `atual_inicio` e `atual_fim`. A base precisa terminar antes do início do atual, ou a rota responde `422`. Se faltar algum mês em um dos períodos, a rota responde `200` com os valores e `n_meses`, e a variação fica nula.
+- **Consequências:** a tela consegue mostrar o que existe sem exibir uma variação enganosa. A regra vale só para esta rota: `GET /receita/comparacao` continua como está. O frontend ainda precisa aceitar trechos de vários meses no seletor.

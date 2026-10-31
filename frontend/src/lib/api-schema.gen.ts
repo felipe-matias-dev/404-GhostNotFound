@@ -1380,7 +1380,9 @@ export interface components {
         };
         /**
          * VariacaoIndicadoresSchema
-         * @description Variação em % de cada indicador (8.0 = +8,0%); nula sem base ou com base zero.
+         * @description Variação em % de cada indicador (8.0 = +8,0%).
+         *
+         *     Nula com base zero ou se faltar algum mês em um dos períodos (DEC-054).
          */
         VariacaoIndicadoresSchema: {
             /** Receita Faturada */
