@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "V-Energy Grid 360 API",
-    "version": "0.12.0"
+    "version": "0.13.0"
   },
   "paths": {
     "/health": {
@@ -4646,6 +4646,16 @@
           "consumo": {
             "$ref": "#/components/schemas/ConsumoUcSchema"
           },
+          "variacao_conta": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VariacaoContaSchema"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "faturas_nao_pagas": {
             "$ref": "#/components/schemas/FaturasNaoPagasSchema"
           },
@@ -4685,6 +4695,7 @@
         "required": [
           "cadastro",
           "consumo",
+          "variacao_conta",
           "faturas_nao_pagas",
           "medidor",
           "interrupcoes",
@@ -4755,6 +4766,91 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "VariacaoContaSchema": {
+        "properties": {
+          "competencia": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+            "title": "Competencia"
+          },
+          "competencia_comparada": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+            "title": "Competencia Comparada"
+          },
+          "conta": {
+            "type": "number",
+            "title": "Conta"
+          },
+          "conta_comparada": {
+            "type": "number",
+            "title": "Conta Comparada"
+          },
+          "diferenca": {
+            "type": "number",
+            "title": "Diferenca"
+          },
+          "dias_faturados": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dias Faturados"
+          },
+          "dias_faturados_comparada": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dias Faturados Comparada"
+          },
+          "consumo": {
+            "type": "number",
+            "title": "Consumo"
+          },
+          "tarifa": {
+            "type": "number",
+            "title": "Tarifa"
+          },
+          "bandeira": {
+            "type": "number",
+            "title": "Bandeira"
+          },
+          "tributos": {
+            "type": "number",
+            "title": "Tributos"
+          },
+          "leitura_estimada": {
+            "type": "boolean",
+            "title": "Leitura Estimada"
+          }
+        },
+        "type": "object",
+        "required": [
+          "competencia",
+          "competencia_comparada",
+          "conta",
+          "conta_comparada",
+          "diferenca",
+          "dias_faturados",
+          "dias_faturados_comparada",
+          "consumo",
+          "tarifa",
+          "bandeira",
+          "tributos",
+          "leitura_estimada"
+        ],
+        "title": "VariacaoContaSchema",
+        "description": "Por que a conta do mês de referência mudou, em R$, contra o mesmo mês do ano anterior.\n\nAs quatro partes somam exatamente a `diferenca` entre as duas contas."
       },
       "VariacaoIndicadoresSchema": {
         "properties": {
