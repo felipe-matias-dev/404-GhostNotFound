@@ -14,7 +14,7 @@ ALLOWED = frozenset(
 
 
 def run(agent_database_url, sql):
-    validator = SqlglotValidator(dialect="postgres", max_rows=200, allowed_schema="gold")
+    validator = SqlglotValidator(dialect="postgres", max_rows=200, allowed_schema="semantic")
     executor = PostgresQueryExecutor(agent_database_url, timeout_seconds=10)
     query = validator.validate(sql, ALLOWED)
     return asyncio.run(executor.execute(query))
@@ -71,6 +71,26 @@ def test_segment_dec_divides_summed_hours_by_the_average_over_the_months_asked(
 
     assert result.rows[0]["dec"] == 0.6
     assert round(result.rows[0]["satisfacao"], 4) == 3.8333
+
+
+def test_integer_counts_in_a_ratio_do_not_truncate_to_zero(agent_database_url, gold_views):
+    result = run(
+        agent_database_url,
+        "SELECT sum(n_interrupcoes) / NULLIF(sum(n_uc), 0) AS fec "
+        "FROM sem_continuidade_alimentador_mensal WHERE competencia = '2025-03'",
+    )
+
+    assert result.rows[0]["fec"] > 0
+
+
+def test_a_nested_division_of_counts_does_not_truncate_either(agent_database_url, gold_views):
+    result = run(
+        agent_database_url,
+        "SELECT sum(n_interrupcoes) / sum(n_uc) / 3 AS fec "
+        "FROM sem_continuidade_alimentador_mensal WHERE competencia = '2025-03'",
+    )
+
+    assert result.rows[0]["fec"] > 0
 
 
 def test_decomposition_effects_add_up_to_the_revenue_change(agent_database_url, gold_views):

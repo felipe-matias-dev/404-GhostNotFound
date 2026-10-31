@@ -1,5 +1,6 @@
 from datetime import datetime
 from io import BytesIO
+from zipfile import ZipFile
 
 import pytest
 from openpyxl import Workbook
@@ -234,3 +235,36 @@ def test_a_very_long_note_is_cut_at_the_modal_limit() -> None:
     ).validas
 
     assert len(linha.observacao) == planilha_campo.MAX_OBSERVACAO
+
+
+def test_a_truncated_sheet_is_an_invalid_file_and_not_a_crash() -> None:
+    original = ZipFile(BytesIO(uma_aba(CONFIRMADA)))
+    saida = BytesIO()
+    with ZipFile(saida, "w") as copia:
+        for nome in original.namelist():
+            dados = original.read(nome)
+            copia.writestr(nome, dados[: len(dados) // 2] if "worksheets/" in nome else dados)
+
+    with pytest.raises(PlanilhaInvalida):
+        ler_planilha(saida.getvalue())
+
+
+def test_too_many_blank_rows_are_refused(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(planilha_campo, "MAX_LINHAS_EM_BRANCO", 2)
+
+    with pytest.raises(PlanilhaInvalida, match="em branco"):
+        ler_planilha(uma_aba([" "], [" "], [" "], CONFIRMADA))
+
+
+@pytest.mark.parametrize(("escrito", "esperado"), [("1.234", "1.234 kWh"), (1.234, "1,234 kWh")])
+def test_dot_is_a_thousands_separator_only_in_typed_text(escrito: object, esperado: str) -> None:
+    linha = list(CONFIRMADA)
+    linha[CABECALHO.index("kwh_recuperado")] = escrito
+
+    assert esperado in ler_planilha(uma_aba(linha)).validas[0].observacao
+
+
+def test_negative_kwh_is_rejected_even_without_irregularity() -> None:
+    linha = ["INS-2", "0002", None, None, "SEM IRREGULARIDADE", None, -5]
+
+    assert "negativo" in ler_planilha(uma_aba(linha)).rejeitadas[0].motivo

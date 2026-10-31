@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import get_args, get_origin
 
 from pydantic import BaseModel, ValidationError
-from sqlalchemy import Connection, Engine, insert, text
+from sqlalchemy import Connection, Engine, insert
 from sqlalchemy.exc import ProgrammingError
 
 from venergy_api.config import get_settings
@@ -49,6 +49,11 @@ from venergy_api.schemas import (
     ReceitaDecomposicaoSchema,
     ReconciliacaoFaturamentoSchema,
 )
+from venergy_api.visoes_agente import (
+    AGENT_VIEWS_SQL,
+    drop_agent_views,
+    garantir_permissoes_do_agente,
+)
 
 # conventions.delivery.array_separator do contrato da Gold.
 ARRAY_SEPARATOR = ";"
@@ -60,7 +65,6 @@ TAMANHO_LOTE = 10_000
 # Views da camada semântica do agente de IA: o GenAI gera o arquivo, e a carga o aplica a
 # cada execução, porque as views dependem das tabelas que ela recria (spec do agente, D7).
 # backend/src/venergy_api/carga.py → raiz do repositório, como em openapi.py.
-AGENT_VIEWS_SQL = Path(__file__).resolve().parents[3] / "ai-agent" / "semantic" / "views.sql"
 
 
 class GoldLoadError(Exception):
@@ -161,21 +165,6 @@ def _inserir_em_lotes(
     return gravadas
 
 
-def drop_agent_views(connection: Connection) -> None:
-    """Apaga as views sem_* do agente no schema gold, para as tabelas poderem ser recriadas."""
-    # Pelo catálogo, e não pelos nomes do views.sql: uma view que o GenAI renomeou ou tirou
-    # do arquivo ainda estaria presa à tabela, e o DROP da tabela falharia.
-    nomes = connection.scalars(
-        text(r"SELECT viewname FROM pg_views WHERE schemaname = 'gold' AND viewname LIKE 'sem\_%'")
-    ).all()
-    if not nomes:
-        return
-    # Um DROP só, com todas: se uma view ler de outra, o Postgres resolve a ordem. Os nomes
-    # vêm do catálogo, e não de entrada de usuário.
-    quote = connection.dialect.identifier_preparer.quote
-    connection.execute(text(f"DROP VIEW {', '.join(f'gold.{quote(nome)}' for nome in nomes)}"))
-
-
 def load_gold(gold_dir: Path, engine: Engine, tamanho_lote: int = TAMANHO_LOTE) -> dict[str, int]:
     """Substitui as tabelas da Gold pelo conteúdo dos CSVs e devolve as linhas por tabela."""
     csv_paths: dict[GoldTable, Path] = {}
@@ -205,6 +194,7 @@ def load_gold(gold_dir: Path, engine: Engine, tamanho_lote: int = TAMANHO_LOTE) 
         # As views do agente prendem as tabelas: saem antes e voltam no fim. O drop_all
         # continua sem CASCADE, para uma dependência que ninguém previu falhar a carga em vez
         # de sumir em silêncio (DEC-014).
+        garantir_permissoes_do_agente(connection)
         drop_agent_views(connection)
         # Recria a Gold em vez de só apagar as linhas: sem migrações, o create_all não
         # acrescenta coluna em tabela que já existe, e cada mudança do contrato exigiria

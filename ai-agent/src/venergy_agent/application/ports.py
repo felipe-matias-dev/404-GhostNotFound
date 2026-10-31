@@ -1,8 +1,9 @@
-from collections.abc import Mapping
+from collections.abc import AsyncIterator, Mapping
 from typing import Protocol
 
 from venergy_agent.domain.answer import AgentAnswer, Insight
 from venergy_agent.domain.conversation import ConversationTurn
+from venergy_agent.domain.events import AgentEvent
 from venergy_agent.domain.judge import JudgeVerdict
 from venergy_agent.domain.narration import Narration
 from venergy_agent.domain.question import Question
@@ -18,6 +19,8 @@ from venergy_agent.domain.sql import (
 
 class TextToSqlAgent(Protocol):
     async def ask(self, question: str, session_id: str) -> AgentAnswer: ...
+
+    def stream(self, question: str, session_id: str) -> AsyncIterator[AgentEvent]: ...
 
 
 class ConversationHistory(Protocol):

@@ -1,15 +1,21 @@
 """Rotas do agente de IA: perguntar em linguagem natural e auditar como ele respondeu."""
 
 import asyncio
+import json
 import logging
-from typing import Annotated
-from uuid import uuid4
+from collections.abc import AsyncIterator
+from typing import Annotated, Any
+from uuid import UUID, uuid4
 
+import anyio
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Path, Request, status
 from fastapi.concurrency import run_in_threadpool
+from fastapi.responses import StreamingResponse
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 from venergy_agent.application.ports import TextToSqlAgent
+from venergy_agent.domain.answer import AgentAnswer, AnswerStatus, Confidence
+from venergy_agent.domain.events import AnswerEvent, StageEvent
 
 from venergy_api.agente import AgenteDep
 from venergy_api.auditoria import (
@@ -21,12 +27,59 @@ from venergy_api.auth import Perfil, UsuarioLogado
 from venergy_api.database import SessionDep
 from venergy_api.historico_ia import usuario_da_requisicao
 from venergy_api.models import AiAuditoria
-from venergy_api.schemas import AuditoriaIaSchema, ErroSchema, PerguntaIaSchema, RespostaIaSchema
+from venergy_api.schemas import (
+    AlteracaoSessaoIaSchema,
+    AuditoriaIaSchema,
+    ErroSchema,
+    PerguntaIaSchema,
+    RespostaIaSchema,
+    SessaoIaSchema,
+)
 from venergy_api.sessao import UsuarioDep, exigir_perfil
+from venergy_api.sessoes_ia import (
+    alterar_sessao,
+    excluir_sessao,
+    listar_sessoes,
+    sessao_disponivel,
+    sessao_excluida,
+)
 
 router = APIRouter(prefix="/ai", tags=["agente de IA"])
 
 MAX_ID_AUDITORIA = 2_147_483_647
+INTERVALO_PING_SEGUNDOS = 15
+RESPOSTA_ABANDONADA = "O cliente desconectou antes da resposta."
+# O FastAPI não descreve SSE sozinho: cada mensagem traz um destes objetos no campo data.
+EVENTOS_SSE: dict[str, Any] = {
+    "oneOf": [
+        {
+            "title": "StageEvent",
+            "type": "object",
+            "required": ["type", "stage", "label", "attempt"],
+            "properties": {
+                "type": {"const": "stage"},
+                "stage": {"enum": ["understanding", "querying", "correcting", "writing"]},
+                "label": {"type": "string"},
+                "attempt": {"type": "integer"},
+            },
+        },
+        {
+            "title": "AnswerEvent",
+            "type": "object",
+            "required": ["type", "answer"],
+            "properties": {
+                "type": {"const": "answer"},
+                "answer": {"$ref": "#/components/schemas/RespostaIaSchema"},
+            },
+        },
+        {
+            "title": "ErrorEvent",
+            "type": "object",
+            "required": ["type", "detail"],
+            "properties": {"type": {"const": "error"}, "detail": {"type": "string"}},
+        },
+    ]
+}
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +92,7 @@ def trava_do_usuario(app: FastAPI, login: str) -> asyncio.Lock:
     "/ask",
     responses={
         status.HTTP_403_FORBIDDEN: {"model": ErroSchema},
+        status.HTTP_409_CONFLICT: {"model": ErroSchema},
         status.HTTP_429_TOO_MANY_REQUESTS: {"model": ErroSchema},
         status.HTTP_503_SERVICE_UNAVAILABLE: {"model": ErroSchema},
     },
@@ -64,14 +118,10 @@ async def perguntar(
         return await _responder(pedido, agente, session, request, usuario)
 
 
-async def _responder(
-    pedido: PerguntaIaSchema,
-    agente: TextToSqlAgent,
-    session: Session,
-    request: Request,
-    usuario: UsuarioLogado,
-) -> RespostaIaSchema:
-    session_id = str(pedido.session_id or uuid4())
+async def _verificar_pedido(
+    session_id: str, session: Session, request: Request, usuario: UsuarioLogado
+) -> None:
+    """Verifica a sessão e o limite antes de chamar o modelo."""
     limite = request.app.state.settings.ai_limite_perguntas
     janela = request.app.state.settings.ai_janela_segundos
     try:
@@ -83,6 +133,7 @@ async def _responder(
             if limite > 0 and not alheia
             else 0
         )
+        excluida = await run_in_threadpool(sessao_excluida, session, session_id)
     except SQLAlchemyError as error:
         # Só o tipo do erro vai para o log: a mensagem do SQLAlchemy traz os parâmetros.
         logger.error("Falha ao verificar a sessão e o limite (%s)", type(error).__name__)
@@ -98,6 +149,11 @@ async def _responder(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Esta sessão pertence a outro usuário. Comece uma conversa nova.",
         )
+    if excluida:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Esta conversa foi excluída. Comece uma conversa nova.",
+        )
     if feitas >= limite > 0:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
@@ -108,6 +164,17 @@ async def _responder(
             # A janela inteira é o teto da espera: o relógio só libera a pergunta mais velha.
             headers={"Retry-After": str(janela)},
         )
+
+
+async def _responder(
+    pedido: PerguntaIaSchema,
+    agente: TextToSqlAgent,
+    session: Session,
+    request: Request,
+    usuario: UsuarioLogado,
+) -> RespostaIaSchema:
+    session_id = str(pedido.session_id or uuid4())
+    await _verificar_pedido(session_id, session, request, usuario)
     token = usuario_da_requisicao.set(usuario.login)
     try:
         answer = await agente.ask(pedido.question, session_id)
@@ -133,6 +200,230 @@ async def _responder(
             detail="Não foi possível gravar a auditoria, então a resposta não foi entregue.",
         ) from error
     return RespostaIaSchema.model_validate(auditoria)
+
+
+def _sse(evento: str, dados: str) -> str:
+    return f"event: {evento}\ndata: {dados}\n\n"
+
+
+def _erro_sse(detalhe: str) -> str:
+    return _sse("error", json.dumps({"type": "error", "detail": detalhe}, ensure_ascii=False))
+
+
+def _gravar_abandono(
+    session: Session,
+    pergunta: str,
+    session_id: str,
+    login: str,
+    ultima_etapa: StageEvent | None,
+) -> None:
+    """A pergunta abandonada conta no limite e no orçamento: sem isso, desconectar burlaria os dois.
+
+    Os tokens são os da última etapa emitida. Os de uma chamada ao modelo ainda em curso não
+    entram, porque o provedor só os informa ao terminar.
+    """
+    abandono = AgentAnswer(
+        answer=RESPOSTA_ABANDONADA,
+        status=AnswerStatus.FAILED,
+        sql=None,
+        rows=(),
+        row_count=0,
+        truncated=False,
+        confidence=Confidence.UNKNOWN,
+        sources=(),
+        assumptions=(),
+        clarification=None,
+        refused_reason=RESPOSTA_ABANDONADA,
+        request_id=uuid4().hex,
+        model="nao_informado",
+        prompt_version="nao_informado",
+        latency_ms=0,
+        input_tokens=ultima_etapa.input_tokens if ultima_etapa else 0,
+        output_tokens=ultima_etapa.output_tokens if ultima_etapa else 0,
+    )
+    try:
+        gravar_auditoria(session, pergunta, session_id, abandono, login)
+    except SQLAlchemyError as error:
+        logger.error("Falha ao gravar a pergunta abandonada: %s", type(error).__name__)
+
+
+async def _eventos(
+    pergunta: str,
+    session_id: str,
+    agente: TextToSqlAgent,
+    sessao: Session,
+    request: Request,
+    usuario: UsuarioLogado,
+) -> AsyncIterator[str]:
+    # Sessão própria: a da dependência não acompanha a vida inteira da resposta em stream.
+    with sessao:
+        # A rota verificou antes de abrir o stream, sem segurar a trava, para responder com o
+        # status HTTP. Aqui, já com a trava, a verificação repete: outro pedido pode ter passado.
+        async with trava_do_usuario(request.app, usuario.login):
+            try:
+                await _verificar_pedido(session_id, sessao, request, usuario)
+            except HTTPException as error:
+                yield _erro_sse(error.detail)
+                return
+            answer: AgentAnswer | None = None
+            token = usuario_da_requisicao.set(usuario.login)
+            eventos = agente.stream(pergunta, session_id)
+            proximo: asyncio.Future[Any] | None = None
+            ultima_etapa: StageEvent | None = None
+            abandonada = False
+            try:
+                while answer is None:
+                    proximo = proximo or asyncio.ensure_future(anext(eventos))
+                    prontos, _ = await asyncio.wait({proximo}, timeout=INTERVALO_PING_SEGUNDOS)
+                    if not prontos:
+                        yield ": ping\n\n"
+                        continue
+                    evento = proximo.result()
+                    proximo = None
+                    if isinstance(evento, AnswerEvent):
+                        answer = evento.answer
+                    else:
+                        ultima_etapa = evento
+                        yield _sse(evento.type, evento.model_dump_json())
+            except StopAsyncIteration:
+                proximo = None
+            except (asyncio.CancelledError, GeneratorExit):
+                abandonada = True
+                raise
+            finally:
+                usuario_da_requisicao.reset(token)
+                # Blindado: num cliente que desconectou, todo await seria cancelado de novo.
+                with anyio.CancelScope(shield=True):
+                    if proximo is not None:
+                        proximo.cancel()
+                        await asyncio.gather(proximo, return_exceptions=True)
+                    await eventos.aclose()
+                    if abandonada:
+                        await run_in_threadpool(
+                            _gravar_abandono,
+                            sessao,
+                            pergunta,
+                            session_id,
+                            usuario.login,
+                            ultima_etapa,
+                        )
+            if answer is None:
+                yield _erro_sse("O agente não devolveu uma resposta. Tente de novo.")
+                return
+            try:
+                auditoria = await run_in_threadpool(
+                    gravar_auditoria, sessao, pergunta, session_id, answer, usuario.login
+                )
+            except SQLAlchemyError as error:
+                logger.error(
+                    "Falha ao gravar a auditoria (request_id=%s): %s",
+                    answer.request_id,
+                    type(error).__name__,
+                )
+                yield _erro_sse(
+                    "Não foi possível gravar a auditoria, então a resposta não foi entregue."
+                )
+                return
+            resposta = RespostaIaSchema.model_validate(auditoria)
+            yield _sse(
+                "answer",
+                f'{{"type":"answer","answer":{resposta.model_dump_json()}}}',
+            )
+
+
+@router.post(
+    "/ask/stream",
+    response_class=StreamingResponse,
+    responses={
+        status.HTTP_200_OK: {
+            "description": "Eventos SSE: stage, ping de comentário e, por último, answer ou error.",
+            "content": {"text/event-stream": {"schema": EVENTOS_SSE}},
+        },
+        status.HTTP_403_FORBIDDEN: {"model": ErroSchema},
+        status.HTTP_409_CONFLICT: {"model": ErroSchema},
+        status.HTTP_429_TOO_MANY_REQUESTS: {"model": ErroSchema},
+        status.HTTP_503_SERVICE_UNAVAILABLE: {"model": ErroSchema},
+    },
+)
+async def perguntar_em_stream(
+    pedido: PerguntaIaSchema,
+    agente: AgenteDep,
+    session: SessionDep,
+    request: Request,
+    usuario: UsuarioDep,
+) -> StreamingResponse:
+    """A mesma pergunta do POST /ai/ask, com as etapas do agente até a resposta final (DEC-055).
+
+    O texto só chega inteiro, no último evento, porque os números são conferidos antes (DEC-019).
+    Erros de verificação respondem com o status HTTP, sem abrir o stream.
+    """
+    session_id = str(pedido.session_id or uuid4())
+    async with trava_do_usuario(request.app, usuario.login):
+        await _verificar_pedido(session_id, session, request, usuario)
+    return StreamingResponse(
+        _eventos(
+            pedido.question,
+            session_id,
+            agente,
+            Session(session.get_bind()),
+            request,
+            usuario,
+        ),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+def _exigir_sessao(session: Session, session_id: str, login: str) -> None:
+    # 404 também para a sessão de outra pessoa: a resposta não revela que o id existe.
+    if not sessao_disponivel(session, session_id, login):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversa não encontrada")
+
+
+@router.get("/sessions")
+def obter_sessoes(session: SessionDep, usuario: UsuarioDep) -> list[SessaoIaSchema]:
+    """As conversas não excluídas do usuário: favoritas primeiro, depois as mais recentes."""
+    return listar_sessoes(session, usuario.login)
+
+
+@router.patch(
+    "/sessions/{session_id}",
+    responses={status.HTTP_404_NOT_FOUND: {"model": ErroSchema}},
+)
+def patch_sessao(
+    session_id: UUID,
+    alteracao: AlteracaoSessaoIaSchema,
+    session: SessionDep,
+    usuario: UsuarioDep,
+) -> SessaoIaSchema:
+    """Renomeia ou favorita uma conversa do usuário."""
+    _exigir_sessao(session, str(session_id), usuario.login)
+    alterar_sessao(
+        session, str(session_id), usuario.login, alteracao.model_dump(exclude_unset=True)
+    )
+    sessoes = listar_sessoes(session, usuario.login, str(session_id))
+    # Um DELETE simultâneo pode ter escondido a conversa depois da verificação.
+    if not sessoes:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversa não encontrada")
+    return sessoes[0]
+
+
+@router.delete(
+    "/sessions/{session_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses={status.HTTP_404_NOT_FOUND: {"model": ErroSchema}},
+)
+async def delete_sessao(
+    session_id: UUID, session: SessionDep, request: Request, usuario: UsuarioDep
+) -> None:
+    """Esconde a conversa do usuário. A auditoria dela continua intacta para a TI.
+
+    Espera a pergunta em andamento do usuário terminar: sem a trava, o turno seria gravado
+    numa conversa já escondida.
+    """
+    async with trava_do_usuario(request.app, usuario.login):
+        await run_in_threadpool(_exigir_sessao, session, str(session_id), usuario.login)
+        await run_in_threadpool(excluir_sessao, session, str(session_id), usuario.login)
 
 
 @router.get(

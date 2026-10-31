@@ -14,6 +14,7 @@ import { DataTable, type DataTableColumn } from "#/components/ui/data-table";
 import { SkeletonSwap } from "#/components/ui/skeleton-swap";
 import { TrendChart } from "#/components/ui/trend-chart";
 import { ApiError } from "#/lib/api";
+import { cn } from "#/lib/utils";
 import { CadastroUc } from "../components/cadastro-uc";
 import { useConsultaUc } from "../components/consulta-uc-provider";
 import { ConsumoUc } from "../components/consumo-uc";
@@ -22,9 +23,21 @@ import {
 	FaturasUc,
 	InterrupcoesUc,
 } from "../components/historico-uc";
+import { VariacaoContaUc } from "../components/variacao-conta-uc";
 import { useVisao360 } from "../hooks/use-visao-360";
 
 const route = getRouteApi("/uc");
+// Uma grade para o topo da tela. Em janela larga, o card da conta fica na coluna do cadastro,
+// acima dele, e ocupa a linha da identificação e a seguinte: assim o consumo sobe logo abaixo
+// da identificação, sem esperar a altura do card. A terceira linha é `1fr` para que só ela
+// cresça com a coluna da esquerda, e o cadastro comece logo depois do card. Em janela estreita,
+// vale a ordem do DOM: identificação, card, consumo e cadastro.
+const GRADE =
+	"grid items-start gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(16rem,1fr)] lg:grid-rows-[auto_auto_1fr]";
+const AREA_IDENTIFICACAO = "min-w-0 lg:col-start-1 lg:row-start-1";
+const AREA_CONTA = "min-w-0 lg:col-start-2 lg:row-span-2 lg:row-start-1";
+const AREA_CONSUMO = "min-w-0 lg:col-start-1 lg:row-span-2 lg:row-start-2";
+const AREA_CADASTRO = "min-w-0 lg:col-start-2 lg:row-start-3";
 const loadingColumns: DataTableColumn<{ id: string }>[] = [
 	{ id: "id", header: "Registro", value: (row) => row.id },
 	{ id: "data", header: "Data" },
@@ -34,16 +47,28 @@ const loadingColumns: DataTableColumn<{ id: string }>[] = [
 function CarregandoUc() {
 	return (
 		<div aria-busy="true" className="flex min-w-0 flex-col gap-5">
-			<SkeletonSwap
-				ready={false}
-				reserve={96}
-				lines={3}
-				label="Identificação da UC"
-			>
-				<span className="sr-only">Carregando unidade consumidora</span>
-			</SkeletonSwap>
-			<div className="grid gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(16rem,1fr)]">
-				<div className="flex min-w-0 flex-col gap-5">
+			<div className={GRADE}>
+				<div className={AREA_IDENTIFICACAO}>
+					<SkeletonSwap
+						ready={false}
+						reserve={96}
+						lines={3}
+						label="Identificação da UC"
+					>
+						<span className="sr-only">Carregando unidade consumidora</span>
+					</SkeletonSwap>
+				</div>
+				<div className={AREA_CONTA}>
+					<SkeletonSwap
+						ready={false}
+						reserve={300}
+						lines={9}
+						label="Por que a conta mudou"
+					>
+						<span className="sr-only">Carregando variação da conta</span>
+					</SkeletonSwap>
+				</div>
+				<div className={cn(AREA_CONSUMO, "flex flex-col gap-5")}>
 					<SkeletonSwap
 						ready={false}
 						reserve={240}
@@ -62,14 +87,16 @@ function CarregandoUc() {
 						loading
 					/>
 				</div>
-				<SkeletonSwap
-					ready={false}
-					reserve={600}
-					lines={20}
-					label="Cadastro, medidor e geração distribuída"
-				>
-					<span className="sr-only">Carregando cadastro</span>
-				</SkeletonSwap>
+				<div className={AREA_CADASTRO}>
+					<SkeletonSwap
+						ready={false}
+						reserve={600}
+						lines={20}
+						label="Cadastro, medidor e geração distribuída"
+					>
+						<span className="sr-only">Carregando cadastro</span>
+					</SkeletonSwap>
+				</div>
 			</div>
 			<DataTable
 				label="Interrupções"
@@ -188,30 +215,38 @@ export function UnidadeConsumidoraPage() {
 					)}
 					{data ? (
 						<>
-							<section
-								aria-labelledby="uc-identificacao"
-								className="border-border border-b pb-5"
-							>
-								<h2 id="uc-identificacao" className="font-mono text-heading">
-									UC {data.cadastro.cod_uc}
-								</h2>
-								<p className="mt-1 text-body">
-									{data.cadastro.titular_mascarado ?? "Titular não informado"}
-								</p>
-								<p className="mt-1 text-small text-text-muted">
-									{data.cadastro.municipio} · {data.cadastro.bairro} ·{" "}
-									{data.cadastro.classe_cadastro}
-								</p>
-							</section>
-							<div className="grid items-start gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(16rem,1fr)]">
-								<div className="flex min-w-0 flex-col gap-5">
+							<div className={GRADE}>
+								<section
+									aria-labelledby="uc-identificacao"
+									className={cn(
+										AREA_IDENTIFICACAO,
+										"border-border border-b pb-5",
+									)}
+								>
+									<h2 id="uc-identificacao" className="font-mono text-heading">
+										UC {data.cadastro.cod_uc}
+									</h2>
+									<p className="mt-1 text-body">
+										{data.cadastro.titular_mascarado ?? "Titular não informado"}
+									</p>
+									<p className="mt-1 text-small text-text-muted">
+										{data.cadastro.municipio} · {data.cadastro.bairro} ·{" "}
+										{data.cadastro.classe_cadastro}
+									</p>
+								</section>
+								<div className={AREA_CONTA}>
+									<VariacaoContaUc data={data} />
+								</div>
+								<div className={cn(AREA_CONSUMO, "flex flex-col gap-5")}>
 									<ConsumoUc data={data} />
 									<FaturasUc
 										codUc={data.cadastro.cod_uc}
 										rows={data.faturas_nao_pagas.itens}
 									/>
 								</div>
-								<CadastroUc cadastro={data.cadastro} medidor={data.medidor} />
+								<div className={AREA_CADASTRO}>
+									<CadastroUc cadastro={data.cadastro} medidor={data.medidor} />
+								</div>
 							</div>
 							<div className="text-small text-text-muted">
 								Alimentador do cadastro:{" "}

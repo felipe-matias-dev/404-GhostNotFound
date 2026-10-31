@@ -38,6 +38,10 @@ class DatasetMismatch(Exception):
     pass
 
 
+class UnknownItems(Exception):
+    pass
+
+
 class JudgeNotAllowed(Exception):
     pass
 
@@ -56,6 +60,19 @@ def judges(judge: bool, sql_only: bool) -> bool:
     if sql_only:
         raise JudgeNotAllowed("--judge precisa da narrativa: não use junto com --sql-only")
     return True
+
+
+def select_items(items: list[dict[str, Any]], ids: set[str]) -> list[dict[str, Any]]:
+    by_id = {item["id"]: item for item in items}
+    unknown = sorted(ids - by_id.keys())
+    if unknown:
+        raise UnknownItems(f"itens que não existem no golden set: {', '.join(unknown)}")
+    selected = set()
+    for item_id in ids:
+        while item_id and item_id not in selected:
+            selected.add(item_id)
+            item_id = by_id[item_id].get("follow_up_of")
+    return [item for item in items if item["id"] in selected]
 
 
 def check_dataset(dataset: str, uc_count: int) -> None:
@@ -101,9 +118,12 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--dataset", choices=("amostra", "gold_real"), default="amostra")
     parser.add_argument("--sql-only", action="store_true")
     parser.add_argument("--judge", action="store_true")
+    parser.add_argument("--ids", default=None, metavar="G001,G002")
     args = parser.parse_args(argv)
     if args.only == "references" and (args.sql_only or args.judge):
         parser.error("--only references não chama o modelo: não use com --sql-only nem --judge")
+    if args.ids and args.only in ("red_team", "references"):
+        parser.error("--ids escolhe itens do golden: não use com --only red_team nem references")
     return args
 
 
@@ -123,9 +143,18 @@ def _build_judge(settings: AgentSettings) -> PydanticAiAnswerJudge:
 
 
 async def _evaluate(
-    only: str | None, pause_seconds: float, dataset: str, sql_only: bool, judge: bool
+    only: str | None,
+    pause_seconds: float,
+    dataset: str,
+    sql_only: bool,
+    judge: bool,
+    ids: set[str] | None = None,
 ) -> tuple[Path, list[str]]:
     with_judge = judges(judge, sql_only)
+    golden_version, golden = load_set(EVAL_DIR / "golden_set.yaml")
+    if ids:
+        golden = select_items(golden, ids)
+        only = "golden"
     settings = AgentSettings()
     layer = await YamlSemanticLayerSource(
         settings.semantic_layer_path, settings.gold_contract_path
@@ -154,7 +183,6 @@ async def _evaluate(
         judge=answer_judge,
         recorder=memory,
     )
-    golden_version, golden = load_set(EVAL_DIR / "golden_set.yaml")
     red_team_version, red_team = load_set(EVAL_DIR / "red_team.yaml")
     report = await runner.run(
         golden if only != "red_team" else [],
@@ -201,13 +229,23 @@ def main(argv: list[str]) -> int:
             print("\n".join(problems) if problems else "todas executam e voltam com dados")
             return 1 if problems else 0
         path, lines = asyncio.run(
-            _evaluate(args.only, args.pause, args.dataset, args.sql_only, args.judge)
+            _evaluate(
+                args.only,
+                args.pause,
+                args.dataset,
+                args.sql_only,
+                args.judge,
+                set(args.ids.split(",")) if args.ids else None,
+            )
         )
     except ValidationError as error:
         print(f"configuração inválida (ai-agent/.env):\n{error}", file=sys.stderr)
         return 1
     except SemanticLayerError as error:
         print(f"camada semântica inválida:\n{error}", file=sys.stderr)
+        return 1
+    except UnknownItems as error:
+        print(error, file=sys.stderr)
         return 1
     except JudgeNotAllowed as error:
         print(f"juiz não permitido: {error}", file=sys.stderr)

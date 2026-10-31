@@ -1,13 +1,9 @@
 import { WaterfallChart } from "#/components/ui/waterfall-chart";
+import { CLASSE_ROTULO } from "#/features/filtros";
+import type { ParPeriodos, Recorte } from "#/lib/filtros";
 import { formatBRL, formatPct, formatPeriodoCurto } from "#/lib/format";
-import {
-	CLASSE_ROTULO,
-	causaDoPasso,
-	type Efeito,
-	passosDaPonte,
-} from "../conversions";
+import { causaDoPasso, type Efeito, passosDaPonte } from "../conversions";
 import { useDecomposicao } from "../hooks/use-decomposicao";
-import type { ParPeriodos, Recorte } from "../types";
 
 export function PonteWaterfall({
 	par,

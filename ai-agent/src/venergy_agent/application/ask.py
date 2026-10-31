@@ -1,8 +1,9 @@
+import asyncio
 import json
 import logging
 import re
 import time
-from collections.abc import Mapping
+from collections.abc import AsyncIterator, Callable, Mapping
 from dataclasses import dataclass
 from decimal import Decimal
 from uuid import uuid4
@@ -25,6 +26,7 @@ from venergy_agent.domain.errors import (
     QueryExecutionError,
     SqlRejected,
 )
+from venergy_agent.domain.events import AgentEvent, AnswerEvent, Stage, StageEvent
 from venergy_agent.domain.followup import depends_on_previous_turn
 from venergy_agent.domain.numbers import unsupported_numbers
 from venergy_agent.domain.question import Question
@@ -40,7 +42,14 @@ from venergy_agent.domain.sql import (
 
 logger = logging.getLogger("venergy_agent.ask")
 
+NARRATION_MARGIN_SECONDS = 1.0
+
 TECHNICAL_NAME = re.compile(r"\b[a-zA-Z]+_\w+")
+WRITE_STATEMENT = re.compile(
+    r"\b(delete\s+from|insert\s+into|update\s+\w+\s+set|truncate|"
+    r"(drop|alter|create)\s+(table|schema|view|index))\b",
+    re.IGNORECASE,
+)
 
 EMPTY_QUESTION = "A pergunta está vazia. Escreva o que você quer saber sobre a distribuidora."
 TOO_LONG_QUESTION = (
@@ -62,6 +71,7 @@ BUDGET_EXHAUSTED = (
 )
 BUDGET_UNAVAILABLE = "Não consegui conferir o seu limite de uso agora. Tente de novo em instantes."
 MODEL_FAILED = "Não consegui consultar o modelo de linguagem agora. Tente de novo em instantes."
+DEADLINE_FAILED = "A resposta demorou mais do que o esperado. Tente de novo em instantes."
 INTERNAL_FAILED = "Algo deu errado do nosso lado. Tente de novo em instantes."
 ATTEMPTS_FAILED = "Não consegui montar uma consulta válida depois de {attempts} tentativas."
 DATABASE_FAILED = "Não consegui consultar o banco agora. Tente de novo em instantes."
@@ -88,6 +98,7 @@ MONTH_NAMES = (
 FALLBACK_MAX_ROWS = 5
 FALLBACK_MAX_COLUMNS = 4
 MISSING_VALUE = "sem valor"
+MAX_DECIMAL_PLACES = 6
 TEXT_VALUE_MAX_CHARS = 120
 EMPTY_RESULT = (
     "Nenhum registro atende à consulta. O agente não distingue zero de dado ausente, "
@@ -123,6 +134,7 @@ class AskUseCase:
         history_turns: int = 0,
         usage: SessionUsage | None = None,
         session_token_budget: int = 0,
+        answer_deadline_seconds: float = 30.0,
     ) -> None:
         self._layer = layer
         self._generator = generator
@@ -138,12 +150,40 @@ class AskUseCase:
         self._history_turns = history_turns
         self._usage = usage
         self._session_token_budget = session_token_budget
+        self._answer_deadline_seconds = answer_deadline_seconds
 
     async def ask(self, question: str, session_id: str) -> AgentAnswer:
+        return await self._run(question, session_id, lambda _: None)
+
+    async def stream(self, question: str, session_id: str) -> AsyncIterator[AgentEvent]:
+        queue: asyncio.Queue[StageEvent | None] = asyncio.Queue()
+        task = asyncio.create_task(self._run(question, session_id, queue.put_nowait))
+        task.add_done_callback(lambda _: queue.put_nowait(None))
+        try:
+            while (event := await queue.get()) is not None:
+                yield event
+            yield AnswerEvent(answer=await task)
+        finally:
+            if not task.done():
+                task.cancel()
+                await asyncio.gather(task, return_exceptions=True)
+
+    async def _run(
+        self, question: str, session_id: str, emit: Callable[[StageEvent], None]
+    ) -> AgentAnswer:
         started = time.perf_counter()
         request_id = uuid4().hex
         try:
-            return await self._answer(question, session_id, request_id, started)
+            async with asyncio.timeout(self._answer_deadline_seconds):
+                return await self._answer(question, session_id, request_id, started, emit)
+        except TimeoutError:
+            return self._unanswered(
+                AnswerStatus.FAILED,
+                DEADLINE_FAILED,
+                request_id=request_id,
+                session_id=session_id,
+                started=started,
+            )
         except Exception as error:
             self._log(
                 request_id, session_id, step="ask", status="internal_error", error=repr(error)
@@ -157,7 +197,12 @@ class AskUseCase:
             )
 
     async def _answer(
-        self, text: str, session_id: str, request_id: str, started: float
+        self,
+        text: str,
+        session_id: str,
+        request_id: str,
+        started: float,
+        emit: Callable[[StageEvent], None],
     ) -> AgentAnswer:
         if not text.strip():
             return self._unanswered(
@@ -177,6 +222,11 @@ class AskUseCase:
                 request_id,
                 session_id,
                 started,
+            )
+        if WRITE_STATEMENT.search(question.text):
+            self._log(request_id, session_id, step="pergunta", status="escrita_recusada")
+            return self._unanswered(
+                AnswerStatus.REFUSED, REFUSED_REASON, request_id, session_id, started
             )
 
         try:
@@ -218,6 +268,8 @@ class AskUseCase:
         last_sql: str | None = None
         last_model: str | None = None
         for attempt in range(1, self._max_attempts + 1):
+            stage = Stage.UNDERSTANDING if attempt == 1 else Stage.CORRECTING
+            emit(_stage_event(stage, attempt, spent))
             generation = await self._generate(question, feedback, attempt, history, spent)
             if generation is None:
                 return self._unanswered(
@@ -270,6 +322,7 @@ class AskUseCase:
                     clarification, request_id, started, model=generation.model, spent=spent
                 )
 
+            emit(_stage_event(Stage.QUERYING, attempt, spent))
             began = time.perf_counter()
             try:
                 validated = self._validator.validate(draft.sql, self._layer.allowed_views)
@@ -349,6 +402,7 @@ class AskUseCase:
                 truncated=result.truncated,
                 latency_ms=_elapsed_ms(began),
             )
+            emit(_stage_event(Stage.WRITING, attempt, spent))
             return await self._answered(
                 question, draft, validated, result, generation, attempt, started, spent
             )
@@ -462,7 +516,7 @@ class AskUseCase:
             result, draft, validated, _period(result) or _endpoints(validated.periods)
         )
         text = await self._narrate(
-            question, draft, visible, text, _period(visible), validated.periods, spent
+            question, draft, visible, text, _period(visible), validated.periods, spent, started
         )
 
         return AgentAnswer(
@@ -494,11 +548,20 @@ class AskUseCase:
         period: tuple[str, str] | None,
         filtered_periods: tuple[str, ...],
         spent: _Spent,
+        started: float,
     ) -> str:
         if self._answer_writer is None:
             return fallback
+        remaining = (
+            self._answer_deadline_seconds
+            - NARRATION_MARGIN_SECONDS
+            - (time.perf_counter() - started)
+        )
+        if remaining <= 0:
+            return fallback
         try:
-            narration = await self._answer_writer.write(question, draft, visible)
+            async with asyncio.timeout(remaining):
+                narration = await self._answer_writer.write(question, draft, visible)
         except ModelCallFailed as error:
             spent.input_tokens += error.input_tokens
             spent.output_tokens += error.output_tokens
@@ -676,6 +739,15 @@ class AskUseCase:
         logger.info(json.dumps(line, ensure_ascii=False, default=str))
 
 
+def _stage_event(stage: Stage, attempt: int, spent: _Spent) -> StageEvent:
+    return StageEvent(
+        stage=stage,
+        attempt=attempt,
+        input_tokens=spent.input_tokens,
+        output_tokens=spent.output_tokens,
+    )
+
+
 def _row_text(columns: tuple[str, ...], row: dict[str, object], units: Mapping[str, str]) -> str:
     return ", ".join(
         f"{column.replace('_', ' ')} = {_with_unit(row.get(column), units.get(column))}"
@@ -696,7 +768,11 @@ def _pt_br(value: object) -> str:
     if isinstance(value, bool):
         return "sim" if value else "não"
     if isinstance(value, int | float | Decimal):
-        grouped = format(Decimal(str(value)), ",f")
+        number = Decimal(str(value))
+        exponent = number.as_tuple().exponent
+        if isinstance(exponent, int) and exponent < -MAX_DECIMAL_PLACES:
+            number = number.quantize(Decimal(1).scaleb(-MAX_DECIMAL_PLACES)).normalize()
+        grouped = format(number, ",f")
         return grouped.replace(",", "_").replace(".", ",").replace("_", ".")
     return _shorten(str(value))
 

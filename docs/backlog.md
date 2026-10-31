@@ -339,7 +339,7 @@
 - **Épico** EP09 · **Sprint** S3 · **Should (diferencial)** · **1 pt**
 - **História:** Como gerente de perdas, quero exportar a fila para enviar à equipe de campo.
 - **Aceite:** botão "Exportar CSV" com as colunas visíveis e os filtros aplicados.
-- **Situação:** backend feito com outro desenho, junto do V1-14: `GET /ordens-inspecao/planilha` exporta as ordens em campo em XLSX, no formato que o upload lê, e botão "Baixar planilha de campo" na tela de Perdas ([DEC-053](decisoes.md#dec-053--planilha-de-campo-exportar-as-ordens-em-campo-e-subir-o-resultado)).
+- **Situação:** backend feito com outro desenho, junto do V1-14: `GET /ordens-inspecao/planilha` exporta as ordens em campo em XLSX, no formato que o upload lê, e botão "Baixar planilha de campo" na tela de Perdas ([DEC-062](decisoes.md#dec-053--planilha-de-campo-exportar-as-ordens-em-campo-e-subir-o-resultado)).
 
 #### V1-12 · Testes automatizados do backend
 - **Épico** EP13 · **Sprint** S3 · **Should (diferencial)** · **3 pts**
@@ -352,7 +352,7 @@
 - **Aceite:** 5 perfis (diretoria, atendimento, perdas, operação e TI) com menu filtrado e permissão checada no backend ([DEC-049](decisoes.md#dec-049--login-com-cookie-httponly-e-perfis-por-cargo)). **Só entra se todos os Must estiverem em Done.**
 
 #### V1-14 · Upload da planilha de campo
-- **Épico** EP09 · **Could (diferencial)** · **3 pts** · feito, com a tela de Perdas ([DEC-053](decisoes.md#dec-053--planilha-de-campo-exportar-as-ordens-em-campo-e-subir-o-resultado))
+- **Épico** EP09 · **Could (diferencial)** · **3 pts** · feito, com a tela de Perdas ([DEC-062](decisoes.md#dec-053--planilha-de-campo-exportar-as-ordens-em-campo-e-subir-o-resultado))
 - **História:** Como gerente de perdas, quero subir pelo portal a planilha preenchida em campo, para registrar resultados sem digitação.
 - **Aceite:** upload XLSX no formato de `inspecoes.xlsx` → atualiza as OIs correspondentes, com relatório de linhas rejeitadas.
 

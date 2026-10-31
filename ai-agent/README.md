@@ -32,7 +32,7 @@ uv run python -m venergy_agent.infrastructure.views_sql          # regera semant
 uv run python -m venergy_agent.infrastructure.views_sql --check  # falha se estiver desatualizado
 ```
 
-**Recarga da Gold (spec §10, D7):** a carga recria as tabelas, e isso falha enquanto houver view dependente. Antes de recarregar, apague as views `sem_*`, e aplique `semantic/views.sql` de novo depois da carga.
+**Recarga da Gold (spec §10, D7):** a carga apaga as views `sem_*` e as aplica de novo na mesma transação, então não há passo manual. Para aplicar `semantic/views.sql` à mão num banco que já tem as views, apague-as antes: `CREATE OR REPLACE VIEW` não muda o tipo de uma coluna.
 
 ## Como rodar
 

@@ -58,7 +58,11 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | 29/10/2026 | DEC-049: login com cookie httpOnly e cinco perfis; só `perdas` escreve nas ordens de inspeção e só `ti` lê a auditoria do agente | Esconder o menu não é segurança: a permissão é checada no backend, onde estão os dados; o agente já lê toda a Gold, então bloquear a leitura por tela daria falsa proteção | Felipe |
 | 29/10/2026 | DEC-050: os eventos das ordens de inspeção guardam o login de quem agiu (`autor_login`), o histórico mostra o nome dele, e a carga e a subida da API acrescentam a coluna sem apagar o histórico | O gerente de perdas é o único que escreve, e a trilha precisa responder quem concluiu ou cancelou uma ordem; recriar a tabela para isso perderia o histórico de quem já usa o portal | Felipe |
 | 29/10/2026 | DEC-051: filtros da fila usam os sinais já informados nos motivos da Gold: queda, medidor eletromecânico e percentual de leituras estimadas | Mantém a fila fiel à Gold, sem recalcular métricas ou tratar ausência como zero; todos os filtros operam antes da paginação | João Euclides |
-| 30/10/2026 | DEC-053: o portal exporta as ordens em campo numa planilha e o upload da mesma planilha preenchida conclui as ordens, aplica as linhas válidas e devolve as rejeitadas com o motivo; o tipo, o kWh, a data e o inspetor ficam na observação da ordem | O case traz as duas pontas como diferenciais (enviar a fila à equipe de campo e registrar o resultado sem digitar); a planilha exportada já sai no formato que o upload lê, e uma linha escrita errada à mão não pode travar o arquivo da equipe inteira | Felipe |
+| 30/10/2026 | DEC-062: o portal exporta as ordens em campo numa planilha e o upload da mesma planilha preenchida conclui as ordens, aplica as linhas válidas e devolve as rejeitadas com o motivo; o tipo, o kWh, a data e o inspetor ficam na observação da ordem | O case traz as duas pontas como diferenciais (enviar a fila à equipe de campo e registrar o resultado sem digitar); a planilha exportada já sai no formato que o upload lê, e uma linha escrita errada à mão não pode travar o arquivo da equipe inteira | Felipe |
+| 30/10/2026 | DEC-057: a visão 360 devolve `variacao_conta`, a diferença da conta contra o mesmo mês do ano anterior dividida em consumo, tarifa, bandeira e tributos, com a fórmula da decomposição da receita (DEC-029); as partes somam exatamente a diferença; os dias faturados de cada conta vêm só como informação; API 0.12.0 | A atendente consegue dizer ao cliente por que a conta subiu, e não só se o consumo subiu; calculado no backend e sem IA, porque o número precisa ser exato e imediato com o cliente na linha | Felipe |
+| 30/10/2026 | DEC-060: filtros compartilhados viajam na URL (`municipio`, `bairro`, `classe` e o par de períodos) entre Visão geral, Receita, Rede e Perdas; filtros próprios de cada tela ficam só na memória da sessão | Trocar de tela não perde o recorte nem repete a escolha, e um link reproduz a análise; a URL continua sendo a fonte da verdade | João Euclides |
+| 30/10/2026 | DEC-058: em Perdas o período é só contexto, e a consulta individual de UC mostra o histórico completo, fora do recorte | A fila é um retrato da Gold sem competência e as ordens são estado atual; a visão 360 é o registro completo da UC, e limitá-la esconderia contas antigas em aberto | João Euclides |
+| 30/10/2026 | DEC-059: ordem de UC ausente do cadastro da Gold some da lista quando há recorte de município, bairro ou classe, e continua visível sem recorte | A localização só existe em `gold_dim_uc` e não pode ser inventada; a ordem sobrevive à recarga (DEC-009) e o gerente não pode perdê-la | João Euclides |
 
 ## DEC-001 · Localização dos arquivos de origem (landing)
 
@@ -1675,7 +1679,134 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Decisão:** quando o histórico da sessão está vazio e a pergunta depende de outro turno, o `AskUseCase` devolve `clarify` sem chamar o modelo. A regra está em `domain/followup.py` e cobre dois casos: pedidos de repetição ("faça o mesmo", "repita a mesma consulta", "o mesmo para X") e perguntas elípticas de até 4 palavras que começam com "e" ("E em Olinda?").
 - **Consequências:** o comportamento é determinístico e não gasta cota. Como não muda prompt, modelo nem camada semântica, não exige rodada da DEC-016 para entrar. Uma pergunta completa que começa com "e" segue para o modelo. Follow-ups escritos de outra forma também seguem, e aí vale o que o prompt manda. Se a leitura do histórico falhar, a pergunta dependente também recebe `clarify`.
 
-## DEC-053 · Planilha de campo: exportar as ordens em campo e subir o resultado
+## DEC-057 · Variação da conta da unidade consumidora dividida por motivo
+
+- **Data:** 30/10/2026 · **Área:** Portal · **Autor:** Felipe
+- **Contexto:** o case pede que o atendente responda ao cliente na hora, "inclusive quando ele reclama de conta alta". A visão 360
+  (DEC-044) só dizia se o **consumo** subiu, e a tela já admitia o limite: "a comparação de consumo não explica sozinha a variação do
+  valor da conta". Do ano anterior ela trazia só o kWh, sem a conta em reais. Na amostra sintética, a unidade 0001 tem consumo na faixa
+  de estabilidade (174 kWh contra 179), mas a conta de dez/2025 é R$ 9,23 maior que a de dez/2024: o atendente via o consumo e não
+  tinha como explicar a diferença.
+- **Decisão:** `GET /unidades-consumidoras/{cod_uc}/visao-360` ganha `variacao_conta`: a conta do mês de referência contra a do mesmo
+  mês do ano anterior, com a diferença em R$ dividida em quatro partes que **somam exatamente a diferença**, centavo por centavo.
+  Com `Q` = `kwh_faturado`, `E` = `receita_energia`, `B` = `receita_bandeira` e `R` = `receita_faturada` (0 = ano anterior, 1 = atual):
+  - **consumo** = `(Q1 − Q0) × E0/Q0`: mais ou menos energia, ao preço do ano anterior;
+  - **bandeira** = `B1 − Q1 × B0/Q0`: o acréscimo da bandeira além do que a conta do ano anterior já trazia por kWh;
+  - **tarifa** = `(E1 − E0) − consumo − bandeira`: o reajuste da tarifa base;
+  - **tributos** = `(R1 − R0) − (E1 − E0)`.
+
+  Os **dias faturados** de cada conta (`dias_faturados` e `dias_faturados_comparada`) vêm no mesmo campo, **só como informação**: a tela
+  diz "esta conta cobriu X dias; a do ano anterior, Y" e eles não entram na divisão. A primeira versão separava uma parte "dias" do
+  consumo (ver as alternativas descartadas).
+
+  É a mesma identidade da DEC-029 (volume + tarifa + bandeira = variação da receita de energia), aplicada a uma fatura. Os valores são
+  `Decimal` (DEC-010); dias, consumo e bandeira são arredondados para centavos e a **tarifa fica com a sobra do arredondamento**, para a
+  soma fechar sem uma linha "arredondamento". Exemplo da amostra sintética, unidade 0001, dez/2025 contra dez/2024: a conta subiu
+  R$ 9,23, sendo tarifa +R$ 11,82, consumo −R$ 4,43, tributos +R$ 1,84 e bandeira R$ 0,00 (verde nos dois meses).
+  - **Sem dias** numa das contas: o campo daquela conta vem vazio; a divisão não muda.
+  - **Sem divisão** (`variacao_conta` vazio): sem fatura no mês de referência, sem fatura no mesmo mês do ano anterior, ou sem energia na
+    conta do ano anterior (painel solar que compensou tudo), porque aí não existe preço por kWh. É o mesmo princípio do
+    `sem_comparacao` da `tendencia`.
+  - **`leitura_estimada`** é verdadeiro quando uma das duas leituras foi estimada: a próxima leitura real corrige o consumo.
+- **Suposição nossa:** o case não define como explicar uma conta. A comparação é com o **mesmo mês do ano anterior**, a mesma base da
+  `tendencia` da DEC-044, para os dois blocos da tela falarem do mesmo par de contas e para tirar o efeito das estações.
+- **Alternativas descartadas:**
+  - Comparar com a conta do mês anterior: é o que o cliente costuma dizer ("veio mais alta que a de novembro"), mas mistura estações e
+    deixaria dois pares de contas diferentes lado a lado na tela. A tela deve dizer a competência comparada.
+  - Separar uma parte **"dias"** do consumo, supondo consumo proporcional aos dias faturados (primeira versão, desta mesma decisão):
+    o Arthur a rodou na Gold real e a hipótese não vale. `dias_faturados` vai de 1 a mais de 38 (pico em 30 e 31) e o kWh não acompanha
+    os dias; em casos extremos "dias" e "consumo" saíam na casa de dezenas de milhares de reais, com sinais opostos, para uma
+    diferença de conta de menos de mil reais. A soma fechava, mas a atendente não tinha como explicar o que via. Os dias continuam
+    na tela como texto.
+  - Uma fórmula própria, sem relação com a da receita: a conta de um cliente e a receita da empresa passam a se explicar pelo mesmo método.
+  - Uma linha "arredondamento": confunde a atendente; a sobra vai para a tarifa.
+  - Uma rota nova: a visão 360 já busca 24 meses de faturas, e o cliente está na linha (DEC-044).
+  - Calcular na tela: a API não entregava `receita_bandeira` nem `tributos`, e cálculo de negócio fica no backend.
+  - Um texto de IA no lugar da tabela (G2-05 do backlog): o número precisa ser exato e imediato, não espera o modelo e não falha quando
+    ele cai. O insight com IA continua na tela de Receita, que cumpre o que o case pede (pelo menos uma tela). O G2-05 pode narrar
+    esse JSON depois.
+- **Limitações conhecidas:**
+  - A parte "tributos" é a variação total dos impostos, sem separar alíquota de base de cálculo.
+  - `receita_energia` ainda é a base provisória da DEC-023: se a reconciliação mudar a definição, a fórmula acompanha sem mudar o
+    contrato da rota.
+  - O consumo mistura gastar mais por dia e a conta cobrir mais dias: com o dado atual não há como separar os dois sem inventar
+    uma proporção. Os dias na tela deixam a atendente ver quando a diferença de dias é grande.
+  - Com um ano de distância quase sempre houve reajuste, então a parte da tarifa tende a aparecer. É o dado real.
+- **Impacto:** campo novo na rota existente, sem quebra de contrato; API 0.12.0, com `contracts/openapi.json` e os tipos do client
+  regenerados. Nenhuma mudança na Gold nem no agente. A tela da visão 360 pode exibir o campo com o tipo gerado do OpenAPI.
+
+## DEC-055 · Etapas do agente por SSE em `POST /ai/ask/stream`
+
+- **Data:** 30/10/2026
+- **Contexto:** o time adiou os eventos de progresso em 24/10 (PR #39, fechado sem merge). A tela de chat já existe, e o time pediu a rota agora (issue #38).
+- **Decisão:** o agente ganha `stream()`, com as etapas e a resposta final, e `ask()` continua igual. A rota emite `stage` e termina em `answer`, com `audit_id` e `session_id`, ou em `error`. A cada 15 s sem evento vai um comentário `: ping`. O texto não chega por partes, porque os números são conferidos antes (DEC-019). Verificações falhas antes do stream respondem com o status HTTP. Depois de aberto o stream, a verificação repete com a trava do usuário, e uma recusa nesse momento vira `error`.
+- **Cliente que desconecta:** o agente é cancelado, e a pergunta entra na auditoria como `failed`, para contar no limite e no orçamento por usuário. As etapas levam internamente os tokens já gastos, fora do JSON do SSE, e o registro os soma ao orçamento. Só os de uma chamada ao modelo ainda em curso ficam de fora, porque o provedor os informa ao terminar.
+- **Consequências:** `POST /ai/ask` segue disponível. O portal ainda precisa ler o stream para mostrar as etapas.
+## DEC-053 · Conversas do agente por usuário no banco
+
+- **Data:** 30/10/2026
+- **Contexto:** o portal guarda as conversas no `localStorage`, então elas não acompanham o usuário entre navegadores (issue #98). A auditoria já grava cada turno com o login, na coluna `usuario` (DEC-046), e é imutável.
+- **Decisão:** os turnos são lidos de `app.ai_auditoria`, sem cópia. A nova tabela `app.ai_sessao` guarda só título, estrela e exclusão lógica, e a linha nasce na primeira alteração, o que também cobre as conversas antigas. A issue propunha a coluna `usuario_login` e um upsert a cada pergunta; os dois ficaram de fora por serem desnecessários. Sem título próprio, vale a primeira pergunta, cortada em 80 caracteres.
+- **Regras:** sessão de outra pessoa, sem dono ou já excluída responde `404` em `PATCH` e `DELETE`. `POST /ai/ask` numa conversa excluída responde `409`, porque o turno novo ficaria invisível. `GET /ai/sessions` devolve no máximo 50 conversas, com as favoritas primeiro. O `DELETE` usa a trava do usuário e espera a pergunta em andamento terminar, para o turno não ser gravado numa conversa já escondida.
+- **Consequências:** excluir não apaga a auditoria, que segue legível pela TI. As linhas gravadas antes da coluna `usuario` não têm dono e não aparecem para ninguém. O frontend ainda precisa trocar o `localStorage` por essas rotas.
+## DEC-056 · Views do agente no schema `semantic` (D1)
+
+- **Data:** 30/10/2026
+- **Contexto:** as views `sem_*` ficavam em `gold`, onde o `venergy_agent` lia todas as tabelas, inclusive colunas sensíveis e a fila de suspeitas, que as views deixam de fora. A allowlist só valia no validador.
+- **Decisão:** as views passam para o schema `semantic`, e o `venergy_agent` tem `USAGE` e `SELECT` só nele, sem acesso a `gold` nem a `app`. A role ganha `statement_timeout` de 30 s, acima do timeout de 10 s de cada consulta. O padrão de `allowed_schema` passa a ser `semantic`.
+- **Banco existente:** a carga e a subida da API aplicam as permissões e, se a Gold já estiver carregada, recriam as views em `semantic`, sem apagar dados. Banco novo recebe tudo do `01-init.sh`.
+- **Consequências:** o modelo não vê o nome do schema, então o prompt não muda. A carga continua apagando e recriando as views na mesma transação.
+
+## DEC-060 · Filtros compartilhados entre as telas do portal
+
+- **Data:** 30/10/2026 · **Área:** Portal · **Autor:** João Euclides
+- **Contexto:** cada tela analítica guardava o próprio recorte: a Visão geral escolhia o par de períodos, a Receita levava município, bairro e classe no mapa, a Rede tinha período e alimentador, e Perdas só tinha os sinais da fila. Trocar de tela esquecia a escolha, e dois números da mesma reunião podiam descrever recortes diferentes. O case não pede filtros conectados; é extensão de usabilidade.
+- **Decisão:**
+  - **Campos compartilhados.** `municipio`, `bairro`, `classe`, `periodo_base` e `periodo_atual` (par `AAAA-MM/AAAA-MM`) viajam na URL entre Visão geral, Receita, Rede e Perdas, e a consulta de UC os recebe como contexto. A barra superior (`FiltrosPortal`) é quem os edita, e os componentes que já levavam o usuário a um recorte, como o mapa da Receita, navegam com a mesma função (`searchPara`); telas sem contrato de filtros (login, 404) não os interpretam. **Limpar recorte** apaga município, bairro e classe e mantém o período.
+  - **A URL é a fonte da verdade.** Cada tela valida os campos com o mesmo schema (`filtrosCompartilhadosShape`, em `frontend/src/lib/filtros.ts`) antes de consultar a API. Valor inválido é removido e a URL é reescrita, com aviso visível; a base deve terminar antes do início do período atual, e uma base sobreposta é substituída pela sugestão.
+  - **Bairro depende do município.** `bairro` sem `municipio` não vai para a API, que responderia `422`; trocar ou remover o município limpa o bairro na mesma navegação, a menos que o patch diga o bairro explicitamente.
+  - **Filtros locais ficam na sessão, não na URL compartilhada.** `efeito` da Receita, `criterio`, `visao`, `alimentador` e `serie` da Rede, `status`, `secao`, sinais da fila, paginação e ordenação de Perdas e `cod_uc` pertencem a cada tela: ficam numa memória do portal, por tela, e voltam quando ela é reaberta. Atualizar a página preserva só o que está na URL. Ao mudar o recorte, a página da fila é descartada; ao mudar o recorte ou o período, o alimentador e a série da Rede também.
+  - **Período padrão.** Só entra na URL quando ela não traz período: primeiro o par mais recente válido do catálogo da decomposição (`GET /receita/decomposicao/periodos`); sem ele, o mês mais recente da série mensal contra o mesmo mês do ano anterior e, sem esse par na série, contra o mês anterior (`GET /receita/mensal`). Período atual sem base assume o mesmo trecho um ano antes; se durar mais de 12 meses, assume a janela imediatamente anterior com a mesma duração. Base sem período atual é descartada. A resolução mora na barra, não em cada tela.
+  - **Um período, dois formatos.** A Rede o grava como duas pontas (`inicio` e `fim`) e as demais telas como par; o formato da outra tela é tratado como link antigo e sai da URL.
+- **Consultas:** o recorte e o período chegam às rotas que já os aceitavam (Receita, continuidade e indicadores) e o recorte estende a fila e as ordens: `GET /fila-suspeitas` filtra por município, bairro e classe antes dos sinais e da paginação, e `GET /ordens-inspecao` filtra por recorte e status. Três rotas são novas: `GET /indicadores/mensal` devolve a série mensal do recorte, e o mês continua na série mesmo sem fato no recorte: energia e receita vêm nulas quando o mês não tem fatura, com zero só onde ela foi emitida, e os chamados seguem contados (DEC-030); `GET /fila-suspeitas/distribuicao-queda` dá a distribuição por queda no recorte, antes dos sinais locais; e `GET /unidades-consumidoras/localidades` entrega os pares distintos de município e bairro do cadastro para a barra, sem dado pessoal.
+  O total de chamados fica nulo quando `gold_kpis_mensais` indica que não há atendimento carregado na competência; com atendimento disponível, vale a soma do recorte, inclusive zero.
+- **Alternativas descartadas:** guardar os filtros em `localStorage` (o link deixa de reproduzir a análise e um recorte antigo reaparece sem aviso); um store global de filtros fora da URL (a URL deixa de ser compartilhável e o botão voltar não desfaz a escolha); manter uma barra de filtros por tela, que foi o estado anterior.
+- **Consequências:** as regras estão testadas em `frontend/src/lib/__tests__/filtros.test.ts` e `frontend/src/features/filtros/__tests__/memoria.test.ts`; a API 0.13.0 traz as rotas novas e o client tipado é regerado (`contracts/openapi.json`). A tela nova entra em `DestinoPortal` e declara os campos locais em `CAMPOS_LOCAIS` para participar da memória. A normalização do padrão e dos valores inválidos usa `replace`, sem criar entrada no histórico do navegador; uma escolha do usuário navega normalmente, para o botão voltar desfazê-la.
+- **Numeração:** DEC-060 evita colisão com a DEC-056 da main, a DEC-057 da visão 360, as DEC-058 e DEC-059 deste PR e as decisões reservadas nos PRs #106, #108, #110 e #115.
+
+## DEC-058 · Período é contexto em Perdas e a consulta de UC não é limitada pelo recorte
+
+- **Data:** 30/10/2026 · **Área:** Portal · **Autor:** João Euclides
+- **Contexto:** com a DEC-060, recorte e período passaram a acompanhar o usuário entre as telas. Duas telas não são análise de período: a fila de suspeitas é um retrato da Gold, sem competência, e as ordens de inspeção são estado atual em `app`; a consulta individual de UC é o registro completo de uma unidade, aberta com o cliente na linha.
+- **Decisão:**
+  - **Perdas.** Município, bairro e classe filtram a fila e a lista de ordens (na fila, antes da paginação). O seletor de período não aparece, e nem `GET /fila-suspeitas` nem `GET /ordens-inspecao` têm parâmetro de período. O período que estiver na URL é preservado apenas como contexto para as outras telas, sem alterar a fila nem as ordens. Os sinais próprios da fila continuam locais (DEC-051).
+  - **Consulta de UC.** `/uc` aceita os campos compartilhados só para exibir o contexto da análise na faixa (`Contexto da análise: ...`). A visão 360 continua a da DEC-044: 12 meses até a última competência da Gold, faturas em aberto sem corte por período e históricos paginados somente na apresentação. Nenhum filtro da análise corta consumo, dívidas, interrupções, chamados ou inspeções.
+- **Alternativas descartadas:** filtrar as ordens pelo período de criação (a pergunta do gerente é o andamento, não a data em que a OI nasceu); e limitar a visão 360 ao período ou ao recorte da análise (esconderia contas antigas em aberto e interrupções fora da janela, e a referência da DEC-044 é a Gold inteira).
+- **Consequências:** os números de Perdas não mudam quando o período é trocado em outra tela, e o link `/uc?cod_uc=...&municipio=...&periodo_atual=...` mostra o mesmo histórico com ou sem recorte; o contexto muda só a faixa da tela. A barra informa na própria tela que a consulta individual não é limitada pelos filtros.
+
+## DEC-059 · Ordem de UC ausente do cadastro da Gold fica fora da lista quando há recorte
+
+- **Data:** 30/10/2026 · **Área:** Portal e dados · **Autor:** João Euclides
+- **Contexto:** `app.ordem_inspecao` não tem chave estrangeira para a Gold (DEC-009), para a carga não apagar as ordens. Uma recarga pode tirar do cadastro (`gold_dim_uc`) uma UC que já tem ordem, e a ordem continua válida e precisa aparecer para o gerente. A localização de uma ordem, porém, só existe no cadastro.
+- **Decisão:** sem recorte, `GET /ordens-inspecao` continua devolvendo todas as ordens, inclusive as de UCs que não estão no cadastro. Com `municipio`, `bairro` ou `classe`, a consulta junta `gold_dim_uc` e as ordens dessas UCs ficam fora da resposta. `bairro` sem `municipio` continua `422`.
+- **Alternativas descartadas:** `LEFT JOIN` com uma localidade sentinela "Sem cadastro", que inventaria uma localização que a Gold não afirma (e uma UC pode ter mudado de bairro); e manter essas ordens em todo recorte, o que faria o total do recorte não fechar com a soma das ordens que ele descreve.
+- **Consequências:** para achar uma ordem cuja UC saiu do cadastro, o gerente limpa o recorte; a tela não avisa quantas ordens ficaram de fora. A fila de suspeitas não tem esse caso: é recalculada pela Gold a cada carga e o recorte também é `INNER JOIN` com o cadastro. O comportamento está coberto por `test_filters_orders_by_segment_and_status_without_changing_them`, que apaga uma UC do cadastro e confere a lista com e sem recorte.
+
+## DEC-054 · Comparação de indicadores exige períodos completos e em ordem
+
+- **Data:** 30/10/2026
+- **Contexto:** a issue #66 pedia uma rota nova para comparar os indicadores entre dois períodos de vários meses, mas `GET /indicadores/comparacao` (DEC-041) já faz essa conta com os componentes somados (DEC-033). Faltavam duas regras: um período sem dado virava variação de -100%, e nada impedia base depois do atual ou sobreposta a ele.
+- **Decisão:** não criar outra rota, nem mudar os parâmetros `base_inicio`, `base_fim`, `atual_inicio` e `atual_fim`. A base precisa terminar antes do início do atual, ou a rota responde `422`. Se faltar algum mês em um dos períodos, a rota responde `200` com os valores e `n_meses`, e a variação fica nula.
+- **Consequências:** a tela consegue mostrar o que existe sem exibir uma variação enganosa. A regra vale só para esta rota: `GET /receita/comparacao` continua como está. O frontend ainda precisa aceitar trechos de vários meses no seletor.
+
+## DEC-060 · Queda do provedor não pode prender a resposta do agente
+
+- **Data:** 31/10/2026 · **Área:** GenAI
+- **Contexto:** em 31/10/2026 o modelo principal respondeu `503` por cerca de 30 minutos. Cada `503` esperava as retentativas antes de passar ao próximo modelo, sem limite de tempo por chamada nem por pergunta. Uma resposta chegou a levar 61 s, e um travamento sem resposta prenderia a tela.
+- **Decisão:** cada chamada tem limite de 15 s. Depois de uma falha, o modelo é pulado por 60 s, exceto o último da cadeia, para a pergunta seguinte não pagar a espera de novo. A pergunta tem prazo de 30 s: estourado, responde `failed` com mensagem própria. Se o prazo vencer na narração, a resposta sai com o texto determinístico, sem perder o resultado. No Docker, cada modelo tem uma tentativa só; fora dele, continuam as 3.
+- **Consequências:** não muda prompt, modelo principal nem camada, então não exige rodada da DEC-016 para entrar. Numa rodada de avaliação com o provedor lento, itens podem sair `failed` por tempo. Os valores vêm de latências observadas e podem ser ajustados por variável de ambiente. A qualidade dos modelos de reserva não foi medida pelo golden, e a cadeia só protege de verdade com outro provedor configurado.
+
+## DEC-062 · Planilha de campo: exportar as ordens em campo e subir o resultado
 
 - **Data:** 30/10/2026 · **Área:** Portal e backend · **Autor:** Felipe
 - **Contexto:** o case traz, como diferencial, "subir pelo portal a planilha que a equipe preenche em campo, para que os
@@ -1723,3 +1854,5 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   montado a partir do pipeline e do case, não de um arquivo de campo real: a planilha original não estava disponível, e os
   testes usam planilhas sintéticas. O número da ordem não vem na planilha; se a equipe passar a preenchê-lo, a ligação pode
   deixar de depender de uma ordem ativa por UC.
+- **Ordem da planilha:** a linha com `OI-<id>`, exportada pelo portal, só conclui essa ordem. Uma planilha antiga é rejeitada se a UC tiver outra ordem em campo. O `id_inspecao` do formato do case não aponta para ordem, então só a UC e o status valem nesse caso.
+

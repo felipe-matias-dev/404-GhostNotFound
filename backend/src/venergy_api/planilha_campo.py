@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from io import BytesIO
+from xml.etree.ElementTree import ParseError
 from zipfile import BadZipFile
 
 from openpyxl import Workbook, load_workbook
@@ -23,6 +24,8 @@ from venergy_api.ordens import ResultadoOrdem
 MAX_BYTES = 5 * 1024 * 1024
 # O arquivo do case tem cerca de 1.400 linhas no ano todo; o teto só barra arquivo errado.
 MAX_LINHAS = 5000
+# Linhas em branco não são inspeção, mas custam leitura: o teto evita um arquivo pequeno e caro.
+MAX_LINHAS_EM_BRANCO = 20000
 # Mesmo limite da observação digitada no modal (AtualizarOrdemSchema).
 MAX_OBSERVACAO = 1000
 
@@ -34,6 +37,10 @@ RESULTADOS = {
     "SEM IRREGULARIDADE": ResultadoOrdem.REGULAR,
     "NADA CONSTA": ResultadoOrdem.REGULAR,
 }
+
+PADRAO_ORDEM = re.compile(r"OI-(\d+)")
+# "1.234" digitado é mil e poucos em pt-BR; a célula numérica do Excel não passa por aqui.
+MILHAR = re.compile(r"\d{1,3}(\.\d{3})+")
 
 TIPO_AUSENTE = {"", "-", "N/A", "NULL"}
 
@@ -56,6 +63,9 @@ class LinhaCampo:
     cod_uc: str
     resultado: ResultadoOrdem
     observacao: str
+    # Só na planilha exportada pelo portal (OI-<id>): a linha vale para esta ordem, e não para
+    # outra que a UC tenha hoje. O id_inspecao do formato do case não aponta para ordem nenhuma.
+    ordem_id: int | None = None
 
 
 @dataclass(frozen=True)
@@ -89,6 +99,7 @@ def ler_planilha(conteudo: bytes) -> PlanilhaLida:
     validas: list[LinhaCampo] = []
     rejeitadas: list[LinhaRejeitada] = []
     ucs_vistas: set[str] = set()
+    em_branco = 0
     try:
         for aba in livro.worksheets:
             linhas = enumerate(aba.iter_rows(values_only=True), start=1)
@@ -97,6 +108,9 @@ def ler_planilha(conteudo: bytes) -> PlanilhaLida:
                 continue
             for numero, valores in linhas:
                 if all(_vazio(valor) for valor in valores):
+                    em_branco += 1
+                    if em_branco > MAX_LINHAS_EM_BRANCO:
+                        raise PlanilhaInvalida("Planilha com linhas em branco demais")
                     continue
                 linhas_lidas += 1
                 if linhas_lidas > MAX_LINHAS:
@@ -112,6 +126,8 @@ def ler_planilha(conteudo: bytes) -> PlanilhaLida:
                     continue
                 ucs_vistas.add(linha.cod_uc)
                 validas.append(linha)
+    except (ParseError, BadZipFile, KeyError, ValueError) as error:
+        raise PlanilhaInvalida("O arquivo não é uma planilha XLSX válida") from error
     finally:
         livro.close()
 
@@ -146,6 +162,8 @@ def _ler_linha(aba: str, numero: int, cod_uc: str, celula: dict[str, object]) ->
 
     tipo = _tipo(celula.get("tipo_irregularidade"))
     kwh = _kwh(celula.get("kwh_recuperado"))
+    if kwh is not None and kwh < 0:
+        raise _LinhaInvalida("kWh recuperado negativo")
     data = _data(celula.get("data"))
     inspetor = " ".join(_texto(celula.get("inspetor")).split())
     inspecao = _texto(celula.get("id_inspecao"))
@@ -173,7 +191,15 @@ def _ler_linha(aba: str, numero: int, cod_uc: str, celula: dict[str, object]) ->
     observacao = "Planilha de campo: " + ", ".join(partes)
     if inspecao:
         observacao += f" (inspeção {inspecao})"
-    return LinhaCampo(aba, numero, cod_uc, resultado, observacao[:MAX_OBSERVACAO])
+    exportada = PADRAO_ORDEM.fullmatch(inspecao)
+    return LinhaCampo(
+        aba,
+        numero,
+        cod_uc,
+        resultado,
+        observacao[:MAX_OBSERVACAO],
+        int(exportada.group(1)) if exportada else None,
+    )
 
 
 def _vazio(valor: object) -> bool:
@@ -205,6 +231,8 @@ def _kwh(valor: object) -> Decimal | None:
     # "1.234,5": com vírgula, o ponto é separador de milhar (INSP-07).
     if "," in texto:
         texto = texto.replace(".", "").replace(",", ".")
+    elif isinstance(valor, str) and MILHAR.fullmatch(texto):
+        texto = texto.replace(".", "")
     try:
         numero = Decimal(texto)
     except InvalidOperation:
@@ -254,7 +282,7 @@ COLUNAS_EXPORTACAO = (
 
 
 # Linhas que a validação das colunas cobre: sobra folga para a equipe acrescentar linhas.
-LINHAS_VALIDADAS = 2000
+LINHAS_VALIDADAS = MAX_LINHAS
 OPCOES_RESULTADO = ("CONFIRMADA", "SEM IRREGULARIDADE")
 
 

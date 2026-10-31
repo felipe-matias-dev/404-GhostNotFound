@@ -266,3 +266,20 @@ def _salvar(livro: Workbook) -> bytes:
     arquivo = BytesIO()
     livro.save(arquivo)
     return arquivo.getvalue()
+
+
+def test_an_old_sheet_does_not_conclude_a_newer_order_of_the_same_uc(client: TestClient) -> None:
+    antiga = gerar_ordem(client, "0001")
+    client.patch(f"/ordens-inspecao/{antiga}", json={"status": "CANCELADA"})
+    nova = gerar_ordem(client, "0001")
+    livro = Workbook()
+    livro.active.append(["id_inspecao", "id_uc", "resultado"])
+    livro.active.append([f"OI-{antiga}", "0001", "SEM IRREGULARIDADE"])
+    saida = BytesIO()
+    livro.save(saida)
+
+    corpo = enviar(client, saida.getvalue()).json()
+
+    assert corpo["concluidas"] == []
+    assert f"ordem {antiga}" in corpo["rejeitadas"][0]["motivo"]
+    assert detalhe(client, nova)["status"] == "EM_CAMPO"

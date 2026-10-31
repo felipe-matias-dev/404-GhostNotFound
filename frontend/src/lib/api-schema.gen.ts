@@ -78,6 +78,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/unidades-consumidoras/localidades": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Localidades */
+        get: operations["get_localidades_unidades_consumidoras_localidades_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/unidades-consumidoras/{cod_uc}": {
         parameters: {
             query?: never;
@@ -277,6 +294,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/indicadores/mensal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Mensal
+         * @description Série mensal do recorte; mês sem fato no recorte vem nulo, e não zero (DEC-030).
+         */
+        get: operations["get_mensal_indicadores_mensal_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/indicadores/comparacao": {
         parameters: {
             query?: never;
@@ -452,6 +489,76 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/ai/ask/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Perguntar Em Stream
+         * @description A mesma pergunta do POST /ai/ask, com as etapas do agente até a resposta final (DEC-055).
+         *
+         *     O texto só chega inteiro, no último evento, porque os números são conferidos antes (DEC-019).
+         *     Erros de verificação respondem com o status HTTP, sem abrir o stream.
+         */
+        post: operations["perguntar_em_stream_ai_ask_stream_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ai/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Obter Sessoes
+         * @description As conversas não excluídas do usuário: favoritas primeiro, depois as mais recentes.
+         */
+        get: operations["obter_sessoes_ai_sessions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ai/sessions/{session_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Sessao
+         * @description Esconde a conversa do usuário. A auditoria dela continua intacta para a TI.
+         *
+         *     Espera a pergunta em andamento do usuário terminar: sem a trava, o turno seria gravado
+         *     numa conversa já escondida.
+         */
+        delete: operations["delete_sessao_ai_sessions__session_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Patch Sessao
+         * @description Renomeia ou favorita uma conversa do usuário.
+         */
+        patch: operations["patch_sessao_ai_sessions__session_id__patch"];
+        trace?: never;
+    };
     "/ai/audit/{audit_id}": {
         parameters: {
             query?: never;
@@ -476,6 +583,16 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * AlteracaoSessaoIaSchema
+         * @description Novo título, estrela ou os dois. Nenhum deles pode vir nulo, e ao menos um é obrigatório.
+         */
+        AlteracaoSessaoIaSchema: {
+            /** Titulo */
+            titulo?: string;
+            /** Favorita */
+            favorita?: boolean;
+        };
         /**
          * AnswerStatus
          * @enum {string}
@@ -879,6 +996,31 @@ export interface components {
             tarifa_base_media: number | null;
         };
         /**
+         * IndicadoresMensalSchema
+         * @description Indicadores de uma competência no recorte: sem fato no recorte, a soma é nula.
+         *
+         *     O recorte pode não ter fatura na competência (ou nenhuma linha), e zero seria inventar dado:
+         *     o mês continua na série para mostrar o buraco (DEC-030).
+         */
+        IndicadoresMensalSchema: {
+            /** Competencia */
+            competencia: string;
+            /** Kwh Faturado */
+            kwh_faturado: number | null;
+            /** Receita Faturada */
+            receita_faturada: number | null;
+            /** Receita Energia */
+            receita_energia: number | null;
+            /** Dec */
+            dec: number | null;
+            /** Fec */
+            fec: number | null;
+            /** N Chamados */
+            n_chamados: number | null;
+            /** Satisfacao Media */
+            satisfacao_media: number | null;
+        };
+        /**
          * IndicadoresPeriodoSchema
          * @description Os indicadores da diretoria somados num período, todos calculados no banco.
          */
@@ -1032,6 +1174,13 @@ export interface components {
             cod_uc: string | null;
             /** Motivo */
             motivo: string;
+        };
+        /** LocalidadeSchema */
+        LocalidadeSchema: {
+            /** Municipio */
+            municipio: string;
+            /** Bairro */
+            bairro: string;
         };
         /**
          * LoginSchema
@@ -1288,6 +1437,30 @@ export interface components {
             rejeitadas: components["schemas"]["LinhaRejeitadaSchema"][];
         };
         /**
+         * SessaoIaSchema
+         * @description Uma conversa do usuário com o agente, com os turnos da auditoria em ordem.
+         */
+        SessaoIaSchema: {
+            /** Session Id */
+            session_id: string;
+            /** Titulo */
+            titulo: string;
+            /** Favorita */
+            favorita: boolean;
+            /**
+             * Criada Em
+             * Format: date-time
+             */
+            criada_em: string;
+            /**
+             * Atualizada Em
+             * Format: date-time
+             */
+            atualizada_em: string;
+            /** Turnos */
+            turnos: components["schemas"]["AuditoriaIaSchema"][];
+        };
+        /**
          * StatusOrdem
          * @enum {string}
          */
@@ -1313,6 +1486,7 @@ export interface components {
         Uc360Schema: {
             cadastro: components["schemas"]["DimUcSchema"];
             consumo: components["schemas"]["ConsumoUcSchema"];
+            variacao_conta: components["schemas"]["VariacaoContaSchema"] | null;
             faturas_nao_pagas: components["schemas"]["FaturasNaoPagasSchema"];
             medidor: components["schemas"]["MedidorUcSchema"] | null;
             /** Interrupcoes */
@@ -1344,8 +1518,42 @@ export interface components {
             ctx?: Record<string, never>;
         };
         /**
+         * VariacaoContaSchema
+         * @description Por que a conta do mês de referência mudou, em R$, contra o mesmo mês do ano anterior.
+         *
+         *     As quatro partes somam exatamente a `diferenca` entre as duas contas.
+         */
+        VariacaoContaSchema: {
+            /** Competencia */
+            competencia: string;
+            /** Competencia Comparada */
+            competencia_comparada: string;
+            /** Conta */
+            conta: number;
+            /** Conta Comparada */
+            conta_comparada: number;
+            /** Diferenca */
+            diferenca: number;
+            /** Dias Faturados */
+            dias_faturados: number | null;
+            /** Dias Faturados Comparada */
+            dias_faturados_comparada: number | null;
+            /** Consumo */
+            consumo: number;
+            /** Tarifa */
+            tarifa: number;
+            /** Bandeira */
+            bandeira: number;
+            /** Tributos */
+            tributos: number;
+            /** Leitura Estimada */
+            leitura_estimada: boolean;
+        };
+        /**
          * VariacaoIndicadoresSchema
-         * @description Variação em % de cada indicador (8.0 = +8,0%); nula sem base ou com base zero.
+         * @description Variação em % de cada indicador (8.0 = +8,0%).
+         *
+         *     Nula com base zero ou se faltar algum mês em um dos períodos (DEC-054).
          */
         VariacaoIndicadoresSchema: {
             /** Receita Faturada */
@@ -1496,6 +1704,26 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    get_localidades_unidades_consumidoras_localidades_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LocalidadeSchema"][];
+                };
             };
         };
     };
@@ -1849,6 +2077,41 @@ export interface operations {
             };
         };
     };
+    get_mensal_indicadores_mensal_get: {
+        parameters: {
+            query?: {
+                inicio?: string | null;
+                fim?: string | null;
+                municipio?: string | null;
+                bairro?: string | null;
+                classe?: ("B1" | "B2" | "B3" | "A4") | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IndicadoresMensalSchema"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_comparacao_indicadores_comparacao_get: {
         parameters: {
             query: {
@@ -1922,7 +2185,11 @@ export interface operations {
     };
     get_distribuicao_queda_fila_suspeitas_distribuicao_queda_get: {
         parameters: {
-            query?: never;
+            query?: {
+                municipio?: string | null;
+                bairro?: string | null;
+                classe?: ("B1" | "B2" | "B3" | "A4") | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -1938,11 +2205,23 @@ export interface operations {
                     "application/json": components["schemas"]["DistribuicaoQuedaSchema"];
                 };
             };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
         };
     };
     get_fila_fila_suspeitas_get: {
         parameters: {
             query?: {
+                municipio?: string | null;
+                bairro?: string | null;
+                classe?: ("B1" | "B2" | "B3" | "A4") | null;
                 pagina?: number;
                 tamanho?: number;
                 sem_ordem_ativa?: boolean;
@@ -1983,6 +2262,9 @@ export interface operations {
     listar_ordens_ordens_inspecao_get: {
         parameters: {
             query?: {
+                municipio?: string | null;
+                bairro?: string | null;
+                classe?: ("B1" | "B2" | "B3" | "A4") | null;
                 status?: components["schemas"]["StatusOrdem"] | null;
             };
             header?: never;
@@ -2131,7 +2413,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErroSchema"];
                 };
             };
-            /** @description Unprocessable Entity */
+            /** @description Unprocessable Content */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -2275,6 +2557,15 @@ export interface operations {
                     "application/json": components["schemas"]["ErroSchema"];
                 };
             };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErroSchema"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -2300,6 +2591,192 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErroSchema"];
+                };
+            };
+        };
+    };
+    perguntar_em_stream_ai_ask_stream_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PerguntaIaSchema"];
+            };
+        };
+        responses: {
+            /** @description Eventos SSE: stage, ping de comentário e, por último, answer ou error. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": {
+                        /** @constant */
+                        type: "stage";
+                        /** @enum {unknown} */
+                        stage: "understanding" | "querying" | "correcting" | "writing";
+                        label: string;
+                        attempt: number;
+                    } | {
+                        /** @constant */
+                        type: "answer";
+                        answer: components["schemas"]["RespostaIaSchema"];
+                    } | {
+                        /** @constant */
+                        type: "error";
+                        detail: string;
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErroSchema"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErroSchema"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErroSchema"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErroSchema"];
+                };
+            };
+        };
+    };
+    obter_sessoes_ai_sessions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessaoIaSchema"][];
+                };
+            };
+        };
+    };
+    delete_sessao_ai_sessions__session_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErroSchema"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_sessao_ai_sessions__session_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AlteracaoSessaoIaSchema"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessaoIaSchema"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErroSchema"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

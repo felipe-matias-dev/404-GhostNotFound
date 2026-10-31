@@ -85,7 +85,7 @@ def _view_block(view: ViewSpec, nonce: str) -> str:
 
 def _column_line(column: ColumnSpec, nonce: str) -> str:
     unit = f", {column.unit}" if column.unit else ""
-    line = f"- {column.name} ({column.type}{unit}): {column.description}"
+    line = f"- {column.name} ({column.view_type}{unit}): {column.description}"
     if column.allowed_values:
         values = delimited("dados", ", ".join(column.allowed_values), nonce)
         line += f". Valores possíveis: {values}"

@@ -6,23 +6,13 @@ import {
 import { useEffect, useMemo, useRef } from "react";
 import { Pagina } from "#/components/layout/pagina";
 import {
-	Breadcrumb,
-	BreadcrumbItem,
-	BreadcrumbLink,
-	BreadcrumbList,
-	BreadcrumbPage,
-	BreadcrumbSeparator,
-} from "#/components/ui/breadcrumb";
-import { Button } from "#/components/ui/button";
-import {
 	SegmentedControl,
 	type SegmentedOption,
 } from "#/components/ui/segmented-control";
-import { useCompetencias } from "#/features/visaoGeral";
+import { useFiltrosPortal } from "#/features/filtros";
 import { AlimentadorSheet } from "../components/alimentador-sheet";
 import { ContinuidadeTable } from "../components/continuidade-table";
-import { IntervaloMeses } from "../components/intervalo-meses";
-import { linhasDoRanking, resolverPeriodo } from "../conversions";
+import { linhasDoRanking } from "../conversions";
 import {
 	useRankingContinuidade,
 	useRecortesContinuidade,
@@ -39,46 +29,63 @@ import type {
 
 const route = getRouteApi("/rede");
 
-const VISOES: readonly SegmentedOption<VisaoRede>[] = [
-	{ value: "alimentadores", label: "Alimentadores" },
-	{ value: "localidades", label: "Localidades" },
-];
-
 const CRITERIOS: readonly SegmentedOption<Criterio>[] = [
 	{ value: "dec", label: "DEC" },
 	{ value: "fec", label: "FEC" },
 ];
 
-const SEM_PERIODO =
-	"Sem competências disponíveis. Escolha um período para consultar a continuidade.";
-const FALHA_CALENDARIO = "Não foi possível carregar as competências.";
+const SEM_PERIODO = "Escolha um período para consultar a continuidade.";
+
+const RECORTE_GLOBAL = "Limpe o recorte para consultar todos os alimentadores";
 
 export function RedePage() {
 	const search = route.useSearch();
 	const navigate = route.useNavigate();
 
-	// O calendário é o mesmo da Visão geral; a URL completa e válida vale mesmo fora dele.
-	const competencias = useCompetencias();
-	const periodo = resolverPeriodo(search, competencias.data ?? []);
-	const padrao = resolverPeriodo({}, competencias.data ?? []);
+	// O período da Rede é o compartilhado: a URL traduz o mesmo trecho para `inicio`/`fim`.
+	const { filtros } = useFiltrosPortal();
+	// A URL bruta ainda pode trazer campos que o schema já descartou (bairro órfão, série sem
+	// alimentador, mês inválido): comparar só com o search validado esconderia esses casos.
+	const buscaBruta = useLocation({
+		select: (local) => local.search,
+	}) as Record<string, unknown>;
+	const par = filtros.periodo_atual;
+	const periodo = useMemo<Periodo | undefined>(() => {
+		if (!par) return undefined;
+		const [inicio, fim] = par.split("/");
+		return inicio && fim ? { inicio, fim } : undefined;
+	}, [par]);
 
 	const criterio: Criterio = search.criterio ?? "dec";
-	const visao: VisaoRede = search.visao ?? "alimentadores";
 	const alimentador = search.alimentador;
 	const metrica: Criterio = search.serie ?? criterio;
-	const municipio = visao === "localidades" ? search.municipio : undefined;
-	const bairro = visao === "localidades" ? search.bairro : undefined;
+	const municipio = filtros.municipio;
+	const bairro = filtros.bairro;
+	const classe = filtros.classe;
+	// Com recorte, o ranking global não se aplica; a preferência explícita volta sem recorte.
+	const comRecorte = Boolean(municipio || bairro || classe);
+	const visaoSalva: VisaoRede =
+		buscaBruta.visao === "localidades" ? "localidades" : "alimentadores";
+	const visao: VisaoRede = comRecorte ? "localidades" : visaoSalva;
+
+	const visoes = useMemo<readonly SegmentedOption<VisaoRede>[]>(
+		() => [
+			{ value: "alimentadores", label: "Alimentadores", disabled: comRecorte },
+			{ value: "localidades", label: "Localidades" },
+		],
+		[comRecorte],
+	);
 
 	// Hooks em ordem fixa; a consulta da visão inativa fica desligada por skipToken.
 	const ranking = useRankingContinuidade(
 		periodo,
 		criterio,
-		visao === "alimentadores",
+		visao === "alimentadores" && !comRecorte,
 	);
 	const recortes = useRecortesContinuidade(
 		periodo,
 		criterio,
-		{ municipio, bairro },
+		{ municipio, bairro, classe },
 		visao === "localidades",
 	);
 	const serie = useSerieAlimentador(periodo, alimentador);
@@ -113,36 +120,35 @@ export function RedePage() {
 					? `Bairros de ${municipio}`
 					: "Municípios";
 
-	// A forma canônica da tela: período resolvido, padrões omitidos e campos sem sentido fora.
+	// A forma canônica da tela: período compartilhado, padrões omitidos e campos sem sentido fora.
 	const alvo = useMemo<RedeSearch>(
 		() => ({
 			inicio: periodo?.inicio,
 			fim: periodo?.fim,
+			periodo_base: filtros.periodo_base,
 			criterio: criterio === "dec" ? undefined : criterio,
-			visao: visao === "localidades" ? "localidades" : undefined,
+			visao: visaoSalva === "localidades" ? "localidades" : undefined,
 			municipio,
 			bairro,
+			classe,
 			alimentador,
 			serie: alimentador ? metrica : undefined,
 		}),
 		[
 			periodo?.inicio,
 			periodo?.fim,
+			filtros.periodo_base,
 			criterio,
-			visao,
+			visaoSalva,
 			municipio,
 			bairro,
+			classe,
 			alimentador,
 			metrica,
 		],
 	);
 	const temPeriodo = Boolean(periodo);
 
-	// A URL bruta ainda pode trazer campos que o schema já descartou (bairro órfão, série sem
-	// alimentador, mês inválido): comparar só com o search validado esconderia esses casos.
-	const buscaBruta = useLocation({
-		select: (local) => local.search,
-	}) as Record<string, unknown>;
 	const canonica = Object.fromEntries(
 		Object.entries(alvo).filter(([, valor]) => valor !== undefined),
 	) as Record<string, string>;
@@ -178,25 +184,19 @@ export function RedePage() {
 			resetScroll: false,
 		});
 
-	const escolherVisao = (proxima: VisaoRede) =>
+	// Trocar de visão fecha o painel, mas nunca limpa o recorte compartilhado: com recorte, a
+	// opção global está desabilitada.
+	const escolherVisao = (proxima: VisaoRede) => {
+		if (proxima === "alimentadores" && comRecorte) return;
 		void ir({
 			visao: proxima === "localidades" ? "localidades" : undefined,
-			municipio: undefined,
-			bairro: undefined,
 			alimentador: undefined,
 			serie: undefined,
 		});
+	};
 
 	const escolherCriterio = (proximo: Criterio) =>
 		void ir({ criterio: proximo === "dec" ? undefined : proximo });
-
-	const escolherPeriodo = (proximo: Periodo) =>
-		void ir({
-			inicio: proximo.inicio,
-			fim: proximo.fim,
-			alimentador: undefined,
-			serie: undefined,
-		});
 
 	// Abrir a linha grava o nível que a resposta atual oferece, nunca o da resposta anterior.
 	const abrirLinha = (linha: LinhaContinuidade) => {
@@ -255,19 +255,11 @@ export function RedePage() {
 		abertoAnterior.current = aberto;
 	}, [alimentador]);
 
-	const carregando = ativa.isLoading || (!periodo && competencias.isPending);
+	const carregando = ativa.isLoading;
 	const atualizando = ativa.isFetching && !ativa.isLoading;
 	const erroTabela = ativa.isError
 		? "Não foi possível carregar a continuidade deste recorte."
 		: null;
-
-	const semPeriodo = !periodo;
-	const calendarioFalhou = semPeriodo && competencias.isError;
-	const calendarioVazio =
-		semPeriodo &&
-		!competencias.isPending &&
-		!competencias.isError &&
-		(competencias.data?.length ?? 0) === 0;
 
 	const legenda =
 		n_meses === undefined
@@ -276,64 +268,6 @@ export function RedePage() {
 
 	return (
 		<Pagina className="max-w-none">
-			{visao === "localidades" && (
-				<Breadcrumb aria-label="Recorte da rede">
-					<BreadcrumbList>
-						<BreadcrumbItem className="min-w-0">
-							{municipio ? (
-								<BreadcrumbLink
-									render={
-										<button
-											type="button"
-											onClick={() => escolherVisao("localidades")}
-										/>
-									}
-								>
-									Todos os municípios
-								</BreadcrumbLink>
-							) : (
-								<BreadcrumbPage>Todos os municípios</BreadcrumbPage>
-							)}
-						</BreadcrumbItem>
-						{municipio && (
-							<>
-								<BreadcrumbSeparator />
-								<BreadcrumbItem className="min-w-0">
-									{bairro ? (
-										<BreadcrumbLink
-											render={
-												<button
-													type="button"
-													onClick={() =>
-														void ir({
-															bairro: undefined,
-															alimentador: undefined,
-															serie: undefined,
-														})
-													}
-												/>
-											}
-										>
-											{municipio}
-										</BreadcrumbLink>
-									) : (
-										<BreadcrumbPage>{municipio}</BreadcrumbPage>
-									)}
-								</BreadcrumbItem>
-							</>
-						)}
-						{bairro && (
-							<>
-								<BreadcrumbSeparator />
-								<BreadcrumbItem className="min-w-0">
-									<BreadcrumbPage>{bairro}</BreadcrumbPage>
-								</BreadcrumbItem>
-							</>
-						)}
-					</BreadcrumbList>
-				</Breadcrumb>
-			)}
-
 			<section
 				aria-labelledby="rede-titulo"
 				className="flex min-w-0 flex-col gap-3"
@@ -355,12 +289,7 @@ export function RedePage() {
 							label="Visão da rede"
 							value={visao}
 							onValueChange={escolherVisao}
-							options={VISOES}
-						/>
-						<IntervaloMeses
-							periodo={periodo}
-							padrao={padrao}
-							onChange={escolherPeriodo}
+							options={visoes}
 						/>
 						<SegmentedControl
 							label="Critério da tabela"
@@ -371,38 +300,23 @@ export function RedePage() {
 					</div>
 				</div>
 
-				{calendarioFalhou && (
-					<div
-						role="alert"
-						className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-danger/40 bg-danger-subtle p-3"
-					>
-						<p className="text-body text-danger">{FALHA_CALENDARIO}</p>
-						<Button
-							variant="outline"
-							size="sm"
-							onClick={() => void competencias.refetch()}
-						>
-							Tentar de novo
-						</Button>
-					</div>
+				{comRecorte && (
+					<p className="text-small text-text-muted">{RECORTE_GLOBAL}</p>
 				)}
 
-				{calendarioVazio && (
-					<p className="text-body text-text-muted">{SEM_PERIODO}</p>
-				)}
-
-				{(periodo || competencias.isPending) && (
+				{periodo ? (
 					<ContinuidadeTable
 						rows={rows}
 						nivel={nivel}
 						criterio={criterio}
 						resetKey={[
 							visao,
-							periodo?.inicio ?? "",
-							periodo?.fim ?? "",
+							periodo.inicio,
+							periodo.fim,
 							criterio,
 							municipio ?? "",
 							bairro ?? "",
+							classe ?? "",
 						].join("|")}
 						loading={carregando}
 						refreshing={atualizando}
@@ -410,6 +324,8 @@ export function RedePage() {
 						onRetry={() => void ativa.refetch()}
 						onOpen={abrirLinha}
 					/>
+				) : (
+					<p className="text-body text-text-muted">{SEM_PERIODO}</p>
 				)}
 			</section>
 
@@ -417,7 +333,7 @@ export function RedePage() {
 				alimentador={alimentador}
 				periodo={periodo}
 				criterio={metrica}
-				fromRecorte={Boolean(bairro)}
+				fromRecorte={comRecorte}
 				linhas={serie.data}
 				loading={serie.isLoading}
 				refreshing={serie.isFetching && !serie.isLoading}

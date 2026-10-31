@@ -53,7 +53,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # com as suas próprias, sem depender de um .env na máquina.
     settings = settings or get_settings()
 
-    app = FastAPI(title="V-Energy Grid 360 API", version="0.11.0", lifespan=lifespan)
+    app = FastAPI(title="V-Energy Grid 360 API", version="0.13.0", lifespan=lifespan)
     # Criado com o app, e não no lifespan: o cache não depende de nada externo, e o app dos
     # testes (sem lifespan) também precisa dele.
     app.state.cache_insights = CacheInsights()

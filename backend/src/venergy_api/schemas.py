@@ -75,6 +75,11 @@ class DimUcSchema(BaseModel):
     energia_injetada_kwh_mes: Annotated[ExactNumber, Field(ge=0)] | None
 
 
+class LocalidadeSchema(BaseModel):
+    municipio: str
+    bairro: str
+
+
 class FaturamentoMensalSchema(BaseModel):
     """Faturamento de uma UC numa competência."""
 
@@ -137,6 +142,18 @@ class KpisMensaisSchema(BaseModel):
     satisfacao_media: float | None
 
 
+class IndicadoresMensalSchema(KpisMensaisSchema):
+    """Indicadores de uma competência no recorte: sem fato no recorte, a soma é nula.
+
+    O recorte pode não ter fatura na competência (ou nenhuma linha), e zero seria inventar dado:
+    o mês continua na série para mostrar o buraco (DEC-030).
+    """
+
+    kwh_faturado: ExactNumber | None
+    receita_faturada: ExactNumber | None
+    receita_energia: ExactNumber | None
+
+
 def _inicio_ate_o_fim(inicio: str | None, fim: str | None) -> None:
     # Na validação do schema, e não na rota: o erro sai no mesmo formato 422 do formato
     # inválido, e o client do frontend trata um só. Texto AAAA-MM compara na ordem do calendário.
@@ -154,6 +171,22 @@ class PeriodoSchema(BaseModel):
     def inicio_ate_o_fim(self) -> "PeriodoSchema":
         _inicio_ate_o_fim(self.inicio, self.fim)
         return self
+
+
+class RecorteFiltroSchema(BaseModel):
+    municipio: RequiredText | None = None
+    bairro: RequiredText | None = None
+    classe: Classe | None = None
+
+    @model_validator(mode="after")
+    def bairro_com_municipio(self) -> "RecorteFiltroSchema":
+        if self.bairro and not self.municipio:
+            raise ValueError("Informe o município junto com o bairro")
+        return self
+
+
+class OrdensFiltroSchema(RecorteFiltroSchema):
+    status: StatusOrdem | None = None
 
 
 class ComparacaoFiltroSchema(BaseModel):
@@ -404,6 +437,29 @@ class ConsumoUcSchema(BaseModel):
     tendencia: Tendencia
 
 
+class VariacaoContaSchema(BaseModel):
+    """Por que a conta do mês de referência mudou, em R$, contra o mesmo mês do ano anterior.
+
+    As quatro partes somam exatamente a `diferenca` entre as duas contas.
+    """
+
+    competencia: Competencia
+    competencia_comparada: Competencia
+    conta: ExactNumber
+    conta_comparada: ExactNumber
+    diferenca: ExactNumber
+    # Só informativos, não entram na divisão: na Gold real o kWh não acompanha os dias da fatura.
+    # Vazios quando a conta não traz os dias.
+    dias_faturados: int | None
+    dias_faturados_comparada: int | None
+    consumo: ExactNumber
+    tarifa: ExactNumber
+    bandeira: ExactNumber
+    tributos: ExactNumber
+    # Leitura estimada numa das contas: a próxima leitura real corrige o consumo.
+    leitura_estimada: bool
+
+
 class FaturaNaoPagaSchema(BaseModel):
     """Uma fatura da UC que ainda não foi paga."""
 
@@ -430,6 +486,9 @@ class Uc360Schema(BaseModel):
 
     cadastro: DimUcSchema
     consumo: ConsumoUcSchema
+    # Vazia sem a conta do mês de referência ou a do mesmo mês do ano anterior, ou quando essa
+    # conta não tem energia: sem base não há como dizer por que a conta mudou (DEC-057).
+    variacao_conta: VariacaoContaSchema | None
     faturas_nao_pagas: FaturasNaoPagasSchema
     # Vazio na UC sem medidor instalado: não há linha em gold_medidor_uc.
     medidor: MedidorUcSchema | None
@@ -529,7 +588,7 @@ class FilaSuspeitaSchema(BaseModel):
     kwh_recuperavel_est: ExactNumber | None
 
 
-class FilaFiltroSchema(BaseModel):
+class FilaFiltroSchema(RecorteFiltroSchema):
     """Página da fila e, se quiser, só as UCs que ainda não têm ordem de inspeção ativa."""
 
     pagina: Annotated[int, Field(ge=1)] = 1
@@ -695,6 +754,9 @@ class OrdemDetalheSchema(OrdemSchema):
 MAX_PERGUNTA_IA = 2000
 
 
+MAX_TITULO_SESSAO_IA = 120
+
+
 class PerguntaIaSchema(BaseModel):
     """Pergunta em português para o agente de IA, dentro de uma conversa."""
 
@@ -750,6 +812,32 @@ class AuditoriaIaSchema(RespostaIaBaseSchema):
     criado_em: datetime
 
 
+class SessaoIaSchema(BaseModel):
+    """Uma conversa do usuário com o agente, com os turnos da auditoria em ordem."""
+
+    session_id: str
+    titulo: str
+    favorita: bool
+    criada_em: datetime
+    atualizada_em: datetime
+    turnos: list[AuditoriaIaSchema]
+
+
+class AlteracaoSessaoIaSchema(BaseModel):
+    """Novo título, estrela ou os dois. Nenhum deles pode vir nulo, e ao menos um é obrigatório."""
+
+    titulo: Annotated[
+        str, StringConstraints(strip_whitespace=True, min_length=1, max_length=MAX_TITULO_SESSAO_IA)
+    ] = None  # type: ignore[assignment]
+    favorita: bool = None  # type: ignore[assignment]
+
+    @model_validator(mode="after")
+    def tem_alteracao(self) -> "AlteracaoSessaoIaSchema":
+        if not self.model_fields_set:
+            raise ValueError("Informe o título ou a estrela")
+        return self
+
+
 class ErroSchema(BaseModel):
     """Corpo das respostas de erro do FastAPI (HTTPException), documentado no OpenAPI."""
 
@@ -758,6 +846,12 @@ class ErroSchema(BaseModel):
 
 class IndicadoresComparacaoFiltroSchema(ComparacaoFiltroSchema):
     """Dois períodos e, se quiser, o recorte: os mesmos filtros da comparação de receita."""
+
+    @model_validator(mode="after")
+    def base_antes_do_atual(self) -> "IndicadoresComparacaoFiltroSchema":
+        if self.base_fim >= self.atual_inicio:
+            raise ValueError("O período base precisa terminar antes do início do período atual")
+        return self
 
 
 class IndicadoresJanelasFiltroSchema(BaseModel):
@@ -800,7 +894,10 @@ class IndicadoresPeriodoSchema(BaseModel):
 
 
 class VariacaoIndicadoresSchema(BaseModel):
-    """Variação em % de cada indicador (8.0 = +8,0%); nula sem base ou com base zero."""
+    """Variação em % de cada indicador (8.0 = +8,0%).
+
+    Nula com base zero ou se faltar algum mês em um dos períodos (DEC-054).
+    """
 
     receita_faturada: float | None
     receita_energia: float | None
@@ -845,3 +942,7 @@ class LoginSchema(BaseModel):
         str, StringConstraints(strip_whitespace=True, to_lower=True, min_length=1, max_length=50)
     ]
     senha: Annotated[str, StringConstraints(min_length=1, max_length=200)]
+
+
+class IndicadoresMensaisFiltroSchema(RecorteFiltroSchema, PeriodoSchema):
+    """Período e recorte opcionais para a série mensal de indicadores."""

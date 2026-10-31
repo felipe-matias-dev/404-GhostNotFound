@@ -86,7 +86,9 @@ export function PlanilhaCampo() {
 			)}
 			<Modal
 				open={aberto}
-				onClose={() => setAberto(false)}
+				onClose={() => {
+					if (!enviando) setAberto(false);
+				}}
 				closeOnEscape={!enviando}
 				closeOnBackdrop={!enviando}
 				title="Enviar planilha de campo"

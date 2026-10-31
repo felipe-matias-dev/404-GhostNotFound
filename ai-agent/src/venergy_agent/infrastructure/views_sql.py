@@ -4,7 +4,8 @@ from pathlib import Path
 from venergy_agent.config import AGENT_ROOT, REPO_ROOT
 from venergy_agent.infrastructure.semantic_source import read_documents, view_definitions
 
-VIEWS_SCHEMA = "gold"
+VIEWS_SCHEMA = "semantic"
+SOURCE_SCHEMA = "gold"
 LAYER_PATH = AGENT_ROOT / "semantic" / "semantic_layer.yaml"
 CONTRACT_PATH = REPO_ROOT / "contracts" / "gold_schema.yaml"
 OUTPUT_PATH = AGENT_ROOT / "semantic" / "views.sql"
@@ -21,13 +22,25 @@ def render_views_sql(layer_path: Path = LAYER_PATH, contract_path: Path = CONTRA
     layer, contract = read_documents(layer_path, contract_path)
     statements = []
     for definition in view_definitions(layer, contract):
-        columns = ",\n    ".join(definition.columns)
+        types = contract["tables"][definition.source_table]["columns"]
+        columns = ",\n    ".join(
+            _numeric(column) if _e_contagem(types[column]) else column
+            for column in definition.columns
+        )
         statements.append(
             f"CREATE OR REPLACE VIEW {VIEWS_SCHEMA}.{definition.name} AS\n"
             f"SELECT\n    {columns}\n"
-            f"FROM {VIEWS_SCHEMA}.{definition.source_table};\n"
+            f"FROM {SOURCE_SCHEMA}.{definition.source_table};\n"
         )
     return HEADER + "\n" + "\n".join(statements)
+
+
+def _e_contagem(coluna: dict) -> bool:
+    return coluna["type"] == "integer" and coluna.get("unit") == "contagem"
+
+
+def _numeric(column: str) -> str:
+    return f"CAST({column} AS numeric) AS {column}"
 
 
 def main(argv: list[str]) -> int:

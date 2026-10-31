@@ -1,36 +1,48 @@
 import type { SortState } from "#/components/ui/data-table";
 import { api, unwrap } from "#/lib/api";
-import type { AtualizarOrdem, FiltrosFila, StatusOrdem } from "./types";
+import type { Recorte } from "#/lib/filtros";
+import {
+	type AtualizarOrdem,
+	type FiltrosFila,
+	ORDENACAO_FILA,
+	type OrdenacaoFila,
+	type StatusOrdem,
+} from "./types";
 
 export const ordensKeys = {
 	all: ["ordens-inspecao"] as const,
-	lista: (status: StatusOrdem | undefined) =>
-		[...ordensKeys.all, { status }] as const,
+	lista: (status: StatusOrdem | undefined, recorte: Recorte) =>
+		[...ordensKeys.all, { status, ...recorte }] as const,
 	detalhe: (id: number) => [...ordensKeys.all, "detalhe", id] as const,
 };
 
 export const filaKey = ["fila-suspeitas"] as const;
+export const distribuicaoQuedaKey = (recorte: Recorte) =>
+	["distribuicao-queda", recorte] as const;
 export const TAMANHO_PAGINA = 20;
 
-const ORDENACAO_FILA: Record<string, "queda" | "energia" | "ordem_ativa"> = {
-	queda: "queda",
-	energia: "energia",
-	ordem_ativa: "ordem_ativa",
-};
+const ordenacaoDaColuna = (coluna: string | undefined): OrdenacaoFila =>
+	ORDENACAO_FILA.find((opcao) => opcao === coluna) ?? "prioridade";
 
-export function distribuicaoQueda() {
-	return unwrap(api.GET("/fila-suspeitas/distribuicao-queda"));
+export function distribuicaoQueda(recorte: Recorte) {
+	return unwrap(
+		api.GET("/fila-suspeitas/distribuicao-queda", {
+			params: { query: recorte },
+		}),
+	);
 }
 
 export function listarFila(
 	pagina: number,
 	sort: SortState | null,
 	filtros: FiltrosFila,
+	recorte: Recorte,
 ) {
 	return unwrap(
 		api.GET("/fila-suspeitas", {
 			params: {
 				query: {
+					...recorte,
 					pagina,
 					tamanho: TAMANHO_PAGINA,
 					queda_min: filtros.queda?.[0],
@@ -38,7 +50,7 @@ export function listarFila(
 					medidor_eletromecanico: filtros.medidorEletromecanico,
 					leituras_estimadas_min: filtros.leiturasEstimadas?.[0],
 					leituras_estimadas_max: filtros.leiturasEstimadas?.[1],
-					ordenar_por: ORDENACAO_FILA[sort?.columnId ?? ""] ?? "prioridade",
+					ordenar_por: ordenacaoDaColuna(sort?.columnId),
 					direcao: sort?.direction ?? "asc",
 				},
 			},
@@ -46,8 +58,15 @@ export function listarFila(
 	);
 }
 
-export function listarOrdens(status: StatusOrdem | undefined) {
-	return unwrap(api.GET("/ordens-inspecao", { params: { query: { status } } }));
+export function listarOrdens(
+	status: StatusOrdem | undefined,
+	recorte: Recorte,
+) {
+	return unwrap(
+		api.GET("/ordens-inspecao", {
+			params: { query: { ...recorte, status } },
+		}),
+	);
 }
 
 export function obterOrdem(id: number) {

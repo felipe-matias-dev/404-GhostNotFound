@@ -24,7 +24,7 @@ Se o agente não souber, diz que não sabe. Resposta inventada é falha crítica
 - **Banco:**
   - o agente conecta com o usuário `venergy_agent`, que nunca acessa o schema `app`, e nunca usa as credenciais do backend;
   - consulta só as views `sem_*`;
-  - pedido em aberto: schema próprio para as views, com `SELECT` só nele, e `statement_timeout` na role (spec §10, D1). Até lá, as views ficam no schema `gold`;
+  - as views ficam no schema `semantic`, o único que ele lê, e a role tem `statement_timeout` (DEC-056);
   - o SQL das views é gerado pelo GenAI em `ai-agent/semantic/views.sql` e aplicado pelo loader com o usuário dono (spec §10, D7).
 - **Configuração:**
   - variáveis com prefixo `VENERGY_AGENT_` (`src/venergy_agent/config.py`, modelo em `.env.example`). O `ai-agent/.env` é localizado pelo caminho do pacote, não pelo diretório atual, e as variáveis de ambiente do processo têm precedência sobre ele;
