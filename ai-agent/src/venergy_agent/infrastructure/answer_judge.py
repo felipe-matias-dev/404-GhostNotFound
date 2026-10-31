@@ -45,6 +45,6 @@ class PydanticAiAnswerJudge:
             raise ModelCallFailed(usage.input_tokens, usage.output_tokens) from error
         return JudgeRun(
             verdict=run.output,
-            input_tokens=run.usage.input_tokens,
-            output_tokens=run.usage.output_tokens,
+            input_tokens=usage.input_tokens,
+            output_tokens=usage.output_tokens,
         )

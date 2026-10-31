@@ -46,6 +46,8 @@ services:
       # inclusive com modelos openrouter:, que usam a OPENROUTER_API_KEY.
       VENERGY_AGENT_FALLBACK_MODEL: ${GEMINI_FALLBACK_MODEL:-google-gla:gemini-3.5-flash}
       VENERGY_AGENT_OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      # Uma tentativa por modelo: em caso de falha, passa logo para o próximo (DEC-061).
+      VENERGY_AGENT_LLM_RETRY_ATTEMPTS: ${LLM_RETRY_ATTEMPTS:-1}
       # Detecção de mudanças por varredura: eventos do sistema de arquivos não atravessam
       # o volume no Docker Desktop do Windows.
       WATCHFILES_FORCE_POLLING: "true"
