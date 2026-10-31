@@ -59,7 +59,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | 29/10/2026 | DEC-050: os eventos das ordens de inspeção guardam o login de quem agiu (`autor_login`), o histórico mostra o nome dele, e a carga e a subida da API acrescentam a coluna sem apagar o histórico | O gerente de perdas é o único que escreve, e a trilha precisa responder quem concluiu ou cancelou uma ordem; recriar a tabela para isso perderia o histórico de quem já usa o portal | Felipe |
 | 29/10/2026 | DEC-051: filtros da fila usam os sinais já informados nos motivos da Gold: queda, medidor eletromecânico e percentual de leituras estimadas | Mantém a fila fiel à Gold, sem recalcular métricas ou tratar ausência como zero; todos os filtros operam antes da paginação | João Euclides |
 | 30/10/2026 | DEC-057: a visão 360 devolve `variacao_conta`, a diferença da conta contra o mesmo mês do ano anterior dividida em consumo, tarifa, bandeira e tributos, com a fórmula da decomposição da receita (DEC-029); as partes somam exatamente a diferença; os dias faturados de cada conta vêm só como informação; API 0.12.0 | A atendente consegue dizer ao cliente por que a conta subiu, e não só se o consumo subiu; calculado no backend e sem IA, porque o número precisa ser exato e imediato com o cliente na linha | Felipe |
-| 30/10/2026 | DEC-056: filtros compartilhados viajam na URL (`municipio`, `bairro`, `classe` e o par de períodos) entre Visão geral, Receita, Rede e Perdas; filtros próprios de cada tela ficam só na memória da sessão | Trocar de tela não perde o recorte nem repete a escolha, e um link reproduz a análise; a URL continua sendo a fonte da verdade | João Euclides |
+| 30/10/2026 | DEC-060: filtros compartilhados viajam na URL (`municipio`, `bairro`, `classe` e o par de períodos) entre Visão geral, Receita, Rede e Perdas; filtros próprios de cada tela ficam só na memória da sessão | Trocar de tela não perde o recorte nem repete a escolha, e um link reproduz a análise; a URL continua sendo a fonte da verdade | João Euclides |
 | 30/10/2026 | DEC-058: em Perdas o período é só contexto, e a consulta individual de UC mostra o histórico completo, fora do recorte | A fila é um retrato da Gold sem competência e as ordens são estado atual; a visão 360 é o registro completo da UC, e limitá-la esconderia contas antigas em aberto | João Euclides |
 | 30/10/2026 | DEC-059: ordem de UC ausente do cadastro da Gold some da lista quando há recorte de município, bairro ou classe, e continua visível sem recorte | A localização só existe em `gold_dim_uc` e não pode ser inventada; a ordem sobrevive à recarga (DEC-009) e o gerente não pode perdê-la | João Euclides |
 
@@ -1734,7 +1734,15 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Impacto:** campo novo na rota existente, sem quebra de contrato; API 0.12.0, com `contracts/openapi.json` e os tipos do client
   regenerados. Nenhuma mudança na Gold nem no agente. A tela da visão 360 pode exibir o campo com o tipo gerado do OpenAPI.
 
-## DEC-056 · Filtros compartilhados entre as telas do portal
+## DEC-056 · Views do agente no schema `semantic` (D1)
+
+- **Data:** 30/10/2026
+- **Contexto:** as views `sem_*` ficavam em `gold`, onde o `venergy_agent` lia todas as tabelas, inclusive colunas sensíveis e a fila de suspeitas, que as views deixam de fora. A allowlist só valia no validador.
+- **Decisão:** as views passam para o schema `semantic`, e o `venergy_agent` tem `USAGE` e `SELECT` só nele, sem acesso a `gold` nem a `app`. A role ganha `statement_timeout` de 30 s, acima do timeout de 10 s de cada consulta. O padrão de `allowed_schema` passa a ser `semantic`.
+- **Banco existente:** a carga e a subida da API aplicam as permissões e, se a Gold já estiver carregada, recriam as views em `semantic`, sem apagar dados. Banco novo recebe tudo do `01-init.sh`.
+- **Consequências:** o modelo não vê o nome do schema, então o prompt não muda. A carga continua apagando e recriando as views na mesma transação.
+
+## DEC-060 · Filtros compartilhados entre as telas do portal
 
 - **Data:** 30/10/2026 · **Área:** Portal · **Autor:** João Euclides
 - **Contexto:** cada tela analítica guardava o próprio recorte: a Visão geral escolhia o par de períodos, a Receita levava município, bairro e classe no mapa, a Rede tinha período e alimentador, e Perdas só tinha os sinais da fila. Trocar de tela esquecia a escolha, e dois números da mesma reunião podiam descrever recortes diferentes. O case não pede filtros conectados; é extensão de usabilidade.
@@ -1749,12 +1757,12 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   O total de chamados fica nulo quando `gold_kpis_mensais` indica que não há atendimento carregado na competência; com atendimento disponível, vale a soma do recorte, inclusive zero.
 - **Alternativas descartadas:** guardar os filtros em `localStorage` (o link deixa de reproduzir a análise e um recorte antigo reaparece sem aviso); um store global de filtros fora da URL (a URL deixa de ser compartilhável e o botão voltar não desfaz a escolha); manter uma barra de filtros por tela, que foi o estado anterior.
 - **Consequências:** as regras estão testadas em `frontend/src/lib/__tests__/filtros.test.ts` e `frontend/src/features/filtros/__tests__/memoria.test.ts`; a API 0.13.0 traz as rotas novas e o client tipado é regerado (`contracts/openapi.json`). A tela nova entra em `DestinoPortal` e declara os campos locais em `CAMPOS_LOCAIS` para participar da memória. A normalização do padrão e dos valores inválidos usa `replace`, sem criar entrada no histórico do navegador; uma escolha do usuário navega normalmente, para o botão voltar desfazê-la.
-- **Numeração:** esta decisão é a DEC-056, e não a DEC-053, porque DEC-053 a DEC-055 estão reservadas em branches do GenAI (conversas do agente, validação da comparação e etapas por SSE). Como na DEC-048, a numeração é resolvida no merge do PR.
+- **Numeração:** DEC-060 evita colisão com a DEC-056 da main, a DEC-057 da visão 360, as DEC-058 e DEC-059 deste PR e as decisões reservadas nos PRs #106, #108, #110 e #115.
 
 ## DEC-058 · Período é contexto em Perdas e a consulta de UC não é limitada pelo recorte
 
 - **Data:** 30/10/2026 · **Área:** Portal · **Autor:** João Euclides
-- **Contexto:** com a DEC-056, recorte e período passaram a acompanhar o usuário entre as telas. Duas telas não são análise de período: a fila de suspeitas é um retrato da Gold, sem competência, e as ordens de inspeção são estado atual em `app`; a consulta individual de UC é o registro completo de uma unidade, aberta com o cliente na linha.
+- **Contexto:** com a DEC-060, recorte e período passaram a acompanhar o usuário entre as telas. Duas telas não são análise de período: a fila de suspeitas é um retrato da Gold, sem competência, e as ordens de inspeção são estado atual em `app`; a consulta individual de UC é o registro completo de uma unidade, aberta com o cliente na linha.
 - **Decisão:**
   - **Perdas.** Município, bairro e classe filtram a fila e a lista de ordens (na fila, antes da paginação). O seletor de período não aparece, e nem `GET /fila-suspeitas` nem `GET /ordens-inspecao` têm parâmetro de período. O período que estiver na URL é preservado apenas como contexto para as outras telas, sem alterar a fila nem as ordens. Os sinais próprios da fila continuam locais (DEC-051).
   - **Consulta de UC.** `/uc` aceita os campos compartilhados só para exibir o contexto da análise na faixa (`Contexto da análise: ...`). A visão 360 continua a da DEC-044: 12 meses até a última competência da Gold, faturas em aberto sem corte por período e históricos paginados somente na apresentação. Nenhum filtro da análise corta consumo, dívidas, interrupções, chamados ou inspeções.
