@@ -19,16 +19,19 @@ import {
 	SidebarTrigger,
 	useSidebar,
 } from "#/components/ui/sidebar";
+import type { DestinoPortal } from "#/lib/filtros";
 import { type ItemNavegacao, useItemAtivo } from "./navegacao";
 
 export function AppSidebar({
 	itens,
 	onConsultarUc,
 	conta,
+	searchPara,
 }: {
 	itens: ItemNavegacao[];
 	onConsultarUc: () => void;
 	conta?: ReactNode;
+	searchPara: (destino: DestinoPortal) => Record<string, unknown>;
 }) {
 	const ativoAtual = useItemAtivo(itens);
 	const { setOpenMobile, isMobile } = useSidebar();
@@ -73,6 +76,11 @@ export function AppSidebar({
 														consulta ? undefined : (
 															<Link
 																to={to}
+																search={
+																	to === "/agente"
+																		? undefined
+																		: (searchPara(to) as never)
+																}
 																onClick={() => setOpenMobile(false)}
 															/>
 														)

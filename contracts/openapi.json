@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "V-Energy Grid 360 API",
-    "version": "0.12.0"
+    "version": "0.13.0"
   },
   "paths": {
     "/health": {
@@ -131,6 +131,36 @@
             "description": "Successful Response"
           }
         }
+      }
+    },
+    "/unidades-consumidoras/localidades": {
+      "get": {
+        "tags": [
+          "unidades consumidoras"
+        ],
+        "summary": "Get Localidades",
+        "operationId": "get_localidades_unidades_consumidoras_localidades_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/LocalidadeSchema"
+                  },
+                  "type": "array",
+                  "title": "Response Get Localidades Unidades Consumidoras Localidades Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ]
       }
     },
     "/unidades-consumidoras/{cod_uc}": {
@@ -1027,6 +1057,139 @@
         }
       }
     },
+    "/indicadores/mensal": {
+      "get": {
+        "tags": [
+          "indicadores"
+        ],
+        "summary": "Get Mensal",
+        "description": "Série mensal do recorte; mês sem fato no recorte vem nulo, e não zero (DEC-030).",
+        "operationId": "get_mensal_indicadores_mensal_get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "inicio",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^\\d{4}-(0[1-9]|1[0-2])$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Inicio"
+            }
+          },
+          {
+            "name": "fim",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^\\d{4}-(0[1-9]|1[0-2])$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Fim"
+            }
+          },
+          {
+            "name": "municipio",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Municipio"
+            }
+          },
+          {
+            "name": "bairro",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Bairro"
+            }
+          },
+          {
+            "name": "classe",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "B1",
+                    "B2",
+                    "B3",
+                    "A4"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Classe"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/IndicadoresMensalSchema"
+                  },
+                  "title": "Response Get Mensal Indicadores Mensal Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/indicadores/comparacao": {
       "get": {
         "tags": [
@@ -1280,6 +1443,69 @@
         ],
         "summary": "Get Distribuicao Queda",
         "operationId": "get_distribuicao_queda_fila_suspeitas_distribuicao_queda_get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "municipio",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Municipio"
+            }
+          },
+          {
+            "name": "bairro",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Bairro"
+            }
+          },
+          {
+            "name": "classe",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "B1",
+                    "B2",
+                    "B3",
+                    "A4"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Classe"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -1290,13 +1516,18 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
           }
-        },
-        "security": [
-          {
-            "APIKeyCookie": []
-          }
-        ]
+        }
       }
     },
     "/fila-suspeitas": {
@@ -1313,6 +1544,62 @@
           }
         ],
         "parameters": [
+          {
+            "name": "municipio",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Municipio"
+            }
+          },
+          {
+            "name": "bairro",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Bairro"
+            }
+          },
+          {
+            "name": "classe",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "B1",
+                    "B2",
+                    "B3",
+                    "A4"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Classe"
+            }
+          },
           {
             "name": "pagina",
             "in": "query",
@@ -1576,6 +1863,62 @@
           }
         ],
         "parameters": [
+          {
+            "name": "municipio",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Municipio"
+            }
+          },
+          {
+            "name": "bairro",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Bairro"
+            }
+          },
+          {
+            "name": "classe",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "B1",
+                    "B2",
+                    "B3",
+                    "A4"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Classe"
+            }
+          },
           {
             "name": "status",
             "in": "query",
@@ -3095,6 +3438,105 @@
         "title": "IndicadoresJanelaSchema",
         "description": "Uma janela corrida completa: `meses` competências seguidas, todas com dado."
       },
+      "IndicadoresMensalSchema": {
+        "properties": {
+          "competencia": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+            "title": "Competencia"
+          },
+          "kwh_faturado": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kwh Faturado"
+          },
+          "receita_faturada": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receita Faturada"
+          },
+          "receita_energia": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receita Energia"
+          },
+          "dec": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dec"
+          },
+          "fec": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fec"
+          },
+          "n_chamados": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "N Chamados"
+          },
+          "satisfacao_media": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Satisfacao Media"
+          }
+        },
+        "type": "object",
+        "required": [
+          "competencia",
+          "kwh_faturado",
+          "receita_faturada",
+          "receita_energia",
+          "dec",
+          "fec",
+          "n_chamados",
+          "satisfacao_media"
+        ],
+        "title": "IndicadoresMensalSchema",
+        "description": "Indicadores de uma competência no recorte: sem fato no recorte, a soma é nula.\n\nO recorte pode não ter fatura na competência (ou nenhuma linha), e zero seria inventar dado:\no mês continua na série para mostrar o buraco (DEC-030)."
+      },
       "IndicadoresPeriodoSchema": {
         "properties": {
           "inicio": {
@@ -3479,6 +3921,24 @@
         ],
         "title": "KpisMensaisSchema",
         "description": "Indicadores executivos de uma competência."
+      },
+      "LocalidadeSchema": {
+        "properties": {
+          "municipio": {
+            "type": "string",
+            "title": "Municipio"
+          },
+          "bairro": {
+            "type": "string",
+            "title": "Bairro"
+          }
+        },
+        "type": "object",
+        "required": [
+          "municipio",
+          "bairro"
+        ],
+        "title": "LocalidadeSchema"
       },
       "LoginSchema": {
         "properties": {
@@ -4579,7 +5039,7 @@
           "satisfacao_media"
         ],
         "title": "VariacaoIndicadoresSchema",
-        "description": "Variação em % de cada indicador (8.0 = +8,0%); nula sem base ou com base zero."
+        "description": "Variação em % de cada indicador (8.0 = +8,0%).\n\nNula com base zero ou se faltar algum mês em um dos períodos (DEC-054)."
       }
     },
     "securitySchemes": {

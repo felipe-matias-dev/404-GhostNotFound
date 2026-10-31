@@ -8,24 +8,27 @@ import {
 	PopoverContent,
 	PopoverTrigger,
 } from "#/components/ui/popover";
-import { distribuicaoQueda } from "../api";
+import type { Recorte } from "#/lib/filtros";
+import { distribuicaoQueda, distribuicaoQuedaKey } from "../api";
 import { FILTROS_FILA_INICIAIS, type FiltrosFila } from "../types";
 
 export function FiltrosSuspeitas({
 	value,
 	onChange,
 	disabled,
+	recorte,
 }: {
 	value: FiltrosFila;
 	onChange: (value: FiltrosFila) => void;
 	disabled: boolean;
+	recorte: Recorte;
 }) {
 	const [aberto, setAberto] = useState(false);
 	const [rascunho, setRascunho] = useState(value);
 	const medidorId = useId();
 	const { data, isPending, isError, refetch } = useQuery({
-		queryKey: ["distribuicao-queda"],
-		queryFn: distribuicaoQueda,
+		queryKey: distribuicaoQuedaKey(recorte),
+		queryFn: () => distribuicaoQueda(recorte),
 	});
 	const bins = Array.from({ length: 21 }, (_, index) => ({
 		inicio: index * 5,
@@ -59,7 +62,7 @@ export function FiltrosSuspeitas({
 				})}
 			>
 				<FunnelIcon aria-hidden />
-				Filtros
+				Filtros de suspeitas
 				{ativos > 0 && (
 					<span className="rounded-sm bg-accent-subtle px-1.5 text-small text-accent-text">
 						{ativos}
@@ -252,7 +255,7 @@ function DistribuicaoQueda({
 	return (
 		<div className="grid gap-2 px-2 pb-2">
 			<p className="text-small text-text-muted">
-				Distribuição da queda na fila inteira
+				Distribuição da queda no recorte
 			</p>
 			{isPending ? (
 				<p className="text-small text-text-muted">Carregando distribuição…</p>

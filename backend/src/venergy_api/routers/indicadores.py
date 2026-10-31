@@ -3,17 +3,31 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Query
-from sqlalchemy import ColumnElement, Double, Integer, cast, distinct, func, or_, select
+from sqlalchemy import (
+    ColumnElement,
+    Double,
+    Integer,
+    and_,
+    case,
+    cast,
+    distinct,
+    func,
+    or_,
+    select,
+)
 from sqlalchemy.orm import InstrumentedAttribute
 
 from venergy_api.database import SessionDep
 from venergy_api.indices import indices
+from venergy_api.models import KpisMensais
 from venergy_api.models import KpisSegmentoMensal as Segmento
 from venergy_api.schemas import (
     ComparacaoIndicadoresSchema,
     IndicadoresComparacaoFiltroSchema,
     IndicadoresJanelaSchema,
     IndicadoresJanelasFiltroSchema,
+    IndicadoresMensaisFiltroSchema,
+    IndicadoresMensalSchema,
     IndicadoresPeriodoSchema,
     VariacaoIndicadoresSchema,
 )
@@ -33,6 +47,12 @@ def _recorte(
         ]
         if valor is not None
     ]
+
+
+def _meses_no_calendario(inicio: str, fim: str) -> int:
+    ano_inicio, mes_inicio = map(int, inicio.split("-"))
+    ano_fim, mes_fim = map(int, fim.split("-"))
+    return (ano_fim - ano_inicio) * 12 + mes_fim - mes_inicio + 1
 
 
 def _razao(numerador: ColumnElement, denominador: ColumnElement) -> ColumnElement:
@@ -88,6 +108,59 @@ def _indicadores(inicio: str, fim: str) -> dict[str, ColumnElement]:
     }
 
 
+def _soma_com_fatura(soma: ColumnElement) -> ColumnElement:
+    """A soma só vale no recorte com fatura; sem ela, nula e não zero (DEC-030)."""
+    return case((func.sum(Segmento.n_faturas) > 0, soma))
+
+
+@router.get("/mensal")
+def get_mensal(
+    filtro: Annotated[IndicadoresMensaisFiltroSchema, Query()], session: SessionDep
+) -> list[IndicadoresMensalSchema]:
+    """Série mensal do recorte; mês sem fato no recorte vem nulo, e não zero (DEC-030)."""
+    calendario = select(Segmento.competencia).distinct().subquery()
+    agregacao = (
+        select(
+            Segmento.competencia,
+            _soma_com_fatura(func.sum(Segmento.kwh_faturado)).label("kwh_faturado"),
+            _soma_com_fatura(func.sum(Segmento.receita_faturada)).label("receita_faturada"),
+            _soma_com_fatura(func.sum(Segmento.receita_energia)).label("receita_energia"),
+            func.sum(Segmento.n_chamados).label("n_chamados"),
+            _razao(func.sum(Segmento.soma_notas), func.sum(Segmento.n_notas)).label(
+                "satisfacao_media"
+            ),
+            *indices(Segmento.horas_interrompidas, Segmento.n_interrupcoes, Segmento.n_uc, 1),
+        )
+        .where(*_recorte(filtro.municipio, filtro.bairro, filtro.classe))
+        .group_by(Segmento.competencia)
+        .subquery()
+    )
+    # O mês sem linha no recorte continua na série, com as somas nulas: o buraco fica visível,
+    # e não vira zero (DEC-030).
+    consulta = (
+        select(
+            calendario.c.competencia,
+            agregacao.c.kwh_faturado,
+            agregacao.c.receita_faturada,
+            agregacao.c.receita_energia,
+            case((KpisMensais.n_chamados.is_not(None), agregacao.c.n_chamados)).label("n_chamados"),
+            agregacao.c.dec,
+            agregacao.c.fec,
+            agregacao.c.satisfacao_media,
+        )
+        .outerjoin(agregacao, calendario.c.competencia == agregacao.c.competencia)
+        .outerjoin(KpisMensais, calendario.c.competencia == KpisMensais.competencia)
+    )
+    if filtro.inicio:
+        consulta = consulta.where(calendario.c.competencia >= filtro.inicio)
+    if filtro.fim:
+        consulta = consulta.where(calendario.c.competencia <= filtro.fim)
+    return [
+        IndicadoresMensalSchema(**linha._mapping)
+        for linha in session.execute(consulta.order_by(calendario.c.competencia))
+    ]
+
+
 @router.get("/comparacao")
 def get_comparacao(
     filtro: Annotated[IndicadoresComparacaoFiltroSchema, Query()], session: SessionDep
@@ -95,9 +168,19 @@ def get_comparacao(
     """Os indicadores da diretoria em dois períodos, da empresa inteira ou de um recorte."""
     base = _indicadores(filtro.base_inicio, filtro.base_fim)
     atual = _indicadores(filtro.atual_inicio, filtro.atual_fim)
-    # Variação em % calculada no banco, sobre as mesmas expressões; sem base ou base zero, nula.
+    # Variação em % calculada no banco, sobre as mesmas expressões. Nula com base zero e com mês
+    # faltando em um dos lados: 6 meses contra 12 pareceria uma queda de 50% que não existiu.
+    completos = and_(
+        base["n_meses"] == _meses_no_calendario(filtro.base_inicio, filtro.base_fim),
+        atual["n_meses"] == _meses_no_calendario(filtro.atual_inicio, filtro.atual_fim),
+    )
     variacao = {
-        nome: cast((atual[nome] - base[nome]) / func.nullif(base[nome], 0) * 100, Double)
+        nome: case(
+            (
+                completos,
+                cast((atual[nome] - base[nome]) / func.nullif(base[nome], 0) * 100, Double),
+            )
+        )
         for nome in VariacaoIndicadoresSchema.model_fields
     }
     colunas = [
