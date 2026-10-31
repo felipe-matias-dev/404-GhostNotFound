@@ -1,8 +1,4 @@
-import {
-	ArrowUpIcon,
-	CaretDownIcon,
-	SpinnerGapIcon,
-} from "@phosphor-icons/react";
+import { ArrowUpIcon, CaretDownIcon } from "@phosphor-icons/react";
 import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { LogoMark } from "#/components/layout/logo";
 import { Button } from "#/components/ui/button";
@@ -34,7 +30,6 @@ const PLACEHOLDER_PADRAO =
 
 export function AgenteComposer({
 	onSubmit,
-	enviando,
 	escopo,
 	onEscopoChange,
 	placeholder = PLACEHOLDER_PADRAO,
@@ -44,7 +39,7 @@ export function AgenteComposer({
 	const [valor, setValor] = useState("");
 	const campoRef = useRef<HTMLTextAreaElement>(null);
 	const acimaDoLimite = valor.length > MAX_PERGUNTA_CHARS;
-	const podeEnviar = valor.trim().length > 0 && !enviando && !acimaDoLimite;
+	const podeEnviar = valor.trim().length > 0 && !acimaDoLimite;
 
 	useEffect(() => {
 		if (autoFocus) campoRef.current?.focus();
@@ -118,18 +113,11 @@ export function AgenteComposer({
 						type="button"
 						size="icon-xs"
 						className="rounded-full"
-						disabled={!valor.trim() || enviando || acimaDoLimite}
+						disabled={!valor.trim() || acimaDoLimite}
 						aria-label="Enviar pergunta"
 						onClick={dispararEnvio}
 					>
-						{enviando ? (
-							<SpinnerGapIcon
-								aria-hidden
-								className="size-3.5 motion-safe:animate-spin"
-							/>
-						) : (
-							<ArrowUpIcon aria-hidden weight="bold" className="size-3.5" />
-						)}
+						<ArrowUpIcon aria-hidden weight="bold" className="size-3.5" />
 					</Button>
 				</div>
 			</div>

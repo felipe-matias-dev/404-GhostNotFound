@@ -76,7 +76,11 @@ export function AgenteProvider({
 	const [widgetAberto, setWidgetAberto] = useState(false);
 	const [chaveCarregada, setChaveCarregada] = useState<string | null>(null);
 	const [localDisponivel, setLocalDisponivel] = useState(true);
-	const enviandoRef = useRef(false);
+	const consultaRef = useRef<{
+		controller: AbortController;
+		sessionId: string;
+		turnoId: string;
+	} | null>(null);
 
 	const sessaoAtiva = useMemo(
 		() =>
@@ -161,33 +165,69 @@ export function AgenteProvider({
 		[],
 	);
 
+	const cancelarConsulta = useCallback(() => {
+		const consulta = consultaRef.current;
+		if (!consulta) return;
+		consultaRef.current = null;
+		consulta.controller.abort();
+		atualizarTurno(consulta.sessionId, consulta.turnoId, {
+			status: "error",
+			erro: "Consulta cancelada. Tente novamente.",
+			etapa: undefined,
+		});
+		setEnviando(false);
+	}, [atualizarTurno]);
+
+	useEffect(() => {
+		if (rota !== "/agente") return;
+		return () => cancelarConsulta();
+	}, [rota, cancelarConsulta]);
+	useEffect(() => () => cancelarConsulta(), [cancelarConsulta]);
+
+	useEffect(() => {
+		if (rota !== "/agente" && !widgetAberto) cancelarConsulta();
+	}, [rota, widgetAberto, cancelarConsulta]);
+
 	const consultar = useCallback(
 		async (sessionId: string, turnoId: string, question: string) => {
-			if (enviandoRef.current) return;
-			enviandoRef.current = true;
+			cancelarConsulta();
+			const controller = new AbortController();
+			consultaRef.current = { controller, sessionId, turnoId };
 			setEnviando(true);
 			try {
-				const resposta = await perguntarAoAgente({
-					question,
-					session_id: sessionId,
-				});
-				atualizarTurno(sessionId, turnoId, { status: "completed", resposta });
+				const resposta = await perguntarAoAgente(
+					{ question, session_id: sessionId },
+					controller.signal,
+					(etapa) => {
+						if (!controller.signal.aborted)
+							atualizarTurno(sessionId, turnoId, { etapa });
+					},
+				);
+				if (!controller.signal.aborted)
+					atualizarTurno(sessionId, turnoId, {
+						status: "completed",
+						resposta,
+						etapa: undefined,
+					});
 			} catch (erro) {
-				atualizarTurno(sessionId, turnoId, {
-					status: "error",
-					erro: extrairMensagemErro(erro),
-				});
+				if (!controller.signal.aborted)
+					atualizarTurno(sessionId, turnoId, {
+						status: "error",
+						erro: extrairMensagemErro(erro),
+						etapa: undefined,
+					});
 			} finally {
-				enviandoRef.current = false;
-				setEnviando(false);
+				if (consultaRef.current?.controller === controller) {
+					consultaRef.current = null;
+					setEnviando(false);
+				}
 			}
 		},
-		[atualizarTurno],
+		[atualizarTurno, cancelarConsulta],
 	);
 
 	const enviarPergunta = useCallback(
 		async (perguntaTexto: string) => {
-			if (enviandoRef.current) return;
 			const validacao = validarPergunta(perguntaTexto);
 			if (!validacao.ok) return;
 			const sessionId = sessaoAtiva.sessionId;
@@ -223,12 +263,12 @@ export function AgenteProvider({
 
 	const tentarNovamente = useCallback(
 		async (turnoId: string) => {
-			if (enviandoRef.current) return;
 			const sessao = sessoes.find((atual) =>
 				atual.turnos.some((turno) => turno.id === turnoId),
 			);
 			const turno = sessao?.turnos.find((atual) => atual.id === turnoId);
 			if (!sessao || !turno) return;
+			cancelarConsulta();
 			atualizarTurno(sessao.sessionId, turnoId, {
 				status: "pending",
 				resposta: undefined,
@@ -236,10 +276,11 @@ export function AgenteProvider({
 			});
 			await consultar(sessao.sessionId, turnoId, turno.question);
 		},
-		[sessoes, atualizarTurno, consultar],
+		[sessoes, atualizarTurno, consultar, cancelarConsulta],
 	);
 
 	const novaConversa = useCallback(() => {
+		cancelarConsulta();
 		const nova = novaSessao(usuario);
 		setSessoes((atuais) =>
 			[nova, ...atuais.filter((sessao) => sessao.turnos.length > 0)].slice(
@@ -249,11 +290,15 @@ export function AgenteProvider({
 		);
 		setSessaoAtivaId(nova.sessionId);
 		return nova.sessionId;
-	}, [usuario]);
+	}, [usuario, cancelarConsulta]);
 
-	const selecionarSessao = useCallback((sessionId: string) => {
-		setSessaoAtivaId(sessionId);
-	}, []);
+	const selecionarSessao = useCallback(
+		(sessionId: string) => {
+			if (consultaRef.current?.sessionId !== sessionId) cancelarConsulta();
+			setSessaoAtivaId(sessionId);
+		},
+		[cancelarConsulta],
+	);
 
 	const renomearSessao = useCallback(
 		(sessionId: string, novoTitulo: string) => {
@@ -283,6 +328,7 @@ export function AgenteProvider({
 
 	const removerSessao = useCallback(
 		(sessionId: string) => {
+			if (consultaRef.current?.sessionId === sessionId) cancelarConsulta();
 			setSessoes((atuais) => {
 				const restantes = atuais.filter(
 					(sessao) => sessao.sessionId !== sessionId,
@@ -291,13 +337,14 @@ export function AgenteProvider({
 			});
 			setSessaoAtivaId((atual) => (atual === sessionId ? null : atual));
 		},
-		[usuario],
+		[usuario, cancelarConsulta],
 	);
 
 	const limparHistorico = useCallback(() => {
+		cancelarConsulta();
 		setSessoes([novaSessao(usuario)]);
 		setSessaoAtivaId(null);
-	}, [usuario]);
+	}, [usuario, cancelarConsulta]);
 	const valor = useMemo<AgenteContextValue>(
 		() => ({
 			sessoes,

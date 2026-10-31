@@ -119,13 +119,16 @@ export function AgenteTurnoItem({
 
 			<div className="min-w-0 space-y-3">
 				{turno.status === "pending" && (
-					<p className="inline-flex items-center gap-2 text-small text-text-muted motion-safe:animate-pulse">
+					<output
+						aria-live="polite"
+						className="inline-flex items-center gap-2 text-small text-text-muted motion-safe:animate-pulse"
+					>
 						<SpinnerGapIcon
 							aria-hidden
 							className="size-3.5 shrink-0 motion-safe:animate-spin"
 						/>
-						Pensando…
-					</p>
+						{turno.etapa ?? "Pensando…"}
+					</output>
 				)}
 
 				{turno.status === "error" && (

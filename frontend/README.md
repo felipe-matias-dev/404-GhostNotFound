@@ -53,6 +53,10 @@ uma opção de tentar novamente, sem confundir indisponibilidade com credencial 
 Sair ou trocar de usuário limpa as consultas em memória; as UCs recentes ficam
 separadas por login no navegador, sem migrar o histórico compartilhado anterior.
 
+O chat mostra as etapas recebidas de `POST /ai/ask/stream` e só exibe a resposta
+completa no evento final. Sair da tela, fechar o chat ou enviar outra pergunta
+cancela a consulta em andamento; perguntas canceladas podem ser tentadas novamente.
+
 ### Filtros das análises
 
 Visão geral, Receita, Rede e Perdas compartilham período, município, bairro e classe
