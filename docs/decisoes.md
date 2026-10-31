@@ -51,6 +51,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | 28/10/2026 | DEC-043: Consulta de UC na sidebar e Ctrl/Cmd + K abrem a palette global; só os cinco códigos consultados com sucesso ficam nos recentes locais | Consulta rápida sem abandonar o contexto, sem persistir nomes ou valores e sem navegar antes de validar a UC | João Euclides |
 | 27/10/2026 | DEC-040: `GET /receita/insight` devolve o insight de IA da tela de receita; o backend monta o JSON de métricas a partir da ponte da Gold, com valores arredondados como a tela os mostra, e guarda o texto num cache em memória pelo conteúdo das métricas; sem a chave do Gemini a rota responde 503; API 0.9.0 | O agente só aceita texto cujos números sejam exatamente valores do JSON (DEC-019), e uma Gold recarregada precisa gerar um insight novo, nunca um velho | Felipe |
 | 27/10/2026 | DEC-044: a visão 360 da unidade consumidora sai de uma rota só, `GET /unidades-consumidoras/{cod_uc}/visao-360`; os 12 meses terminam na última competência da Gold e a "conta alta" é o último mês contra o mesmo mês do ano anterior, com faixa de ±10%; integrada à API 0.9.0 da main | O atendente está com o cliente na linha: uma chamada só à API e uma resposta pronta para "o consumo subiu?", sem a tela refazer conta de negócio | Felipe |
+| 29/10/2026 | DEC-046 (proposta): follow-up com memória, orçamento de tokens e limite de perguntas por usuário; o histórico vem da auditoria do backend, `AgentAnswer` ganha `input_tokens` e `output_tokens`, `prompts/v3` e `429` em `POST /ai/ask` (API 0.10.0) | Follow-up ("e em Olinda?") sem o agente guardar estado nem ler `app`, e trava de custo por sessão | GenAI |
 | 29/10/2026 | DEC-045: tela de Rede usa período padrão de até 12 meses, aceita período válido da URL e apresenta histórico global do alimentador | Preserva o recorte escolhido e distingue o índice local do histórico do alimentador inteiro | João Euclides |
 | 29/10/2026 | DEC-047: avaliação comparativa sobre os itens em comum, aviso quando `failed` passa de 5%, e juiz (LLM as a judge) só em respostas `answered` narradas da amostra, com modelo diferente do gerador | Rodadas com versões diferentes do golden set só se comparam no que têm em comum, e o juiz não pode enviar linhas da Gold real a um modelo | Perylo |
 | 28/10/2026 | DEC-048: ordem de inspeção em campo pode voltar para gerada; a observação da volta fica só no histórico | Uma OI enviada a campo sem querer não precisa ser cancelada e gerada de novo, o que sujaria a métrica de visita desnecessária | Felipe |
@@ -1368,6 +1369,52 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   A decisão foi renumerada de DEC-036 para DEC-044 na resolução do PR #55: DEC-036 já identifica a tela
   da diretoria na `main`, e DEC-041 a DEC-043 estão reservadas nas branches do portal.
 
+
+## DEC-046 · Memória de conversa, orçamento de tokens e limite de perguntas por usuário
+
+- **Status:** aceita em 30/10/2026, com o aceite do V1 (Felipe Matias) à mudança do contrato `AgentAnswer` (spec §4 e DEC-020).
+- **Data:** 29/10/2026 · **Área:** IA e Backend · **Autor:** GenAI
+- **Contexto:** o diferencial G1-10 pede follow-up ("e em Olinda?"), e o guia (§5.4) pede orçamento de tokens e limite de uso por
+  sessão. O agente é somente leitura e não guarda estado (§8 do guia); o backend já grava cada pergunta e resposta na auditoria
+  (DEC-034).
+- **Decisão:**
+  - **Histórico vem do backend, pela auditoria.** Porta `ConversationHistory.recent(session_id, limit)`, implementada pelo backend
+    (`HistoricoAuditoria`) com a conexão dele. O `venergy_agent` continua sem ler o schema `app`, e o agente continua sem gravar.
+  - **O turno é `(pergunta, SQL, status)`**, sem texto de resposta nem linhas: o SQL leva os filtros que o follow-up herda, e a
+    resposta traria dado do banco para o prompt de geração. Turnos `refused` ficam de fora; `clarify`, `unknown` e `failed` entram.
+  - **Histórico é dado:** só no prompt do usuário, entre `<historico-{nonce}>`, numa versão nova do prompt de SQL (`prompts/v3`, que
+    passa a ser o padrão). O prompt de sistema continua estável. As versões v1 e v2 ignoram o histórico. Padrão `history_turns = 3`.
+  - **Orçamento:** porta `SessionUsage.tokens_used(session_id)`. Com `session_token_budget` (padrão 200000, 0 desliga) esgotado, o
+    `ask()` devolve `refused` com motivo próprio, sem chamar o modelo. Conferido antes de cada pergunta: a que cruza o limite termina.
+    Leitura do consumo que falha → `failed` sem chamar o modelo; leitura do histórico que falha → segue sem histórico.
+  - **Limite de perguntas no backend:** `POST /ai/ask` responde `429` (`ErroSchema`, `Retry-After`) quando o usuário já fez
+    `VENERGY_API_AI_LIMITE_PERGUNTAS` (20) perguntas em `VENERGY_API_AI_JANELA_SEGUNDOS` (600), contadas pelas linhas da auditoria
+    com o relógio do banco. 0 desliga. API 0.10.0.
+- **Contrato (para o V1 revisar):** `AgentAnswer` ganha `input_tokens` e `output_tokens` (`int >= 0`, padrão 0, tokens do gerador de
+  SQL somando as tentativas; a narrativa não entra). Sem invariante nova por status. `app.ai_auditoria` ganha as duas colunas
+  (`integer not null default 0`), que a subida da API e a carga da Gold acrescentam a um banco antigo com `ADD COLUMN IF NOT EXISTS`, sem tocar nas
+  linhas (sem passo manual; banco fora do ar na subida só gera um aviso). `RespostaIaSchema` e `AuditoriaIaSchema` expõem os dois campos. Motivo novo de `refused` (`BUDGET_EXHAUSTED`).
+- **Alternativas descartadas:** o agente consultar `app.ai_auditoria` (quebra o isolamento do `venergy_agent`, D1 e DEC-034);
+  memória no processo do agente (some no restart e não escala); o agente gravar o histórico (é somente leitura); contador de
+  perguntas em memória na API (some no restart, não vale com mais de um processo); um total único de tokens (entrada e saída têm
+  preços diferentes).
+- **Identificador da sessão (revisão do PR #86):** o `session_id` de `POST /ai/ask` é opcional. Sem ele, o servidor gera um UUID4
+  aleatório e o devolve na resposta (`RespostaIaSchema.session_id`); com ele, só aceita UUID válido (`422` caso contrário). Um UUID
+  que o servidor não gerou continua aceito, porque sem autenticação não há como provar a origem, mas ids fáceis de adivinhar
+  (`"sessao-1"`) deixam de existir.
+- **Memória e a Gold real (DEC-015, aceita em 29/10/2026):** o SQL do turno anterior vai ao Gemini junto com o histórico, na API e na
+  avaliação, nas duas bases. O time aceita esse envio pelo plano gratuito; o dataset e as saídas com dados dele continuam fora do Git (DEC-024).
+- **Limitações:** a contagem do limite não é atômica: rajadas simultâneas do mesmo usuário podem passar um pouco do limite. O orçamento não conta a narrativa. O padrão de
+  200000 tokens é uma suposição a medir nos logs (`input_tokens` da etapa `geracao`).
+- **Pendente (regra de merge, DEC-016):** a troca do prompt padrão para a v3 só entra na `main` depois de `make eval ONLY=golden`
+  na v2 e na v3 e `make eval ONLY=red_team` na v3, sem regressão nos itens comuns (os que não são follow-up) e com pelo menos 4 dos 5 follow-ups do golden
+  (G046, G099, G100, G102, G103) certos, inclusive o G046, com a memória ligada no runner da avaliação (amostra).
+- **Resultado da rodada (30/10/2026):** a v3 foi rodada na Gold real, em modo só SQL, com o golden 0.14.0 e a camada 0.4.0 (`2026-10-30T172756Z`): execução 93,9%, status 94,6%, sem falhas nem erro de provedor. A v2 de referência é a rodada de 29/10 (`2026-10-29T011532Z`, golden 0.9.0). Como as duas versões do golden são diferentes, o SQL gravado da v2 foi reexecutado com o gabarito 0.14.0, nos 40 itens comuns com referência SQL: a v2 acerta 37, a v3 acerta 40, e não há regressão. Nos follow-ups, G046, G099, G101 e G102 estão certos, e G103 não. A comparação é offline, sobre o SQL gravado; a v2 não foi rodada de novo.
+- **Problema conhecido:** G103, o follow-up que depende de um turno recusado. O agente responde com um período inventado, em vez de pedir esclarecimento (issue #104). Corrigir exige mudança de prompt e nova rodada, por isso fica para depois do merge.
+- **Tokens de falhas e leitura do orçamento (issue #103):** os tokens de chamadas que falham entram no orçamento e na auditoria. Se a leitura do consumo da sessão falhar, a pergunta é negada com mensagem própria e log `step=orcamento`, por custo.
+- **Atualização (29/10/2026, revisão do Felipe no #86):** o `session_id` não sai na auditoria (`GET /ai/audit/{id}`), só na resposta do `POST /ai/ask`. (Substituída pela atualização do login, abaixo: o limite e o orçamento deixam de contar pelo `session_id`.)
+
+
 ## DEC-042 · Visão 360 da UC e comparação sazonal do consumo
 
 - **Data:** 28/10/2026 · **Área:** Portal · **Revisada após o PR #55:** a DEC-044 é a autoridade
@@ -1554,6 +1601,22 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   auditoria poderia virar "o próprio autor ou a TI". Mexer em tabela que já existe, sem migrações, quebra o banco local de quem
   não recriar as tabelas; a DEC-050 resolveu isso com `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` na carga e na subida da API.
 
+- **Atualização (29/10/2026, login da DEC-049; revisão do Felipe no #86):** com o login, o backend sabe quem pergunta, e as
+  limitações de "omitir ou trocar o `session_id` zera os contadores" e "quem souber o id lê o histórico" deixam de valer.
+  - `app.ai_auditoria` ganha `usuario` (texto, o login de quem perguntou; nulo nas linhas de antes) e o índice `(usuario, id)`,
+    acrescentados pela subida da API e pela carga com `ADD COLUMN/INDEX IF NOT EXISTS`, sem tocar nas linhas, pelo ponto único `garantir_estrutura_do_app` da DEC-050.
+  - **O limite de perguntas é por usuário**, em todas as sessões dele, com as mesmas variáveis (`VENERGY_API_AI_LIMITE_PERGUNTAS`,
+    `VENERGY_API_AI_JANELA_SEGUNDOS`).
+  - **Pedidos simultâneos do mesmo usuário passam um de cada vez** (trava por usuário na rota, revisão do Felipe em 30/10/2026): a contagem e a gravação da auditoria ficam na mesma vez, e o limite não é mais furado por rajadas. A trava vale dentro de um processo da API, que é como o projeto roda.
+  - **O orçamento de tokens tem janela de tempo** (`VENERGY_API_AI_JANELA_ORCAMENTO_SEGUNDOS`, padrão 86400, 24 horas): soma só o que o usuário gastou na janela. Antes somava desde sempre, e quem batia o teto ficava bloqueado para sempre. A mensagem passou a ser "tente de novo mais tarde".
+  - **O orçamento de tokens é por usuário.** O contrato `ask(question, session_id)` do agente não muda: a rota define o usuário numa
+    `ContextVar` antes de chamar o agente, e `HistoricoAuditoria.tokens_used` soma os tokens do usuário em todas as sessões dele
+    (sem usuário no contexto, cai para a sessão).
+  - **A sessão pertence ao usuário:** um `session_id` que já tem linhas na auditoria de outro usuário (ou sem dono, de antes da
+    coluna) responde `403`, sem chamar o agente. Sem `session_id`, o servidor gera um UUID4 novo. O histórico continua por
+    `session_id` (separa as conversas), mas só o dono o usa.
+  - Limitação que fica: os contadores são por login, e não por pessoa; quem tem várias contas tem vários limites.
+
 ## DEC-050 · Autoria nos eventos das ordens de inspeção
 
 - **Data:** 29/10/2026 · **Área:** Portal · **Autor:** Felipe
@@ -1593,9 +1656,9 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   - o nome mostrado é o atual de `app.usuarios`, e não o do momento da ação; os nomes das personas não mudam;
   - mesmo quando a coluna já existe, o `ALTER TABLE` pega uma trava exclusiva rápida na tabela a cada subida. Para um portal
     local, com uma subida por vez, não pesa; conferir o catálogo antes evitaria a trava, ao custo de mais código.
-- **Em aberto:** a autoria da auditoria do agente (`app.ai_auditoria`). O PR #86 (memória de conversa) cria a coluna `usuario`
-  e passa a acrescentá-la pelo mesmo `garantir_estrutura_do_app`. A leitura continua só da TI até o portal ter um painel de
-  auditoria.
+- **Auditoria do agente (PR #86):** `garantir_estrutura_do_app` também chama `garantir_estrutura_da_auditoria`, que acrescenta a
+  `app.ai_auditoria` as colunas de tokens e `usuario` e os índices de sessão e de usuário. Num banco antes da primeira carga,
+  sem a tabela, não faz nada. A leitura da auditoria continua só da TI até o portal ter um painel de auditoria.
 
 ## DEC-051 · Filtro de queda na fila de suspeitas
 
@@ -1604,6 +1667,13 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Decisão:** a API extrai somente esse padrão, entre 0 e 100%, sem confundir com os percentuais de leituras estimadas. A distribuição cobre a fila inteira; o filtro por faixa inclusiva e a ordenação são aplicados antes da paginação. A fila sem filtro mantém também as UCs cujo motivo não foi reconhecido; com filtro elas ficam fora e são contadas separadamente na distribuição.
 - **Extensão (29/10/2026):** o painel combina queda com `medidor_eletromecanico=true` e os limites inclusivos `leituras_estimadas_min/max`, extraídos do motivo completo de leituras estimadas. A Gold só emite esse motivo para percentuais a partir de 25%; o filtro aceita limites de 25 a 100 e não abrange valores inferiores nem ausentes. A ausência também pode indicar dados indisponíveis, nunca é interpretada como zero. Os três sinais são combinados com AND antes da paginação.
 - **Limite:** o valor é o percentual inteiro já arredondado pela Gold, não uma nova conta. Alterar a redação do motivo exige atualizar o extrator; uma coluna numérica na Gold eliminaria essa dependência.
+
+## DEC-052 · Follow-up sem referência vira esclarecimento antes do modelo
+
+- **Data:** 30/10/2026
+- **Contexto:** turnos recusados não entram no histórico (DEC-046). O G103, "Agora faça o mesmo para Olinda.", ficava sem referência, e o modelo respondia com um palpite, contra o requisito central de não inventar (issue #104).
+- **Decisão:** quando o histórico da sessão está vazio e a pergunta depende de outro turno, o `AskUseCase` devolve `clarify` sem chamar o modelo. A regra está em `domain/followup.py` e cobre dois casos: pedidos de repetição ("faça o mesmo", "repita a mesma consulta", "o mesmo para X") e perguntas elípticas de até 4 palavras que começam com "e" ("E em Olinda?").
+- **Consequências:** o comportamento é determinístico e não gasta cota. Como não muda prompt, modelo nem camada semântica, não exige rodada da DEC-016 para entrar. Uma pergunta completa que começa com "e" segue para o modelo. Follow-ups escritos de outra forma também seguem, e aí vale o que o prompt manda. Se a leitura do histórico falhar, a pergunta dependente também recebe `clarify`.
 
 ## DEC-057 · Variação da conta da unidade consumidora dividida por motivo
 

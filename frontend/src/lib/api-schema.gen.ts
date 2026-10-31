@@ -411,6 +411,12 @@ export interface paths {
         /**
          * Perguntar
          * @description Pergunta ao agente e grava a resposta, qualquer que seja o status, na auditoria.
+         *
+         *     Responde 403, sem chamar o agente, se o session_id já pertence a outro usuário, e 429, também
+         *     sem chamar o agente, se o usuário já fez o máximo de perguntas na janela. O limite e o
+         *     orçamento de tokens valem por usuário, em todas as sessões dele: omitir ou trocar o
+         *     session_id não zera nada. O session_id só separa as conversas, e cada uma é de quem a
+         *     começou (DEC-046).
          */
         post: operations["perguntar_ai_ask_post"];
         delete?: never;
@@ -525,10 +531,12 @@ export interface components {
             prompt_version: string;
             /** Latency Ms */
             latency_ms: number;
+            /** Input Tokens */
+            input_tokens: number;
+            /** Output Tokens */
+            output_tokens: number;
             /** Pergunta */
             pergunta: string;
-            /** Session Id */
-            session_id: string;
             /**
              * Criado Em
              * Format: date-time
@@ -1087,7 +1095,7 @@ export interface components {
             /** Question */
             question: string;
             /** Session Id */
-            session_id: string;
+            session_id?: string | null;
         };
         /** RankingAlimentadorSchema */
         RankingAlimentadorSchema: {
@@ -1164,7 +1172,8 @@ export interface components {
         };
         /**
          * RespostaIaSchema
-         * @description A resposta do agente (AgentAnswer) mais o id do registro de auditoria dela.
+         * @description A resposta devolvida pelo POST /ai/ask. Só ela traz o session_id, para o cliente
+         *     continuar a conversa; a auditoria não o expõe (o id da sessão protege o histórico).
          */
         RespostaIaSchema: {
             /** Audit Id */
@@ -1199,6 +1208,12 @@ export interface components {
             prompt_version: string;
             /** Latency Ms */
             latency_ms: number;
+            /** Input Tokens */
+            input_tokens: number;
+            /** Output Tokens */
+            output_tokens: number;
+            /** Session Id */
+            session_id: string;
         };
         /**
          * ResultadoOrdem
@@ -2146,6 +2161,15 @@ export interface operations {
                     "application/json": components["schemas"]["RespostaIaSchema"];
                 };
             };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErroSchema"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -2153,6 +2177,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErroSchema"];
                 };
             };
             /** @description Service Unavailable */

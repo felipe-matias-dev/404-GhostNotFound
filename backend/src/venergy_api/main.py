@@ -41,7 +41,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     # Antes de atender: uma API nova sobre um banco antigo gravaria colunas que ainda não
     # existem (DEC-050). Só acrescenta o que falta, nunca apaga nem altera dado.
     garantir_estrutura_na_subida(app.state.settings.database_url)
-    app.state.agente = await montar_agente()
+    app.state.agente = await montar_agente(
+        janela_orcamento_segundos=app.state.settings.ai_janela_orcamento_segundos
+    )
     app.state.redator_insights = await montar_redator_insights()
     yield
 
@@ -55,6 +57,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # Criado com o app, e não no lifespan: o cache não depende de nada externo, e o app dos
     # testes (sem lifespan) também precisa dele.
     app.state.cache_insights = CacheInsights()
+    app.state.ai_travas = {}
     # A dependência de login lê o segredo daqui, e não de get_settings(): os testes montam o
     # app com as próprias configurações.
     app.state.settings = settings

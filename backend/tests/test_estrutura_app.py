@@ -39,7 +39,7 @@ def test_api_startup_adds_the_author_column_without_losing_events(
     client_for: Callable[[Engine], TestClient],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    async def sem_agente() -> None:
+    async def sem_agente(**_: object) -> None:
         return None
 
     monkeypatch.setattr("venergy_api.main.montar_agente", sem_agente)

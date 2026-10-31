@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AgenteRouteImport } from './routes/agente'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as PerdasRouteImport } from './routes/perdas'
 import { Route as ReceitaRouteImport } from './routes/receita'
@@ -19,6 +20,11 @@ import { Route as UcRouteImport } from './routes/uc'
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AgenteRoute = AgenteRouteImport.update({
+  id: '/agente',
+  path: '/agente',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -49,6 +55,7 @@ const UcRoute = UcRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/agente': typeof AgenteRoute
   '/login': typeof LoginRoute
   '/perdas': typeof PerdasRoute
   '/receita': typeof ReceitaRoute
@@ -57,6 +64,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/agente': typeof AgenteRoute
   '/login': typeof LoginRoute
   '/perdas': typeof PerdasRoute
   '/receita': typeof ReceitaRoute
@@ -66,6 +74,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/agente': typeof AgenteRoute
   '/login': typeof LoginRoute
   '/perdas': typeof PerdasRoute
   '/receita': typeof ReceitaRoute
@@ -74,14 +83,24 @@ export interface FileRoutesById {
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/login' | '/perdas' | '/receita' | '/rede' | '/uc'
+  fullPaths:
+    '/' | '/agente' | '/login' | '/perdas' | '/receita' | '/rede' | '/uc'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/login' | '/perdas' | '/receita' | '/rede' | '/uc'
-  id: '__root__' | '/' | '/login' | '/perdas' | '/receita' | '/rede' | '/uc'
+  to: '/' | '/agente' | '/login' | '/perdas' | '/receita' | '/rede' | '/uc'
+  id:
+    | '__root__'
+    | '/'
+    | '/agente'
+    | '/login'
+    | '/perdas'
+    | '/receita'
+    | '/rede'
+    | '/uc'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AgenteRoute: typeof AgenteRoute
   LoginRoute: typeof LoginRoute
   PerdasRoute: typeof PerdasRoute
   ReceitaRoute: typeof ReceitaRoute
@@ -96,6 +115,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/agente': {
+      id: '/agente'
+      path: '/agente'
+      fullPath: '/agente'
+      preLoaderRoute: typeof AgenteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -138,6 +164,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AgenteRoute: AgenteRoute,
   LoginRoute: LoginRoute,
   PerdasRoute: PerdasRoute,
   ReceitaRoute: ReceitaRoute,

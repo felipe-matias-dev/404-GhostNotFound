@@ -3,6 +3,7 @@
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Annotated, Any, Literal
+from uuid import UUID
 
 from pydantic import (
     BaseModel,
@@ -694,7 +695,6 @@ class OrdemDetalheSchema(OrdemSchema):
 # A entrada é limitada na API, antes de chegar ao agente. O teto de 500 caracteres da pergunta
 # continua sendo do agente; este é folgado, só para não aceitar um corpo gigante.
 MAX_PERGUNTA_IA = 2000
-MAX_SESSAO_IA = 100
 
 
 class PerguntaIaSchema(BaseModel):
@@ -703,13 +703,13 @@ class PerguntaIaSchema(BaseModel):
     question: Annotated[
         str, StringConstraints(strip_whitespace=True, min_length=1, max_length=MAX_PERGUNTA_IA)
     ]
-    session_id: Annotated[
-        str, StringConstraints(strip_whitespace=True, min_length=1, max_length=MAX_SESSAO_IA)
-    ]
+    # Opcional: sem ele o servidor gera um UUID4 aleatório e o devolve na resposta. Com ele, só
+    # UUID (o histórico da sessão é protegido por esse identificador, não por autenticação).
+    session_id: UUID | None = None
 
 
-class RespostaIaSchema(BaseModel):
-    """A resposta do agente (AgentAnswer) mais o id do registro de auditoria dela."""
+class RespostaIaBaseSchema(BaseModel):
+    """A resposta do agente (AgentAnswer) mais o id do registro de auditoria dela, sem a sessão."""
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -732,13 +732,23 @@ class RespostaIaSchema(BaseModel):
     model: str
     prompt_version: str
     latency_ms: int
+    # Tokens do gerador de SQL (todas as tentativas) e da narração neste pedido; 0 quando o
+    # modelo não rodou.
+    input_tokens: int
+    output_tokens: int
 
 
-class AuditoriaIaSchema(RespostaIaSchema):
+class RespostaIaSchema(RespostaIaBaseSchema):
+    """A resposta devolvida pelo POST /ai/ask. Só ela traz o session_id, para o cliente
+    continuar a conversa; a auditoria não o expõe (o id da sessão protege o histórico)."""
+
+    session_id: str
+
+
+class AuditoriaIaSchema(RespostaIaBaseSchema):
     """O registro completo da auditoria: a resposta com a pergunta e o momento em que veio."""
 
     pergunta: str
-    session_id: str
     criado_em: datetime
 
 
