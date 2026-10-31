@@ -1730,3 +1730,11 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   - Com um ano de distância quase sempre houve reajuste, então a parte da tarifa tende a aparecer. É o dado real.
 - **Impacto:** campo novo na rota existente, sem quebra de contrato; API 0.12.0, com `contracts/openapi.json` e os tipos do client
   regenerados. Nenhuma mudança na Gold nem no agente. A tela da visão 360 pode exibir o campo com o tipo gerado do OpenAPI.
+
+## DEC-056 · Views do agente no schema `semantic` (D1)
+
+- **Data:** 30/10/2026
+- **Contexto:** as views `sem_*` ficavam em `gold`, onde o `venergy_agent` lia todas as tabelas, inclusive colunas sensíveis e a fila de suspeitas, que as views deixam de fora. A allowlist só valia no validador.
+- **Decisão:** as views passam para o schema `semantic`, e o `venergy_agent` tem `USAGE` e `SELECT` só nele, sem acesso a `gold` nem a `app`. A role ganha `statement_timeout` de 30 s, acima do timeout de 10 s de cada consulta. O padrão de `allowed_schema` passa a ser `semantic`.
+- **Banco existente:** a carga e a subida da API aplicam as permissões e, se a Gold já estiver carregada, recriam as views em `semantic`, sem apagar dados. Banco novo recebe tudo do `01-init.sh`.
+- **Consequências:** o modelo não vê o nome do schema, então o prompt não muda. A carga continua apagando e recriando as views na mesma transação.

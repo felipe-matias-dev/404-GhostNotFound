@@ -26,7 +26,7 @@ def answered_items():
 def test_reference_sql_runs_on_the_database_through_the_agent_path(
     item, agent_database_url, gold_views
 ):
-    validator = SqlglotValidator(dialect="postgres", max_rows=200, allowed_schema="gold")
+    validator = SqlglotValidator(dialect="postgres", max_rows=200, allowed_schema="semantic")
     executor = PostgresQueryExecutor(agent_database_url, timeout_seconds=10)
 
     query = validator.validate(item["reference_sql"], ALLOWED)

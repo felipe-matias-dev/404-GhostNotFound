@@ -32,18 +32,23 @@ def owner() -> Iterator[psycopg.Connection]:
     except psycopg.OperationalError:
         pytest.fail(UNAVAILABLE, pytrace=False)
     with connection:
+        connection.execute("CREATE SCHEMA IF NOT EXISTS semantic")
+        connection.execute("GRANT USAGE ON SCHEMA semantic TO venergy_agent")
+        connection.execute(
+            "ALTER DEFAULT PRIVILEGES IN SCHEMA semantic GRANT SELECT ON TABLES TO venergy_agent"
+        )
         yield connection
 
 
 @pytest.fixture
 def probe_view(owner: psycopg.Connection) -> Iterator[str]:
-    owner.execute("DROP TABLE IF EXISTS gold.sem_executor_probe")
-    owner.execute("CREATE TABLE gold.sem_executor_probe (cod_uc text, kwh numeric)")
+    owner.execute("DROP TABLE IF EXISTS semantic.sem_executor_probe")
+    owner.execute("CREATE TABLE semantic.sem_executor_probe (cod_uc text, kwh numeric)")
     owner.execute(
-        "INSERT INTO gold.sem_executor_probe VALUES ('0001', 100), ('0002', 200), ('0003', 300)"
+        "INSERT INTO semantic.sem_executor_probe VALUES ('0001', 100), ('0002', 200), ('0003', 300)"
     )
     yield "sem_executor_probe"
-    owner.execute("DROP TABLE gold.sem_executor_probe")
+    owner.execute("DROP TABLE semantic.sem_executor_probe")
 
 
 GOLD_TABLES = (
@@ -183,7 +188,7 @@ def gold_views(owner: psycopg.Connection) -> Iterator[None]:
 
     def drop() -> None:
         for view in VIEW_NAMES:
-            owner.execute(f"DROP VIEW IF EXISTS gold.{view}")
+            owner.execute(f"DROP VIEW IF EXISTS semantic.{view}")
         for table in GOLD_TABLE_NAMES:
             owner.execute(f"DROP TABLE IF EXISTS gold.{table} CASCADE")
 
