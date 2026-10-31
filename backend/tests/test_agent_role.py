@@ -62,27 +62,27 @@ def sqlstate_of(error: pytest.ExceptionInfo[DBAPIError]) -> str:
     return error.value.orig.sqlstate
 
 
-@pytest.mark.usefixtures("gold_with_one_uc")
-def test_agent_reads_the_gold(agent_engine: Engine) -> None:
-    with agent_engine.connect() as connection:
-        total = connection.execute(text("SELECT count(*) FROM gold.gold_dim_uc")).scalar_one()
-
-    assert total == 1
-
-
-def test_agent_still_reads_the_gold_after_a_reload(
+def test_agent_cannot_read_the_gold_tables_even_after_a_reload(
     tmp_path: Path, engine: Engine, agent_engine: Engine
 ) -> None:
-    # A carga recria as tabelas da Gold. A permissão de leitura vem do ALTER DEFAULT
-    # PRIVILEGES do schema, que vale para toda tabela nova: a recarga não pode tirá-la.
     write_sample(tmp_path / "gold", force=True)
     load_gold(tmp_path / "gold", engine)
     load_gold(tmp_path / "gold", engine)
 
-    with agent_engine.connect() as connection:
-        total = connection.execute(text("SELECT count(*) FROM gold.gold_dim_uc")).scalar_one()
+    with agent_engine.connect() as connection, pytest.raises(DBAPIError) as error:
+        connection.execute(text("SELECT count(*) FROM gold.gold_dim_uc"))
 
-    assert total == len(SAMPLE_UCS)
+    assert sqlstate_of(error) == INSUFFICIENT_PRIVILEGE
+
+
+def test_agent_role_has_a_statement_timeout(
+    tmp_path: Path, engine: Engine, agent_engine: Engine
+) -> None:
+    write_sample(tmp_path / "gold", force=True)
+    load_gold(tmp_path / "gold", engine)
+
+    with agent_engine.connect() as connection:
+        assert connection.execute(text("SHOW statement_timeout")).scalar_one() == "30s"
 
 
 def test_agent_reads_the_views_after_a_reload(
@@ -95,7 +95,7 @@ def test_agent_reads_the_views_after_a_reload(
     load_gold(tmp_path / "gold", engine)
 
     with agent_engine.connect() as connection:
-        total = connection.execute(text("SELECT count(*) FROM gold.sem_uc")).scalar_one()
+        total = connection.execute(text("SELECT count(*) FROM semantic.sem_uc")).scalar_one()
 
     assert total == len(SAMPLE_UCS)
 
@@ -111,26 +111,26 @@ def test_agent_cannot_write_through_a_view(
     with autocommit.connect() as connection:
         connection.execute(text("SET default_transaction_read_only = off"))
         with pytest.raises(DBAPIError) as error:
-            connection.execute(text("DELETE FROM gold.sem_uc"))
+            connection.execute(text("DELETE FROM semantic.sem_uc"))
 
     assert sqlstate_of(error) == INSUFFICIENT_PRIVILEGE
 
 
 @pytest.mark.usefixtures("gold_with_one_uc")
 @pytest.mark.parametrize(
-    "statement",
+    ("statement", "sqlstate"),
     [
-        "INSERT INTO gold.gold_dim_uc (cod_uc) VALUES ('9999')",
-        "UPDATE gold.gold_dim_uc SET bairro = 'X'",
-        "DELETE FROM gold.gold_dim_uc",
-        "DROP TABLE gold.gold_dim_uc",
+        ("INSERT INTO gold.gold_dim_uc (cod_uc) VALUES ('9999')", INSUFFICIENT_PRIVILEGE),
+        ("UPDATE gold.gold_dim_uc SET bairro = 'X'", INSUFFICIENT_PRIVILEGE),
+        ("DELETE FROM gold.gold_dim_uc", INSUFFICIENT_PRIVILEGE),
+        ("DROP TABLE gold.gold_dim_uc", READ_ONLY_TRANSACTION),
     ],
 )
-def test_agent_cannot_write(agent_engine: Engine, statement: str) -> None:
+def test_agent_cannot_write(agent_engine: Engine, statement: str, sqlstate: str) -> None:
     with agent_engine.connect() as connection, pytest.raises(DBAPIError) as error:
         connection.execute(text(statement))
 
-    assert sqlstate_of(error) == READ_ONLY_TRANSACTION
+    assert sqlstate_of(error) == sqlstate
 
 
 @pytest.mark.usefixtures("gold_with_one_uc")

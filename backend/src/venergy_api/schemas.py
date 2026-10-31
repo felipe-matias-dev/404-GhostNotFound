@@ -75,6 +75,11 @@ class DimUcSchema(BaseModel):
     energia_injetada_kwh_mes: Annotated[ExactNumber, Field(ge=0)] | None
 
 
+class LocalidadeSchema(BaseModel):
+    municipio: str
+    bairro: str
+
+
 class FaturamentoMensalSchema(BaseModel):
     """Faturamento de uma UC numa competência."""
 
@@ -137,6 +142,18 @@ class KpisMensaisSchema(BaseModel):
     satisfacao_media: float | None
 
 
+class IndicadoresMensalSchema(KpisMensaisSchema):
+    """Indicadores de uma competência no recorte: sem fato no recorte, a soma é nula.
+
+    O recorte pode não ter fatura na competência (ou nenhuma linha), e zero seria inventar dado:
+    o mês continua na série para mostrar o buraco (DEC-030).
+    """
+
+    kwh_faturado: ExactNumber | None
+    receita_faturada: ExactNumber | None
+    receita_energia: ExactNumber | None
+
+
 def _inicio_ate_o_fim(inicio: str | None, fim: str | None) -> None:
     # Na validação do schema, e não na rota: o erro sai no mesmo formato 422 do formato
     # inválido, e o client do frontend trata um só. Texto AAAA-MM compara na ordem do calendário.
@@ -154,6 +171,22 @@ class PeriodoSchema(BaseModel):
     def inicio_ate_o_fim(self) -> "PeriodoSchema":
         _inicio_ate_o_fim(self.inicio, self.fim)
         return self
+
+
+class RecorteFiltroSchema(BaseModel):
+    municipio: RequiredText | None = None
+    bairro: RequiredText | None = None
+    classe: Classe | None = None
+
+    @model_validator(mode="after")
+    def bairro_com_municipio(self) -> "RecorteFiltroSchema":
+        if self.bairro and not self.municipio:
+            raise ValueError("Informe o município junto com o bairro")
+        return self
+
+
+class OrdensFiltroSchema(RecorteFiltroSchema):
+    status: StatusOrdem | None = None
 
 
 class ComparacaoFiltroSchema(BaseModel):
@@ -555,7 +588,7 @@ class FilaSuspeitaSchema(BaseModel):
     kwh_recuperavel_est: ExactNumber | None
 
 
-class FilaFiltroSchema(BaseModel):
+class FilaFiltroSchema(RecorteFiltroSchema):
     """Página da fila e, se quiser, só as UCs que ainda não têm ordem de inspeção ativa."""
 
     pagina: Annotated[int, Field(ge=1)] = 1
@@ -790,6 +823,12 @@ class ErroSchema(BaseModel):
 class IndicadoresComparacaoFiltroSchema(ComparacaoFiltroSchema):
     """Dois períodos e, se quiser, o recorte: os mesmos filtros da comparação de receita."""
 
+    @model_validator(mode="after")
+    def base_antes_do_atual(self) -> "IndicadoresComparacaoFiltroSchema":
+        if self.base_fim >= self.atual_inicio:
+            raise ValueError("O período base precisa terminar antes do início do período atual")
+        return self
+
 
 class IndicadoresJanelasFiltroSchema(BaseModel):
     """Tamanho da janela corrida, em competências, e o recorte opcional."""
@@ -831,7 +870,10 @@ class IndicadoresPeriodoSchema(BaseModel):
 
 
 class VariacaoIndicadoresSchema(BaseModel):
-    """Variação em % de cada indicador (8.0 = +8,0%); nula sem base ou com base zero."""
+    """Variação em % de cada indicador (8.0 = +8,0%).
+
+    Nula com base zero ou se faltar algum mês em um dos períodos (DEC-054).
+    """
 
     receita_faturada: float | None
     receita_energia: float | None
@@ -876,3 +918,7 @@ class LoginSchema(BaseModel):
         str, StringConstraints(strip_whitespace=True, to_lower=True, min_length=1, max_length=50)
     ]
     senha: Annotated[str, StringConstraints(min_length=1, max_length=200)]
+
+
+class IndicadoresMensaisFiltroSchema(RecorteFiltroSchema, PeriodoSchema):
+    """Período e recorte opcionais para a série mensal de indicadores."""

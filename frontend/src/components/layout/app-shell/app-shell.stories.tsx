@@ -15,6 +15,7 @@ const meta = {
 	parameters: { layout: "fullscreen", rota: "/receita" },
 	args: {
 		onConsultarUc: fn(),
+		searchPara: () => ({}),
 		children: (
 			<Pagina descricao="Ponte de receita entre dois períodos, separada em efeito preço, volume e mix." />
 		),

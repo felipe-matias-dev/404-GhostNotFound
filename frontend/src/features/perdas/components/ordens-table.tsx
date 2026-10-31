@@ -1,9 +1,10 @@
 import { Badge } from "#/components/ui/badge";
 import { DataTable, type DataTableColumn } from "#/components/ui/data-table";
 import { useSession } from "#/features/auth";
+import type { Recorte } from "#/lib/filtros";
 import { formatDataHora } from "#/lib/format";
 import { RESULTADO_ORDEM_ROTULO, STATUS_ORDEM_VISUAL } from "../conversions";
-import { useOrdens } from "../hooks/use-ordens";
+import { chaveDoRecorte, useOrdens } from "../hooks/use-ordens";
 import { type Ordem, STATUS_ORDEM, type StatusOrdem } from "../types";
 import { useAcoesOrdem } from "./acoes-ordem";
 import { OrdemAcoesBotoes } from "./ordem-acoes-botoes";
@@ -61,10 +62,18 @@ const COLUNAS: DataTableColumn<Ordem>[] = [
 	},
 ];
 
-export function OrdensTable({ status }: { status: StatusOrdem | undefined }) {
+export function OrdensTable({
+	status,
+	recorte,
+}: {
+	status: StatusOrdem | undefined;
+	recorte: Recorte;
+}) {
 	const { data: user } = useSession();
-	const { data, isPending, isPlaceholderData, isError, refetch } =
-		useOrdens(status);
+	const { data, isPending, isPlaceholderData, isError, refetch } = useOrdens(
+		status,
+		recorte,
+	);
 	const { abrir, abrirHistorico, pendente } = useAcoesOrdem();
 
 	return (
@@ -72,7 +81,7 @@ export function OrdensTable({ status }: { status: StatusOrdem | undefined }) {
 			label="Ordens de inspeção"
 			columns={COLUNAS}
 			rows={data}
-			resetKey={status ?? "todas"}
+			resetKey={`${status ?? "todas"}|${chaveDoRecorte(recorte)}`}
 			getRowId={(o) => String(o.id)}
 			getRowLabel={(o) => `OI ${o.id} da UC ${o.cod_uc}`}
 			loading={isPending || isPlaceholderData}
@@ -87,7 +96,7 @@ export function OrdensTable({ status }: { status: StatusOrdem | undefined }) {
 							<OrdemAcoesBotoes
 								ordem={o}
 								onAcao={abrir}
-								pendente={pendente(o.id)}
+								pendente={pendente(o.id) || isPlaceholderData}
 							/>
 						)
 					: undefined

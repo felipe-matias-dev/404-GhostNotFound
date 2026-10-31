@@ -38,7 +38,7 @@ export function buscarRankingContinuidade(
 	);
 }
 
-/** O nível abaixo do recorte atual, recortado pela geografia escolhida. */
+/** O nível abaixo do recorte atual, recortado pela geografia e pela classe escolhidas. */
 export function buscarRecortesContinuidade(
 	periodo: Periodo,
 	criterio: Criterio,
@@ -52,8 +52,7 @@ export function buscarRecortesContinuidade(
 					inicio: periodo.inicio,
 					fim: periodo.fim,
 					criterio,
-					municipio: recorte.municipio,
-					bairro: recorte.bairro,
+					...recorte,
 				},
 			},
 			signal,

@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-	mesesDoPeriodo,
-	resolverPeriodo,
-	serieDoAlimentador,
-} from "../conversions";
+import { mesesDoPeriodo, serieDoAlimentador } from "../conversions";
 import type { AlimentadorMensal, Periodo } from "../types";
 
 const linha = (
@@ -22,75 +18,6 @@ const linha = (
 });
 
 const periodo: Periodo = { inicio: "2024-12", fim: "2025-02" };
-
-describe("resolverPeriodo", () => {
-	it("pega os últimos 12 meses de calendário até a competência mais recente", () => {
-		const entrada = [
-			"2026-06",
-			"2025-07",
-			"2026-01",
-			"2026-06",
-			"2025-09",
-			"2025-08",
-			"2026-02",
-			"2025-12",
-			"2025-11",
-			"2025-10",
-			"2026-03",
-			"2026-05",
-			"2026-04",
-			"2025-01",
-		];
-		const copia = [...entrada];
-
-		expect(resolverPeriodo({}, entrada)).toEqual({
-			inicio: "2025-07",
-			fim: "2026-06",
-		});
-		expect(entrada).toEqual(copia);
-	});
-
-	it("limita o início à competência mais antiga da base", () => {
-		expect(
-			resolverPeriodo({}, ["2026-03", "2026-05", "2026-06", "2026-04"]),
-		).toEqual({ inicio: "2026-03", fim: "2026-06" });
-	});
-
-	it("mantém a URL completa e válida, mesmo fora do calendário", () => {
-		expect(
-			resolverPeriodo({ inicio: "2030-01", fim: "2030-03" }, ["2026-05"]),
-		).toEqual({ inicio: "2030-01", fim: "2030-03" });
-	});
-
-	it("volta ao padrão com período incompleto ou invertido", () => {
-		const calendario = ["2024-01", "2024-02", "2025-05", "2025-06"];
-
-		expect(resolverPeriodo({ inicio: "2025-01" }, calendario)).toEqual({
-			inicio: "2024-07",
-			fim: "2025-06",
-		});
-		expect(
-			resolverPeriodo({ inicio: "2025-06", fim: "2025-01" }, calendario),
-		).toEqual({ inicio: "2024-07", fim: "2025-06" });
-		expect(
-			resolverPeriodo({ inicio: "2025-13", fim: "2025-01" }, calendario),
-		).toEqual({ inicio: "2024-07", fim: "2025-06" });
-	});
-
-	it("não resolve período sem URL nem competências", () => {
-		expect(resolverPeriodo({}, [])).toBeUndefined();
-		expect(
-			resolverPeriodo({ inicio: undefined, fim: undefined }, []),
-		).toBeUndefined();
-	});
-
-	it("resolve a URL válida mesmo com o calendário vazio", () => {
-		expect(resolverPeriodo({ inicio: "2031-01", fim: "2031-02" }, [])).toEqual({
-			inicio: "2031-01",
-			fim: "2031-02",
-		});
-	});
-});
 
 describe("mesesDoPeriodo", () => {
 	it("inclui as duas pontas e cruza o ano", () => {

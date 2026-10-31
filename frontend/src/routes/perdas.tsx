@@ -1,13 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { z } from "zod";
-import { PerdasPage, STATUS_ORDEM } from "#/features/perdas";
-
-const searchSchema = z.object({
-	status: z.enum(STATUS_ORDEM).optional().catch(undefined),
-	secao: z.enum(["fila", "ordens"]).optional().catch(undefined),
-});
+import { PerdasPage, perdasSearchSchema } from "#/features/perdas";
 
 export const Route = createFileRoute("/perdas")({
-	validateSearch: searchSchema,
+	validateSearch: perdasSearchSchema,
 	component: PerdasPage,
 });

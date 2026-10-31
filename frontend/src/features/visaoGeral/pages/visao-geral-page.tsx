@@ -1,61 +1,54 @@
-import { getRouteApi } from "@tanstack/react-router";
+import { useRouterState } from "@tanstack/react-router";
 import { Pagina } from "#/components/layout/pagina";
+import {
+	useCompetencias,
+	useFiltrosPortal,
+	usePeriodosDecomposicao,
+} from "#/features/filtros";
+import type { ParPeriodos, Recorte } from "#/lib/filtros";
 import { EfeitosReceita } from "../components/efeitos-receita";
 import { IndicadoresMes } from "../components/indicadores-mes";
 import { ResumoReceita } from "../components/resumo-receita";
-import { janelasDaBase, parEscolhido } from "../conversions";
-import { useCompetencias, useJanelas } from "../hooks/use-indicadores";
-import type { ParPeriodos } from "../types";
-
-const route = getRouteApi("/");
 
 export function VisaoGeralPage() {
-	const { periodo_base, periodo_atual } = route.useSearch();
-	const navigate = route.useNavigate();
-
-	// O par da URL só vale se os dois meses existem na série; senão, o padrão.
+	const { filtros } = useFiltrosPortal();
+	const navegando = useRouterState({ select: (state) => state.isLoading });
+	const periodos = usePeriodosDecomposicao();
 	const competencias = useCompetencias();
-	const par = competencias.data
-		? parEscolhido(competencias.data, periodo_base, periodo_atual)
-		: undefined;
-	const serieJanelas = useJanelas();
-	const janelas = serieJanelas.data
-		? janelasDaBase(serieJanelas.data)
-		: undefined;
 
-	const escolher = (proximo: ParPeriodos) =>
-		navigate({
-			search: (atual) => ({
-				...atual,
-				periodo_base: proximo.periodo_base,
-				periodo_atual: proximo.periodo_atual,
-			}),
-			resetScroll: false,
-		});
+	// O período é o da barra comum; resolver padrão é trabalho dela, uma vez na URL.
+	const par: ParPeriodos | undefined =
+		filtros.periodo_base && filtros.periodo_atual
+			? {
+					periodo_base: filtros.periodo_base,
+					periodo_atual: filtros.periodo_atual,
+				}
+			: undefined;
+	const recorte: Recorte = {
+		municipio: filtros.municipio,
+		bairro: filtros.bairro,
+		classe: filtros.classe,
+	};
 
-	// Série carregada sem nenhum par possível (menos de dois meses): não há o que comparar.
-	const semDados = Boolean(competencias.data) && !par;
+	// Sem par, pode ser o catálogo ainda chegando ou não haver dois meses para comparar.
+	const resolvendo =
+		!par && (navegando || periodos.isPending || competencias.isPending);
+	const semPeriodo = !par && !resolvendo;
+
 	return (
 		<Pagina className="max-w-none gap-4">
-			<ResumoReceita
-				janelas={janelas}
-				semJanelas={Boolean(serieJanelas.data) && !janelas}
-				erroSerie={serieJanelas.isError}
-				onRetrySerie={() => serieJanelas.refetch()}
-			/>
-			<EfeitosReceita janelas={janelas} />
-			<IndicadoresMes
-				competencias={competencias.data ?? []}
+			<ResumoReceita par={par} recorte={recorte} semPeriodo={semPeriodo} />
+			<EfeitosReceita
 				par={par}
-				onEscolher={escolher}
-				carregando={competencias.isPending}
-				erro={
-					competencias.isError
-						? "Não foi possível carregar os indicadores."
-						: null
-				}
-				semDados={semDados}
-				onRetry={() => competencias.refetch()}
+				recorte={recorte}
+				carregando={resolvendo}
+				semPeriodo={semPeriodo}
+			/>
+			<IndicadoresMes
+				par={par}
+				recorte={recorte}
+				carregando={resolvendo}
+				semPeriodo={semPeriodo}
 			/>
 		</Pagina>
 	);

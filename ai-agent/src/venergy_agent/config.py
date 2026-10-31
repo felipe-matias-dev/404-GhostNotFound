@@ -22,7 +22,7 @@ class AgentSettings(BaseSettings):
     llm_retry_initial_delay_seconds: float = Field(1.0, gt=0)
     sql_dialect: Literal["postgres"] = "postgres"
     database_url: str
-    allowed_schema: str = "gold"
+    allowed_schema: str = "semantic"
     max_question_chars: int = Field(500, gt=0)
     max_rows: int = Field(200, gt=0)
     query_timeout_seconds: float = Field(10.0, gt=0)
