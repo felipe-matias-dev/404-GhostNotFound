@@ -62,7 +62,7 @@ Cada parte do sistema responde à pergunta de uma pessoa da V-Energy.
 |---|---|---|---|
 | **Henrique**, diretor comercial | Por que a receita não acompanhou a tarifa, e onde ela caiu? | Telas **Visão geral** (indicadores comercial, de rede e de atendimento) e **Receita** (ponte em cascata, mapa da Região Metropolitana do Recife, drill-down município → bairro → classe) | Pronto |
 | **Rafael**, gerente de perdas | Quais unidades inspecionar primeiro, e em que pé está cada ordem? | Tela **Perdas**: ordens de inspeção em Kanban ou tabela, com gerar, enviar a campo, concluir e cancelar. Fila de suspeitas em `GET /fila-suspeitas` | Ordens prontas; fila pronta na API, tela em construção |
-| **Camila**, atendimento | O que aconteceu com esta unidade consumidora, e por que a conta veio alta? | `GET /unidades-consumidoras/{cod_uc}/visao-360`: cadastro, consumo de 12 meses contra o ano anterior, faturas em aberto, medidor, interrupções, chamados e a regra da conta alta ([DEC-044](docs/decisoes.md#dec-044--visão-360-da-unidade-consumidora-rota-única-janela-da-gold-e-regra-da-conta-alta)) | API pronta, tela em construção |
+| **Camila**, atendimento | O que aconteceu com esta unidade consumidora, e por que a conta veio alta? | `GET /unidades-consumidoras/{cod_uc}/visao-360`: cadastro, consumo de 12 meses contra o ano anterior, faturas em aberto, medidor, interrupções, chamados e a regra da conta alta ([DEC-044](docs/decisoes.md#dec-044--visão-360-da-unidade-consumidora-rota-única-janela-da-gold-e-regra-da-conta-alta)). A conta é explicada em reais: a diferença contra o mesmo mês do ano anterior vem dividida em consumo, tarifa, bandeira e tributos, e as partes somam a diferença ([DEC-057](docs/decisoes.md#dec-057--variação-da-conta-da-unidade-consumidora-dividida-por-motivo)) | API pronta, tela em construção |
 | **Beatriz**, operação | Quais alimentadores e regiões têm o pior DEC e FEC? | `GET /continuidade/alimentadores/ranking`, `/mensal` e `/recortes` ([DEC-033](docs/decisoes.md#dec-033--dec-e-fec-por-período-e-recorte-e-a-fila-de-suspeitas-paginada)) | API pronta, tela em construção |
 | **Patrícia**, diretora de TI | Os dados são confiáveis e seguros? Dá para perguntar em português? | Pipeline com travas de qualidade, agente Text-to-SQL em `POST /ai/ask` com auditoria e insight de IA em `GET /receita/insight` | Pipeline e API prontos; chat no portal em construção |
 
@@ -185,8 +185,17 @@ do valor da conta. Faturas pendentes não têm corte por período e os históric
 somente na apresentação. A Gold é histórica, não indica falta de energia em tempo real.
 Diferenças da apresentação e limites em
 [DEC-042](docs/decisoes.md#dec-042--visão-360-da-uc-e-comparação-sazonal-do-consumo).
-A comparação monetária com o ano anterior, o tipo de leitura e a diferença absoluta em kWh
-saíram da tela porque não estão no contrato aprovado; não são simulados por outras chamadas.
+A diferença absoluta em kWh não aparece na tela porque não está no contrato aprovado; não é
+simulada por outras chamadas.
+
+O card **Por que a conta mudou**, no topo da tela, responde à reclamação de conta alta em reais:
+a conta do mês de referência contra a do mesmo mês do ano anterior, com a diferença dividida em
+consumo, tarifa, bandeira e tributos, e a parte que mais pesou na direção da conta destacada.
+Os dias que cada conta cobriu aparecem só como texto, sem entrar na divisão. As partes vêm prontas
+de `variacao_conta`, na mesma rota da visão 360, e somam exatamente a diferença; a tela não faz
+conta. Sem a conta do ano anterior, o card diz que não há com o que comparar, e uma leitura
+estimada ganha um aviso. Fórmula e limites em
+[DEC-057](docs/decisoes.md#dec-057--variação-da-conta-da-unidade-consumidora-dividida-por-motivo).
 
 ## Decisões que defendemos
 

@@ -5,3 +5,4 @@ export type ConsumoMesUc = components["schemas"]["ConsumoMesSchema"];
 export type FaturaNaoPaga = components["schemas"]["FaturaNaoPagaSchema"];
 export type InterrupcaoUc = components["schemas"]["InterrupcaoUcSchema"];
 export type AtendimentoUc = components["schemas"]["AtendimentoUcSchema"];
+export type VariacaoConta = components["schemas"]["VariacaoContaSchema"];

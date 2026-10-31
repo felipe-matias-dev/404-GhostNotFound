@@ -36,9 +36,9 @@ Hexagonal: `domain` ← `application` ← `infrastructure`.
 
 ```
 pergunta → Question → SemanticLayer (carregada uma vez)
-        → follow-up sem turno anterior no histórico → clarify, sem chamar o modelo (DEC-052)
         → orçamento da sessão esgotado? → refused, sem chamar o modelo
         → histórico da sessão (últimos turnos, sem os refused)
+        → follow-up sem turno anterior no histórico → clarify, sem chamar o modelo (DEC-052)
         → SqlGenerator (com o histórico) → SqlDraft
             unknown | clarify | refuse → AgentAnswer sem SQL
             ok → SqlglotValidator → PostgresQueryExecutor
@@ -52,7 +52,7 @@ pergunta → Question → SemanticLayer (carregada uma vez)
 
 Período (G1-05): quando as linhas têm `competencia`, o texto determinístico cita o primeiro e o último mês do resultado, e a narrativa só é aceita se citar os dois extremos das linhas que o redator viu (por exemplo "junho de 2025", "06/2025", "jun/2025" ou "entre junho e dezembro de 2025"); senão, o log registra `periodo_ausente_na_resposta`. Os meses usados como literal no SQL (`competencia = '2025-06'`) também valem na checagem de números (DEC-019); quando as linhas não têm `competencia`, são eles o período que a narrativa precisa citar e que o texto determinístico mostra. Pedido de esclarecimento que cita nome técnico vira uma pergunta genérica sobre período e recorte. Detalhes, confiança e logs: spec §5.1. O backend monta o agente uma vez por processo com `build_agent(AgentSettings())`.
 
-`InsightWriter` (item 9, `infrastructure/insight_writer.py`, prompt em `prompts/insight/v2/`, com unidade, efeito tarifa e bandeira como partes do efeito preço e negativo por extenso): narra o JSON de métricas de uma tela e devolve `None` se algum número do texto não estiver no JSON. O backend monta o JSON, guarda o insight em cache e liga o redator (D9): feito para a tela de Receita (`GET /receita/insight`, DEC-040), com `build_insight_writer` em `bootstrap.py`. O golden set está em `eval/golden_set.yaml` (versão 0.15.0, 105 itens, alinhado à camada 0.4.0). A revisão humana é parcial: `revisado_por` está preenchido em 99 de 105 itens (Dados, issue #90 e PR #97); os demais são os follow-ups da memória, que aguardam revisão.
+`InsightWriter` (item 9, `infrastructure/insight_writer.py`, prompt em `prompts/insight/v2/`, com unidade, efeito tarifa e bandeira como partes do efeito preço e negativo por extenso): narra o JSON de métricas de uma tela e devolve `None` se algum número do texto não estiver no JSON. O backend monta o JSON, guarda o insight em cache e liga o redator (D9): feito para a tela de Receita (`GET /receita/insight`, DEC-040), com `build_insight_writer` em `bootstrap.py`. O golden set está em `eval/golden_set.yaml` (versão 0.17.0, 105 itens, alinhado à camada 0.4.0). `revisado_por` está preenchido por Dados em 104 itens; o G105 aguarda a conferência da mudança da 0.17.0.
 
 ## 3b. Memória e orçamento
 
@@ -110,7 +110,7 @@ O banco local só tem a amostra sintética do backend (`venergy_api.amostra`). A
 - O YAML não registra a versão do contrato (`conventions.agent.contract_version`).
 - D7 resolvido: a carga apaga as views `sem_*` antes de recriar as tabelas da Gold e as aplica de novo no fim, numa única transação (`backend/src/venergy_api/carga.py`, `drop_agent_views`). Se uma view não bater com a Gold, a carga falha e desfaz tudo.
 - D1 continua aberto: as views ficam no schema `gold`, onde o `venergy_agent` lê todas as tabelas.
-- O golden set tem revisão humana parcial: `revisado_por` está preenchido em 99 de 105 itens; faltam os follow-ups da memória (G046 e G099 a G103).
+- O golden set tem revisão humana em 104 de 105 itens (Dados, issue #90); falta o G105, mudado na 0.17.0. Item novo ou gabarito mudado volta a `null` até Dados conferir.
 - Recortes de receita: a tela (`GET /receita/comparacao`, DEC-021) soma a fato com o cadastro atual da UC, e o agente soma `sem_kpis_segmento_mensal`. Os números só divergem se uma UC mudou de recorte; alinhar quando o backend migrar para a tabela de segmentos.
 
 ## 6b. Avaliação (item 7)
@@ -118,8 +118,8 @@ O banco local só tem a amostra sintética do backend (`venergy_api.amostra`). A
 - `evaluation/metrics.py`: execution accuracy por conjunto de linhas, tentativa barrada pelo validador, vazamento de prompt, fidelidade numérica, taxas e percentis.
 - `evaluation/runner.py`: `EvaluationRunner` sobre as portas.
 - `evaluation/database_guard.py`: `PostgresDatabaseGuard` mede a violação no banco: impressão digital das views antes e depois da rodada e escritas reais com o usuário do agente, sempre com rollback (spec §9.2).
-- `evaluation/__main__.py`: CLI que grava `eval/runs/<data>.json`; `--only references` executa só as referências do golden na base escolhida, sem chamar o modelo, e aponta as que falham ou voltam vazias (issue #90, item 8); `--dataset amostra|gold_real` confere a base carregada, e `--sql-only` monta o agente sem o redator. Narração e juiz rodam nas duas bases (DEC-015). Os relatórios da Gold real vão para `eval/runs_gold/`, fora do Git (issue #56).
-- `evaluation/compare.py` (`make eval-compare A=... B=...`): tabela markdown de duas rodadas, sem chamar modelo; as métricas são recalculadas só sobre os itens em comum, lista os itens que mudaram e avisa quando `failed` passa de 5%.
+- `evaluation/__main__.py`: CLI que grava `eval/runs/<data>.json`; `--ids G001,G002` (`make eval IDS=...`) roda só esses itens do golden, com os turnos de que dependem, para repetir pioras e itens alterados sem gastar uma rodada inteira; `--only references` executa só as referências do golden na base escolhida, sem chamar o modelo, e aponta as que falham ou voltam vazias (issue #90, item 8); `--dataset amostra|gold_real` confere a base carregada, e `--sql-only` monta o agente sem o redator. Narração e juiz rodam nas duas bases (DEC-015). Os relatórios da Gold real vão para `eval/runs_gold/`, fora do Git (issue #56).
+- `evaluation/compare.py` (`make eval-compare A=... B=...`): tabela markdown de duas rodadas, sem chamar modelo; as métricas são recalculadas só sobre os itens em comum, lista os itens que mudaram e avisa quando `failed` passa de 5%. `SKIP=G001,G002` tira da comparação os itens cuja pergunta ou gabarito mudou entre as rodadas.
 - O runner roda cada cadeia de follow-up em sequência, numa sessão própria, e entrega cada turno a um `TurnRecorder` opcional (ponto de ligação da memória, G1-10, ligado ao adapter em memória no CLI da avaliação, exceto na Gold real). `--judge` liga o juiz (porta `AnswerJudge`) só na amostra narrada; as métricas ganham `refusal_accuracy` e `judge_*`.
 - Linha de base e achados: spec §9.6.
 
