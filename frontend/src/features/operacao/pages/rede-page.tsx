@@ -62,9 +62,7 @@ export function RedePage() {
 	const municipio = filtros.municipio;
 	const bairro = filtros.bairro;
 	const classe = filtros.classe;
-	// Com recorte, a visão global não existe: o endpoint do ranking ignora a geografia. A
-	// preferência explícita na URL continua lá e volta a valer quando o recorte é limpo; a
-	// inferência do schema não a substitui.
+	// Com recorte, o ranking global não se aplica; a preferência explícita volta sem recorte.
 	const comRecorte = Boolean(municipio || bairro || classe);
 	const visaoSalva: VisaoRede =
 		buscaBruta.visao === "localidades" ? "localidades" : "alimentadores";

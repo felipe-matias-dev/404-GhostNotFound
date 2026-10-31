@@ -63,6 +63,8 @@ A faixa superior reúne o recorte compartilhado; **Filtros de suspeitas** afeta 
 os sinais da fila.
 Na Rede, `inicio` e `fim` representam o período atual. Um par válido que não conste
 na decomposição permanece selecionado, com aviso de indisponibilidade da ponte.
+Com recorte, a Rede mostra localidades sem salvar essa visão como preferência; ao limpar
+o recorte, volta ao ranking de alimentadores, salvo se localidades foi escolhida na URL.
 Períodos inválidos recebidos por URL são removidos antes das consultas, com aviso visível.
 A base deve terminar antes do início do período atual. Na URL, uma base sobreposta é
 substituída pela sugestão e gera aviso; no seletor manual, a aplicação é bloqueada.

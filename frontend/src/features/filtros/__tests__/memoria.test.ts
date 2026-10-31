@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { redeSearchSchema } from "#/features/operacao";
 import { type DestinoPortal, lerFiltrosCompartilhados } from "#/lib/filtros";
 import {
 	type BuscaDaTela,
@@ -162,6 +163,33 @@ describe("buscaPara", () => {
 		const memoria = registrar({}, "/perdas", perdas);
 		const receita = tela("/receita", { ...perdas, status: undefined });
 		expect(buscaPara("/perdas", receita, memoria).pagina).toBe(3);
+	});
+
+	it("não salva visão implícita ao limpar o recorte ou voltar à Rede", () => {
+		const search = redeSearchSchema.parse({ municipio: "Recife" });
+		const atual = tela("/rede", search);
+		const memoria = registrar({}, "/rede", search);
+		expect(
+			buscaPara("/rede", atual, memoria, { municipio: undefined }).visao,
+		).toBeUndefined();
+		const receita = tela("/receita", {});
+		expect(buscaPara("/rede", receita, memoria).visao).toBeUndefined();
+	});
+
+	it("preserva a visão de localidades escolhida explicitamente", () => {
+		const search = redeSearchSchema.parse({
+			municipio: "Recife",
+			visao: "localidades",
+		});
+		const memoria = registrar({}, "/rede", search);
+		expect(
+			buscaPara("/rede", tela("/rede", search), memoria, {
+				municipio: undefined,
+			}).visao,
+		).toBe("localidades");
+		expect(buscaPara("/rede", tela("/receita", {}), memoria).visao).toBe(
+			"localidades",
+		);
 	});
 
 	it("fecha o painel da Rede quando período ou recorte mudam, sem perder o critério", () => {

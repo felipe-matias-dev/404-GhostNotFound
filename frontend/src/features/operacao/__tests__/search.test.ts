@@ -22,17 +22,6 @@ describe("redeSearchSchema", () => {
 		expect(search.bairro).toBe("Boa Viagem");
 	});
 
-	it("infere localidades a partir de um município com bairro", () => {
-		const search = redeSearchSchema.parse({
-			municipio: "Recife",
-			bairro: "Boa Viagem",
-		});
-
-		expect(search.visao).toBe("localidades");
-		expect(search.municipio).toBe("Recife");
-		expect(search.bairro).toBe("Boa Viagem");
-	});
-
 	it("barra mês fora do formato AAAA-MM", () => {
 		const mesTreze = redeSearchSchema.parse({
 			inicio: "2025-13",

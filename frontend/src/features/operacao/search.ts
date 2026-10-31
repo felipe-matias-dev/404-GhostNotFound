@@ -40,7 +40,7 @@ export const redeSearchSchema = z
 			criterio: search.criterio,
 			// A série só existe com um alimentador aberto: sozinha, não diz nada.
 			serie: search.alimentador ? search.serie : undefined,
-			visao: search.visao ?? (municipio ? "localidades" : undefined),
+			visao: search.visao,
 			municipio,
 			// Um bairro sem município não tem onde ser procurado.
 			bairro: municipio ? search.bairro : undefined,
