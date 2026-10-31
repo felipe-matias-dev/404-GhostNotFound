@@ -36,9 +36,9 @@ Hexagonal: `domain` ← `application` ← `infrastructure`.
 
 ```
 pergunta → Question → SemanticLayer (carregada uma vez)
-        → follow-up sem turno anterior no histórico → clarify, sem chamar o modelo (DEC-052)
         → orçamento da sessão esgotado? → refused, sem chamar o modelo
         → histórico da sessão (últimos turnos, sem os refused)
+        → follow-up sem turno anterior no histórico → clarify, sem chamar o modelo (DEC-052)
         → SqlGenerator (com o histórico) → SqlDraft
             unknown | clarify | refuse → AgentAnswer sem SQL
             ok → SqlglotValidator → PostgresQueryExecutor
@@ -120,8 +120,8 @@ O banco local só tem a amostra sintética do backend (`venergy_api.amostra`). A
 - `evaluation/metrics.py`: execution accuracy por conjunto de linhas, tentativa barrada pelo validador, vazamento de prompt, fidelidade numérica, taxas e percentis.
 - `evaluation/runner.py`: `EvaluationRunner` sobre as portas.
 - `evaluation/database_guard.py`: `PostgresDatabaseGuard` mede a violação no banco: impressão digital das views antes e depois da rodada e escritas reais com o usuário do agente, sempre com rollback (spec §9.2).
-- `evaluation/__main__.py`: CLI que grava `eval/runs/<data>.json`; `--only references` executa só as referências do golden na base escolhida, sem chamar o modelo, e aponta as que falham ou voltam vazias (issue #90, item 8); `--dataset amostra|gold_real` confere a base carregada, e `--sql-only` monta o agente sem o redator. Narração e juiz rodam nas duas bases (DEC-015). Os relatórios da Gold real vão para `eval/runs_gold/`, fora do Git (issue #56).
-- `evaluation/compare.py` (`make eval-compare A=... B=...`): tabela markdown de duas rodadas, sem chamar modelo; as métricas são recalculadas só sobre os itens em comum, lista os itens que mudaram e avisa quando `failed` passa de 5%.
+- `evaluation/__main__.py`: CLI que grava `eval/runs/<data>.json`; `--ids G001,G002` (`make eval IDS=...`) roda só esses itens do golden, com os turnos de que dependem, para repetir pioras e itens alterados sem gastar uma rodada inteira; `--only references` executa só as referências do golden na base escolhida, sem chamar o modelo, e aponta as que falham ou voltam vazias (issue #90, item 8); `--dataset amostra|gold_real` confere a base carregada, e `--sql-only` monta o agente sem o redator. Narração e juiz rodam nas duas bases (DEC-015). Os relatórios da Gold real vão para `eval/runs_gold/`, fora do Git (issue #56).
+- `evaluation/compare.py` (`make eval-compare A=... B=...`): tabela markdown de duas rodadas, sem chamar modelo; as métricas são recalculadas só sobre os itens em comum, lista os itens que mudaram e avisa quando `failed` passa de 5%. `SKIP=G001,G002` tira da comparação os itens cuja pergunta ou gabarito mudou entre as rodadas.
 - O runner roda cada cadeia de follow-up em sequência, numa sessão própria, e entrega cada turno a um `TurnRecorder` opcional (ponto de ligação da memória, G1-10, ligado ao adapter em memória no CLI da avaliação, exceto na Gold real). `--judge` liga o juiz (porta `AnswerJudge`) só na amostra narrada; as métricas ganham `refusal_accuracy` e `judge_*`.
 - Linha de base e achados: spec §9.6.
 

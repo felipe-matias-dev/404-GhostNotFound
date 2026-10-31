@@ -7,6 +7,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from venergy_api.consumo_uc import inicio_da_consulta, montar_consumo
+from venergy_api.conta_uc import montar_variacao_conta
 from venergy_api.database import SessionDep
 from venergy_api.models import (
     AtendimentoUc,
@@ -105,6 +106,7 @@ def get_visao_360(cod_uc: str, session: SessionDep) -> Uc360Schema:
     return Uc360Schema(
         cadastro=DimUcSchema.model_validate(uc),
         consumo=montar_consumo(referencia, faturas),
+        variacao_conta=montar_variacao_conta(referencia, faturas),
         faturas_nao_pagas=FaturasNaoPagasSchema(
             quantidade=len(nao_pagas),
             valor_total=valor_total,
