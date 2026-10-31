@@ -1,133 +1,51 @@
 import type { TrendCategory, TrendSeries } from "#/components/ui/trend-chart";
 import type { WaterfallStep } from "#/components/ui/waterfall-chart";
+import { trechoDe } from "#/features/filtros";
+import type { ParPeriodos } from "#/lib/filtros";
 import { formatCompetencia, formatCompetenciaCurta } from "#/lib/format";
-import type { JanelaIndicadores, ParPeriodos } from "./types";
+import type { JanelaIndicadores } from "./types";
 
-/** "2025-03" → "2025-03/2025-03": um mês no formato de período da URL e da API. */
-export const periodoDoMes = (competencia: string) =>
-	`${competencia}/${competencia}`;
+/** Janela máxima que `/indicadores/janelas` calcula; acima dela o gráfico fica indisponível. */
+export const MESES_MAX_JANELA = 24;
 
-/** Período de um mês só → a competência; `undefined` num trecho de vários meses. */
-export function mesDoPeriodo(periodo: string | undefined): string | undefined {
-	const [inicio, fim] = periodo?.split("/") ?? [];
-	return inicio && inicio === fim ? inicio : undefined;
+/** Quantidade de meses de um período "AAAA-MM/AAAA-MM". */
+export function mesesDoPeriodo(periodo: string): number {
+	const { inicio, fim } = trechoDe(periodo);
+	return fim - inicio + 1;
 }
 
-const deslocar = (competencia: string, meses: number) => {
-	const [ano, mes] = competencia.split("-").map(Number);
-	const total = ano * 12 + (mes - 1) + meses;
-	return `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, "0")}`;
-};
+export type Intervalo = { inicio: string; fim: string };
 
-/**
- * Base contra a qual o mês atual é comparado: o mesmo mês do ano anterior, que tira a
- * sazonalidade (padrão), ou o mês anterior.
- */
-export type Relacao = "ano" | "mes";
-
-const baseDe = (atual: string, relacao: Relacao) =>
-	deslocar(atual, relacao === "ano" ? -12 : -1);
-
-export type Base = { relacao: Relacao; competencia: string };
-
-/** Bases que existem na série para um mês atual, na ordem de preferência. */
-export function basesDoMes(competencias: string[], atual: string): Base[] {
-	const existentes = new Set(competencias);
-	return (["ano", "mes"] as const)
-		.map((relacao) => ({ relacao, competencia: baseDe(atual, relacao) }))
-		.filter((base) => existentes.has(base.competencia));
-}
-
-/** Par de um mês atual, com a relação pedida se ela existir; senão a outra. */
-export function parDoMes(
-	competencias: string[],
-	atual: string,
-	relacao: Relacao = "ano",
-): ParPeriodos | undefined {
-	const bases = basesDoMes(competencias, atual);
-	const base =
-		bases.find((candidata) => candidata.relacao === relacao) ?? bases[0];
-	if (!base) return undefined;
+/** Do menor início ao maior fim dos dois períodos do par, inclusive. */
+export function intervaloDoPar(par: ParPeriodos): Intervalo {
+	const [baseInicio = "", baseFim = ""] = par.periodo_base.split("/");
+	const [atualInicio = "", atualFim = ""] = par.periodo_atual.split("/");
 	return {
-		periodo_base: periodoDoMes(base.competencia),
-		periodo_atual: periodoDoMes(atual),
+		inicio: baseInicio < atualInicio ? baseInicio : atualInicio,
+		fim: baseFim > atualFim ? baseFim : atualFim,
 	};
 }
 
-/** Como a base do par se relaciona com o mês atual; `undefined` se não for nenhuma das duas. */
-export function relacaoDoPar(par: ParPeriodos): Relacao | undefined {
-	const atual = mesDoPeriodo(par.periodo_atual);
-	const base = mesDoPeriodo(par.periodo_base);
-	if (!atual || !base) return undefined;
-	if (base === baseDe(atual, "ano")) return "ano";
-	if (base === baseDe(atual, "mes")) return "mes";
-	return undefined;
-}
-
-/**
- * Par que a tela abre sem escolha na URL: o mês mais recente contra o mesmo mês do ano
- * anterior; sem ele, o mês anterior. A série vem em ordem, do mais antigo ao mais recente.
- */
-export function parPadrao(competencias: string[]): ParPeriodos | undefined {
-	for (const atual of [...competencias].reverse()) {
-		const par = parDoMes(competencias, atual);
-		if (par) return par;
-	}
-	return undefined;
-}
-
-/**
- * O par da URL, se é mês contra mês, com os dois meses na série e a base antes do atual;
- * senão o padrão. O seletor da faixa continua mensal.
- */
-export function parEscolhido(
-	competencias: string[],
-	periodoBase: string | undefined,
-	periodoAtual: string | undefined,
-): ParPeriodos | undefined {
-	const base = mesDoPeriodo(periodoBase);
-	const atual = mesDoPeriodo(periodoAtual);
-	const existentes = new Set(competencias);
-	if (
-		base &&
-		atual &&
-		base < atual &&
-		existentes.has(base) &&
-		existentes.has(atual)
-	) {
-		return {
-			periodo_base: periodoDoMes(base),
-			periodo_atual: periodoDoMes(atual),
-		};
-	}
-	return parPadrao(competencias);
-}
-
-/** Janelas de 12 meses no formato de período da URL e da API: "2024-01/2024-12". */
-export type Janelas = { base: string; atual: string };
-
-/** Primeira e última janelas completas de 12 meses, sem sobreposição. */
-export function janelasDaBase(
+/** Só as janelas completas dentro do intervalo, como o backend as devolve. */
+export function janelasDoIntervalo(
 	janelas: JanelaIndicadores[],
-): Janelas | undefined {
-	const base = janelas[0];
-	const atual = janelas.at(-1);
-	if (!base || !atual || atual.inicio <= base.fim) return undefined;
-	return {
-		base: `${base.inicio}/${base.fim}`,
-		atual: `${atual.inicio}/${atual.fim}`,
-	};
+	intervalo: Intervalo,
+): JanelaIndicadores[] {
+	return janelas.filter(
+		(janela) =>
+			janela.inicio >= intervalo.inicio && janela.fim <= intervalo.fim,
+	);
 }
 
 export type Tesoura = {
 	categories: TrendCategory[];
 	series: TrendSeries[];
-	/** As somas de 12 meses por trás de cada ponto, para o tooltip. */
+	/** As somas de `meses` meses por trás de cada ponto, para o tooltip. */
 	somas: { receita: number; kwh: number }[];
 };
 
-/** Variação das somas calculadas pelo backend sobre a primeira janela. */
-export function tesoura(pontos: JanelaIndicadores[]): Tesoura {
+/** Variação das somas calculadas pelo backend sobre a primeira janela exibida. */
+export function tesoura(pontos: JanelaIndicadores[], meses: number): Tesoura {
 	const base = pontos[0];
 	if (!base || pontos.length < 2)
 		return { categories: [], series: [], somas: [] };
@@ -135,7 +53,7 @@ export function tesoura(pontos: JanelaIndicadores[]): Tesoura {
 		categories: pontos.map((p) => ({
 			key: p.fim,
 			label: formatCompetenciaCurta(p.fim),
-			title: `12 meses até ${formatCompetencia(p.fim)}`,
+			title: `${meses} ${meses === 1 ? "mês" : "meses"} até ${formatCompetencia(p.fim)}`,
 		})),
 		series: [
 			{

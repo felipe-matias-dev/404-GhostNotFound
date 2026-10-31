@@ -1,84 +1,14 @@
 import { describe, expect, it } from "vitest";
+import type { ParPeriodos } from "#/lib/filtros";
 import {
 	efeitosDaReceita,
-	janelasDaBase,
+	intervaloDoPar,
+	janelasDoIntervalo,
 	leitura,
-	parDoMes,
-	parEscolhido,
-	parPadrao,
+	mesesDoPeriodo,
 	tesoura,
 } from "../conversions";
-import type { JanelaIndicadores, ParPeriodos } from "../types";
-
-const par = (base: string, atual: string): ParPeriodos => ({
-	periodo_base: `${base}/${base}`,
-	periodo_atual: `${atual}/${atual}`,
-});
-
-const meses = (inicio: string, quantos: number) => {
-	const [ano, mes] = inicio.split("-").map(Number);
-	return Array.from({ length: quantos }, (_, i) => {
-		const total = ano * 12 + mes - 1 + i;
-		return `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, "0")}`;
-	});
-};
-
-describe("parPadrao", () => {
-	it("compara o mês mais recente com o mesmo mês do ano anterior", () => {
-		expect(parPadrao(meses("2024-01", 24))).toEqual(par("2024-12", "2025-12"));
-	});
-
-	it("usa o mês anterior quando a série tem menos de um ano", () => {
-		expect(parPadrao(meses("2025-01", 6))).toEqual(par("2025-05", "2025-06"));
-	});
-
-	it("não compara nada com um mês só", () => {
-		expect(parPadrao(["2025-01"])).toBeUndefined();
-	});
-});
-
-describe("parDoMes", () => {
-	const competencias = meses("2024-01", 24);
-
-	it("mantém a relação pedida quando a base existe", () => {
-		expect(parDoMes(competencias, "2025-03", "mes")).toEqual(
-			par("2025-02", "2025-03"),
-		);
-	});
-
-	it("troca de relação quando a base pedida está fora da série", () => {
-		expect(parDoMes(competencias, "2024-03", "ano")).toEqual(
-			par("2024-02", "2024-03"),
-		);
-	});
-
-	it("vira o ano no mês anterior de janeiro", () => {
-		expect(parDoMes(competencias, "2025-01", "mes")).toEqual(
-			par("2024-12", "2025-01"),
-		);
-	});
-});
-
-describe("parEscolhido", () => {
-	const competencias = meses("2024-01", 24);
-
-	it("aceita da URL dois meses da série, com a base antes do atual", () => {
-		expect(
-			parEscolhido(competencias, "2024-03/2024-03", "2025-07/2025-07"),
-		).toEqual(par("2024-03", "2025-07"));
-	});
-
-	it.each([
-		["trecho de vários meses", "2024-01/2024-12", "2025-01/2025-12"],
-		["mês fora da série", "2023-12/2023-12", "2024-12/2024-12"],
-		["base depois do atual", "2025-07/2025-07", "2024-07/2024-07"],
-		["sem par na URL", undefined, undefined],
-	])("volta ao padrão com %s", (_, base, atual) => {
-		expect(parEscolhido(competencias, base, atual)).toEqual(
-			par("2024-12", "2025-12"),
-		);
-	});
-});
+import type { JanelaIndicadores } from "../types";
 
 const janela = (
 	inicio: string,
@@ -96,62 +26,128 @@ const janela = (
 	tarifa_base_media: receita / kwh,
 });
 
-describe("janelasDaBase", () => {
-	it("compara a primeira e a última janela completa retornadas pelo backend", () => {
-		expect(
-			janelasDaBase([
-				janela("2022-01", "2022-12", 120, 1200),
-				janela("2022-02", "2023-01", 130, 1250),
-				janela("2025-01", "2025-12", 150, 1400),
-			]),
-		).toEqual({
-			base: "2022-01/2022-12",
-			atual: "2025-01/2025-12",
+const par = (base: string, atual: string): ParPeriodos => ({
+	periodo_base: base,
+	periodo_atual: atual,
+});
+
+describe("mesesDoPeriodo", () => {
+	it("conta os meses inclusive nas duas pontas", () => {
+		expect(mesesDoPeriodo("2025-01/2025-12")).toBe(12);
+		expect(mesesDoPeriodo("2025-03/2025-03")).toBe(1);
+		expect(mesesDoPeriodo("2024-01/2025-03")).toBe(15);
+	});
+
+	it("atravessa mais de um ano e passa do limite do gráfico", () => {
+		expect(mesesDoPeriodo("2024-01/2026-01")).toBe(25);
+	});
+});
+
+describe("intervaloDoPar", () => {
+	it("vai do menor início ao maior fim dos dois períodos", () => {
+		expect(intervaloDoPar(par("2024-03/2024-05", "2025-01/2025-02"))).toEqual({
+			inicio: "2024-03",
+			fim: "2025-02",
 		});
 	});
 
-	it("não compara janelas sobrepostas nem série sem janela completa", () => {
-		expect(janelasDaBase([])).toBeUndefined();
+	it("aceita o período atual começando antes da base", () => {
+		expect(intervaloDoPar(par("2025-01/2025-03", "2024-11/2024-12"))).toEqual({
+			inicio: "2024-11",
+			fim: "2025-03",
+		});
+	});
+});
+
+describe("janelasDoIntervalo", () => {
+	const janelas = [
+		janela("2023-12", "2024-02", 100, 1000),
+		janela("2024-01", "2024-03", 110, 1050),
+		janela("2024-02", "2024-04", 120, 1100),
+		janela("2025-01", "2025-03", 150, 1300),
+	];
+
+	it("mantém só as janelas completas dentro do intervalo", () => {
 		expect(
-			janelasDaBase([
-				janela("2024-01", "2024-12", 120, 1200),
-				janela("2024-12", "2025-11", 150, 1400),
-			]),
-		).toBeUndefined();
+			janelasDoIntervalo(janelas, { inicio: "2024-01", fim: "2025-03" }).map(
+				(j) => j.inicio,
+			),
+		).toEqual(["2024-01", "2024-02", "2025-01"]);
+	});
+
+	it("não deixa escapar uma janela que atravessa a borda", () => {
+		expect(
+			janelasDoIntervalo(janelas, { inicio: "2024-02", fim: "2024-04" }).map(
+				(j) => j.inicio,
+			),
+		).toEqual(["2024-02"]);
 	});
 });
 
 describe("tesoura", () => {
 	it("mede a variação das somas recebidas sem acumular novamente as janelas", () => {
-		const t = tesoura([
-			janela("2024-01", "2024-12", 120, 1200),
-			janela("2024-02", "2025-01", 132, 1176),
-		]);
+		const t = tesoura(
+			[
+				janela("2024-01", "2024-12", 120, 1200),
+				janela("2024-02", "2025-01", 132, 1176),
+			],
+			12,
+		);
 		expect(t.categories.map((c) => c.key)).toEqual(["2024-12", "2025-01"]);
 		expect(t.series[0].values).toEqual([0, expect.closeTo(0.1)]);
 		expect(t.series[1].values).toEqual([0, expect.closeTo(-0.02)]);
 		expect(t.somas[1]).toEqual({ receita: 132, kwh: 1176 });
 	});
 
+	it("usa o tamanho da janela selecionada no rótulo", () => {
+		const trimestre = tesoura(
+			[
+				janela("2024-01", "2024-03", 120, 1200),
+				janela("2024-02", "2024-04", 132, 1176),
+			],
+			3,
+		);
+		expect(trimestre.categories[0]?.title).toBe("3 meses até mar/2024");
+		expect(
+			tesoura(
+				[
+					janela("2025-01", "2025-01", 10, 100),
+					janela("2025-02", "2025-02", 11, 110),
+				],
+				1,
+			).categories[0]?.title,
+		).toBe("1 mês até jan/2025");
+	});
+
 	it("mantém os meses retornados mesmo quando há um intervalo sem janelas", () => {
 		expect(
-			tesoura([
-				janela("2024-01", "2024-12", 120, 1200),
-				janela("2024-04", "2025-03", 132, 1176),
-			]).categories.map((c) => c.key),
+			tesoura(
+				[
+					janela("2024-01", "2024-12", 120, 1200),
+					janela("2024-04", "2025-03", 132, 1176),
+				],
+				12,
+			).categories.map((c) => c.key),
 		).toEqual(["2024-12", "2025-03"]);
-		expect(tesoura([janela("2024-01", "2024-12", 120, 1200)]).series).toEqual(
-			[],
-		);
+		expect(
+			tesoura([janela("2024-01", "2024-12", 120, 1200)], 12).series,
+		).toEqual([]);
 	});
 
 	it("não inventa variação para uma série cuja primeira soma é zero", () => {
-		const t = tesoura([
-			janela("2024-01", "2024-12", 0, 1200),
-			janela("2024-02", "2025-01", 132, 1176),
-		]);
+		const t = tesoura(
+			[
+				janela("2024-01", "2024-12", 0, 1200),
+				janela("2024-02", "2025-01", 132, 1176),
+			],
+			12,
+		);
 		expect(t.series[0].values).toEqual([null, null]);
 		expect(t.series[1].values[1]).toBeCloseTo(-0.02);
+	});
+
+	it("não desenha a tesoura com menos de duas janelas", () => {
+		expect(tesoura([], 12).categories).toEqual([]);
 	});
 });
 

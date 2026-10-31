@@ -78,6 +78,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/unidades-consumidoras/localidades": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Localidades */
+        get: operations["get_localidades_unidades_consumidoras_localidades_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/unidades-consumidoras/{cod_uc}": {
         parameters: {
             query?: never;
@@ -269,6 +286,26 @@ export interface paths {
          * @description DEC e FEC por município, por bairro de um município ou por alimentador de um bairro.
          */
         get: operations["get_recortes_continuidade_recortes_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/indicadores/mensal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Mensal
+         * @description Série mensal do recorte; mês sem fato no recorte vem nulo, e não zero (DEC-030).
+         */
+        get: operations["get_mensal_indicadores_mensal_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -847,6 +884,31 @@ export interface components {
             tarifa_base_media: number | null;
         };
         /**
+         * IndicadoresMensalSchema
+         * @description Indicadores de uma competência no recorte: sem fato no recorte, a soma é nula.
+         *
+         *     O recorte pode não ter fatura na competência (ou nenhuma linha), e zero seria inventar dado:
+         *     o mês continua na série para mostrar o buraco (DEC-030).
+         */
+        IndicadoresMensalSchema: {
+            /** Competencia */
+            competencia: string;
+            /** Kwh Faturado */
+            kwh_faturado: number | null;
+            /** Receita Faturada */
+            receita_faturada: number | null;
+            /** Receita Energia */
+            receita_energia: number | null;
+            /** Dec */
+            dec: number | null;
+            /** Fec */
+            fec: number | null;
+            /** N Chamados */
+            n_chamados: number | null;
+            /** Satisfacao Media */
+            satisfacao_media: number | null;
+        };
+        /**
          * IndicadoresPeriodoSchema
          * @description Os indicadores da diretoria somados num período, todos calculados no banco.
          */
@@ -977,6 +1039,13 @@ export interface components {
             n_chamados: number | null;
             /** Satisfacao Media */
             satisfacao_media: number | null;
+        };
+        /** LocalidadeSchema */
+        LocalidadeSchema: {
+            /** Municipio */
+            municipio: string;
+            /** Bairro */
+            bairro: string;
         };
         /**
          * LoginSchema
@@ -1467,6 +1536,26 @@ export interface operations {
             };
         };
     };
+    get_localidades_unidades_consumidoras_localidades_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LocalidadeSchema"][];
+                };
+            };
+        };
+    };
     get_unidade_consumidora_unidades_consumidoras__cod_uc__get: {
         parameters: {
             query?: never;
@@ -1817,6 +1906,41 @@ export interface operations {
             };
         };
     };
+    get_mensal_indicadores_mensal_get: {
+        parameters: {
+            query?: {
+                inicio?: string | null;
+                fim?: string | null;
+                municipio?: string | null;
+                bairro?: string | null;
+                classe?: ("B1" | "B2" | "B3" | "A4") | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IndicadoresMensalSchema"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_comparacao_indicadores_comparacao_get: {
         parameters: {
             query: {
@@ -1890,7 +2014,11 @@ export interface operations {
     };
     get_distribuicao_queda_fila_suspeitas_distribuicao_queda_get: {
         parameters: {
-            query?: never;
+            query?: {
+                municipio?: string | null;
+                bairro?: string | null;
+                classe?: ("B1" | "B2" | "B3" | "A4") | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -1906,11 +2034,23 @@ export interface operations {
                     "application/json": components["schemas"]["DistribuicaoQuedaSchema"];
                 };
             };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
         };
     };
     get_fila_fila_suspeitas_get: {
         parameters: {
             query?: {
+                municipio?: string | null;
+                bairro?: string | null;
+                classe?: ("B1" | "B2" | "B3" | "A4") | null;
                 pagina?: number;
                 tamanho?: number;
                 sem_ordem_ativa?: boolean;
@@ -1951,6 +2091,9 @@ export interface operations {
     listar_ordens_ordens_inspecao_get: {
         parameters: {
             query?: {
+                municipio?: string | null;
+                bairro?: string | null;
+                classe?: ("B1" | "B2" | "B3" | "A4") | null;
                 status?: components["schemas"]["StatusOrdem"] | null;
             };
             header?: never;

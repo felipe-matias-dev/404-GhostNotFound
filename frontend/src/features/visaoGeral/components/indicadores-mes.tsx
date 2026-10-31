@@ -2,17 +2,17 @@ import { Link } from "@tanstack/react-router";
 import type { ReactElement } from "react";
 import { KpiCard } from "#/components/ui/kpi-card";
 import { Sparkline } from "#/components/ui/sparkline";
+import { useFiltrosPortal } from "#/features/filtros";
+import type { ParPeriodos, Recorte } from "#/lib/filtros";
 import { cn } from "#/lib/utils";
-import { mesDoPeriodo } from "../conversions";
 import {
 	useComparacaoIndicadores,
-	useKpisMensais,
+	useIndicadoresMensais,
 } from "../hooks/use-indicadores";
 import { DEFINICOES } from "../indicadores";
-import type { Indicador, ParPeriodos } from "../types";
-import { ComparacaoPicker } from "./comparacao-picker";
+import type { Indicador } from "../types";
 
-// Receita e energia ficam no resumo de 12 meses: repetidas aqui, num mês, com o mesmo nome,
+// Receita e energia ficam no resumo: repetidas aqui, no mesmo período, com o mesmo nome,
 // seriam duas "receitas" com variações diferentes.
 const DA_FAIXA = [
 	"dec",
@@ -21,44 +21,51 @@ const DA_FAIXA = [
 	"satisfacao_media",
 ] as const satisfies readonly Indicador[];
 
-const LINKS: Partial<Record<Indicador, ReactElement>> = {
-	dec: <Link to="/rede" />,
-	fec: <Link to="/rede" />,
-};
-
 /**
- * Rede e atendimento no mês escolhido, numa faixa só, cada um com a variação sobre o mês base
- * e a forma da série inteira (o mês atual em destaque, o base em anel). Valores e variações
+ * Rede e atendimento no período escolhido, numa faixa só, cada um com a variação sobre a base
+ * e a forma da série no recorte (o último mês de cada período em destaque). Valores e variações
  * vêm da comparação do backend; a série mensal serve só às sparklines.
  */
 export function IndicadoresMes({
-	competencias,
 	par,
-	onEscolher,
+	recorte,
 	carregando,
-	erro,
-	semDados,
-	onRetry,
+	semPeriodo,
 }: {
-	competencias: string[];
 	par: ParPeriodos | undefined;
-	onEscolher: (par: ParPeriodos) => void;
+	recorte: Recorte;
+	/** O período padrão ainda não foi resolvido pela barra comum. */
 	carregando: boolean;
-	erro: string | null;
 	/** A Gold não tem dois meses para comparar: todos os indicadores ficam vazios. */
-	semDados: boolean;
-	onRetry: () => void;
+	semPeriodo: boolean;
 }) {
-	const comparacao = useComparacaoIndicadores(par);
-	const serie = useKpisMensais();
+	const { searchPara } = useFiltrosPortal();
+	const comparacao = useComparacaoIndicadores(par, recorte);
+	const serie = useIndicadoresMensais(par, recorte);
 	const linhas = serie.data ?? [];
-	const indiceDe = (periodo: string | undefined) => {
-		const mes = mesDoPeriodo(periodo);
-		const i = linhas.findIndex((linha) => linha.competencia === mes);
-		return i < 0 ? undefined : i;
+	const indiceDe = (competencia: string | undefined) => {
+		const indice = linhas.findIndex(
+			(linha) => linha.competencia === competencia,
+		);
+		return indice < 0 ? undefined : indice;
 	};
-	const atual = indiceDe(par?.periodo_atual);
-	const base = indiceDe(par?.periodo_base);
+	const atual = indiceDe(par?.periodo_atual.split("/")[1]);
+	const base = indiceDe(par?.periodo_base.split("/")[1]);
+
+	const links: Partial<Record<Indicador, ReactElement>> = {
+		dec: (
+			<Link
+				to="/rede"
+				search={searchPara("/rede", { criterio: "dec" }) as never}
+			/>
+		),
+		fec: (
+			<Link
+				to="/rede"
+				search={searchPara("/rede", { criterio: "fec" }) as never}
+			/>
+		),
+	};
 
 	return (
 		<section
@@ -67,14 +74,8 @@ export function IndicadoresMes({
 		>
 			<div className="flex flex-wrap items-center justify-between gap-2 px-5 pt-4 pb-3">
 				<h2 id="mes-titulo" className="text-heading">
-					Rede e atendimento no mês
+					Rede e atendimento no período
 				</h2>
-				<ComparacaoPicker
-					competencias={competencias}
-					par={par}
-					onEscolher={onEscolher}
-					semPeriodos={Boolean(erro) || semDados}
-				/>
 			</div>
 			<div className="grid grid-cols-2 gap-px border-border border-t bg-border @2xl:grid-cols-4">
 				{DA_FAIXA.map((indicador) => {
@@ -86,23 +87,22 @@ export function IndicadoresMes({
 							key={indicador}
 							label={definicao.label}
 							value={
-								semDados || comparacao.data?.atual.n_meses === 0
+								semPeriodo || comparacao.data?.atual.n_meses === 0
 									? null
 									: comparacao.data?.atual[indicador]
 							}
 							format={definicao.format}
 							hint={definicao.hint}
-							link={LINKS[indicador]}
+							link={links[indicador]}
 							loading={carregando || (Boolean(par) && comparacao.isPending)}
 							error={
-								erro ??
-								(comparacao.isError
+								comparacao.isError
 									? "Não foi possível carregar os indicadores."
-									: null)
+									: null
 							}
-							onRetry={erro ? onRetry : () => comparacao.refetch()}
+							onRetry={() => void comparacao.refetch()}
 							emptyMessage={
-								semDados ? "Sem indicadores carregados." : "Sem dado no mês."
+								semPeriodo ? "Sem período selecionado." : "Sem dado no período."
 							}
 							delta={
 								variacao == null
@@ -112,7 +112,7 @@ export function IndicadoresMes({
 							// Card inteiro é o link: o fundo responde ao hover, e o chevron diz para onde.
 							className={cn(
 								"rounded-none border-0 px-5 py-4 shadow-none",
-								LINKS[indicador] && "hover:bg-surface-2",
+								links[indicador] && "hover:bg-surface-2",
 							)}
 						>
 							<Sparkline values={valores} highlight={atual} reference={base} />

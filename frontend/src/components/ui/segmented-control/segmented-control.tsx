@@ -23,6 +23,8 @@ export type SegmentedOption<Value extends string> = {
 	label: ReactNode;
 	/** Nome acessível quando o rótulo é só um ícone. */
 	ariaLabel?: string;
+	/** Opção indisponível no contexto atual; o grupo continua acessível pelas demais. */
+	disabled?: boolean;
 };
 
 export type SegmentedControlProps<Value extends string> = {
@@ -66,6 +68,7 @@ export function SegmentedControl<Value extends string>({
 						key={option.value}
 						value={option.value}
 						aria-label={option.ariaLabel}
+						disabled={option.disabled}
 						className="relative flex h-full cursor-pointer select-none items-center gap-1.5 whitespace-nowrap rounded-sm px-2 text-small text-text-muted outline-none transition-colors hover:text-text focus-visible:ring-3 focus-visible:ring-focus-ring/50 data-disabled:pointer-events-none data-disabled:text-text-disabled data-pressed:text-text [&_svg:not([class*='size-'])]:size-3.5 [&_svg]:shrink-0"
 					>
 						{pressed ? (

@@ -1,6 +1,5 @@
 import type { TrendCategory, TrendSeries } from "#/components/ui/trend-chart";
 import { formatCompetencia, formatCompetenciaCurta } from "#/lib/format";
-import type { RedeSearch } from "./search";
 import type {
 	AlimentadorMensal,
 	Criterio,
@@ -17,28 +16,6 @@ const deslocar = (competencia: string, meses: number) => {
 	const anoDestino = String(Math.floor(total / 12)).padStart(4, "0");
 	return `${anoDestino}-${String((total % 12) + 1).padStart(2, "0")}`;
 };
-
-/**
- * O período da tabela: a URL válida prevalece, mesmo fora do calendário; sem ela, os últimos
- * 12 meses de calendário até a competência mais recente, limitados à mais antiga da base.
- */
-export function resolverPeriodo(
-	search: Pick<RedeSearch, "inicio" | "fim">,
-	competencias: readonly string[],
-): Periodo | undefined {
-	const { inicio, fim } = search;
-	if (inicio && fim && MES.test(inicio) && MES.test(fim) && inicio <= fim) {
-		return { inicio, fim };
-	}
-	const ordenadas = [
-		...new Set(competencias.filter((c) => MES.test(c))),
-	].sort();
-	const primeira = ordenadas[0];
-	const ultima = ordenadas.at(-1);
-	if (!primeira || !ultima) return undefined;
-	const candidato = deslocar(ultima, -11);
-	return { inicio: candidato > primeira ? candidato : primeira, fim: ultima };
-}
 
 export const MAX_MESES_GRAFICO = 120;
 

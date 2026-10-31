@@ -19,12 +19,15 @@ from sqlalchemy.orm import InstrumentedAttribute
 
 from venergy_api.database import SessionDep
 from venergy_api.indices import indices
+from venergy_api.models import KpisMensais
 from venergy_api.models import KpisSegmentoMensal as Segmento
 from venergy_api.schemas import (
     ComparacaoIndicadoresSchema,
     IndicadoresComparacaoFiltroSchema,
     IndicadoresJanelaSchema,
     IndicadoresJanelasFiltroSchema,
+    IndicadoresMensaisFiltroSchema,
+    IndicadoresMensalSchema,
     IndicadoresPeriodoSchema,
     VariacaoIndicadoresSchema,
 )
@@ -103,6 +106,59 @@ def _indicadores(inicio: str, fim: str) -> dict[str, ColumnElement]:
         "n_notas": total(Segmento.n_notas),
         "satisfacao_media": _razao(soma(Segmento.soma_notas), soma(Segmento.n_notas)),
     }
+
+
+def _soma_com_fatura(soma: ColumnElement) -> ColumnElement:
+    """A soma só vale no recorte com fatura; sem ela, nula e não zero (DEC-030)."""
+    return case((func.sum(Segmento.n_faturas) > 0, soma))
+
+
+@router.get("/mensal")
+def get_mensal(
+    filtro: Annotated[IndicadoresMensaisFiltroSchema, Query()], session: SessionDep
+) -> list[IndicadoresMensalSchema]:
+    """Série mensal do recorte; mês sem fato no recorte vem nulo, e não zero (DEC-030)."""
+    calendario = select(Segmento.competencia).distinct().subquery()
+    agregacao = (
+        select(
+            Segmento.competencia,
+            _soma_com_fatura(func.sum(Segmento.kwh_faturado)).label("kwh_faturado"),
+            _soma_com_fatura(func.sum(Segmento.receita_faturada)).label("receita_faturada"),
+            _soma_com_fatura(func.sum(Segmento.receita_energia)).label("receita_energia"),
+            func.sum(Segmento.n_chamados).label("n_chamados"),
+            _razao(func.sum(Segmento.soma_notas), func.sum(Segmento.n_notas)).label(
+                "satisfacao_media"
+            ),
+            *indices(Segmento.horas_interrompidas, Segmento.n_interrupcoes, Segmento.n_uc, 1),
+        )
+        .where(*_recorte(filtro.municipio, filtro.bairro, filtro.classe))
+        .group_by(Segmento.competencia)
+        .subquery()
+    )
+    # O mês sem linha no recorte continua na série, com as somas nulas: o buraco fica visível,
+    # e não vira zero (DEC-030).
+    consulta = (
+        select(
+            calendario.c.competencia,
+            agregacao.c.kwh_faturado,
+            agregacao.c.receita_faturada,
+            agregacao.c.receita_energia,
+            case((KpisMensais.n_chamados.is_not(None), agregacao.c.n_chamados)).label("n_chamados"),
+            agregacao.c.dec,
+            agregacao.c.fec,
+            agregacao.c.satisfacao_media,
+        )
+        .outerjoin(agregacao, calendario.c.competencia == agregacao.c.competencia)
+        .outerjoin(KpisMensais, calendario.c.competencia == KpisMensais.competencia)
+    )
+    if filtro.inicio:
+        consulta = consulta.where(calendario.c.competencia >= filtro.inicio)
+    if filtro.fim:
+        consulta = consulta.where(calendario.c.competencia <= filtro.fim)
+    return [
+        IndicadoresMensalSchema(**linha._mapping)
+        for linha in session.execute(consulta.order_by(calendario.c.competencia))
+    ]
 
 
 @router.get("/comparacao")

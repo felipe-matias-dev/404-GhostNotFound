@@ -1,8 +1,7 @@
 import { z } from "zod";
+import { type Classe, filtrosCompartilhadosShape } from "#/lib/filtros";
 
-const MES = /^\d{4}-(0[1-9]|1[0-2])$/;
-
-const mes = z.string().regex(MES).optional().catch(undefined);
+const mes = z.string().optional().catch(undefined);
 const texto = z.string().trim().min(1).optional().catch(undefined);
 const criterio = z.enum(["dec", "fec"]).optional().catch(undefined);
 
@@ -16,6 +15,8 @@ type RedeSearchNormalizada = {
 	municipio?: string;
 	bairro?: string;
 	alimentador?: string;
+	classe?: Classe;
+	periodo_base?: string;
 };
 
 export const redeSearchSchema = z
@@ -27,19 +28,15 @@ export const redeSearchSchema = z
 		visao: z.enum(["alimentadores", "localidades"]).optional().catch(undefined),
 		municipio: texto,
 		bairro: texto,
+		classe: filtrosCompartilhadosShape.classe,
+		periodo_base: filtrosCompartilhadosShape.periodo_base,
 		alimentador: texto,
 	})
 	.transform((search): RedeSearchNormalizada => {
-		// Período só vale com as duas pontas válidas e em ordem; senão a tela resolve o padrão.
-		const inicio = search.inicio;
-		const fim = search.fim;
-		const periodoValido =
-			inicio !== undefined && fim !== undefined && inicio <= fim;
-		const global = search.visao === "alimentadores";
-		const municipio = global ? undefined : search.municipio;
+		const municipio = search.municipio;
 		return {
-			inicio: periodoValido ? inicio : undefined,
-			fim: periodoValido ? fim : undefined,
+			inicio: search.inicio,
+			fim: search.fim,
 			criterio: search.criterio,
 			// A série só existe com um alimentador aberto: sozinha, não diz nada.
 			serie: search.alimentador ? search.serie : undefined,
@@ -47,6 +44,8 @@ export const redeSearchSchema = z
 			municipio,
 			// Um bairro sem município não tem onde ser procurado.
 			bairro: municipio ? search.bairro : undefined,
+			classe: search.classe,
+			periodo_base: search.periodo_base,
 			alimentador: search.alimentador,
 		};
 	});
