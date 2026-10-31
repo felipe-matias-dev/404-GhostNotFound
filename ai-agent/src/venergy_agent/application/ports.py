@@ -4,7 +4,7 @@ from typing import Protocol
 from venergy_agent.domain.answer import AgentAnswer, Insight
 from venergy_agent.domain.conversation import ConversationTurn
 from venergy_agent.domain.events import AgentEvent
-from venergy_agent.domain.judge import JudgeVerdict
+from venergy_agent.domain.judge import JudgeRun
 from venergy_agent.domain.narration import Narration
 from venergy_agent.domain.question import Question
 from venergy_agent.domain.semantic import SemanticLayer
@@ -64,4 +64,4 @@ class InsightWriter(Protocol):
 
 
 class AnswerJudge(Protocol):
-    async def judge(self, question: str, answer: AgentAnswer) -> JudgeVerdict: ...
+    async def judge(self, question: str, answer: AgentAnswer) -> JudgeRun: ...

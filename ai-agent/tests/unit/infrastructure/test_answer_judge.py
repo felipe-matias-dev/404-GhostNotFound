@@ -3,8 +3,10 @@ from pathlib import Path
 import pytest
 from pydantic_ai.messages import ModelResponse, SystemPromptPart, ToolCallPart, UserPromptPart
 from pydantic_ai.models.function import AgentInfo, FunctionModel
+from pydantic_ai.usage import RequestUsage
 
 from venergy_agent.domain.answer import AgentAnswer, AnswerStatus, Confidence
+from venergy_agent.domain.errors import ModelCallFailed
 from venergy_agent.infrastructure.answer_judge import PydanticAiAnswerJudge
 
 SHIPPED_PROMPTS = Path(__file__).parents[3] / "prompts" / "judge"
@@ -51,17 +53,51 @@ def judge(model, version="v1"):
 async def test_returns_the_verdict_produced_by_the_model():
     model, _ = scripted_model(GOOD)
 
-    verdict = await judge(model).judge(QUESTION, ANSWER)
+    run = await judge(model).judge(QUESTION, ANSWER)
 
-    assert (verdict.score, verdict.passed, verdict.rationale) == (5, True, "Clara e fiel.")
+    assert (run.verdict.score, run.verdict.passed, run.verdict.rationale) == (
+        5,
+        True,
+        "Clara e fiel.",
+    )
+
+
+async def test_reports_the_tokens_spent_by_the_judge():
+    def respond(messages, info: AgentInfo):
+        return ModelResponse(
+            parts=[ToolCallPart(tool_name=info.output_tools[0].name, args=GOOD)],
+            usage=RequestUsage(input_tokens=120, output_tokens=15),
+        )
+
+    run = await judge(FunctionModel(respond)).judge(QUESTION, ANSWER)
+
+    assert (run.input_tokens, run.output_tokens) == (120, 15)
+
+
+async def test_a_judge_call_that_never_becomes_valid_reports_the_tokens_it_spent():
+    calls = []
+
+    def respond(messages, info: AgentInfo):
+        calls.append(messages)
+        return ModelResponse(
+            parts=[ToolCallPart(tool_name=info.output_tools[0].name, args={"score": 9})],
+            usage=RequestUsage(input_tokens=7, output_tokens=3),
+        )
+
+    with pytest.raises(ModelCallFailed) as failure:
+        await judge(FunctionModel(respond)).judge(QUESTION, ANSWER)
+
+    assert failure.value.input_tokens == 7 * len(calls)
+    assert failure.value.output_tokens == 3 * len(calls)
+    assert failure.value.input_tokens > 0
 
 
 async def test_incoherent_verdict_is_sent_back_to_the_model():
     model, calls = scripted_model(INCOHERENT, GOOD)
 
-    verdict = await judge(model).judge(QUESTION, ANSWER)
+    run = await judge(model).judge(QUESTION, ANSWER)
 
-    assert verdict.passed is True
+    assert run.verdict.passed is True
     assert len(calls) == 2
 
 
