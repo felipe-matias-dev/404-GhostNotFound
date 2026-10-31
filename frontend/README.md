@@ -64,6 +64,10 @@ os sinais da fila.
 Na Rede, `inicio` e `fim` representam o período atual. Um par válido que não conste
 na decomposição permanece selecionado, com aviso de indisponibilidade da ponte.
 Períodos inválidos recebidos por URL são removidos antes das consultas, com aviso visível.
+A base deve terminar antes do início do período atual. Na URL, uma base sobreposta é
+substituída pela sugestão e gera aviso; no seletor manual, a aplicação é bloqueada.
+Para períodos maiores que 12 meses, a sugestão tem a mesma duração e termina no mês
+anterior ao início do período atual.
 Em Perdas, município, bairro e classe filtram fila e ordens, mas o período é só
 contexto: a fila usa a janela fixa da Gold e as ordens não são filtradas por data.
 Na consulta individual de UC, o histórico e as dívidas não são limitados pelo recorte.

@@ -96,6 +96,24 @@ describe("filtros compartilhados", () => {
 		expect(periodoAnterior("2025-01/2025-03")).toBe("2024-01/2024-03");
 		expect(periodoAnterior("0000-01/0000-03")).toBeUndefined();
 	});
+	it("corrige bases sobrepostas e sugere janela anterior de mesma duração", () => {
+		const atual = "2024-01/2025-06";
+		expect(periodoAnterior(atual)).toBe("2022-07/2023-12");
+		expect(
+			lerFiltrosCompartilhados("/", {
+				periodo_atual: atual,
+				periodo_base: "2023-01/2024-06",
+			}).periodo_base,
+		).toBe("2022-07/2023-12");
+		expect(
+			lerFiltrosCompartilhados("/rede", {
+				inicio: "2025-01",
+				fim: "2025-03",
+				periodo_base: "2024-12/2025-01",
+			}).periodo_base,
+		).toBe("2024-01/2024-03");
+		expect(periodoAnterior("0001-01/0002-06")).toBeUndefined();
+	});
 });
 
 describe("aplicarPatch", () => {

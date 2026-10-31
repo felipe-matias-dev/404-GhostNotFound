@@ -49,11 +49,11 @@ export function FiltrosPortal() {
 
 	const bruto = state.location.search as Record<string, unknown>;
 	// O padrão só vale enquanto a URL não traz período: par gravado primeiro, série mensal depois.
-	const padrao = periodos.data?.length
-		? parPadrao(periodos.data)
-		: !periodos.isPending && !competencias.isPending
+	const padrao =
+		parPadrao(periodos.data ?? []) ??
+		(!periodos.isPending && !competencias.isPending
 			? parPadraoMensal(competencias.data ?? [])
-			: undefined;
+			: undefined);
 	const resolvidos = aplicarPeriodoPadrao(filtros, padrao);
 	const compartilhados: Record<string, string | undefined> = destino
 		? gravarFiltrosCompartilhados(destino, resolvidos)

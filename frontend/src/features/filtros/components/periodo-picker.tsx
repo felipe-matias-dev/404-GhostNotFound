@@ -11,7 +11,11 @@ import {
 	PopoverContent,
 	PopoverTrigger,
 } from "#/components/ui/popover";
-import { anoAnterior, type ParPeriodos } from "#/lib/filtros";
+import {
+	type ParPeriodos,
+	periodoAnterior,
+	periodosOrdenados,
+} from "#/lib/filtros";
 import { formatCompetencia, formatPeriodoCurto, MESES } from "#/lib/format";
 import { cn } from "#/lib/utils";
 import {
@@ -59,7 +63,11 @@ export function PeriodoPicker({
 	const valido =
 		rascunho.every(mesValido) &&
 		rascunho[0] <= rascunho[1] &&
-		rascunho[2] <= rascunho[3];
+		rascunho[2] <= rascunho[3] &&
+		periodosOrdenados(
+			`${rascunho[2]}/${rascunho[3]}`,
+			`${rascunho[0]}/${rascunho[1]}`,
+		);
 	const incompleto = rascunho.some((mes) => mes !== "");
 
 	const mudarMes = (indice: number, valor: string) => {
@@ -68,7 +76,7 @@ export function PeriodoPicker({
 			const proximo = [...anterior];
 			proximo[indice] = valor;
 			const [inicio, fim] = proximo;
-			// Enquanto a base não foi editada à mão, ela espelha o atual um ano antes.
+			// Enquanto a base não foi editada à mão, acompanha o período atual.
 			if (
 				indice < 2 &&
 				!baseEditada &&
@@ -76,19 +84,19 @@ export function PeriodoPicker({
 				mesValido(fim) &&
 				inicio <= fim
 			) {
-				const inicioBase = anoAnterior(inicio);
-				const fimBase = anoAnterior(fim);
-				if (inicioBase && fimBase) {
-					proximo[2] = inicioBase;
-					proximo[3] = fimBase;
-				}
+				const base = periodoAnterior(`${inicio}/${fim}`);
+				[proximo[2], proximo[3]] = base?.split("/") ?? ["", ""];
 			}
 			return proximo;
 		});
 	};
 
 	const { atuais, inicios, anoMin, anoMax } = useMemo(() => {
-		const atuais = new Set(pares.map((p) => p.periodo_atual));
+		const atuais = new Set(
+			pares
+				.filter((p) => periodosOrdenados(p.periodo_base, p.periodo_atual))
+				.map((p) => p.periodo_atual),
+		);
 		const trechos = [...atuais].map(trechoDe);
 		return {
 			atuais,
@@ -342,8 +350,8 @@ export function PeriodoPicker({
 							)}
 							{incompleto && !valido && (
 								<output className="col-span-2 text-small text-text-muted">
-									Preencha os quatro meses, com o início antes do fim em cada
-									intervalo.
+									Preencha os quatro meses em ordem; a base deve terminar antes
+									do início do período atual.
 								</output>
 							)}
 							<button

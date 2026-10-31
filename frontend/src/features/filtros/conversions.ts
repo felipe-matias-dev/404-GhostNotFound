@@ -1,4 +1,8 @@
-import type { Classe, ParPeriodos } from "#/lib/filtros";
+import {
+	type Classe,
+	type ParPeriodos,
+	periodosOrdenados,
+} from "#/lib/filtros";
 
 /** Classes de consumo como no case (`gold_receita_decomposicao.classe`). */
 export const CLASSE_ROTULO: Record<Classe, string> = {
@@ -39,8 +43,11 @@ const meses = (periodo: string) => {
  * recente. A lista vem ordenada como texto, e o último item pode ser um par de 1 mês.
  */
 export function parPadrao(pares: ParPeriodos[]) {
-	const anuais = pares.filter((p) => meses(p.periodo_atual) === 12);
-	return (anuais.length ? anuais : pares).reduce<ParPeriodos | undefined>(
+	const validos = pares.filter((p) =>
+		periodosOrdenados(p.periodo_base, p.periodo_atual),
+	);
+	const anuais = validos.filter((p) => meses(p.periodo_atual) === 12);
+	return (anuais.length ? anuais : validos).reduce<ParPeriodos | undefined>(
 		(melhor, p) =>
 			!melhor || p.periodo_atual > melhor.periodo_atual ? p : melhor,
 		undefined,
@@ -50,7 +57,10 @@ export function parPadrao(pares: ParPeriodos[]) {
 /** Bases gravadas para um período atual, da mais recente para a mais antiga. */
 export function basesDoAtual(pares: ParPeriodos[], atual: string): string[] {
 	return pares
-		.filter((p) => p.periodo_atual === atual)
+		.filter(
+			(p) =>
+				p.periodo_atual === atual && periodosOrdenados(p.periodo_base, atual),
+		)
 		.map((p) => p.periodo_base)
 		.sort()
 		.reverse();
@@ -83,7 +93,11 @@ export type Atalho = { rotulo: string; atual: string };
  * gravou, sem repetir o mesmo período com outro nome.
  */
 export function atalhos(pares: ParPeriodos[]): Atalho[] {
-	const atuais = new Set(pares.map((p) => p.periodo_atual));
+	const atuais = new Set(
+		pares
+			.filter((p) => periodosOrdenados(p.periodo_base, p.periodo_atual))
+			.map((p) => p.periodo_atual),
+	);
 	if (!atuais.size) return [];
 	const ultimo = Math.max(...[...atuais].map((p) => trechoDe(p).fim));
 	const janeiro = ultimo - (ultimo % 12);

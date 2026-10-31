@@ -54,4 +54,14 @@ describe("parDoAtual", () => {
 		const pares = [par("2024-01/2024-12", "2025-01/2025-12")];
 		expect(parDoAtual(pares, "2025-01/2025-03")).toBeUndefined();
 	});
+	it("ignora pares do catálogo cuja base toca ou ultrapassa o período atual", () => {
+		const atual = "2025-01/2025-03";
+		const invalido = par("2024-12/2025-01", atual);
+		const valido = par("2023-01/2023-03", atual);
+		expect(
+			parDoAtual([invalido, valido], atual, invalido.periodo_base),
+		).toEqual(valido);
+		expect(parDoAtual([invalido], atual)).toBeUndefined();
+		expect(parPadrao([invalido])).toBeUndefined();
+	});
 });

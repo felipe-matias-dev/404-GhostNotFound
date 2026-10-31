@@ -49,22 +49,30 @@ const schema = z.object({
 	periodo_atual: periodo,
 });
 
-/** "2024-03" um ano antes → "2023-03"; sem ano anterior, o mês fica como está. */
-export function anoAnterior(competencia: string): string | undefined {
-	const ano = Number(competencia.slice(0, 4));
-	if (!Number.isFinite(ano) || ano <= 0) return undefined;
-	return `${String(ano - 1).padStart(4, "0")}${competencia.slice(4)}`;
+/** Base de mesma duração, um ano antes ou imediatamente antes de uma janela maior. */
+export function periodoAnterior(periodoAtual: string): string | undefined {
+	if (!PERIODO.test(periodoAtual)) return undefined;
+	const [inicio, fim] = periodoAtual.split("/");
+	if (inicio > fim) return undefined;
+	const numero = (mes: string) =>
+		Number(mes.slice(0, 4)) * 12 + Number(mes.slice(5)) - 1;
+	const primeiro = numero(inicio);
+	const ultimo = numero(fim);
+	const deslocamento = Math.max(12, ultimo - primeiro + 1);
+	if (primeiro < deslocamento) return undefined;
+	const competencia = (mes: number) =>
+		`${String(Math.floor(mes / 12)).padStart(4, "0")}-${String((mes % 12) + 1).padStart(2, "0")}`;
+	return `${competencia(primeiro - deslocamento)}/${competencia(ultimo - deslocamento)}`;
 }
 
-/**
- * "2025-01/2025-03" um ano antes → "2024-01/2024-03". É a base sugerida quando a URL traz
- * o período atual sem a base gravada.
- */
-export function periodoAnterior(periodoAtual: string): string | undefined {
-	const [inicio, fim] = periodoAtual.split("/");
-	const baseInicio = inicio ? anoAnterior(inicio) : undefined;
-	const baseFim = fim ? anoAnterior(fim) : undefined;
-	return baseInicio && baseFim ? `${baseInicio}/${baseFim}` : undefined;
+export function periodosOrdenados(base: string, atual: string): boolean {
+	return (
+		PERIODO.test(base) &&
+		PERIODO.test(atual) &&
+		base.slice(0, 7) <= base.slice(8) &&
+		atual.slice(0, 7) <= atual.slice(8) &&
+		base.slice(8) < atual.slice(0, 7)
+	);
 }
 
 /** Período atual da busca da tela: `/rede` o escreve como duas pontas, as demais como par. */
@@ -89,9 +97,11 @@ export function lerFiltrosCompartilhados(
 		...search,
 		periodo_atual: periodoDaBusca(destino, search),
 	});
-	// Base sem período atual não diz nada; período atual sem base vale o mesmo trecho um ano antes.
 	const base = parsed.periodo_atual
-		? (parsed.periodo_base ?? periodoAnterior(parsed.periodo_atual))
+		? parsed.periodo_base &&
+			periodosOrdenados(parsed.periodo_base, parsed.periodo_atual)
+			? parsed.periodo_base
+			: periodoAnterior(parsed.periodo_atual)
 		: undefined;
 	return {
 		municipio: parsed.municipio,
