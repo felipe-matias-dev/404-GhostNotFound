@@ -1,25 +1,20 @@
 # Calibração do juiz (rubrica prompts/judge/v1)
 
-Este arquivo registra a calibração do juiz de respostas (DEC-047) com a amostra sintética de 20 itens. Não contém dados da Gold real.
+Este arquivo é uma análise diagnóstica da amostra sintética de 20 itens. Não é a calibração oficial.
 
-## Resumo
+A calibração oficial segue o critério do guia da issue #116: 15 itens novos, sem repetir os 20 abaixo, com notas dadas sem ver as do juiz. O critério é `passed` igual em pelo menos 12 de 15 e diferença média de até 1 ponto. Esse resultado ainda não existe.
 
-- Itens: 20
-- Acordo de aprovação (nota 4 ou 5 contra nota 4 ou 5): 18/20 (90%)
-- Nota exata: 3/20 (15%)
-- Diferença de até 1 ponto: 18/20 (90%)
+## Como os 20 itens foram usados
 
-Com 20 itens, o intervalo de confiança do acordo é largo. Isso não fecha a calibração, só mostra o ponto de partida.
-
-## Histórico das rodadas de notas humanas
-
-| Rodada | Itens | Acordo de aprovação |
+| Rodada | Notas cegas? | Acordo de aprovação |
 |---|---|---|
-| 1 (notas iniciais) | 20 | 75% (15/20) |
-| 2 (após reavaliação às cegas) | 20 | 85% (17/20) |
-| 3 (após revisão de três notas) | 20 | 90% (18/20) |
+| 1 (notas iniciais, antes da execução do juiz) | sim | 75% (15/20) |
+| 2 (reavaliação, sem ver as notas do juiz) | sim | 85% (17/20) |
+| 3 (revisão de notas, depois de ver as notas do juiz) | não | 90% (18/20) |
 
-A rodada 3 é a que está registrada abaixo.
+A rodada 3 não conta como calibração cega, porque algumas notas foram revistas depois de ver as do juiz. Ela é apresentada só como registro do que mudou.
+
+Estado da amostra: 18 de 20 de acordo na aprovação, nota exata em 3 de 20, diferença de até 1 ponto em 18 de 20. Com 20 itens, o intervalo de confiança é largo, então isso não fecha a calibração.
 
 ## Notas por item
 
