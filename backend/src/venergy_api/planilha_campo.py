@@ -228,7 +228,8 @@ def _kwh(valor: object) -> Decimal | None:
     texto = _texto(valor)
     if not texto:
         return None
-    # "1.234,5": com vírgula, o ponto é separador de milhar (INSP-07).
+    # Vírgula decimal como na INSP-07. O ponto de milhar ("1.234,5", "1.234") vai além da Silver,
+    # que só troca a vírgula: a planilha do case não tem milhar, a digitada à mão pode ter.
     if "," in texto:
         texto = texto.replace(".", "").replace(",", ".")
     elif isinstance(valor, str) and MILHAR.fullmatch(texto):

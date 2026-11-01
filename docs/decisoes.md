@@ -1826,17 +1826,24 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   - **Tela.** Na seção de inspeções de Perdas, só para o perfil `perdas`, o botão "Baixar planilha de campo" e o botão "Enviar
     planilha de campo", que abre um modal com o resumo (concluídas e rejeitadas) e a tabela das linhas rejeitadas com o motivo;
   - **Subir.** `POST /ordens-inspecao/planilha` (`multipart/form-data`, campo `arquivo`, só o perfil `perdas`):
-  - **Ligação por UC.** A linha vale para a ordem ativa da UC, que é única (índice `uq_ordem_inspecao_uc_ativa`, DEC-009);
+  - **Ligação por UC.** A linha vale para a ordem ativa da UC, que é única (índice `uq_ordem_inspecao_uc_ativa`, DEC-009).
+    A linha com `OI-<id>`, exportada pelo portal, só conclui essa ordem: uma planilha antiga é rejeitada se a UC tiver hoje
+    outra ordem em campo. O `id_inspecao` do formato do case não aponta para ordem, então nesse caso valem só a UC e o status;
   - **Só conclui ordem em campo.** A ordem `GERADA` é rejeitada ("ainda não foi enviada a campo"): a máquina de estados não
     permite `GERADA → CONCLUIDA`, e o upload não inventa um envio a campo que ninguém fez. A mudança passa pela mesma função do
     `PATCH` (`_mudar_status`), com o login de quem enviou o arquivo no histórico (DEC-050);
   - **Aplica o válido e relata o resto.** A resposta traz `linhas_lidas`, as `concluidas` e as `rejeitadas` (aba, linha, UC e
-    motivo). Arquivo que não é XLSX, vazio, sem as colunas `id_uc` e `resultado`, maior que 5 MB ou com mais de 5.000 linhas é
-    `422` e não grava nada;
-  - **Mesmas regras da Silver.** `resultado` aceita as grafias `IRREGULARIDADE CONFIRMADA`, `CONFIRMADA` (→
+    motivo). Arquivo que não é XLSX, corrompido, vazio, sem as colunas `id_uc` e `resultado`, maior que 5 MB, com mais de
+    5.000 linhas ou com mais de 20.000 linhas em branco é `422` e não grava nada. O XML do arquivo é lido com `defusedxml`,
+    porque vem do usuário;
+  - **Regras da Silver, mais o milhar digitado.** `resultado` aceita as grafias `IRREGULARIDADE CONFIRMADA`, `CONFIRMADA` (→
     `IRREGULAR_CONFIRMADA`), `SEM IRREGULARIDADE` e `NADA CONSTA` (→ `REGULAR`). Tipo ausente (`-`, `N/A`, `NULL`, vazio),
-    data em quatro formatos e kWh com vírgula são tratados como no pipeline. Confirmada exige tipo e kWh maior que zero; sem
-    irregularidade exige tipo vazio e kWh zero. UC repetida: vale a primeira linha;
+    data em quatro formatos e kWh com vírgula decimal são tratados como no pipeline. Confirmada exige tipo e kWh maior que
+    zero; sem irregularidade exige tipo vazio e kWh zero; kWh negativo é rejeitado. UC repetida: vale a primeira linha. A
+    única diferença para a Silver é o ponto de milhar em texto digitado: "1.234,5" e "1.234" valem 1.234,5 e 1.234 kWh. A
+    Silver só troca a vírgula por ponto, o que basta para a planilha do case (a INSP-07 só cataloga a vírgula decimal, e a
+    trava da Silver garante que nenhum kWh virou nulo), mas leria "1.234" digitado à mão como 1,234 kWh. Célula numérica do
+    Excel não passa por essa regra;
   - **Dados extras na observação.** A ordem só guarda resultado e observação; tipo, kWh, data, inspetor e código da inspeção
     entram no texto ("Planilha de campo: desvio direto, 120,5 kWh recuperados, inspetor Fulano, 12/08/2025 (inspeção INS-1)").
 - **Descartado:**
@@ -1852,6 +1859,5 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   exportar a fila de suspeitas ainda precisa gerar e enviar as ordens a campo antes. Reenviar o mesmo arquivo não muda nada (a ordem já está concluída e a linha é rejeitada). O kWh recuperado
   fica em texto, então não dá para somá-lo no portal; se isso virar necessidade, a saída é a coluna numérica. O formato foi
   montado a partir do pipeline e do case, não de um arquivo de campo real: a planilha original não estava disponível, e os
-  testes usam planilhas sintéticas. O número da ordem não vem na planilha; se a equipe passar a preenchê-lo, a ligação pode
-  deixar de depender de uma ordem ativa por UC.
-- **Ordem da planilha:** a linha com `OI-<id>`, exportada pelo portal, só conclui essa ordem. Uma planilha antiga é rejeitada se a UC tiver outra ordem em campo. O `id_inspecao` do formato do case não aponta para ordem, então só a UC e o status valem nesse caso.
+  testes usam planilhas sintéticas. Uma planilha no formato do case, sem `OI-<id>`, ainda depende de haver uma só ordem ativa
+  por UC.
