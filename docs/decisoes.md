@@ -58,6 +58,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | 29/10/2026 | DEC-049: login com cookie httpOnly e cinco perfis; só `perdas` escreve nas ordens de inspeção e só `ti` lê a auditoria do agente | Esconder o menu não é segurança: a permissão é checada no backend, onde estão os dados; o agente já lê toda a Gold, então bloquear a leitura por tela daria falsa proteção | Felipe |
 | 29/10/2026 | DEC-050: os eventos das ordens de inspeção guardam o login de quem agiu (`autor_login`), o histórico mostra o nome dele, e a carga e a subida da API acrescentam a coluna sem apagar o histórico | O gerente de perdas é o único que escreve, e a trilha precisa responder quem concluiu ou cancelou uma ordem; recriar a tabela para isso perderia o histórico de quem já usa o portal | Felipe |
 | 29/10/2026 | DEC-051: filtros da fila usam os sinais já informados nos motivos da Gold: queda, medidor eletromecânico e percentual de leituras estimadas | Mantém a fila fiel à Gold, sem recalcular métricas ou tratar ausência como zero; todos os filtros operam antes da paginação | João Euclides |
+| 30/10/2026 | DEC-062: o portal exporta as ordens em campo numa planilha e o upload da mesma planilha preenchida conclui as ordens, aplica as linhas válidas e devolve as rejeitadas com o motivo; o tipo, o kWh, a data e o inspetor ficam na observação da ordem | O case traz as duas pontas como diferenciais (enviar a fila à equipe de campo e registrar o resultado sem digitar); a planilha exportada já sai no formato que o upload lê, e uma linha escrita errada à mão não pode travar o arquivo da equipe inteira | Felipe |
 | 30/10/2026 | DEC-057: a visão 360 devolve `variacao_conta`, a diferença da conta contra o mesmo mês do ano anterior dividida em consumo, tarifa, bandeira e tributos, com a fórmula da decomposição da receita (DEC-029); as partes somam exatamente a diferença; os dias faturados de cada conta vêm só como informação; API 0.12.0 | A atendente consegue dizer ao cliente por que a conta subiu, e não só se o consumo subiu; calculado no backend e sem IA, porque o número precisa ser exato e imediato com o cliente na linha | Felipe |
 | 30/10/2026 | DEC-060: filtros compartilhados viajam na URL (`municipio`, `bairro`, `classe` e o par de períodos) entre Visão geral, Receita, Rede e Perdas; filtros próprios de cada tela ficam só na memória da sessão | Trocar de tela não perde o recorte nem repete a escolha, e um link reproduz a análise; a URL continua sendo a fonte da verdade | João Euclides |
 | 30/10/2026 | DEC-058: em Perdas o período é só contexto, e a consulta individual de UC mostra o histórico completo, fora do recorte | A fila é um retrato da Gold sem competência e as ordens são estado atual; a visão 360 é o registro completo da UC, e limitá-la esconderia contas antigas em aberto | João Euclides |
@@ -1804,3 +1805,59 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Contexto:** em 31/10/2026 o modelo principal respondeu `503` por cerca de 30 minutos. Cada `503` esperava as retentativas antes de passar ao próximo modelo, sem limite de tempo por chamada nem por pergunta. Uma resposta chegou a levar 61 s, e um travamento sem resposta prenderia a tela.
 - **Decisão:** cada chamada tem limite de 15 s. Depois de uma falha, o modelo é pulado por 60 s, exceto o último da cadeia, para a pergunta seguinte não pagar a espera de novo. A pergunta tem prazo de 30 s: estourado, responde `failed` com mensagem própria. Se o prazo vencer na narração, a resposta sai com o texto determinístico, sem perder o resultado. No Docker, cada modelo tem uma tentativa só; fora dele, continuam as 3.
 - **Consequências:** não muda prompt, modelo principal nem camada, então não exige rodada da DEC-016 para entrar. Numa rodada de avaliação com o provedor lento, itens podem sair `failed` por tempo. Os valores vêm de latências observadas e podem ser ajustados por variável de ambiente. A qualidade dos modelos de reserva não foi medida pelo golden, e a cadeia só protege de verdade com outro provedor configurado.
+
+## DEC-062 · Planilha de campo: exportar as ordens em campo e subir o resultado
+
+- **Data:** 30/10/2026 · **Área:** Portal e backend · **Autor:** Felipe
+- **Contexto:** o case traz, como diferencial, "subir pelo portal a planilha que a equipe preenche em campo, para que os
+  resultados sejam registrados sem digitação manual" (V1-14). Até aqui cada ordem era concluída à mão, pelo modal (DEC-026). A
+  planilha tem o formato de `inspecoes.xlsx` (`id_inspecao`, `id_uc`, `data`, `inspetor`, `resultado`, `tipo_irregularidade`,
+  `kwh_recuperado`), não traz o número da ordem e chega com as sujeiras já catalogadas em `docs/qualidade-dados.md`
+  (INSP-01 a INSP-07).
+- **Decisão:** as duas pontas usam a mesma rota e o mesmo formato:
+  - **Exportar.** `GET /ordens-inspecao/planilha` (só o perfil `perdas`) baixa um XLSX com as ordens `EM_CAMPO`, uma por
+    linha, com as colunas de `inspecoes.xlsx` (`id_inspecao`, `id_uc`, `data`, `inspetor`, `resultado`,
+    `tipo_irregularidade`, `kwh_recuperado`) e, ao final, `municipio` e `bairro` para a equipe saber onde fica a unidade. O
+    `id_inspecao` sai como `OI-<id da ordem>` e `id_uc` já vem preenchido; o resto fica em branco para a equipe preencher. A planilha já sai com seleção nas colunas: `resultado` é uma lista
+    (`CONFIRMADA` ou `SEM IRREGULARIDADE`), `data` aceita só data e `kwh_recuperado` só número maior ou igual a zero. É um apoio
+    à equipe: o upload continua conferindo tudo, porque um valor colado por cima da lista passa pela planilha;
+    Exporta só as ordens em campo, porque são as únicas que o upload pode concluir: a linha exportada sempre corresponde a uma
+    ordem que dá para concluir. Sem ordens em campo, o arquivo sai só com o cabeçalho;
+  - **Tela.** Na seção de inspeções de Perdas, só para o perfil `perdas`, o botão "Baixar planilha de campo" e o botão "Enviar
+    planilha de campo", que abre um modal com o resumo (concluídas e rejeitadas) e a tabela das linhas rejeitadas com o motivo;
+  - **Subir.** `POST /ordens-inspecao/planilha` (`multipart/form-data`, campo `arquivo`, só o perfil `perdas`):
+  - **Ligação por UC.** A linha vale para a ordem ativa da UC, que é única (índice `uq_ordem_inspecao_uc_ativa`, DEC-009).
+    A linha com `OI-<id>`, exportada pelo portal, só conclui essa ordem: uma planilha antiga é rejeitada se a UC tiver hoje
+    outra ordem em campo. O `id_inspecao` do formato do case não aponta para ordem, então nesse caso valem só a UC e o status;
+  - **Só conclui ordem em campo.** A ordem `GERADA` é rejeitada ("ainda não foi enviada a campo"): a máquina de estados não
+    permite `GERADA → CONCLUIDA`, e o upload não inventa um envio a campo que ninguém fez. A mudança passa pela mesma função do
+    `PATCH` (`_mudar_status`), com o login de quem enviou o arquivo no histórico (DEC-050);
+  - **Aplica o válido e relata o resto.** A resposta traz `linhas_lidas`, as `concluidas` e as `rejeitadas` (aba, linha, UC e
+    motivo). Arquivo que não é XLSX, corrompido, vazio, sem as colunas `id_uc` e `resultado`, maior que 5 MB, com mais de
+    5.000 linhas ou com mais de 20.000 linhas em branco é `422` e não grava nada. O XML do arquivo é lido com `defusedxml`,
+    porque vem do usuário;
+  - **Regras da Silver, mais o milhar digitado.** `resultado` aceita as grafias `IRREGULARIDADE CONFIRMADA`, `CONFIRMADA` (→
+    `IRREGULAR_CONFIRMADA`), `SEM IRREGULARIDADE` e `NADA CONSTA` (→ `REGULAR`). Tipo ausente (`-`, `N/A`, `NULL`, vazio),
+    data em quatro formatos e kWh com vírgula decimal são tratados como no pipeline. Confirmada exige tipo e kWh maior que
+    zero; sem irregularidade exige tipo vazio e kWh zero; kWh negativo é rejeitado. UC repetida: vale a primeira linha. A
+    única diferença para a Silver é o ponto de milhar em texto digitado: "1.234,5" e "1.234" valem 1.234,5 e 1.234 kWh. A
+    Silver só troca a vírgula por ponto, o que basta para a planilha do case (a INSP-07 só cataloga a vírgula decimal, e a
+    trava da Silver garante que nenhum kWh virou nulo), mas leria "1.234" digitado à mão como 1,234 kWh. Célula numérica do
+    Excel não passa por essa regra;
+  - **Dados extras na observação.** A ordem só guarda resultado e observação; tipo, kWh, data, inspetor e código da inspeção
+    entram no texto ("Planilha de campo: desvio direto, 120,5 kWh recuperados, inspetor Fulano, 12/08/2025 (inspeção INS-1)").
+- **Descartado:**
+  - **tudo ou nada**, porque uma linha errada travaria o arquivo inteiro e o aceite pede o relatório de rejeitadas;
+  - **enviar a campo e concluir no mesmo upload**, que cria um envio no histórico que ninguém fez;
+  - **aba de instruções na planilha**, descartada por uma lista de seleção nas próprias colunas, que evita o erro em vez de explicá-lo
+    (e o upload teria de ignorar a aba);
+  - **colunas novas na ordem** (tipo, kWh, data), que mexem no schema, no contrato e na tela sem o case pedir;
+  - **exportar a fila de suspeitas em CSV**, como diz o backlog (V1-11): a equipe teria de salvar como XLSX antes de devolver, e
+    as unidades da fila ainda não têm ordem para o upload concluir;
+  - **pandas**, dependência pesada para ler uma planilha pequena: a leitura usa `openpyxl` em modo somente leitura.
+- **Consequências:** a exportação cumpre o V1-11 com outro desenho: XLSX das ordens em campo, e não CSV da fila. Quem quiser
+  exportar a fila de suspeitas ainda precisa gerar e enviar as ordens a campo antes. Reenviar o mesmo arquivo não muda nada (a ordem já está concluída e a linha é rejeitada). O kWh recuperado
+  fica em texto, então não dá para somá-lo no portal; se isso virar necessidade, a saída é a coluna numérica. O formato foi
+  montado a partir do pipeline e do case, não de um arquivo de campo real: a planilha original não estava disponível, e os
+  testes usam planilhas sintéticas. Uma planilha no formato do case, sem `OI-<id>`, ainda depende de haver uma só ordem ativa
+  por UC.

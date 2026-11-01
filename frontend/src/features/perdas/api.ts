@@ -89,3 +89,23 @@ export function atualizarOrdem(id: number, mudanca: AtualizarOrdem) {
 export function criarOrdens(codUcs: string[]) {
 	return unwrap(api.POST("/ordens-inspecao", { body: { cod_ucs: codUcs } }));
 }
+
+export function baixarPlanilhaCampo() {
+	return unwrap(
+		api.GET("/ordens-inspecao/planilha", { parseAs: "blob" }),
+	) as Promise<Blob>;
+}
+
+export function enviarPlanilhaCampo(arquivo: File) {
+	return unwrap(
+		api.POST("/ordens-inspecao/planilha", {
+			// O contrato descreve o campo como string; o multipart real leva o arquivo.
+			body: { arquivo: "" },
+			bodySerializer: () => {
+				const form = new FormData();
+				form.append("arquivo", arquivo);
+				return form;
+			},
+		}),
+	);
+}
