@@ -54,6 +54,25 @@ export function linhasDoRanking(
 	}));
 }
 
+const semAcento = (texto: string) =>
+	texto
+		.normalize("NFD")
+		.replace(/\p{Diacritic}/gu, "")
+		.toLocaleLowerCase("pt-BR")
+		.trim();
+
+/** As linhas cujo nome contém o termo, sem diferenciar acento, caixa nem espaço nas pontas. */
+export function filtrarSegmentos<T extends { segmento: string }>(
+	linhas: readonly T[],
+	termo: string,
+): T[] {
+	const procurado = semAcento(termo);
+	if (!procurado) return [...linhas];
+	return linhas.filter((linha) =>
+		semAcento(linha.segmento).includes(procurado),
+	);
+}
+
 /** A série mensal do alimentador no período: um ponto por mês, sem interpolar as lacunas. */
 export function serieDoAlimentador(
 	linhas: readonly AlimentadorMensal[],

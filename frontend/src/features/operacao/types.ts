@@ -21,3 +21,6 @@ export type LinhaContinuidade =
 	components["schemas"]["RecorteContinuidadeSchema"];
 
 export type NivelRecorte = RecortesContinuidade["nivel"];
+
+/** A linha da tabela com a posição que ela tem na ordem da API (o ranking). */
+export type LinhaTabela = LinhaContinuidade & { posicao: number };

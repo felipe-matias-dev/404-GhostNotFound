@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { mesesDoPeriodo, serieDoAlimentador } from "../conversions";
+import {
+	filtrarSegmentos,
+	mesesDoPeriodo,
+	serieDoAlimentador,
+} from "../conversions";
 import type { AlimentadorMensal, Periodo } from "../types";
 
 const linha = (
@@ -101,5 +105,22 @@ describe("serieDoAlimentador", () => {
 		);
 
 		expect(series[0]?.values).toEqual([null, null, null]);
+	});
+});
+
+describe("filtrarSegmentos", () => {
+	const linhas = [
+		{ segmento: "Jaboatão dos Guararapes" },
+		{ segmento: "Recife" },
+		{ segmento: "ALM-REC-024" },
+	];
+
+	it("acha sem diferenciar acento, caixa e espaço nas pontas", () => {
+		expect(filtrarSegmentos(linhas, "  JABOATAO ")).toEqual([linhas[0]]);
+		expect(filtrarSegmentos(linhas, "rec")).toEqual([linhas[1], linhas[2]]);
+	});
+
+	it("devolve todas as linhas, na mesma ordem, sem termo", () => {
+		expect(filtrarSegmentos(linhas, "   ")).toEqual(linhas);
 	});
 });
