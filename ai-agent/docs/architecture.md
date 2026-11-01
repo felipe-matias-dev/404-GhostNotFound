@@ -54,7 +54,7 @@ Período (G1-05): quando as linhas têm `competencia`, o texto determinístico c
 
 `stream()` percorre o mesmo fluxo do `ask()` e emite as etapas (`domain/events.py`) até um `AnswerEvent` final; fechar o iterador cancela a execução (DEC-055).
 
-`InsightWriter` (item 9, `infrastructure/insight_writer.py`, prompt em `prompts/insight/v2/`, com unidade, efeito tarifa e bandeira como partes do efeito preço e negativo por extenso): narra o JSON de métricas de uma tela e devolve `None` se algum número do texto não estiver no JSON. O backend monta o JSON, guarda o insight em cache e liga o redator (D9): feito para a tela de Receita (`GET /receita/insight`, DEC-040), com `build_insight_writer` em `bootstrap.py`. O golden set está em `eval/golden_set.yaml` (versão 0.17.0, 105 itens, alinhado à camada 0.4.0). `revisado_por` está preenchido por Dados em 104 itens; o G105 aguarda a conferência da mudança da 0.17.0.
+`InsightWriter` (item 9, `infrastructure/insight_writer.py`, prompt em `prompts/insight/v2/`, com unidade, efeito tarifa e bandeira como partes do efeito preço e negativo por extenso): narra o JSON de métricas de uma tela e devolve `None` se algum número do texto não estiver no JSON. O backend monta o JSON, guarda o insight em cache e liga o redator (D9): feito para a tela de Receita (`GET /receita/insight`, DEC-040), com `build_insight_writer` em `bootstrap.py`. O golden set está em `eval/golden_set.yaml` (versão 0.18.0, 105 itens, alinhado à camada 0.4.0). Todos os itens têm `revisado_por` preenchido por Dados (issue #90).
 
 **Queda do provedor (DEC-060):** `GuardedModel` limita cada chamada a 15 s e, depois de uma falha, pula o modelo por 60 s, exceto o último da cadeia. A pergunta tem prazo de 30 s: estourado, volta `failed`; se a demora for na narração, a resposta sai com o texto determinístico.
 
@@ -114,7 +114,7 @@ O banco local só tem a amostra sintética do backend (`venergy_api.amostra`). A
 - O YAML não registra a versão do contrato (`conventions.agent.contract_version`).
 - D7 resolvido: a carga apaga as views `sem_*` antes de recriar as tabelas da Gold e as aplica de novo no fim, numa única transação (`backend/src/venergy_api/carga.py`, `drop_agent_views`). Se uma view não bater com a Gold, a carga falha e desfaz tudo.
 - D1 resolvido (DEC-056): as views ficam no schema `semantic`, o único que o `venergy_agent` lê.
-- O golden set tem revisão humana em 104 de 105 itens (Dados, issue #90); falta o G105, mudado na 0.17.0. Item novo ou gabarito mudado volta a `null` até Dados conferir.
+- O golden set tem revisão humana completa: `revisado_por` está preenchido nos 105 itens (Dados, issue #90). Item novo ou gabarito mudado volta a `null` até Dados conferir.
 - Recortes de receita: a tela (`GET /receita/comparacao`, DEC-021) soma a fato com o cadastro atual da UC, e o agente soma `sem_kpis_segmento_mensal`. Os números só divergem se uma UC mudou de recorte; alinhar quando o backend migrar para a tabela de segmentos.
 
 ## 6b. Avaliação (item 7)
