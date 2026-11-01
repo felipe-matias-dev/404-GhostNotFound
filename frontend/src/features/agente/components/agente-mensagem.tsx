@@ -207,14 +207,6 @@ export function AgenteTurnoItem({
 							{resposta.answer}
 						</p>
 
-						{resposta.status === "clarify" &&
-							resposta.clarification &&
-							resposta.clarification !== resposta.answer && (
-								<p className="rounded-md border border-info bg-info-subtle p-2.5 text-body text-text">
-									{resposta.clarification}
-								</p>
-							)}
-
 						{resposta.status !== "answered" &&
 							resposta.refused_reason &&
 							resposta.refused_reason !== resposta.answer && (

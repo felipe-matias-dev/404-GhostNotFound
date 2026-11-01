@@ -56,6 +56,8 @@ separadas por login no navegador, sem migrar o histórico compartilhado anterior
 O chat mostra as etapas recebidas de `POST /ai/ask/stream` e só exibe a resposta
 completa no evento final. Sair da tela, fechar o chat ou enviar outra pergunta
 cancela a consulta em andamento; perguntas canceladas podem ser tentadas novamente.
+Quando o agente pede esclarecimento, o chat exibe a pergunta uma única vez,
+como parte do texto da resposta.
 
 ### Filtros das análises
 
