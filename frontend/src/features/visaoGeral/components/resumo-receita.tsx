@@ -9,6 +9,11 @@ import { Button, buttonVariants } from "#/components/ui/button";
 import { KpiDelta, KpiValue } from "#/components/ui/kpi-card";
 import { TrendChart } from "#/components/ui/trend-chart";
 import { useFiltrosPortal } from "#/features/filtros";
+import {
+	DEFINICOES,
+	type DefinicaoIndicador,
+	useComparacaoIndicadores,
+} from "#/features/indicadores";
 import type { ParPeriodos, Recorte } from "#/lib/filtros";
 import {
 	formatBRL,
@@ -18,8 +23,7 @@ import {
 } from "#/lib/format";
 import { cn } from "#/lib/utils";
 import { leitura, MESES_MAX_JANELA, mesesDoPeriodo } from "../conversions";
-import { useComparacaoIndicadores, useTesoura } from "../hooks/use-indicadores";
-import { DEFINICOES, type DefinicaoIndicador } from "../indicadores";
+import { useTesoura } from "../hooks/use-indicadores";
 
 const receita = (valor: number) => formatBRL(valor, { compacto: true });
 const energia = (valor: number) => formatKWh(valor, { compacto: true });

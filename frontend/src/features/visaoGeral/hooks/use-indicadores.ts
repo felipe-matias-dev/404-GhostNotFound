@@ -1,39 +1,13 @@
 import { skipToken, useQuery } from "@tanstack/react-query";
+import { intervaloDoPar } from "#/features/indicadores";
 import type { ParPeriodos, Recorte } from "#/lib/filtros";
+import { buscarJanelas, visaoGeralKeys } from "../api";
 import {
-	buscarComparacaoIndicadores,
-	buscarIndicadoresMensais,
-	buscarJanelas,
-	visaoGeralKeys,
-} from "../api";
-import {
-	intervaloDoPar,
 	janelasDoIntervalo,
 	MESES_MAX_JANELA,
 	mesesDoPeriodo,
 	tesoura,
 } from "../conversions";
-
-/** A série mensal do recorte no intervalo dos dois períodos: a forma de cada sparkline. */
-export function useIndicadoresMensais(
-	par: ParPeriodos | undefined,
-	recorte: Recorte,
-) {
-	return useQuery({
-		queryKey: visaoGeralKeys.mensal(par, recorte),
-		queryFn: par ? () => buscarIndicadoresMensais(par, recorte) : skipToken,
-	});
-}
-
-export function useComparacaoIndicadores(
-	par: ParPeriodos | undefined,
-	recorte: Recorte,
-) {
-	return useQuery({
-		queryKey: visaoGeralKeys.comparacao(par, recorte),
-		queryFn: par ? () => buscarComparacaoIndicadores(par, recorte) : skipToken,
-	});
-}
 
 /**
  * A tesoura do par: janelas do tamanho do período atual, recortadas ao intervalo dos dois

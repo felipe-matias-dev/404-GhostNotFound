@@ -1,7 +1,7 @@
 import type { TrendCategory, TrendSeries } from "#/components/ui/trend-chart";
 import type { WaterfallStep } from "#/components/ui/waterfall-chart";
 import { trechoDe } from "#/features/filtros";
-import type { ParPeriodos } from "#/lib/filtros";
+import type { Intervalo } from "#/features/indicadores";
 import { formatCompetencia, formatCompetenciaCurta } from "#/lib/format";
 import type { JanelaIndicadores } from "./types";
 
@@ -12,18 +12,6 @@ export const MESES_MAX_JANELA = 24;
 export function mesesDoPeriodo(periodo: string): number {
 	const { inicio, fim } = trechoDe(periodo);
 	return fim - inicio + 1;
-}
-
-export type Intervalo = { inicio: string; fim: string };
-
-/** Do menor início ao maior fim dos dois períodos do par, inclusive. */
-export function intervaloDoPar(par: ParPeriodos): Intervalo {
-	const [baseInicio = "", baseFim = ""] = par.periodo_base.split("/");
-	const [atualInicio = "", atualFim = ""] = par.periodo_atual.split("/");
-	return {
-		inicio: baseInicio < atualInicio ? baseInicio : atualInicio,
-		fim: baseFim > atualFim ? baseFim : atualFim,
-	};
 }
 
 /** Só as janelas completas dentro do intervalo, como o backend as devolve. */

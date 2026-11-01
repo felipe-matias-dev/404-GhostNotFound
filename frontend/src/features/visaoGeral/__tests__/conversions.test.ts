@@ -1,8 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { ParPeriodos } from "#/lib/filtros";
 import {
 	efeitosDaReceita,
-	intervaloDoPar,
 	janelasDoIntervalo,
 	leitura,
 	mesesDoPeriodo,
@@ -26,11 +24,6 @@ const janela = (
 	tarifa_base_media: receita / kwh,
 });
 
-const par = (base: string, atual: string): ParPeriodos => ({
-	periodo_base: base,
-	periodo_atual: atual,
-});
-
 describe("mesesDoPeriodo", () => {
 	it("conta os meses inclusive nas duas pontas", () => {
 		expect(mesesDoPeriodo("2025-01/2025-12")).toBe(12);
@@ -40,22 +33,6 @@ describe("mesesDoPeriodo", () => {
 
 	it("atravessa mais de um ano e passa do limite do gráfico", () => {
 		expect(mesesDoPeriodo("2024-01/2026-01")).toBe(25);
-	});
-});
-
-describe("intervaloDoPar", () => {
-	it("vai do menor início ao maior fim dos dois períodos", () => {
-		expect(intervaloDoPar(par("2024-03/2024-05", "2025-01/2025-02"))).toEqual({
-			inicio: "2024-03",
-			fim: "2025-02",
-		});
-	});
-
-	it("aceita o período atual começando antes da base", () => {
-		expect(intervaloDoPar(par("2025-01/2025-03", "2024-11/2024-12"))).toEqual({
-			inicio: "2024-11",
-			fim: "2025-03",
-		});
 	});
 });
 

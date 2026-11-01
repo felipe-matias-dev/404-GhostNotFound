@@ -3,14 +3,14 @@ import type { ReactElement } from "react";
 import { KpiCard } from "#/components/ui/kpi-card";
 import { Sparkline } from "#/components/ui/sparkline";
 import { useFiltrosPortal } from "#/features/filtros";
-import type { ParPeriodos, Recorte } from "#/lib/filtros";
-import { cn } from "#/lib/utils";
 import {
+	DEFINICOES,
+	type Indicador,
 	useComparacaoIndicadores,
 	useIndicadoresMensais,
-} from "../hooks/use-indicadores";
-import { DEFINICOES } from "../indicadores";
-import type { Indicador } from "../types";
+} from "#/features/indicadores";
+import type { ParPeriodos, Recorte } from "#/lib/filtros";
+import { cn } from "#/lib/utils";
 
 // Receita e energia ficam no resumo: repetidas aqui, no mesmo período, com o mesmo nome,
 // seriam duas "receitas" com variações diferentes.

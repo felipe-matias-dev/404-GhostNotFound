@@ -15,7 +15,7 @@ export type DefinicaoIndicador = {
 	hint: string;
 };
 
-/** Como cada indicador da diretoria aparece: nos cards e no gráfico de tendência. */
+/** Como cada indicador aparece nos cards e gráficos da Visão geral e da Rede. */
 export const DEFINICOES: Record<Indicador, DefinicaoIndicador> = {
 	receita_faturada: {
 		label: "Receita faturada",
