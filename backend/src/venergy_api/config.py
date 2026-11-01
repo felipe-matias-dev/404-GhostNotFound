@@ -31,7 +31,7 @@ class Settings(BaseSettings):
     ai_janela_segundos: int = Field(600, gt=0)
     ai_janela_orcamento_segundos: int = Field(JANELA_ORCAMENTO_PADRAO_SEGUNDOS, gt=0)
     # Dias que uma ordem de inspeção pode ficar em cada status antes de aparecer como atrasada.
-    # O case não fixa esses prazos: são suposição do time (DEC-063), ajustável sem mexer no código.
+    # O case não fixa esses prazos: são suposição do time (DEC-064), ajustável sem mexer no código.
     ordem_atraso_gerada_dias: int = Field(5, ge=0)
     ordem_atraso_em_campo_dias: int = Field(10, ge=0)
 

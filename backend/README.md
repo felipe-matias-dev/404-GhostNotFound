@@ -99,6 +99,8 @@ acrescentar `VENERGY_API_JWT_SECRET` (mínimo de 32 caracteres) e `VENERGY_API_S
 | `PATCH /ordens-inspecao/{id}` | Só o perfil `perdas`. Muda o status (`EM_CAMPO`, `GERADA` na volta de campo, `CONCLUIDA` com `resultado`, `CANCELADA`), com `observacao` opcional: `409` se a mudança não for permitida |
 | `GET /ordens-inspecao/planilha` | Só o perfil `perdas`. Baixa um XLSX com as ordens em campo (`EM_CAMPO`), no cabeçalho de `inspecoes.xlsx` mais `municipio` e `bairro`, para a equipe preencher e o `POST` abaixo ler de volta ([DEC-062](../docs/decisoes.md#dec-062--planilha-de-campo-exportar-as-ordens-em-campo-e-subir-o-resultado)) |
 | `POST /ordens-inspecao/planilha` | Só o perfil `perdas`. Recebe o XLSX da equipe de campo (`multipart`, campo `arquivo`) e conclui as ordens em campo das UCs da planilha; devolve as concluídas e as linhas rejeitadas com o motivo ([DEC-062](../docs/decisoes.md#dec-062--planilha-de-campo-exportar-as-ordens-em-campo-e-subir-o-resultado)). `422` se o arquivo não servir |
+| `GET /ordens-inspecao/eventos` | Fluxo SSE (`text/event-stream`) com um evento `ordens` a cada criação ou mudança de ordem (`{"ordem_ids": [...]}`, ou `null` se foram mais de 500) e `: ping` a cada 15 s. A tela refaz a consulta ao receber ([DEC-063](../docs/decisoes.md#dec-063--ordens-de-inspeção-em-tempo-real-aviso-no-commit-e-sse)). `503` no Windows sem `--reload` |
+| `GET /ordens-inspecao/tempos-por-etapa` | Mediana e p90, em segundos, do tempo das passagens encerradas por `GERADA` e `EM_CAMPO`, com o número de passagens (`n`). Cada ordem também traz `no_status_desde`, `segundos_no_status` e `atrasada` ([DEC-064](../docs/decisoes.md#dec-064--tempo-das-ordens-no-status-e-por-etapa)) |
 | `POST /ai/ask` | Pergunta ao agente de IA (`{"question": "...", "session_id": "<uuid>"}`; o `session_id` é opcional: sem ele o servidor gera um UUID4 e o devolve na resposta, e com ele só aceita UUID, senão `422`) e devolve a resposta com o `audit_id` do registro gravado em `app.ai_auditoria`, junto com o usuário logado. Todo status é gravado, e se a gravação falhar a resposta não sai (`500`). Sem a chave do Gemini, `503` ([DEC-034](../docs/decisoes.md)). O limite de perguntas e o orçamento de tokens valem por usuário, em todas as sessões dele: com o usuário no limite da janela, `429` com `Retry-After`, e com um `session_id` que pertence a outro usuário, `403`, nos dois casos sem chamar o agente ([DEC-046](../docs/decisoes.md)) |
 | `POST /ai/ask/stream` | A mesma pergunta em SSE: eventos `stage` e, por último, `answer` ou `error` ([DEC-055](../docs/decisoes.md)). |
 | `GET /ai/sessions` | As conversas do usuário logado com os turnos (no máximo 50, favoritas primeiro; DEC-053). |
@@ -211,6 +213,8 @@ Variáveis lidas do `.env` (veja `.env.example`):
 | `VENERGY_API_AI_LIMITE_PERGUNTAS` | Máximo de perguntas por usuário na janela, no `POST /ai/ask` (`429` ao passar). `0` desliga. Padrão: `20` |
 | `VENERGY_API_AI_JANELA_SEGUNDOS` | Janela do limite acima, em segundos. Padrão: `600` |
 | `VENERGY_API_AI_JANELA_ORCAMENTO_SEGUNDOS` | Janela do orçamento de tokens do agente por usuário, em segundos: só o gasto dentro dela conta. Padrão: `86400` (24 horas) |
+| `VENERGY_API_ORDEM_ATRASO_GERADA_DIAS` | Dias que uma ordem pode ficar em `GERADA` antes de aparecer como atrasada. Padrão: `5` |
+| `VENERGY_API_ORDEM_ATRASO_EM_CAMPO_DIAS` | O mesmo para `EM_CAMPO`. Padrão: `10` |
 
 Os caminhos são relativos à pasta `backend/`, de onde os comandos rodam.
 

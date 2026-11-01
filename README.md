@@ -229,6 +229,18 @@ O registro completo, com 55 decisões numeradas e as suposições, está em [`do
 - **Descartado:** tudo ou nada, porque uma linha escrita errada travaria o arquivo inteiro; e concluir ordem que ainda não foi enviada a campo, que pularia a máquina de estados.
 - **Efeito:** a planilha exportada volta pelo upload sem remontar nada, reenviar o mesmo arquivo não muda nada, e o histórico mostra quem subiu a planilha. Tipo, kWh, data e inspetor ficam no texto da observação. A tela de Perdas tem os botões de baixar e de enviar, com a tabela das linhas rejeitadas; a planilha sai com seleção em resultado, data e kWh.
 
+**Tela de ordens que se atualiza sozinha** · [DEC-063](docs/decisoes.md#dec-063--ordens-de-inspeção-em-tempo-real-aviso-no-commit-e-sse)
+- **Problema:** dois analistas de perdas olham a mesma ordem, e quem não recarrega a página vê o status antigo.
+- **Decisão:** quem muda uma ordem dispara um `pg_notify` do Postgres na mesma transação, e `GET /ordens-inspecao/eventos` (SSE) repassa o aviso às telas abertas, que refazem a consulta. Um lote ou uma planilha é um aviso só.
+- **Descartado:** WebSocket, porque o fluxo é só do servidor para a tela, e uma fila em memória, que avisaria antes do commit.
+- **Efeito:** o aviso só sai se o banco confirmou a mudança. Com 20 mudanças simultâneas da mesma ordem, uma passa, 19 recebem 409 e as telas são avisadas uma vez (`python -m venergy_api.demo_concorrencia`).
+
+**Quanto tempo cada ordem está parada** · [DEC-064](docs/decisoes.md#dec-064--tempo-das-ordens-no-status-e-por-etapa)
+- **Problema:** uma ordem esquecida em campo só aparecia para quem abria o histórico dela.
+- **Decisão:** cada cartão do Kanban mostra há quanto tempo a ordem está no status atual, contando ao vivo, e o selo "Atrasada" (mais de 5 dias gerada ou 10 em campo, prazos supostos e ajustáveis no `.env`). `GET /ordens-inspecao/tempos-por-etapa` dá a mediana e o p90 por etapa, com o número de passagens.
+- **Descartado:** calcular o tempo no navegador a partir da data, porque o relógio errado do computador daria um contador errado; e a média, que uma ordem esquecida distorce.
+- **Efeito:** o Rafael vê o que está parado sem abrir ordem por ordem. O tempo sai do histórico das ordens, que é dado do backend, e não da Gold.
+
 **DEC e FEC calculados a partir dos componentes** · [DEC-033](docs/decisoes.md#dec-033--dec-e-fec-por-período-e-recorte-e-a-fila-de-suspeitas-paginada)
 - **Problema:** DEC e FEC não se somam nem se tiram a média entre alimentadores ou bairros.
 - **Decisão:** o indicador de um recorte sai da soma dos componentes dividida pela média mensal de unidades consumidoras, no backend.
