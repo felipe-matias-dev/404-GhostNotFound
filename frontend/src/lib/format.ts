@@ -192,3 +192,34 @@ export function formatSegundos(ms: number): string {
 	const segundos = ms / 1000;
 	return `${decimal1.format(segundos)} ${segundos === 1 ? "segundo" : "segundos"}`;
 }
+
+const SEGUNDOS_POR_MINUTO = 60;
+const SEGUNDOS_POR_HORA = 3600;
+const SEGUNDOS_POR_DIA = 86_400;
+
+/**
+ * Tempo decorrido, com a unidade que cabe no tamanho: segundos só na primeira hora, depois
+ * horas e minutos, depois dias e horas. 42 → "42 s", 728 → "12 min 08 s", 12 000 → "3 h 20 min",
+ * 191 000 → "2 d 5 h". Negativo ou inválido vira "0 s".
+ */
+export function formatTempoDecorrido(segundos: number): string {
+	const total = Number.isFinite(segundos)
+		? Math.max(0, Math.floor(segundos))
+		: 0;
+	if (total < SEGUNDOS_POR_MINUTO) return `${total} s`;
+	if (total < SEGUNDOS_POR_HORA) {
+		const minutos = Math.floor(total / SEGUNDOS_POR_MINUTO);
+		const resto = String(total % SEGUNDOS_POR_MINUTO).padStart(2, "0");
+		return `${minutos} min ${resto} s`;
+	}
+	if (total < SEGUNDOS_POR_DIA) {
+		const horas = Math.floor(total / SEGUNDOS_POR_HORA);
+		const minutos = String(
+			Math.floor((total % SEGUNDOS_POR_HORA) / SEGUNDOS_POR_MINUTO),
+		).padStart(2, "0");
+		return `${horas} h ${minutos} min`;
+	}
+	const dias = Math.floor(total / SEGUNDOS_POR_DIA);
+	const horas = Math.floor((total % SEGUNDOS_POR_DIA) / SEGUNDOS_POR_HORA);
+	return `${dias} d ${horas} h`;
+}

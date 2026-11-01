@@ -1,6 +1,12 @@
 import type { components } from "#/lib/api-schema.gen";
 
 export type Ordem = components["schemas"]["OrdemSchema"];
+/**
+ * A OI como a tela a usa: a da API mais o instante (ms) em que a lista chegou. O contador
+ * soma o tempo desde esse instante ao `segundos_no_status` do servidor, então só o relógio
+ * do navegador contra ele mesmo entra na conta.
+ */
+export type OrdemDaTela = Ordem & { recebida_em: number };
 export type OrdemDetalhe = components["schemas"]["OrdemDetalheSchema"];
 export type EventoOrdem = components["schemas"]["EventoSchema"];
 export type AtualizarOrdem = components["schemas"]["AtualizarOrdemSchema"];

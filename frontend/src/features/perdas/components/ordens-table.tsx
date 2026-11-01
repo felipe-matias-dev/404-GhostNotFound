@@ -5,11 +5,12 @@ import type { Recorte } from "#/lib/filtros";
 import { formatDataHora } from "#/lib/format";
 import { RESULTADO_ORDEM_ROTULO, STATUS_ORDEM_VISUAL } from "../conversions";
 import { chaveDoRecorte, useOrdens } from "../hooks/use-ordens";
-import { type Ordem, STATUS_ORDEM, type StatusOrdem } from "../types";
+import { type OrdemDaTela, STATUS_ORDEM, type StatusOrdem } from "../types";
 import { useAcoesOrdem } from "./acoes-ordem";
 import { OrdemAcoesBotoes } from "./ordem-acoes-botoes";
+import { TempoNoStatus } from "./tempo-no-status";
 
-const COLUNAS: DataTableColumn<Ordem>[] = [
+const COLUNAS: DataTableColumn<OrdemDaTela>[] = [
 	{
 		id: "id",
 		header: "OI",
@@ -43,6 +44,23 @@ const COLUNAS: DataTableColumn<Ordem>[] = [
 		id: "resultado",
 		header: "Resultado",
 		value: (o) => (o.resultado ? RESULTADO_ORDEM_ROTULO[o.resultado] : null),
+	},
+	{
+		id: "no_status",
+		header: "No status",
+		width: "176px",
+		numeric: true,
+		// Ordena pelo que o servidor mediu; o contador ao vivo só muda a exibição.
+		value: (o) =>
+			o.status === "GERADA" || o.status === "EM_CAMPO"
+				? o.segundos_no_status
+				: null,
+		cell: (o) =>
+			o.status === "GERADA" || o.status === "EM_CAMPO" ? (
+				<TempoNoStatus ordem={o} />
+			) : (
+				"—"
+			),
 	},
 	{
 		id: "criada_em",

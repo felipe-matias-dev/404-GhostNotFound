@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import type { Recorte } from "#/lib/filtros";
 import { listarOrdens, ordensKeys } from "../api";
+import { paraOrdensDaTela } from "../conversions";
 import type { StatusOrdem } from "../types";
 
 function ehObjeto(valor: unknown): valor is Record<string, unknown> {
@@ -33,7 +34,9 @@ export function useOrdens(status: StatusOrdem | undefined, recorte: Recorte) {
 	const chave = chaveDoRecorte(recorte);
 	return useQuery({
 		queryKey: ordensKeys.lista(status, recorte),
-		queryFn: () => listarOrdens(status, recorte),
+		// Carimba a chegada da lista: o contador de cada OI parte desse instante.
+		queryFn: async () =>
+			paraOrdensDaTela(await listarOrdens(status, recorte), Date.now()),
 		// Trocar só o status mantém as linhas do mesmo recorte enquanto chegam as novas; ao mudar
 		// município, bairro ou classe, nada do recorte anterior é reaproveitado como se fosse atual.
 		placeholderData: (previous, previousQuery) =>
