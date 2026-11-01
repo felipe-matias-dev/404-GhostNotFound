@@ -11,6 +11,7 @@ import { OrdensTable } from "../components/ordens-table";
 import { StatusFilter } from "../components/status-filter";
 import { VisaoToggle } from "../components/visao-toggle";
 import { useOrdens } from "../hooks/use-ordens";
+import { useOrdensAoVivo } from "../hooks/use-ordens-ao-vivo";
 import { useVisaoOrdens } from "../hooks/use-visao-ordens";
 import { recorteDaBusca } from "../search";
 import type { StatusOrdem } from "../types";
@@ -18,6 +19,7 @@ import type { StatusOrdem } from "../types";
 const route = getRouteApi("/perdas");
 
 export function PerdasPage() {
+	useOrdensAoVivo();
 	return (
 		<AcoesOrdemProvider>
 			<OrdensSecao />

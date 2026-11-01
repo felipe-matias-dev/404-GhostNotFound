@@ -1,5 +1,5 @@
 import type { SortState } from "#/components/ui/data-table";
-import { api, unwrap } from "#/lib/api";
+import { API_URL, api, unwrap } from "#/lib/api";
 import type { Recorte } from "#/lib/filtros";
 import {
 	type AtualizarOrdem,
@@ -17,6 +17,9 @@ export const ordensKeys = {
 };
 
 export const filaKey = ["fila-suspeitas"] as const;
+
+/** Fluxo SSE do backend com os avisos de ordens criadas ou alteradas (`GET /ordens-inspecao/eventos`). */
+export const URL_AVISOS_ORDENS = `${API_URL}/ordens-inspecao/eventos`;
 export const distribuicaoQuedaKey = (recorte: Recorte) =>
 	["distribuicao-queda", recorte] as const;
 export const TAMANHO_PAGINA = 20;
