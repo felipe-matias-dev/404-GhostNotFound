@@ -30,6 +30,11 @@ class Settings(BaseSettings):
     ai_limite_perguntas: int = Field(20, ge=0)
     ai_janela_segundos: int = Field(600, gt=0)
     ai_janela_orcamento_segundos: int = Field(JANELA_ORCAMENTO_PADRAO_SEGUNDOS, gt=0)
+    # Limite de tentativas de login (DEC-065): depois de `login_max_falhas` senhas erradas do
+    # mesmo login a partir do mesmo endereço, dentro da janela, o par fica bloqueado (429) até
+    # a falha mais antiga sair dela. 0 desliga o limite.
+    login_max_falhas: int = Field(5, ge=0)
+    login_janela_segundos: int = Field(900, gt=0)
 
 
 @lru_cache
