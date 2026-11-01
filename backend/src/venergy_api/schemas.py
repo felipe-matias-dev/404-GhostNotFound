@@ -725,6 +725,17 @@ class EventoSchema(BaseModel):
     ocorrido_em: datetime
 
 
+class TempoPorEtapaSchema(BaseModel):
+    """Quanto as OIs levam em uma etapa ativa, contando só as passagens já encerradas."""
+
+    etapa: StatusOrdem
+    # Quantas passagens entraram na conta: sem ele, a mediana de uma passagem só pareceria firme.
+    n: Annotated[int, Field(ge=0)]
+    # Nulos quando n é 0. Em segundos, para a tela escolher a unidade.
+    mediana_segundos: float | None
+    p90_segundos: float | None
+
+
 class OrdemDetalheSchema(OrdemSchema):
     """A OI com o histórico de mudanças de status, do mais antigo ao mais recente."""
 

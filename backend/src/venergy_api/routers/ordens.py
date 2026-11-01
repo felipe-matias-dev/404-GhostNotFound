@@ -4,7 +4,7 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import StreamingResponse
-from sqlalchemy import select
+from sqlalchemy import Double, cast, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -32,12 +32,16 @@ from venergy_api.schemas import (
     OrdemDetalheSchema,
     OrdemSchema,
     OrdensFiltroSchema,
+    TempoPorEtapaSchema,
 )
 from venergy_api.sessao import exigir_perfil
 
 router = APIRouter(prefix="/ordens-inspecao", tags=["ordens de inspeção"])
 
 INDICE_UC_ATIVA = "uq_ordem_inspecao_uc_ativa"
+
+# As etapas em que uma OI espera por alguém; CONCLUIDA e CANCELADA são finais e não têm duração.
+ETAPAS_DO_RESUMO = (StatusOrdem.GERADA, StatusOrdem.EM_CAMPO)
 
 # O FastAPI não descreve SSE sozinho: cada mensagem `ordens` traz este objeto no campo data.
 EVENTO_ORDENS_SSE: dict[str, Any] = {
@@ -194,6 +198,44 @@ async def acompanhar_ordens(request: Request) -> StreamingResponse:
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+# Declarada antes de /{ordem_id}, como /eventos.
+@router.get("/tempos-por-etapa")
+def tempos_por_etapa(session: SessionDep) -> list[TempoPorEtapaSchema]:
+    """Mediana e p90 do tempo que as OIs passaram em cada etapa ativa, com o número de passagens.
+
+    Calculado sobre o histórico (app.ordem_evento), que é dado do backend. Cada evento abre uma
+    passagem pela etapa em que a OI entrou e ela termina no evento seguinte da mesma OI; a
+    passagem em curso ainda não tem fim e fica de fora. Uma OI que volta para GERADA conta duas.
+    """
+    seguinte = func.lead(OrdemEvento.ocorrido_em).over(
+        partition_by=OrdemEvento.ordem_id, order_by=OrdemEvento.id
+    )
+    passagens = select(
+        OrdemEvento.status_novo.label("etapa"),
+        cast(func.extract("epoch", seguinte - OrdemEvento.ocorrido_em), Double).label("segundos"),
+    ).cte("passagens")
+    resumo = (
+        select(
+            passagens.c.etapa,
+            func.count().label("n"),
+            func.percentile_cont(0.5).within_group(passagens.c.segundos).label("mediana"),
+            func.percentile_cont(0.9).within_group(passagens.c.segundos).label("p90"),
+        )
+        .where(passagens.c.segundos.is_not(None))
+        .group_by(passagens.c.etapa)
+    )
+    por_etapa = {linha.etapa: linha for linha in session.execute(resumo)}
+    return [
+        TempoPorEtapaSchema(
+            etapa=etapa,
+            n=por_etapa[etapa].n if etapa in por_etapa else 0,
+            mediana_segundos=por_etapa[etapa].mediana if etapa in por_etapa else None,
+            p90_segundos=por_etapa[etapa].p90 if etapa in por_etapa else None,
+        )
+        for etapa in ETAPAS_DO_RESUMO
+    ]
 
 
 def _buscar_ordem(session: Session, ordem_id: int, *, travar: bool = False) -> OrdemInspecao:

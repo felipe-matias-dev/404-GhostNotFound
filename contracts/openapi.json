@@ -2015,6 +2015,37 @@
         ]
       }
     },
+    "/ordens-inspecao/tempos-por-etapa": {
+      "get": {
+        "tags": [
+          "ordens de inspeção"
+        ],
+        "summary": "Tempos Por Etapa",
+        "description": "Mediana e p90 do tempo que as OIs passaram em cada etapa ativa, com o número de passagens.\n\nCalculado sobre o histórico (app.ordem_evento), que é dado do backend. Cada evento abre uma\npassagem pela etapa em que a OI entrou e ela termina no evento seguinte da mesma OI; a\npassagem em curso ainda não tem fim e fica de fora. Uma OI que volta para GERADA conta duas.",
+        "operationId": "tempos_por_etapa_ordens_inspecao_tempos_por_etapa_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TempoPorEtapaSchema"
+                  },
+                  "type": "array",
+                  "title": "Response Tempos Por Etapa Ordens Inspecao Tempos Por Etapa Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ]
+      }
+    },
     "/ordens-inspecao/{ordem_id}": {
       "get": {
         "tags": [
@@ -5061,6 +5092,49 @@
           "CANCELADA"
         ],
         "title": "StatusOrdem"
+      },
+      "TempoPorEtapaSchema": {
+        "properties": {
+          "etapa": {
+            "$ref": "#/components/schemas/StatusOrdem"
+          },
+          "n": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "N"
+          },
+          "mediana_segundos": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mediana Segundos"
+          },
+          "p90_segundos": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P90 Segundos"
+          }
+        },
+        "type": "object",
+        "required": [
+          "etapa",
+          "n",
+          "mediana_segundos",
+          "p90_segundos"
+        ],
+        "title": "TempoPorEtapaSchema",
+        "description": "Quanto as OIs levam em uma etapa ativa, contando só as passagens já encerradas."
       },
       "TotaisPeriodoSchema": {
         "properties": {
