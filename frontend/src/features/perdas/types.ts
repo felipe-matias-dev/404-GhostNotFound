@@ -7,6 +7,7 @@ export type Ordem = components["schemas"]["OrdemSchema"];
  * do navegador contra ele mesmo entra na conta.
  */
 export type OrdemDaTela = Ordem & { recebida_em: number };
+export type TempoPorEtapa = components["schemas"]["TempoPorEtapaSchema"];
 export type OrdemDetalhe = components["schemas"]["OrdemDetalheSchema"];
 export type EventoOrdem = components["schemas"]["EventoSchema"];
 export type AtualizarOrdem = components["schemas"]["AtualizarOrdemSchema"];

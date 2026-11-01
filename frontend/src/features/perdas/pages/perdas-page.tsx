@@ -8,6 +8,7 @@ import { FilaSuspeitas } from "../components/fila-suspeitas";
 import { GerarOrdens } from "../components/gerar-ordens";
 import { OrdensKanban } from "../components/ordens-kanban";
 import { OrdensTable } from "../components/ordens-table";
+import { ResumoTempos } from "../components/resumo-tempos";
 import { StatusFilter } from "../components/status-filter";
 import { VisaoToggle } from "../components/visao-toggle";
 import { useOrdens } from "../hooks/use-ordens";
@@ -99,6 +100,7 @@ function OrdensSecao() {
 							<StatusFilter value={status} onChange={filtrar} />
 						)}
 					</div>
+					<ResumoTempos />
 					{kanban ? (
 						<KanbanDasOrdens
 							recorte={recorte}

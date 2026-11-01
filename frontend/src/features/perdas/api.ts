@@ -14,6 +14,8 @@ export const ordensKeys = {
 	lista: (status: StatusOrdem | undefined, recorte: Recorte) =>
 		[...ordensKeys.all, { status, ...recorte }] as const,
 	detalhe: (id: number) => [...ordensKeys.all, "detalhe", id] as const,
+	// Começa por `all`: a invalidação por esse prefixo (aviso de mudança de ordem) renova o resumo.
+	temposPorEtapa: ["ordens-inspecao", "tempos-por-etapa"] as const,
 };
 
 export const filaKey = ["fila-suspeitas"] as const;
@@ -70,6 +72,10 @@ export function listarOrdens(
 			params: { query: { ...recorte, status } },
 		}),
 	);
+}
+
+export function temposPorEtapa() {
+	return unwrap(api.GET("/ordens-inspecao/tempos-por-etapa"));
 }
 
 export function obterOrdem(id: number) {
