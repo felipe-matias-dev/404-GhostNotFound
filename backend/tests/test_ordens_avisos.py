@@ -1,5 +1,7 @@
 import json
+from collections import Counter
 from collections.abc import Iterator
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date
 
 import psycopg
@@ -128,3 +130,21 @@ def test_batch_too_large_for_the_notice_goes_without_the_ids(
         session.commit()
 
     assert ouvinte.avisos() == [{"ordem_ids": None}]
+
+
+def test_simultaneous_changes_to_the_same_order_let_one_through_and_notify_once(
+    client: TestClient, ouvinte: Ouvinte
+) -> None:
+    [ordem] = create_orders(client, "0001")
+    ouvinte.avisos()
+
+    def enviar_para_o_campo(_: int) -> int:
+        return client.patch(
+            f"/ordens-inspecao/{ordem['id']}", json={"status": "EM_CAMPO"}
+        ).status_code
+
+    with ThreadPoolExecutor(max_workers=20) as pool:
+        resultados = Counter(pool.map(enviar_para_o_campo, range(20)))
+
+    assert resultados == {200: 1, 409: 19}
+    assert ouvinte.avisos() == [{"ordem_ids": [ordem["id"]]}]
