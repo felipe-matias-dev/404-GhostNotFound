@@ -1,9 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type * as AgentApi from "../api";
 import { perguntarAoAgente } from "../api";
 import { type ConsultaAtiva, consultarAgente } from "../consulta";
 import type { RespostaIa, TurnoConversa } from "../types";
 
-vi.mock("../api", () => ({ perguntarAoAgente: vi.fn() }));
+vi.mock("../api", async (importOriginal) => ({
+	...(await importOriginal<typeof AgentApi>()),
+	perguntarAoAgente: vi.fn(),
+}));
 
 const resposta: RespostaIa = {
 	audit_id: 1,

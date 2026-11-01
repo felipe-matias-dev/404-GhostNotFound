@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { perguntarAoAgente } from "../api";
+import { AgentProtocolError, perguntarAoAgente } from "../api";
 
 const pedido = {
 	question: "Qual a receita?",
@@ -73,5 +73,57 @@ describe("stream do agente", () => {
 		await expect(
 			perguntarAoAgente(pedido, new AbortController().signal, () => {}),
 		).rejects.toThrow("Falha na auditoria");
+	});
+
+	it("interrompe o stream em JSON inválido sem aceitar eventos posteriores", async () => {
+		let cancelado = false;
+		const etapas: string[] = [];
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(
+				async () =>
+					new Response(
+						new ReadableStream({
+							start(controller) {
+								controller.enqueue(
+									new TextEncoder().encode(
+										`data: nao-e-json\n\ndata: {"type":"stage","label":"Etapa posterior"}\n\ndata: ${JSON.stringify({ type: "answer", answer })}\n\n`,
+									),
+								);
+							},
+							cancel() {
+								cancelado = true;
+							},
+						}),
+					),
+			),
+		);
+		const erro = await perguntarAoAgente(
+			pedido,
+			new AbortController().signal,
+			(etapa) => etapas.push(etapa),
+		).catch((error: unknown) => error);
+		expect(erro).toBeInstanceOf(AgentProtocolError);
+		expect((erro as AgentProtocolError).cause).toBeInstanceOf(SyntaxError);
+		expect(etapas).toEqual([]);
+		expect(cancelado).toBe(true);
+	});
+
+	it.each([
+		"",
+		"\n",
+	])("não entrega uma resposta sem a linha vazia final, com sufixo %j", async (sufixo) => {
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(
+				async () =>
+					new Response(
+						`data: ${JSON.stringify({ type: "answer", answer })}${sufixo}`,
+					),
+			),
+		);
+		await expect(
+			perguntarAoAgente(pedido, new AbortController().signal, () => {}),
+		).rejects.toBeInstanceOf(AgentProtocolError);
 	});
 });

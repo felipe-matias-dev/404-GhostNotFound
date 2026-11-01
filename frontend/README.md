@@ -64,6 +64,9 @@ portal. Perguntas canceladas podem ser tentadas novamente; o abandono conta no l
 de perguntas e os tokens já informados pelo provedor contam no orçamento (DEC-055).
 Quando o agente pede esclarecimento, o chat exibe a pergunta uma única vez,
 como parte do texto da resposta.
+Falhas de interpretação do stream mostram uma mensagem de erro com opção de tentar
+novamente, sem expor o erro técnico do parser. Uma resposta sem a linha vazia final
+do evento SSE é incompleta: não é exibida como resposta concluída.
 
 ### Filtros das análises
 

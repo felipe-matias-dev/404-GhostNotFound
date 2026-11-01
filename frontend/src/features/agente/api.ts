@@ -10,6 +10,8 @@ export const agenteKeys = {
 type Evento =
 	paths["/ai/ask/stream"]["post"]["responses"][200]["content"]["text/event-stream"];
 
+export class AgentProtocolError extends Error {}
+
 export async function perguntarAoAgente(
 	body: PerguntaIa,
 	signal: AbortSignal,
@@ -48,13 +50,21 @@ export async function perguntarAoAgente(
 					.map((line) => line.slice(5).replace(/^ /, ""))
 					.join("\n");
 				if (!data) continue;
-				const event = JSON.parse(data) as Evento;
+				let event: Evento;
+				try {
+					event = JSON.parse(data) as Evento;
+				} catch (cause) {
+					throw new AgentProtocolError(
+						"Não foi possível interpretar a resposta do agente. Tente novamente.",
+						{ cause },
+					);
+				}
 				if (event.type === "stage") onStage(event.label);
 				else if (event.type === "answer") return event.answer;
 				else if (event.type === "error") throw new Error(event.detail);
 			}
 			if (done)
-				throw new Error(
+				throw new AgentProtocolError(
 					"A conexão terminou antes da resposta. Tente novamente.",
 				);
 		}
