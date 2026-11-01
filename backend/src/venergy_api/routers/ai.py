@@ -27,6 +27,7 @@ from venergy_api.auth import Perfil, UsuarioLogado
 from venergy_api.database import SessionDep
 from venergy_api.historico_ia import usuario_da_requisicao
 from venergy_api.models import AiAuditoria
+from venergy_api.rastreamento import anotar_resposta_do_agente
 from venergy_api.schemas import (
     AlteracaoSessaoIaSchema,
     AuditoriaIaSchema,
@@ -180,6 +181,7 @@ async def _responder(
         answer = await agente.ask(pedido.question, session_id)
     finally:
         usuario_da_requisicao.reset(token)
+    anotar_resposta_do_agente(answer)
     try:
         # A sessão do backend é síncrona: a gravação sai do laço de eventos para não
         # travar as outras requisições enquanto o banco responde.
@@ -310,6 +312,7 @@ async def _eventos(
             if answer is None:
                 yield _erro_sse("O agente não devolveu uma resposta. Tente de novo.")
                 return
+            anotar_resposta_do_agente(answer)
             try:
                 auditoria = await run_in_threadpool(
                     gravar_auditoria, sessao, pergunta, session_id, answer, usuario.login

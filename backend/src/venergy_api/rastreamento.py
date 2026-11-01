@@ -6,6 +6,7 @@ instalado e a API responde como antes.
 """
 
 from fastapi import FastAPI
+from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.instrumentation.psycopg import PsycopgInstrumentor
@@ -14,6 +15,7 @@ from opentelemetry.sdk.trace import SpanProcessor, TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from pydantic_ai import Agent
 from pydantic_ai.models.instrumented import InstrumentationSettings
+from venergy_agent.domain.answer import AgentAnswer
 
 from venergy_api.config import Settings
 
@@ -59,3 +61,21 @@ def configurar_rastreamento(
     # processo. Ficam a duração, o modelo e os tokens.
     Agent.instrument_all(InstrumentationSettings(tracer_provider=provider, include_content=False))
     return provider
+
+
+def anotar_resposta_do_agente(answer: AgentAnswer) -> None:
+    """Grava no span da requisição o que o agente respondeu, a começar pelo `request_id`.
+
+    É a ponte entre a auditoria e o trace: o perfil `ti` lê o `request_id` em
+    `GET /ai/audit/{id}` e o Jaeger acha o trace por essa tag, sem coluna nova no banco. Com o
+    rastreamento desligado, o span atual não grava nada, e a chamada não custa nada.
+    """
+    trace.get_current_span().set_attributes(
+        {
+            "venergy.ai.request_id": answer.request_id,
+            "venergy.ai.status": answer.status.value,
+            "venergy.ai.row_count": answer.row_count,
+            "venergy.ai.input_tokens": answer.input_tokens,
+            "venergy.ai.output_tokens": answer.output_tokens,
+        }
+    )
