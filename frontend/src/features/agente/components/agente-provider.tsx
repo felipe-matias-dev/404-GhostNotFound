@@ -184,10 +184,6 @@ export function AgenteProvider({
 	}, [rota, cancelarConsulta]);
 	useEffect(() => () => cancelarConsulta(), [cancelarConsulta]);
 
-	useEffect(() => {
-		if (rota !== "/agente" && !widgetAberto) cancelarConsulta();
-	}, [rota, widgetAberto, cancelarConsulta]);
-
 	const consultar = useCallback(
 		async (sessionId: string, turnoId: string, question: string) => {
 			cancelarConsulta();

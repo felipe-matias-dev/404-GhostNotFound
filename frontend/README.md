@@ -54,8 +54,11 @@ Sair ou trocar de usuário limpa as consultas em memória; as UCs recentes ficam
 separadas por login no navegador, sem migrar o histórico compartilhado anterior.
 
 O chat mostra as etapas recebidas de `POST /ai/ask/stream` e só exibe a resposta
-completa no evento final. Sair da tela, fechar o chat ou enviar outra pergunta
-cancela a consulta em andamento; perguntas canceladas podem ser tentadas novamente.
+completa no evento final. Minimizar ou fechar o widget só esconde a janela: a consulta
+continua, com o indicador no botão flutuante, e a resposta fica disponível ao reabrir.
+Sair da página `/agente`, criar ou trocar de conversa, remover a conversa em andamento,
+limpar o histórico, enviar outra pergunta ou sair do portal cancela a consulta;
+perguntas canceladas podem ser tentadas novamente.
 Quando o agente pede esclarecimento, o chat exibe a pergunta uma única vez,
 como parte do texto da resposta.
 
