@@ -215,6 +215,8 @@ Variáveis lidas do `.env` (veja `.env.example`):
 | `VENERGY_API_AI_JANELA_ORCAMENTO_SEGUNDOS` | Janela do orçamento de tokens do agente por usuário, em segundos: só o gasto dentro dela conta. Padrão: `86400` (24 horas) |
 | `VENERGY_API_ORDEM_ATRASO_GERADA_DIAS` | Dias que uma ordem pode ficar em `GERADA` antes de aparecer como atrasada. Padrão: `5` |
 | `VENERGY_API_ORDEM_ATRASO_EM_CAMPO_DIAS` | O mesmo para `EM_CAMPO`. Padrão: `10` |
+| `VENERGY_API_ORDENS_AVISOS_POR_USUARIO` | Telas com o tempo real das ordens abertas ao mesmo tempo por login (`429` ao passar). Padrão: `3` |
+| `VENERGY_API_ORDENS_AVISOS_TOTAL` | O mesmo, somando todos os logins. Cada tela usa uma conexão do Postgres. Padrão: `50` |
 | `VENERGY_API_LOGIN_MAX_FALHAS` | Senhas erradas do mesmo login e do mesmo endereço, dentro da janela, antes do bloqueio (`429`). `0` desliga. Padrão: `5` |
 | `VENERGY_API_LOGIN_JANELA_SEGUNDOS` | Janela do limite acima, em segundos. Padrão: `900` (15 minutos) |
 

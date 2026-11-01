@@ -2465,6 +2465,15 @@ export interface operations {
                     };
                 };
             };
+            /** @description Telas demais com o tempo real abertas, do usuário ou no servidor. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErroSchema"];
+                };
+            };
             /** @description Service Unavailable */
             503: {
                 headers: {

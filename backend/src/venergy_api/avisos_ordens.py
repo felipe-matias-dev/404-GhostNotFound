@@ -3,7 +3,8 @@
 import asyncio
 import json
 import sys
-from collections.abc import AsyncIterator, Sequence
+from collections import Counter
+from collections.abc import AsyncIterator, Callable, Sequence
 
 import psycopg
 from sqlalchemy import text
@@ -46,20 +47,60 @@ def loop_suporta_listen() -> bool:
     return not ruim
 
 
-async def fluxo_de_avisos(database_url: str, intervalo_ping: float) -> AsyncIterator[str]:
+class VagasDeAvisos:
+    """Fluxos de avisos abertos neste processo, por login e no total.
+
+    Cada fluxo prende uma conexão do Postgres fora do pool. Sem teto, um login com muitas abas
+    (ou um script) esgota as conexões do banco e derruba o portal inteiro (DEC-063). Sem trava:
+    reservar e liberar rodam no event loop, sem await entre conferir e contar.
+    """
+
+    def __init__(self, por_usuario: int, total: int) -> None:
+        self.por_usuario = por_usuario
+        self.total = total
+        self._abertos: Counter[str] = Counter()
+
+    def reservar(self, login: str) -> bool:
+        if self._abertos[login] >= self.por_usuario or self._abertos.total() >= self.total:
+            return False
+        self._abertos[login] += 1
+        return True
+
+    def liberar(self, login: str) -> None:
+        self._abertos[login] -= 1
+        if self._abertos[login] <= 0:
+            del self._abertos[login]
+
+    def abertos(self) -> int:
+        return self._abertos.total()
+
+
+async def fluxo_de_avisos(
+    database_url: str, intervalo_ping: float, ao_fechar: Callable[[], None]
+) -> AsyncIterator[str]:
     """Os avisos de ordens como eventos SSE, de uma conexão LISTEN própria por tela aberta.
 
     O primeiro item sai depois do LISTEN: quando o navegador considera a conexão aberta, nenhum
     aviso se perde entre o abrir e o ouvir. Um aviso não é durável, então o que acontecer com a
     tela desconectada se perde, e a tela invalida os dados ao reconectar.
+
+    `ao_fechar` roda uma vez quando o fluxo termina, inclusive se a conexão falhar. Só vale para
+    um gerador que já começou: quem abre o fluxo lê o primeiro item antes de entregá-lo.
     """
-    url = make_url(database_url).set(drivername="postgresql").render_as_string(hide_password=False)
-    async with await psycopg.AsyncConnection.connect(
-        url, autocommit=True, application_name=APLICACAO
-    ) as conexao:
-        await conexao.execute(f"LISTEN {CANAL}")
-        yield PING
-        while True:
-            async for aviso in conexao.notifies(timeout=intervalo_ping):
-                yield evento_sse(EVENTO, aviso.payload)
+    try:
+        url = (
+            make_url(database_url)
+            .set(drivername="postgresql")
+            .render_as_string(hide_password=False)
+        )
+        async with await psycopg.AsyncConnection.connect(
+            url, autocommit=True, application_name=APLICACAO
+        ) as conexao:
+            await conexao.execute(f"LISTEN {CANAL}")
             yield PING
+            while True:
+                async for aviso in conexao.notifies(timeout=intervalo_ping):
+                    yield evento_sse(EVENTO, aviso.payload)
+                yield PING
+    finally:
+        ao_fechar()

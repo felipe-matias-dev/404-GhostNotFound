@@ -2015,6 +2015,16 @@
               }
             }
           },
+          "429": {
+            "description": "Telas demais com o tempo real abertas, do usuário ou no servidor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErroSchema"
+                }
+              }
+            }
+          },
           "503": {
             "description": "Service Unavailable",
             "content": {

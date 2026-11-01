@@ -1,7 +1,11 @@
 """Rotas das ordens de inspeção: o gerente de perdas gera OIs a partir da fila e as acompanha."""
 
+from collections.abc import AsyncGenerator, AsyncIterator
+from contextlib import aclosing
+from functools import partial
 from typing import Annotated, Any
 
+import psycopg
 from fastapi import (
     APIRouter,
     Depends,
@@ -54,7 +58,7 @@ from venergy_api.schemas import (
     ResultadoPlanilhaSchema,
     TempoPorEtapaSchema,
 )
-from venergy_api.sessao import exigir_perfil
+from venergy_api.sessao import UsuarioDep, exigir_perfil
 
 router = APIRouter(prefix="/ordens-inspecao", tags=["ordens de inspeção"])
 
@@ -200,24 +204,56 @@ def listar_ordens(
             ),
             "content": {"text/event-stream": {"schema": EVENTO_ORDENS_SSE}},
         },
+        status.HTTP_429_TOO_MANY_REQUESTS: {
+            "model": ErroSchema,
+            "description": "Telas demais com o tempo real abertas, do usuário ou no servidor.",
+        },
         status.HTTP_503_SERVICE_UNAVAILABLE: {"model": ErroSchema},
     },
 )
-async def acompanhar_ordens(request: Request) -> StreamingResponse:
+async def acompanhar_ordens(request: Request, usuario: UsuarioDep) -> StreamingResponse:
     """Avisa a tela, sem ela perguntar, de que ordens foram criadas ou mudaram de status."""
-    # Um 503 antes de abrir o stream: o EventSource não reconecta depois de um status que não
-    # seja 200, e a tela segue funcionando, só sem o tempo real. Abrir e abortar o stream faria
-    # a tela reconectar e refazer as consultas a cada poucos segundos.
+    # Toda recusa sai antes de abrir o stream: o EventSource não reconecta depois de um status
+    # que não seja 200, e a tela segue funcionando, só sem o tempo real. Abrir e abortar o
+    # stream faria a tela reconectar e refazer as consultas a cada poucos segundos.
     if not loop_suporta_listen():
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Avisos em tempo real indisponíveis neste servidor. No Windows, use --reload.",
         )
+    vagas = request.app.state.vagas_avisos_ordens
+    if not vagas.reservar(usuario.login):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Muitas telas com o tempo real abertas. Feche uma aba e recarregue.",
+        )
+    fluxo = fluxo_de_avisos(
+        request.app.state.settings.database_url,
+        INTERVALO_PING_SEGUNDOS,
+        ao_fechar=partial(vagas.liberar, usuario.login),
+    )
+    # O primeiro item (o ping depois do LISTEN) é lido aqui, e não pelo StreamingResponse: um
+    # gerador que já começou sempre devolve a vaga ao fechar, mesmo que o cliente saia antes
+    # do primeiro byte, e um banco sem conexão livre vira 503 em vez de um stream quebrado.
+    try:
+        abertura = await anext(fluxo)
+    except psycopg.OperationalError as error:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Avisos em tempo real indisponíveis agora. A tela segue sem eles.",
+        ) from error
     return StreamingResponse(
-        fluxo_de_avisos(request.app.state.settings.database_url, INTERVALO_PING_SEGUNDOS),
+        _a_partir_de(abertura, fluxo),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+async def _a_partir_de(primeiro: str, resto: AsyncGenerator[str]) -> AsyncIterator[str]:
+    async with aclosing(resto):
+        yield primeiro
+        async for item in resto:
+            yield item
 
 
 # Declarada antes de /{ordem_id}, como /eventos.

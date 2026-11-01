@@ -34,6 +34,11 @@ class Settings(BaseSettings):
     # O case não fixa esses prazos: são suposição do time (DEC-064), ajustável sem mexer no código.
     ordem_atraso_gerada_dias: int = Field(5, ge=0)
     ordem_atraso_em_campo_dias: int = Field(10, ge=0)
+    # Telas com o tempo real das ordens abertas ao mesmo tempo, por login e no processo. Cada uma
+    # prende uma conexão do Postgres (que aceita 100): 50 deixam folga para o pool, o agente e a
+    # carga (DEC-063).
+    ordens_avisos_por_usuario: int = Field(3, ge=1)
+    ordens_avisos_total: int = Field(50, ge=1)
     # Limite de tentativas de login (DEC-065): depois de `login_max_falhas` senhas erradas do
     # mesmo login a partir do mesmo endereço, dentro da janela, o par fica bloqueado (429) até
     # a falha mais antiga sair dela. 0 desliga o limite.
