@@ -2122,7 +2122,7 @@
             }
           },
           "422": {
-            "description": "Unprocessable Entity",
+            "description": "Planilha inutilizável: não é XLSX, está corrompida ou passa do limite",
             "content": {
               "application/json": {
                 "schema": {

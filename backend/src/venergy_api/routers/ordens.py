@@ -301,7 +301,13 @@ def _mudar_status(
     "/planilha",
     responses={
         status.HTTP_403_FORBIDDEN: {"model": ErroSchema},
-        status.HTTP_422_UNPROCESSABLE_CONTENT: {"model": ErroSchema},
+        # Descrição explícita: sem ela o FastAPI usa o nome do status HTTP, que o Python 3.13
+        # mudou de "Unprocessable Entity" para "Unprocessable Content", e o contrato gerado
+        # passaria a depender da versão do Python de quem o gera.
+        status.HTTP_422_UNPROCESSABLE_CONTENT: {
+            "model": ErroSchema,
+            "description": "Planilha inutilizável: não é XLSX, está corrompida ou passa do limite",
+        },
     },
 )
 def enviar_planilha(

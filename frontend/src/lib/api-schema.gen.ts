@@ -2545,7 +2545,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErroSchema"];
                 };
             };
-            /** @description Unprocessable Entity */
+            /** @description Planilha inutilizável: não é XLSX, está corrompida ou passa do limite */
             422: {
                 headers: {
                     [name: string]: unknown;
