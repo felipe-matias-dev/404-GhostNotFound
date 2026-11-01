@@ -60,7 +60,7 @@ Cada parte do sistema responde à pergunta de uma pessoa da V-Energy.
 
 | Quem | Pergunta | Onde é respondida | Estado |
 |---|---|---|---|
-| **Henrique**, diretor comercial | Por que a receita não acompanhou a tarifa, e onde ela caiu? | Telas **Visão geral** (indicadores comercial, de rede e de atendimento) e **Receita** (ponte em cascata, mapa da Região Metropolitana do Recife, drill-down município → bairro → classe) | Pronto |
+| **Henrique**, diretor comercial | Por que a receita não acompanhou a tarifa, e onde ela caiu? | Telas **Visão geral** (indicadores comercial, de rede e de atendimento) e **Receita** (ponte em cascata, mapa da Região Metropolitana do Recife, drill-down município → bairro → classe e insight de IA da ponte gerado sob pedido, [DEC-069](docs/decisoes.md#dec-069--insight-de-ia-ao-lado-da-leitura-que-ele-narra)) | Pronto |
 | **Rafael**, gerente de perdas | Quais unidades inspecionar primeiro, e em que pé está cada ordem? | Tela **Perdas**: ordens de inspeção em Kanban ou tabela, com gerar, enviar a campo, concluir e cancelar. Fila de suspeitas em `GET /fila-suspeitas` | Ordens prontas; fila pronta na API, tela em construção |
 | **Camila**, atendimento | O que aconteceu com esta unidade consumidora, e por que a conta veio alta? | `GET /unidades-consumidoras/{cod_uc}/visao-360`: cadastro, consumo de 12 meses contra o ano anterior, faturas em aberto, medidor, interrupções, chamados e a regra da conta alta ([DEC-044](docs/decisoes.md#dec-044--visão-360-da-unidade-consumidora-rota-única-janela-da-gold-e-regra-da-conta-alta)). A conta é explicada em reais: a diferença contra o mesmo mês do ano anterior vem dividida em consumo, tarifa, bandeira e tributos, e as partes somam a diferença ([DEC-057](docs/decisoes.md#dec-057--variação-da-conta-da-unidade-consumidora-dividida-por-motivo)) | API pronta, tela em construção |
 | **Beatriz**, operação | Quais alimentadores e regiões têm o pior DEC e FEC? | `GET /continuidade/alimentadores/ranking`, `/mensal` e `/recortes` ([DEC-033](docs/decisoes.md#dec-033--dec-e-fec-por-período-e-recorte-e-a-fila-de-suspeitas-paginada)) | API pronta, tela em construção |
@@ -201,7 +201,7 @@ estimada ganha um aviso. Fórmula e limites em
 
 ## Decisões que defendemos
 
-O registro completo, com 55 decisões numeradas e as suposições, está em [`docs/decisoes.md`](docs/decisoes.md). Estas são as que mais mudam o produto.
+O registro completo, com 62 decisões numeradas e as suposições, está em [`docs/decisoes.md`](docs/decisoes.md). Estas são as que mais mudam o produto.
 
 **PostgreSQL com schemas `gold` e `app`** · [DEC-002](docs/decisoes.md#dec-002--banco-local-postgresql)
 - **Problema:** o agente precisa de um usuário que só lê, e a recarga da Gold não pode apagar o trabalho de campo.
@@ -251,7 +251,7 @@ O registro completo, com 55 decisões numeradas e as suposições, está em [`do
 
 **Agente só sobre views validadas por parser, e o LLM só narra** · [ADR-03 e ADR-04](docs/arquitetura.md#7-decisões-técnicas)
 - **Descartado:** SQL livre e ferramentas parametrizadas.
-- **Efeito:** mesmo com o prompt manipulado, o banco não aceita escrita. O insight das telas narra um JSON de métricas da Gold e é descartado se citar um número que não está nele.
+- **Efeito:** mesmo com o prompt manipulado, o banco não aceita escrita. O insight das telas narra um JSON de métricas da Gold e é descartado se citar um número que não está nele. No portal, ele fica ao lado da leitura do gráfico que narra e só chama o modelo quando a pessoa clica em **Gerar insight** ([DEC-069](docs/decisoes.md#dec-069--insight-de-ia-ao-lado-da-leitura-que-ele-narra)).
 
 **Workflow mensal e reprocessamento completo** · [DEC-039](docs/decisoes.md#dec-039--workflow-do-databricks-e-agendamento-mensal)
 - **Agendamento:** dia 6, D+5 do fechamento do faturamento. Os detalhes estão em [Workflow no Databricks](#workflow-no-databricks).

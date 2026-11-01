@@ -64,6 +64,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | 30/10/2026 | DEC-060: filtros compartilhados viajam na URL (`municipio`, `bairro`, `classe` e o par de períodos) entre Visão geral, Receita, Rede e Perdas; filtros próprios de cada tela ficam só na memória da sessão | Trocar de tela não perde o recorte nem repete a escolha, e um link reproduz a análise; a URL continua sendo a fonte da verdade | João Euclides |
 | 30/10/2026 | DEC-058: em Perdas o período é só contexto, e a consulta individual de UC mostra o histórico completo, fora do recorte | A fila é um retrato da Gold sem competência e as ordens são estado atual; a visão 360 é o registro completo da UC, e limitá-la esconderia contas antigas em aberto | João Euclides |
 | 30/10/2026 | DEC-059: ordem de UC ausente do cadastro da Gold some da lista quando há recorte de município, bairro ou classe, e continua visível sem recorte | A localização só existe em `gold_dim_uc` e não pode ser inventada; a ordem sobrevive à recarga (DEC-009) e o gerente não pode perdê-la | João Euclides |
+| 01/11/2026 | DEC-069: o insight de IA de uma tela fica ao lado da frase de leitura do gráfico que ele narra e só é gerado quando o usuário clica em "Gerar insight" (marca do VE-360); o texto abre numa caixa e volta pelo botão "Insight feito por IA"; sem texto, a tela diz que o insight está indisponível. Primeiro na Receita, na ponte (`GET /receita/insight`, DEC-040) | O insight aprofunda a leitura da ponte, então fica nela, abaixo do título e dos filtros na hierarquia da tela; no Header ele se perdia ao lado do título. Gerar ao abrir a tela gastava tokens a cada recorte visitado, lido ou não | João Euclides |
 
 ## DEC-001 · Localização dos arquivos de origem (landing)
 
@@ -1887,3 +1888,21 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   - **Atrás de um proxy o endereço visto é o do proxy.** No desenvolvimento (Vite) e no Docker todos os usuários chegam com o mesmo endereço, e o limite vira, na prática, por login. Em produção seria preciso confiar no cabeçalho do proxy de verdade (`--proxy-headers` e `--forwarded-allow-ips` do uvicorn). Para o case, local e de demonstração, é aceitável, mas é o ponto que a banca pode perguntar;
   - **trocar de login a cada tentativa não é coberto** pelo par login e endereço. Com cinco logins conhecidos, é o risco aceito;
   - **na demonstração, cinco erros de senha do `rafael` trancam o login dele por 15 minutos para todos**, porque o proxy faz todas as tentativas chegarem com o mesmo endereço (primeiro item acima): quem alcança a tela de login consegue trancar um usuário por esse tempo, sem afetar os outros usuários. Para liberar na hora: `docker compose exec db psql -U venergy -d venergy -c "DELETE FROM app.tentativa_login"`, ou `VENERGY_API_LOGIN_MAX_FALHAS=0` no `.env`;
+
+## DEC-069 · Insight de IA ao lado da leitura que ele narra
+
+- **Data:** 01/11/2026 · **Área:** Portal e IA · **Autor:** João Euclides · **Revisa:** DEC-040 (sem texto, a tela diz que o
+  insight está indisponível, em vez de só ficar sem ele)
+- **Contexto:** a DEC-040 entregou `GET /receita/insight`, mas a tela de Receita não o exibia. O case (5.3) pede insight de IA em pelo menos uma tela, e outras telas devem ganhar o seu.
+- **Decisão:**
+  - **Lugar:** ao lado da frase de leitura do gráfico que o insight narra; na Receita, a ponte (`summaryAction` do `WaterfallChart`, que desce para baixo da frase quando o card é estreito). Componente `InsightIa` (`features/agente`), com a marca do VE-360 (`LogoMark`, o sinal de "feito pelo agente", como no chat).
+  - **Só sob pedido:** abrir a tela ou trocar de recorte não chama o modelo. O botão "Gerar insight" busca o texto do recorte atual (a query do TanStack fica com `enabled: false` e o clique faz o `refetch`); enquanto o modelo escreve, "Gerando insight…" com a marca pulsando. O texto chega aberto numa caixa ancorada no botão, com o título, o texto e uma nota de que todo número foi conferido com as métricas da tela (DEC-019); fecha pelo X, por Esc ou clicando fora, e o botão vira "Insight feito por IA" para reabrir. Voltar a um recorte já gerado na mesma sessão do portal mostra o texto sem nova chamada; depois de recarregar a página, o clique chega ao cache da API (DEC-040), que também não chama o modelo.
+  - **Sem texto:** texto vazio (narração descartada ou falha do provedor) e erro (`503`, IA desligada) mostram "Insight indisponível." com "Tentar de novo"; a frase de leitura determinística continua, e a tela nunca fica sem leitura.
+  - **Recorte:** o insight segue os filtros da tela (período, município, bairro, classe). Ao trocar de recorte, o texto anterior some na hora, sem `placeholderData`, porque citaria números que a tela não mostra. Sem retry automático.
+- **Alternativas descartadas:**
+  - No Header, ao lado do título: foi a primeira versão e ficava pouco visível, além de pôr um conteúdo da análise no nível da navegação.
+  - Abrir ao passar o ponteiro, como o "i" das ajudas: escondido demais para um texto de várias frases.
+  - Um card de insight próprio no conteúdo: empurra a ponte para baixo e se repete em cada tela com outro formato.
+  - Manter o texto anterior durante a troca de recorte.
+  - Gerar o insight ao abrir a tela: cada recorte visitado custava uma chamada ao modelo, mesmo sem ninguém ler o texto.
+- **Consequências:** tela nova com insight põe `<InsightIa texto={...} carregando={...} indisponivel={...} onGerar={...} />` ao lado da frase de leitura do gráfico que ele narra, com um hook da própria feature que não busca sozinho (`enabled: false`). Na Visão geral, a DEC-036 continua: quando ela tiver insight, ele ocupa o lugar da frase de leitura.
