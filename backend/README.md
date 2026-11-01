@@ -75,7 +75,7 @@ acrescentar `VENERGY_API_JWT_SECRET` (mínimo de 32 caracteres) e `VENERGY_API_S
 | Rota | O que faz |
 |---|---|
 | `GET /health` | `200` se a API alcança o banco, `503` se não alcança. Não exige login |
-| `POST /auth/login` | Confere `{"login": "...", "senha": "..."}` e grava o cookie `venergy_sessao` (`HttpOnly`, `SameSite=Lax`, 8 horas). `401` com a mesma mensagem para login inexistente e senha errada |
+| `POST /auth/login` | Confere `{"login": "...", "senha": "..."}` e grava o cookie `venergy_sessao` (`HttpOnly`, `SameSite=Lax`, 8 horas). `401` com a mesma mensagem para login inexistente e senha errada. `429` com `Retry-After` depois de 5 senhas erradas do mesmo login e do mesmo endereço em 15 minutos, mesmo com a senha certa ([DEC-065](../docs/decisoes.md#dec-065--limite-de-tentativas-de-login-por-login-e-endereço)) |
 | `GET /auth/me` | Quem está logado (`login`, `nome`, `perfil`): o portal chama ao abrir para montar o menu. `401` sem sessão |
 | `POST /auth/logout` | Apaga o cookie de sessão. `204`, com ou sem sessão |
 | `GET /unidades-consumidoras/localidades` | Pares distintos de município e bairro do cadastro, sem dados pessoais |
@@ -215,6 +215,8 @@ Variáveis lidas do `.env` (veja `.env.example`):
 | `VENERGY_API_AI_JANELA_ORCAMENTO_SEGUNDOS` | Janela do orçamento de tokens do agente por usuário, em segundos: só o gasto dentro dela conta. Padrão: `86400` (24 horas) |
 | `VENERGY_API_ORDEM_ATRASO_GERADA_DIAS` | Dias que uma ordem pode ficar em `GERADA` antes de aparecer como atrasada. Padrão: `5` |
 | `VENERGY_API_ORDEM_ATRASO_EM_CAMPO_DIAS` | O mesmo para `EM_CAMPO`. Padrão: `10` |
+| `VENERGY_API_LOGIN_MAX_FALHAS` | Senhas erradas do mesmo login e do mesmo endereço, dentro da janela, antes do bloqueio (`429`). `0` desliga. Padrão: `5` |
+| `VENERGY_API_LOGIN_JANELA_SEGUNDOS` | Janela do limite acima, em segundos. Padrão: `900` (15 minutos) |
 
 Os caminhos são relativos à pasta `backend/`, de onde os comandos rodam.
 

@@ -491,6 +491,31 @@ class Usuario(Base):
     senha_hash: Mapped[str]
 
 
+class TentativaLogin(Base):
+    """Uma tentativa de login, certa ou errada: a base do limite de tentativas (DEC-065).
+
+    Sem chave estrangeira para usuarios: o login digitado pode nem existir, e o limite trata os
+    dois casos do mesmo jeito. O endereço vem da conexão, nunca de um cabeçalho que o cliente
+    escreve.
+    """
+
+    __tablename__ = "tentativa_login"
+    __table_args__ = (
+        Index("ix_tentativa_login_par", "login", "ip", "ocorrida_em"),
+        {"schema": "app"},
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    login: Mapped[str]
+    ip: Mapped[str]
+    sucesso: Mapped[bool]
+    # clock_timestamp(), e não now(): o now() é o início da transação, e quem esperou a trava do
+    # par seria gravado com um instante anterior ao da tentativa que passou antes dele.
+    ocorrida_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.clock_timestamp()
+    )
+
+
 class AiSessao(Base):
     """O que o usuário decidiu sobre uma conversa do agente: título, estrela e exclusão.
 

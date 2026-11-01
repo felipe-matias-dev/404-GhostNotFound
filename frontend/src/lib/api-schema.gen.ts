@@ -1739,6 +1739,17 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Senhas erradas demais para este login e este endereço (DEC-065) */
+            429: {
+                headers: {
+                    /** @description Segundos até o par poder tentar de novo */
+                    "Retry-After"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErroSchema"];
+                };
+            };
         };
     };
     quem_sou_eu_auth_me_get: {
