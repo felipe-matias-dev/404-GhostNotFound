@@ -201,7 +201,7 @@ estimada ganha um aviso. Fórmula e limites em
 
 ## Decisões que defendemos
 
-O registro completo, com 55 decisões numeradas e as suposições, está em [`docs/decisoes.md`](docs/decisoes.md). Estas são as que mais mudam o produto.
+O registro completo, com todas as decisões numeradas e as suposições, está em [`docs/decisoes.md`](docs/decisoes.md). Estas são as que mais mudam o produto.
 
 **PostgreSQL com schemas `gold` e `app`** · [DEC-002](docs/decisoes.md#dec-002--banco-local-postgresql)
 - **Problema:** o agente precisa de um usuário que só lê, e a recarga da Gold não pode apagar o trabalho de campo.
@@ -439,6 +439,6 @@ Toda suposição feita onde o case não é explícito está em [docs/decisoes.md
 
 | Frente | Integrantes |
 |---|---|
-| Engenharia de Dados | Arthur Oliveira, Alysson, Gabriel |
+| Engenharia de Dados | Arthur Oliveira, Alisson, Gabriel |
 | Portal Web | Felipe Matias, João Euclides |
 | Inteligência Artificial | Luis Felipe Perylo, Lucas Mendes |
