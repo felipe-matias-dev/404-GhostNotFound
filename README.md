@@ -216,6 +216,12 @@ O registro completo, com 55 decisões numeradas e as suposições, está em [`do
 - **Efeito:** sem login a API responde 401 e com o perfil errado, 403; o Rafael é o único que mexe nas ordens de inspeção.
 - **Portal:** `/login` integrado ao cookie, menu e entrada por cargo, retorno a links de dados após autenticar e saída com limpeza do cache. A entrada usa a marca animada e uma rede elétrica ilustrativa, com pausa e movimento reduzido; detalhes em [Login e perfis](frontend/README.md#login-e-perfis).
 
+**Limite de tentativas de login, sem captcha** · [DEC-065](docs/decisoes.md#dec-065--limite-de-tentativas-de-login-por-login-e-endereço)
+- **Problema:** o login não tinha freio, e o portal tem cinco logins conhecidos para alguém testar senhas.
+- **Decisão:** cinco senhas erradas do mesmo login e do mesmo endereço em 15 minutos bloqueiam o par (`429` com o tempo de espera). Bloqueado, nem a senha certa entra, e a resposta é igual para login que existe ou não. O contador fica no banco, e as tentativas simultâneas passam uma de cada vez.
+- **Descartado:** captcha, que depende de serviço externo e de internet e quebraria o teste do clone limpo; e bloquear só pelo login, que deixaria qualquer um trancar a conta do Rafael.
+- **Efeito:** o chute de senha para depois de cinco tentativas, sem dependência nova. Atrás de um proxy (Vite, Docker) o endereço é o do proxy, e o limite vira por login; está na decisão.
+
 **Ordens de inspeção como máquina de estados garantida no banco** · [DEC-009](docs/decisoes.md#dec-009--modelo-das-ordens-de-inspeção)
 - **Decisão:** status `GERADA → EM_CAMPO → CONCLUIDA` ou `CANCELADA` (com volta de `EM_CAMPO` para `GERADA`, [DEC-048](docs/decisoes.md#dec-048--ordem-em-campo-pode-voltar-para-gerada)), histórico em `app.ordem_evento` e no máximo uma ordem ativa por unidade consumidora, garantida por índice único parcial.
 - **Por que no banco:** uma checagem só no Python deixaria passar duas requisições simultâneas.
