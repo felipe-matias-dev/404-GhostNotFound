@@ -10,6 +10,8 @@ import {
 	type SegmentedOption,
 } from "#/components/ui/segmented-control";
 import { useFiltrosPortal } from "#/features/filtros";
+import { useIndicadoresMensais } from "#/features/indicadores";
+import type { ParPeriodos } from "#/lib/filtros";
 import { AlimentadorSheet } from "../components/alimentador-sheet";
 import { ContinuidadeTable } from "../components/continuidade-table";
 import { linhasDoRanking } from "../conversions";
@@ -44,8 +46,8 @@ export function RedePage() {
 
 	// O período da Rede é o compartilhado: a URL traduz o mesmo trecho para `inicio`/`fim`.
 	const { filtros } = useFiltrosPortal();
-	// A URL bruta ainda pode trazer campos que o schema já descartou (bairro órfão, série sem
-	// alimentador, mês inválido): comparar só com o search validado esconderia esses casos.
+	// A URL bruta ainda pode trazer campos que o schema já descartou (bairro órfão, mês
+	// inválido, a antiga `serie`): comparar só com o search validado esconderia esses casos.
 	const buscaBruta = useLocation({
 		select: (local) => local.search,
 	}) as Record<string, unknown>;
@@ -58,7 +60,6 @@ export function RedePage() {
 
 	const criterio: Criterio = search.criterio ?? "dec";
 	const alimentador = search.alimentador;
-	const metrica: Criterio = search.serie ?? criterio;
 	const municipio = filtros.municipio;
 	const bairro = filtros.bairro;
 	const classe = filtros.classe;
@@ -89,6 +90,16 @@ export function RedePage() {
 		visao === "localidades",
 	);
 	const serie = useSerieAlimentador(periodo, alimentador);
+	// A referência do painel é a empresa inteira, como o histórico do alimentador, que também
+	// ignora o recorte; só é pedida com o painel aberto.
+	const parEmpresa: ParPeriodos | undefined =
+		alimentador && filtros.periodo_atual && filtros.periodo_base
+			? {
+					periodo_base: filtros.periodo_base,
+					periodo_atual: filtros.periodo_atual,
+				}
+			: undefined;
+	const empresa = useIndicadoresMensais(parEmpresa, {});
 
 	const ativa = visao === "alimentadores" ? ranking : recortes;
 	const rows: LinhaContinuidade[] | undefined =
@@ -132,7 +143,6 @@ export function RedePage() {
 			bairro,
 			classe,
 			alimentador,
-			serie: alimentador ? metrica : undefined,
 		}),
 		[
 			periodo?.inicio,
@@ -144,7 +154,6 @@ export function RedePage() {
 			bairro,
 			classe,
 			alimentador,
-			metrica,
 		],
 	);
 	const temPeriodo = Boolean(periodo);
@@ -191,7 +200,6 @@ export function RedePage() {
 		void ir({
 			visao: proxima === "localidades" ? "localidades" : undefined,
 			alimentador: undefined,
-			serie: undefined,
 		});
 	};
 
@@ -212,7 +220,6 @@ export function RedePage() {
 				municipio: linha.segmento,
 				bairro: undefined,
 				alimentador: undefined,
-				serie: undefined,
 			});
 			return;
 		}
@@ -221,18 +228,14 @@ export function RedePage() {
 				visao: "localidades",
 				bairro: linha.segmento,
 				alimentador: undefined,
-				serie: undefined,
 			});
 			return;
 		}
-		void ir({ alimentador: linha.segmento, serie: criterio });
+		void ir({ alimentador: linha.segmento });
 	};
 
-	const trocarSerie = (proximo: Criterio) => void ir({ serie: proximo }, true);
-
-	// Fechar remove só o alimentador e a métrica do painel; tabela, recorte, período e página ficam.
-	const fecharPainel = () =>
-		void ir({ alimentador: undefined, serie: undefined });
+	// Fechar remove só o alimentador; tabela, recorte, período e página ficam.
+	const fecharPainel = () => void ir({ alimentador: undefined });
 
 	// O kit devolve o foco a quem abriu; sem ele (deep link, card desmontado), vai ao título.
 	useEffect(() => {
@@ -332,18 +335,13 @@ export function RedePage() {
 			<AlimentadorSheet
 				alimentador={alimentador}
 				periodo={periodo}
-				criterio={metrica}
 				fromRecorte={comRecorte}
 				linhas={serie.data}
+				empresa={empresa.data}
 				loading={serie.isLoading}
 				refreshing={serie.isFetching && !serie.isLoading}
-				error={
-					serie.isError
-						? "Não foi possível carregar o histórico do alimentador."
-						: null
-				}
+				failed={serie.isError}
 				onRetry={() => void serie.refetch()}
-				onCriterioChange={trocarSerie}
 				onClose={fecharPainel}
 			/>
 		</Pagina>

@@ -77,17 +77,6 @@ describe("redeSearchSchema", () => {
 		expect(comEspacos.alimentador).toBe("ALM-REC-006");
 	});
 
-	it("remove a série sem alimentador", () => {
-		const sozinha = redeSearchSchema.parse({ serie: "fec" });
-		const comAlimentador = redeSearchSchema.parse({
-			serie: "fec",
-			alimentador: "ALM-A",
-		});
-
-		expect(sozinha.serie).toBeUndefined();
-		expect(comAlimentador.serie).toBe("fec");
-	});
-
 	it("barra critério e visão desconhecidos", () => {
 		const search = redeSearchSchema.parse({
 			criterio: "dec",

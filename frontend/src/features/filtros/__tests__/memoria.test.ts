@@ -202,7 +202,6 @@ describe("buscaPara", () => {
 			criterio: "fec",
 			visao: "localidades",
 			alimentador: "AL-01",
-			serie: "dec",
 		});
 		const receita = tela("/receita", {
 			municipio: "Paulista",
@@ -221,7 +220,6 @@ describe("buscaPara", () => {
 			fim: "2024-03",
 		});
 		expect(volta.alimentador).toBeUndefined();
-		expect(volta.serie).toBeUndefined();
 		expect(volta.periodo_atual).toBeUndefined();
 	});
 
@@ -232,12 +230,10 @@ describe("buscaPara", () => {
 			fim: "2025-03",
 			municipio: "Paulista",
 			alimentador: "AL-01",
-			serie: "fec",
 		});
 		const receita = tela("/receita", { ...par, municipio: "Paulista" });
 		const volta = buscaPara("/rede", receita, memoria);
 		expect(volta.alimentador).toBe("AL-01");
-		expect(volta.serie).toBe("fec");
 	});
 
 	it("na própria tela a URL validada manda, sem mesclar a memória", () => {

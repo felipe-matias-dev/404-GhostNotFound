@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
 	filtrarSegmentos,
+	historicoDoAlimentador,
 	mesesDoPeriodo,
-	serieDoAlimentador,
 } from "../conversions";
 import type { AlimentadorMensal, Periodo } from "../types";
 
@@ -49,13 +49,13 @@ describe("mesesDoPeriodo", () => {
 	});
 });
 
-describe("serieDoAlimentador", () => {
+describe("historicoDoAlimentador", () => {
 	it("cobre todos os meses do período, com zero em zero e lacuna nula", () => {
-		const { categories, series } = serieDoAlimentador(
+		const { categories, meses, series } = historicoDoAlimentador(
 			[linha("2024-12", 0, 0), linha("2025-02", 2.5, 3)],
 			periodo,
 			"ALM-A",
-			"dec",
+			undefined,
 		);
 
 		expect(categories.map(({ key }) => key)).toEqual([
@@ -63,14 +63,19 @@ describe("serieDoAlimentador", () => {
 			"2025-01",
 			"2025-02",
 		]);
-		expect(series).toHaveLength(1);
-		expect(series[0]?.id).toBe("ALM-A");
-		expect(series[0]?.label).toBe("ALM-A");
-		expect(series[0]?.values).toEqual([0, null, 2.5]);
+		expect(meses.map((mes) => mes?.competencia)).toEqual([
+			"2024-12",
+			undefined,
+			"2025-02",
+		]);
+		expect(series.dec).toHaveLength(1);
+		expect(series.dec[0]?.id).toBe("ALM-A");
+		expect(series.dec[0]?.values).toEqual([0, null, 2.5]);
+		expect(series.fec[0]?.values).toEqual([0, null, 3]);
 	});
 
 	it("não mistura outro alimentador nem agrega meses", () => {
-		const { series } = serieDoAlimentador(
+		const { series } = historicoDoAlimentador(
 			[
 				linha("2024-12", 1, 0.5),
 				linha("2024-12", 9, 9, "ALM-B"),
@@ -79,32 +84,38 @@ describe("serieDoAlimentador", () => {
 			],
 			periodo,
 			"ALM-A",
-			"dec",
+			undefined,
 		);
 
-		expect(series[0]?.values).toEqual([1, null, 2]);
+		expect(series.dec[0]?.values).toEqual([1, null, 2]);
 	});
 
-	it("preserva o FEC quando é o critério", () => {
-		const { series } = serieDoAlimentador(
-			[linha("2024-12", 7, 0.5), linha("2025-02", 7, 3)],
+	it("alinha a empresa pela competência, com o mês sem dado nulo e fora do período ignorado", () => {
+		const { series } = historicoDoAlimentador(
+			[linha("2024-12", 7, 0.5)],
 			periodo,
 			"ALM-A",
-			"fec",
+			[
+				{ competencia: "2024-11", dec: 9, fec: 9 },
+				{ competencia: "2025-02", dec: 1.5, fec: 0.8 },
+				{ competencia: "2024-12", dec: 1.2, fec: null },
+			],
 		);
 
-		expect(series[0]?.values).toEqual([0.5, null, 3]);
+		expect(series.dec.map(({ id }) => id)).toEqual(["ALM-A", "empresa"]);
+		expect(series.dec[1]?.values).toEqual([1.2, null, 1.5]);
+		expect(series.fec[1]?.values).toEqual([null, null, 0.8]);
 	});
 
 	it("deixa a série toda nula quando não há linha do alimentador", () => {
-		const { series } = serieDoAlimentador(
+		const { series } = historicoDoAlimentador(
 			[linha("2024-12", 1, 1, "ALM-B")],
 			periodo,
 			"ALM-A",
-			"dec",
+			undefined,
 		);
 
-		expect(series[0]?.values).toEqual([null, null, null]);
+		expect(series.dec[0]?.values).toEqual([null, null, null]);
 	});
 });
 

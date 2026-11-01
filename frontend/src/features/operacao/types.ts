@@ -24,3 +24,9 @@ export type NivelRecorte = RecortesContinuidade["nivel"];
 
 /** A linha da tabela com a posição que ela tem na ordem da API (o ranking). */
 export type LinhaTabela = LinhaContinuidade & { posicao: number };
+
+/** DEC e FEC da empresa num mês: a referência do histórico do alimentador. */
+export type ReferenciaMensal = Pick<
+	components["schemas"]["IndicadoresMensalSchema"],
+	"competencia" | "dec" | "fec"
+>;

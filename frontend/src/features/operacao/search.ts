@@ -10,7 +10,6 @@ type RedeSearchNormalizada = {
 	inicio?: string;
 	fim?: string;
 	criterio?: "dec" | "fec";
-	serie?: "dec" | "fec";
 	visao?: "alimentadores" | "localidades";
 	municipio?: string;
 	bairro?: string;
@@ -24,7 +23,6 @@ export const redeSearchSchema = z
 		inicio: mes,
 		fim: mes,
 		criterio,
-		serie: criterio,
 		visao: z.enum(["alimentadores", "localidades"]).optional().catch(undefined),
 		municipio: texto,
 		bairro: texto,
@@ -38,8 +36,6 @@ export const redeSearchSchema = z
 			inicio: search.inicio,
 			fim: search.fim,
 			criterio: search.criterio,
-			// A série só existe com um alimentador aberto: sozinha, não diz nada.
-			serie: search.alimentador ? search.serie : undefined,
 			visao: search.visao,
 			municipio,
 			// Um bairro sem município não tem onde ser procurado.

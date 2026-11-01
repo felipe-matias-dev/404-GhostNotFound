@@ -1,10 +1,6 @@
 import { InfoIcon } from "@phosphor-icons/react";
-import type { ReactElement } from "react";
+import type { ReactElement, ReactNode } from "react";
 import { Button } from "#/components/ui/button";
-import {
-	SegmentedControl,
-	type SegmentedOption,
-} from "#/components/ui/segmented-control";
 import {
 	Sheet,
 	SheetContent,
@@ -18,63 +14,95 @@ import {
 	TooltipTrigger,
 } from "#/components/ui/tooltip";
 import { TrendChart } from "#/components/ui/trend-chart";
-import { formatHoras, formatIndice, formatPeriodoCurto } from "#/lib/format";
 import {
+	formatHoras,
+	formatIndice,
+	formatNumero,
+	formatPeriodoCurto,
+} from "#/lib/format";
+import {
+	type HistoricoAlimentador,
+	historicoDoAlimentador,
 	MAX_MESES_GRAFICO,
 	periodoExcedeGrafico,
-	serieDoAlimentador,
 } from "../conversions";
-import type { AlimentadorMensal, Criterio, Periodo } from "../types";
+import { INDICADORES_REDE } from "../indicadores";
+import type { AlimentadorMensal, Periodo, ReferenciaMensal } from "../types";
 
-const INDICES: readonly SegmentedOption<Criterio>[] = [
-	{ value: "dec", label: "DEC" },
-	{ value: "fec", label: "FEC" },
-];
-
-const AJUDA =
-	"DEC: duração equivalente, em horas, de interrupção por UC. FEC: frequência equivalente de interrupções por UC.";
+const AJUDA = `DEC: ${INDICADORES_REDE.dec.hint} FEC: ${INDICADORES_REDE.fec.hint} A linha cinza é a empresa inteira no mesmo mês.`;
 
 export type AlimentadorSheetProps = {
 	alimentador: string | undefined;
 	periodo: Periodo | undefined;
-	criterio: Criterio;
 	fromRecorte: boolean;
 	linhas: AlimentadorMensal[] | undefined;
+	/** DEC e FEC mensais da empresa; sem eles, o gráfico mostra só o alimentador. */
+	empresa: ReferenciaMensal[] | undefined;
 	loading: boolean;
 	refreshing: boolean;
-	error: string | null;
+	/** A consulta do histórico falhou; com histórico na tela, vira aviso de atualização. */
+	failed: boolean;
 	onRetry: () => void;
-	onCriterioChange: (criterio: Criterio) => void;
 	onClose: () => void;
 };
 
-/** Histórico global do alimentador: uma série mensal, com o índice escolhido só aqui. */
+/** O que aconteceu no mês sob o cursor, além do índice: as contagens que formam o DEC e o FEC. */
+const rodape = (historico: HistoricoAlimentador) => (indice: number) => {
+	const mes = historico.meses[indice];
+	if (!mes) return "Sem dado do alimentador neste mês.";
+	return `${formatHoras(mes.horas_interrompidas)} interrompidas · ${formatNumero(mes.n_interrupcoes)} interrupções · ${formatNumero(mes.n_uc)} UCs`;
+};
+
+/** Histórico global do alimentador: DEC e FEC mensais, com a empresa como referência. */
 export function AlimentadorSheet({
 	alimentador,
 	periodo,
-	criterio,
 	fromRecorte,
 	linhas,
+	empresa,
 	loading,
 	refreshing,
-	error,
+	failed,
 	onRetry,
-	onCriterioChange,
 	onClose,
 }: AlimentadorSheetProps): ReactElement {
-	// Sem dados ainda, a série fica `undefined` para o gráfico mostrar o molde; converter as
+	// Sem dados ainda, o histórico fica `undefined` para o gráfico mostrar o molde; converter as
 	// linhas ausentes em período todo nulo faria um vazio falso antes da resposta.
 	const periodoLongo = periodo !== undefined && periodoExcedeGrafico(periodo);
-	const serie =
+	const historico =
 		periodo && !periodoLongo && alimentador && linhas !== undefined
-			? serieDoAlimentador(linhas, periodo, alimentador, criterio)
+			? historicoDoAlimentador(linhas, periodo, alimentador, empresa)
 			: undefined;
-	// Com o histórico na tela, a falha de atualização vira aviso; o erro nativo só sem série.
-	const erroComDados = Boolean(error) && serie !== undefined;
-
-	const nomeIndice = criterio === "dec" ? "DEC" : "FEC";
-	const formatar = criterio === "dec" ? formatHoras : formatIndice;
 	const codigo = alimentador ?? "";
+
+	const grafico = (
+		indice: "dec" | "fec",
+		formatar: (valor: number) => string,
+		toolbar?: ReactNode,
+	) => (
+		<TrendChart
+			label={`Histórico de ${indice.toUpperCase()} do alimentador ${codigo}`}
+			categories={historico?.categories}
+			series={historico?.series[indice]}
+			formatValue={formatar}
+			categoryLabel="Competência"
+			height={200}
+			endLabels={Boolean(empresa)}
+			tooltipFooter={historico ? rodape(historico) : undefined}
+			summary={
+				<span className="text-small font-medium text-text">
+					{indice.toUpperCase()}
+				</span>
+			}
+			toolbar={toolbar}
+			loading={Boolean(periodo) && loading}
+			emptyMessage={
+				periodo
+					? "Sem histórico deste alimentador no período."
+					: "Escolha um período para ver o histórico."
+			}
+		/>
+	);
 
 	return (
 		<Sheet
@@ -90,7 +118,8 @@ export function AlimentadorSheet({
 				<SheetHeader className="pr-12">
 					<SheetTitle>Alimentador {codigo}</SheetTitle>
 					<SheetDescription>
-						Histórico do alimentador inteiro, em todos os municípios e classes.
+						Histórico do alimentador inteiro, em todos os municípios e classes,
+						com a empresa como referência.
 					</SheetDescription>
 				</SheetHeader>
 
@@ -111,13 +140,15 @@ export function AlimentadorSheet({
 						</div>
 					)}
 
-					{erroComDados && (
+					{failed && (
 						<div
 							role="alert"
 							className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-danger/40 bg-danger-subtle p-3"
 						>
 							<p className="text-body text-danger">
-								A atualização falhou. O histórico anterior continua exibido.
+								{historico
+									? "A atualização falhou. O histórico anterior continua exibido."
+									: "Não foi possível carregar o histórico do alimentador."}
 							</p>
 							<Button variant="outline" size="sm" onClick={onRetry}>
 								Tentar de novo
@@ -131,52 +162,39 @@ export function AlimentadorSheet({
 							período menor para ver o histórico.
 						</output>
 					) : (
-						<TrendChart
-							label={`Histórico de ${nomeIndice} do alimentador ${codigo}`}
-							categories={serie?.categories}
-							series={serie?.series}
-							formatValue={formatar}
-							categoryLabel="Competência"
-							height={300}
-							loading={Boolean(periodo) && loading}
-							error={serie === undefined ? error : null}
-							onRetry={onRetry}
-							emptyMessage={
-								periodo
-									? "Sem histórico deste alimentador no período."
-									: "Escolha um período para ver o histórico."
-							}
-							toolbar={
-								<>
-									{refreshing && (
-										<output className="text-small text-text-muted">
-											Atualizando…
-										</output>
-									)}
-									<SegmentedControl
-										label="Índice do histórico"
-										value={criterio}
-										onValueChange={onCriterioChange}
-										options={INDICES}
-									/>
-									<Tooltip>
-										<TooltipTrigger
-											delay={0}
-											render={
-												<button
-													type="button"
-													aria-label="Sobre os índices DEC e FEC"
-													className="grid size-6 shrink-0 place-items-center rounded-sm text-text-muted outline-none transition-colors hover:text-text focus-visible:ring-3 focus-visible:ring-focus-ring/50"
-												/>
-											}
-										>
-											<InfoIcon aria-hidden className="size-3.5" />
-										</TooltipTrigger>
-										<TooltipContent>{AJUDA}</TooltipContent>
-									</Tooltip>
-								</>
-							}
-						/>
+						(historico || !failed) && (
+							<>
+								{grafico(
+									"dec",
+									formatHoras,
+									<>
+										{refreshing && (
+											<output className="text-small text-text-muted">
+												Atualizando…
+											</output>
+										)}
+										<Tooltip>
+											<TooltipTrigger
+												delay={0}
+												render={
+													<button
+														type="button"
+														aria-label="Sobre os índices DEC e FEC"
+														className="grid size-6 shrink-0 place-items-center rounded-sm text-text-muted outline-none transition-colors hover:text-text focus-visible:ring-3 focus-visible:ring-focus-ring/50"
+													/>
+												}
+											>
+												<InfoIcon aria-hidden className="size-3.5" />
+											</TooltipTrigger>
+											<TooltipContent className="max-w-sm">
+												{AJUDA}
+											</TooltipContent>
+										</Tooltip>
+									</>,
+								)}
+								{grafico("fec", formatIndice)}
+							</>
+						)
 					)}
 				</div>
 			</SheetContent>

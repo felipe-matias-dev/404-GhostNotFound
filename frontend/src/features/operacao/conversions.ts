@@ -6,6 +6,7 @@ import type {
 	LinhaContinuidade,
 	Periodo,
 	RankingContinuidade,
+	ReferenciaMensal,
 } from "./types";
 
 const MES = /^\d{4}-(0[1-9]|1[0-2])$/;
@@ -73,29 +74,65 @@ export function filtrarSegmentos<T extends { segmento: string }>(
 	);
 }
 
-/** A série mensal do alimentador no período: um ponto por mês, sem interpolar as lacunas. */
-export function serieDoAlimentador(
+export type HistoricoAlimentador = {
+	categories: TrendCategory[];
+	/** A linha do alimentador em cada mês do período; `undefined` é lacuna, não zero. */
+	meses: (AlimentadorMensal | undefined)[];
+	/** Por índice: o alimentador e, quando houver, a empresa no mesmo mês. */
+	series: Record<Criterio, TrendSeries[]>;
+};
+
+/**
+ * O histórico mensal do alimentador no período, um ponto por mês e sem interpolar as lacunas,
+ * com o DEC e o FEC da empresa no mesmo mês como referência.
+ */
+export function historicoDoAlimentador(
 	linhas: readonly AlimentadorMensal[],
 	periodo: Periodo,
 	alimentador: string,
-	criterio: Criterio,
-): { categories: TrendCategory[]; series: TrendSeries[] } {
-	const categories = mesesDoPeriodo(periodo).map((competencia) => ({
-		key: competencia,
-		label: formatCompetenciaCurta(competencia),
-		title: formatCompetencia(competencia),
-	}));
-	const porCompetencia = new Map<string, AlimentadorMensal>();
+	empresa: readonly ReferenciaMensal[] | undefined,
+): HistoricoAlimentador {
+	const competencias = mesesDoPeriodo(periodo);
+	const doAlimentador = new Map<string, AlimentadorMensal>();
 	for (const linha of linhas) {
 		if (linha.cod_alimentador === alimentador) {
-			porCompetencia.set(linha.competencia, linha);
+			doAlimentador.set(linha.competencia, linha);
 		}
 	}
-	const values = categories.map(
-		({ key }) => porCompetencia.get(key)?.[criterio] ?? null,
+	const daEmpresa = new Map(
+		(empresa ?? []).map((linha) => [linha.competencia, linha]),
 	);
+	const meses = competencias.map((competencia) =>
+		doAlimentador.get(competencia),
+	);
+	const seriesDe = (indice: Criterio): TrendSeries[] => {
+		const proprio: TrendSeries = {
+			id: alimentador,
+			label: alimentador,
+			values: meses.map((linha) => linha?.[indice] ?? null),
+			emphasis: true,
+		};
+		if (!empresa) return [proprio];
+		return [
+			proprio,
+			{
+				id: "empresa",
+				label: "Empresa",
+				shortLabel: "empresa",
+				color: "muted",
+				values: competencias.map(
+					(competencia) => daEmpresa.get(competencia)?.[indice] ?? null,
+				),
+			},
+		];
+	};
 	return {
-		categories,
-		series: [{ id: alimentador, label: alimentador, values }],
+		categories: competencias.map((competencia) => ({
+			key: competencia,
+			label: formatCompetenciaCurta(competencia),
+			title: formatCompetencia(competencia),
+		})),
+		meses,
+		series: { dec: seriesDe("dec"), fec: seriesDe("fec") },
 	};
 }
