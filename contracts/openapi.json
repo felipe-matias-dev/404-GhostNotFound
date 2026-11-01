@@ -1964,6 +1964,47 @@
         }
       }
     },
+    "/ordens-inspecao/eventos": {
+      "get": {
+        "tags": [
+          "ordens de inspeção"
+        ],
+        "summary": "Acompanhar Ordens",
+        "description": "Avisa a tela, sem ela perguntar, de que ordens foram criadas ou mudaram de status.",
+        "operationId": "acompanhar_ordens_ordens_inspecao_eventos_get",
+        "responses": {
+          "200": {
+            "description": "Eventos SSE: `ordens`, com os ids das ordens que mudaram (ou `null`, se foram muitas), e ping de comentário. A tela refaz a consulta ao receber.",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "properties": {
+                    "ordem_ids": {
+                      "items": {
+                        "type": "integer"
+                      },
+                      "type": [
+                        "array",
+                        "null"
+                      ]
+                    }
+                  },
+                  "type": "object",
+                  "required": [
+                    "ordem_ids"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ]
+      }
+    },
     "/ordens-inspecao/{ordem_id}": {
       "get": {
         "tags": [

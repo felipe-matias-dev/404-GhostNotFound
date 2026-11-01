@@ -1,14 +1,19 @@
 """Rotas das ordens de inspeção: o gerente de perdas gera OIs a partir da fila e as acompanha."""
 
-from typing import Annotated
+from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from venergy_api.auth import Perfil, UsuarioLogado
-from venergy_api.avisos_ordens import avisar_mudanca_de_ordem
+from venergy_api.avisos_ordens import (
+    INTERVALO_PING_SEGUNDOS,
+    avisar_mudanca_de_ordem,
+    fluxo_de_avisos,
+)
 from venergy_api.database import SessionDep
 from venergy_api.models import DimUc, OrdemEvento, OrdemInspecao
 from venergy_api.ordens import STATUS_ATIVOS, StatusOrdem, TransicaoInvalidaError, validar_transicao
@@ -25,6 +30,13 @@ from venergy_api.sessao import exigir_perfil
 router = APIRouter(prefix="/ordens-inspecao", tags=["ordens de inspeção"])
 
 INDICE_UC_ATIVA = "uq_ordem_inspecao_uc_ativa"
+
+# O FastAPI não descreve SSE sozinho: cada mensagem `ordens` traz este objeto no campo data.
+EVENTO_ORDENS_SSE: dict[str, Any] = {
+    "type": "object",
+    "required": ["ordem_ids"],
+    "properties": {"ordem_ids": {"type": ["array", "null"], "items": {"type": "integer"}}},
+}
 
 # Gerar e mudar ordem é a única escrita do sistema, e é trabalho do gerente de perdas. Os
 # outros perfis só consultam; o menu esconde os botões, e esta barreira vale para quem chama a API.
@@ -119,6 +131,29 @@ def listar_ordens(
     if predicados:
         consulta = consulta.join(DimUc, DimUc.cod_uc == OrdemInspecao.cod_uc).where(*predicados)
     return [OrdemSchema.model_validate(ordem) for ordem in session.scalars(consulta)]
+
+
+# Declarada antes de /{ordem_id}: do contrário, "eventos" seria lido como o id de uma ordem (422).
+@router.get(
+    "/eventos",
+    response_class=StreamingResponse,
+    responses={
+        status.HTTP_200_OK: {
+            "description": (
+                "Eventos SSE: `ordens`, com os ids das ordens que mudaram (ou `null`, se foram "
+                "muitas), e ping de comentário. A tela refaz a consulta ao receber."
+            ),
+            "content": {"text/event-stream": {"schema": EVENTO_ORDENS_SSE}},
+        },
+    },
+)
+async def acompanhar_ordens(request: Request) -> StreamingResponse:
+    """Avisa a tela, sem ela perguntar, de que ordens foram criadas ou mudaram de status."""
+    return StreamingResponse(
+        fluxo_de_avisos(request.app.state.settings.database_url, INTERVALO_PING_SEGUNDOS),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 def _buscar_ordem(session: Session, ordem_id: int, *, travar: bool = False) -> OrdemInspecao:
