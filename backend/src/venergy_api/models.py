@@ -479,8 +479,10 @@ class TentativaLogin(Base):
     login: Mapped[str]
     ip: Mapped[str]
     sucesso: Mapped[bool]
+    # clock_timestamp(), e não now(): o now() é o início da transação, e quem esperou a trava do
+    # par seria gravado com um instante anterior ao da tentativa que passou antes dele.
     ocorrida_em: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
+        DateTime(timezone=True), server_default=func.clock_timestamp()
     )
 
 

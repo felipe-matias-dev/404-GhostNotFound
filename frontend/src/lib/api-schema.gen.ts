@@ -1661,6 +1661,8 @@ export interface operations {
             /** @description Senhas erradas demais para este login e este endereço (DEC-065) */
             429: {
                 headers: {
+                    /** @description Segundos até o par poder tentar de novo */
+                    "Retry-After"?: number;
                     [name: string]: unknown;
                 };
                 content: {

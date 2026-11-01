@@ -8,7 +8,7 @@ login: do contrário, qualquer pessoa trancaria a conta do gerente de perdas de 
 from datetime import timedelta
 from math import ceil
 
-from sqlalchemy import func, or_, select, text
+from sqlalchemy import delete, func, or_, select, text
 from sqlalchemy.orm import Session
 
 from venergy_api.models import TentativaLogin
@@ -34,8 +34,9 @@ def segundos_de_bloqueio(
     """Quantos segundos faltam para o par poder tentar de novo, ou None se não está bloqueado.
 
     Contam as falhas da janela posteriores ao último sucesso: entrar certo zera a contagem. O
-    relógio é o do banco, o mesmo que grava a tentativa. Bloqueado, a espera vai até a falha
-    que deixa o total abaixo do limite sair da janela.
+    relógio é o do banco, o mesmo que grava a tentativa (clock_timestamp, como na gravação, para
+    a idade nunca ficar negativa). Bloqueado, a espera vai até a falha que deixa o total abaixo
+    do limite sair da janela.
     """
     par = (TentativaLogin.login == login, TentativaLogin.ip == ip)
     ultimo_sucesso = (
@@ -47,11 +48,12 @@ def segundos_de_bloqueio(
     idades = [
         float(idade)
         for idade in session.scalars(
-            select(func.extract("epoch", func.now() - TentativaLogin.ocorrida_em))
+            select(func.extract("epoch", func.clock_timestamp() - TentativaLogin.ocorrida_em))
             .where(
                 *par,
                 TentativaLogin.sucesso.is_(False),
-                TentativaLogin.ocorrida_em > func.now() - timedelta(seconds=janela_segundos),
+                TentativaLogin.ocorrida_em
+                > func.clock_timestamp() - timedelta(seconds=janela_segundos),
                 or_(ultimo_sucesso.is_(None), TentativaLogin.ocorrida_em > ultimo_sucesso),
             )
             .order_by(TentativaLogin.ocorrida_em)
@@ -63,5 +65,21 @@ def segundos_de_bloqueio(
     return max(1, ceil(janela_segundos - idade_da_que_libera))
 
 
-def registrar_tentativa(session: Session, login: str, ip: str, *, sucesso: bool) -> None:
+def registrar_tentativa(
+    session: Session, login: str, ip: str, *, sucesso: bool, janela_segundos: int
+) -> None:
+    """Grava a tentativa e apaga as que já saíram da janela, para a tabela guardar só a janela.
+
+    Apagar é seguro: uma linha mais antiga que a janela não entra na contagem, e um sucesso
+    antigo só importaria para falhas mais velhas que ele, que também já saíram da janela. O
+    SKIP LOCKED evita que dois pares diferentes esperem um pelo outro nas mesmas linhas velhas.
+    """
+    velhas = (
+        select(TentativaLogin.id)
+        .where(
+            TentativaLogin.ocorrida_em < func.clock_timestamp() - timedelta(seconds=janela_segundos)
+        )
+        .with_for_update(skip_locked=True)
+    )
+    session.execute(delete(TentativaLogin).where(TentativaLogin.id.in_(velhas)))
     session.add(TentativaLogin(login=login, ip=ip, sucesso=sucesso))

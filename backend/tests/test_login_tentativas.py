@@ -1,3 +1,4 @@
+import time
 from collections import Counter
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
@@ -11,6 +12,7 @@ from sqlalchemy.orm import Session
 from venergy_api.database import Base
 from venergy_api.estrutura_app import garantir_estrutura_do_app
 from venergy_api.models import TentativaLogin
+from venergy_api.tentativas_login import registrar_tentativa
 from venergy_api.usuarios import criar_usuarios_demo
 
 SENHA = "senha-de-demonstracao"
@@ -77,7 +79,7 @@ def test_blocks_after_the_limit_even_with_the_right_password(api: TestClient) ->
     assert 0 < int(response.headers["retry-after"]) <= JANELA
 
 
-def test_wrong_password_below_the_limit_is_still_a_plain_401(api: TestClient) -> None:
+def test_another_login_is_not_blocked(api: TestClient) -> None:
     errar(api, LIMITE)
 
     outro = entrar(api, "patricia", SENHA)
@@ -194,3 +196,58 @@ def test_zero_turns_the_limit_off_and_records_nothing(
 
     assert entrar(sem_limite, senha=SENHA).status_code == 200
     assert tentativas(engine) == []
+
+
+def test_429_documents_the_retry_after_header_in_the_contract(api: TestClient) -> None:
+    resposta = api.app.openapi()["paths"]["/auth/login"]["post"]["responses"]["429"]
+
+    assert "Retry-After" in resposta["headers"]
+
+
+@pytest.mark.usefixtures("api")
+def test_attempt_is_stamped_when_recorded_and_not_when_the_transaction_began(
+    engine: Engine,
+) -> None:
+    # Quem espera a trava do par já abriu a transação: o instante gravado tem de ser o da
+    # gravação, senão ela ficaria com um instante anterior ao da tentativa que passou antes.
+    with Session(engine) as session:
+        inicio = session.scalar(text("SELECT now()"))
+        time.sleep(0.3)
+        registrar_tentativa(
+            session, "camila", ENDERECO_DO_TESTE, sucesso=False, janela_segundos=JANELA
+        )
+        session.commit()
+    with Session(engine) as session:
+        gravada = session.scalars(select(TentativaLogin.ocorrida_em)).one()
+
+    assert (gravada - inicio).total_seconds() >= 0.25
+
+
+def test_recording_deletes_attempts_older_than_the_window(api: TestClient, engine: Engine) -> None:
+    gravar_falhas(engine, JANELA + 60, JANELA + 600, login="patricia")
+    gravar_falhas(engine, 60, login="patricia")
+
+    entrar(api)
+
+    assert tentativas(engine) == [
+        ("patricia", ENDERECO_DO_TESTE, False),
+        ("camila", ENDERECO_DO_TESTE, False),
+    ]
+
+
+def test_a_success_older_than_the_window_does_not_change_the_count(
+    api: TestClient, engine: Engine
+) -> None:
+    # É o que torna seguro apagar as linhas fora da janela: o último sucesso só importa se
+    # estiver dentro dela, porque as falhas contadas já são todas mais novas que a janela.
+    with Session(engine) as session, session.begin():
+        session.execute(
+            text(
+                "INSERT INTO app.tentativa_login (login, ip, sucesso, ocorrida_em) "
+                "VALUES ('camila', :ip, true, now() - make_interval(secs => :idade))"
+            ),
+            {"ip": ENDERECO_DO_TESTE, "idade": JANELA + 60},
+        )
+    gravar_falhas(engine, 100, 90, 80)
+
+    assert entrar(api, senha=SENHA).status_code == 429

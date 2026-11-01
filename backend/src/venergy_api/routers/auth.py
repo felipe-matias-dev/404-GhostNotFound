@@ -53,6 +53,12 @@ def _texto_da_espera(segundos: int) -> str:
         status.HTTP_429_TOO_MANY_REQUESTS: {
             "model": ErroSchema,
             "description": "Senhas erradas demais para este login e este endereço (DEC-065)",
+            "headers": {
+                "Retry-After": {
+                    "description": "Segundos até o par poder tentar de novo",
+                    "schema": {"type": "integer"},
+                }
+            },
         },
     },
 )
@@ -90,7 +96,13 @@ def entrar(
     )
     entrou = usuario is not None and senha_certa
     if limitado:
-        registrar_tentativa(session, pedido.login, ip, sucesso=entrou)
+        registrar_tentativa(
+            session,
+            pedido.login,
+            ip,
+            sucesso=entrou,
+            janela_segundos=configuracao.login_janela_segundos,
+        )
         session.commit()
     if not entrou:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, LOGIN_INVALIDO)
