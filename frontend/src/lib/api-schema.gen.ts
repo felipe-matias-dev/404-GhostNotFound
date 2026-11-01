@@ -459,6 +459,33 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/ordens-inspecao/planilha": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Exportar Planilha
+         * @description Baixa as OIs em campo na planilha que a equipe preenche e o upload lê de volta.
+         */
+        get: operations["exportar_planilha_ordens_inspecao_planilha_get"];
+        put?: never;
+        /**
+         * Enviar Planilha
+         * @description Conclui as OIs em campo com os resultados da planilha preenchida pela equipe.
+         *
+         *     Aplica as linhas válidas e devolve as rejeitadas com o motivo: uma linha escrita errada à
+         *     mão não pode travar o arquivo inteiro. Arquivo inutilizável é 422 e não grava nada.
+         */
+        post: operations["enviar_planilha_ordens_inspecao_planilha_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/ordens-inspecao/{ordem_id}": {
         parameters: {
             query?: never;
@@ -703,6 +730,11 @@ export interface components {
              * Format: date-time
              */
             criado_em: string;
+        };
+        /** Body_enviar_planilha_ordens_inspecao_planilha_post */
+        Body_enviar_planilha_ordens_inspecao_planilha_post: {
+            /** Arquivo */
+            arquivo: string;
         };
         /** ComparacaoIndicadoresSchema */
         ComparacaoIndicadoresSchema: {
@@ -1164,6 +1196,29 @@ export interface components {
             /** Satisfacao Media */
             satisfacao_media: number | null;
         };
+        /** LinhaConcluidaSchema */
+        LinhaConcluidaSchema: {
+            /** Aba */
+            aba: string;
+            /** Linha */
+            linha: number;
+            /** Cod Uc */
+            cod_uc: string;
+            /** Ordem Id */
+            ordem_id: number;
+            resultado: components["schemas"]["ResultadoOrdem"];
+        };
+        /** LinhaRejeitadaSchema */
+        LinhaRejeitadaSchema: {
+            /** Aba */
+            aba: string;
+            /** Linha */
+            linha: number;
+            /** Cod Uc */
+            cod_uc: string | null;
+            /** Motivo */
+            motivo: string;
+        };
         /** LocalidadeSchema */
         LocalidadeSchema: {
             /** Municipio */
@@ -1437,6 +1492,18 @@ export interface components {
          * @enum {string}
          */
         ResultadoOrdem: "IRREGULAR_CONFIRMADA" | "REGULAR" | "NAO_REALIZADA";
+        /**
+         * ResultadoPlanilhaSchema
+         * @description O que o envio da planilha de campo fez: ordens concluídas e linhas que ficaram de fora.
+         */
+        ResultadoPlanilhaSchema: {
+            /** Linhas Lidas */
+            linhas_lidas: number;
+            /** Concluidas */
+            concluidas: components["schemas"]["LinhaConcluidaSchema"][];
+            /** Rejeitadas */
+            rejeitadas: components["schemas"]["LinhaRejeitadaSchema"][];
+        };
         /**
          * SessaoIaSchema
          * @description Uma conversa do usuário com o agente, com os turnos da auditoria em ordem.
@@ -2414,6 +2481,77 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TempoPorEtapaSchema"][];
+                };
+            };
+        };
+    };
+    exportar_planilha_ordens_inspecao_planilha_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErroSchema"];
+                };
+            };
+        };
+    };
+    enviar_planilha_ordens_inspecao_planilha_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_enviar_planilha_ordens_inspecao_planilha_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResultadoPlanilhaSchema"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErroSchema"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErroSchema"];
                 };
             };
         };

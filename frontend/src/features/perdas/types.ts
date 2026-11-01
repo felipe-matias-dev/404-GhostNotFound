@@ -57,3 +57,6 @@ export const FILTROS_FILA_INICIAIS: FiltrosFila = {
 	medidorEletromecanico: false,
 	leiturasEstimadas: null,
 };
+
+export type ResultadoPlanilha =
+	components["schemas"]["ResultadoPlanilhaSchema"];

@@ -712,6 +712,30 @@ class OrdemSchema(BaseModel):
     atrasada: bool = False
 
 
+class LinhaConcluidaSchema(BaseModel):
+    aba: str
+    linha: int
+    cod_uc: str
+    ordem_id: int
+    resultado: ResultadoOrdem
+
+
+class LinhaRejeitadaSchema(BaseModel):
+    aba: str
+    linha: int
+    # Vazio quando a própria célula da UC estava em branco.
+    cod_uc: str | None
+    motivo: str
+
+
+class ResultadoPlanilhaSchema(BaseModel):
+    """O que o envio da planilha de campo fez: ordens concluídas e linhas que ficaram de fora."""
+
+    linhas_lidas: int
+    concluidas: list[LinhaConcluidaSchema]
+    rejeitadas: list[LinhaRejeitadaSchema]
+
+
 class EventoSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

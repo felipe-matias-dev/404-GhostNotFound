@@ -3,10 +3,12 @@ from collections import Counter
 from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date
+from io import BytesIO
 
 import psycopg
 import pytest
 from fastapi.testclient import TestClient
+from openpyxl import Workbook
 from sqlalchemy import Engine
 from sqlalchemy.orm import Session
 
@@ -26,6 +28,16 @@ UC_BASE = {
 }
 
 ESPERA_SEM_AVISO = 0.3
+XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+CABECALHO_PLANILHA = [
+    "id_inspecao",
+    "id_uc",
+    "data",
+    "inspetor",
+    "resultado",
+    "tipo_irregularidade",
+    "kwh_recuperado",
+]
 
 
 class Ouvinte:
@@ -148,3 +160,49 @@ def test_simultaneous_changes_to_the_same_order_let_one_through_and_notify_once(
 
     assert resultados == {200: 1, 409: 19}
     assert ouvinte.avisos() == [{"ordem_ids": [ordem["id"]]}]
+
+
+def planilha(*cod_ucs: str) -> bytes:
+    livro = Workbook()
+    aba = livro.active
+    aba.title = "ago-set"
+    aba.append(CABECALHO_PLANILHA)
+    for numero, cod_uc in enumerate(cod_ucs, start=1):
+        aba.append([f"INS-{numero}", cod_uc, "2025-08-12", "Fulano", "SEM IRREGULARIDADE", None, 0])
+    saida = BytesIO()
+    livro.save(saida)
+    return saida.getvalue()
+
+
+def enviar_planilha(client: TestClient, *cod_ucs: str) -> dict:
+    response = client.post(
+        "/ordens-inspecao/planilha",
+        files={"arquivo": ("campo.xlsx", planilha(*cod_ucs), XLSX)},
+    )
+    assert response.status_code == 200, response.text
+    return response.json()
+
+
+def test_spreadsheet_upload_sends_a_single_notice_with_every_concluded_order(
+    client: TestClient, ouvinte: Ouvinte
+) -> None:
+    ordens = create_orders(client, "0001", "0002")
+    for ordem in ordens:
+        client.patch(f"/ordens-inspecao/{ordem['id']}", json={"status": "EM_CAMPO"})
+    ouvinte.avisos()
+
+    resultado = enviar_planilha(client, "0001", "0002")
+
+    assert len(resultado["concluidas"]) == 2
+    assert ouvinte.avisos() == [{"ordem_ids": [o["id"] for o in ordens]}]
+
+
+def test_spreadsheet_upload_that_concludes_nothing_sends_no_notice(
+    client: TestClient, ouvinte: Ouvinte
+) -> None:
+    ouvinte.avisos()
+
+    resultado = enviar_planilha(client, "0003")
+
+    assert resultado["concluidas"] == []
+    assert ouvinte.avisos() == []
