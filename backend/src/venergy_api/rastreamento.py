@@ -7,12 +7,16 @@ instalado e a API responde como antes.
 
 from fastapi import FastAPI
 from opentelemetry import trace
+from opentelemetry.context import Context
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.instrumentation.psycopg import PsycopgInstrumentor
 from opentelemetry.sdk.resources import SERVICE_NAME, Resource
 from opentelemetry.sdk.trace import SpanProcessor, TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.sdk.trace.sampling import Decision, ParentBased, Sampler, SamplingResult
+from opentelemetry.trace import SpanKind
+from opentelemetry.util.types import Attributes
 from pydantic_ai import Agent
 from pydantic_ai.models.instrumented import InstrumentationSettings
 from venergy_agent.domain.answer import AgentAnswer
@@ -25,6 +29,31 @@ NOME_DO_SERVICO = "venergy-api"
 # tempo real das ordens é uma conexão aberta por minutos, que viraria uma barra só escondendo o
 # resto. O /ai/ask/stream fica: dura segundos e é o caminho da pergunta ao agente.
 ROTAS_FORA_DO_RASTREAMENTO = r"/health$,/ordens/eventos"
+
+
+class SoTracesDeRequisicao(Sampler):
+    """Só começa um trace numa requisição HTTP: uma consulta sem requisição em volta é descartada.
+
+    Tirar uma rota do rastreamento não basta. Sem o span da rota, o `SELECT 1` da saúde e as
+    consultas do tempo real das ordens viram traces soltos, um a cada poucos segundos. Os spans
+    de dentro de uma requisição seguem a decisão dela (`ParentBased`).
+    """
+
+    def should_sample(
+        self,
+        parent_context: Context | None,
+        trace_id: int,
+        name: str,
+        kind: SpanKind | None = None,
+        attributes: Attributes = None,
+        **_: object,
+    ) -> SamplingResult:
+        if kind is SpanKind.SERVER:
+            return SamplingResult(Decision.RECORD_AND_SAMPLE, attributes)
+        return SamplingResult(Decision.DROP)
+
+    def get_description(self) -> str:
+        return "SoTracesDeRequisicao"
 
 
 def configurar_rastreamento(
@@ -42,7 +71,10 @@ def configurar_rastreamento(
 
     # O provider vai explícito para cada instrumentação, nunca como o global do processo: o
     # global só pode ser definido uma vez, e cada teste monta a API com o seu.
-    provider = TracerProvider(resource=Resource.create({SERVICE_NAME: NOME_DO_SERVICO}))
+    provider = TracerProvider(
+        resource=Resource.create({SERVICE_NAME: NOME_DO_SERVICO}),
+        sampler=ParentBased(root=SoTracesDeRequisicao()),
+    )
     provider.add_span_processor(processador)
 
     FastAPIInstrumentor.instrument_app(
