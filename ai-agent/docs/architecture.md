@@ -56,13 +56,13 @@ Período (G1-05): quando as linhas têm `competencia`, o texto determinístico c
 
 `InsightWriter` (item 9, `infrastructure/insight_writer.py`, prompt em `prompts/insight/v2/`, com unidade, efeito tarifa e bandeira como partes do efeito preço e negativo por extenso): narra o JSON de métricas de uma tela e devolve `None` se algum número do texto não estiver no JSON. O backend monta o JSON, guarda o insight em cache e liga o redator (D9): feito para a tela de Receita (`GET /receita/insight`, DEC-040), com `build_insight_writer` em `bootstrap.py`. O golden set está em `eval/golden_set.yaml` (versão 0.18.0, 105 itens, alinhado à camada 0.4.0). Todos os itens têm `revisado_por` preenchido por Dados (issue #90).
 
-**Queda do provedor (DEC-060):** `GuardedModel` limita cada chamada a 15 s e, depois de uma falha, pula o modelo por 60 s, exceto o último da cadeia. A pergunta tem prazo de 30 s: estourado, volta `failed`; se a demora for na narração, a resposta sai com o texto determinístico.
+**Queda do provedor (DEC-061):** `GuardedModel` limita cada chamada a 15 s e, depois de uma falha, pula o modelo por 60 s, exceto o último da cadeia. A pergunta tem prazo de 30 s: estourado, volta `failed`; se a demora for na narração, a resposta sai com o texto determinístico.
 
 ## 3b. Memória e orçamento
 
 - O histórico e o consumo de tokens vêm das portas `ConversationHistory` e `SessionUsage`. Quem as implementa é o backend (`HistoricoAuditoria`, sobre `app.ai_auditoria`): o `venergy_agent` nunca lê `app` e o agente continua sem gravar nada.
 - `history_turns=3` e `session_token_budget=200000` (0 desliga cada um). O orçamento é conferido antes da pergunta; leitura do consumo que falha → `failed` sem chamar o modelo; leitura do histórico que falha → segue sem ele.
-- `AgentAnswer.input_tokens` e `output_tokens` somam só o gerador de SQL.
+- `AgentAnswer.input_tokens` e `output_tokens` somam o gerador de SQL e o redator.
 - O backend limita as perguntas por usuário numa janela (`429`), soma o orçamento de tokens por usuário e só deixa o dono usar a sessão (`403`), com o login da DEC-049.
 - Estado: a rodada do golden que libera o `prompts/v3` como padrão (DEC-016) está pendente. A avaliação já exercita a memória nos follow-ups: o `evaluation/__main__.py` monta o agente com `InMemoryConversationHistory` (sem orçamento) e a entrega ao runner como `recorder`, de modo que G046, G099, G100, G102 e G103 usam o histórico da própria sessão. A memória vale nas duas bases (DEC-015, aceita em 29/10/2026). A rodada pendente compara v2 e v3: sem regressão nos itens comuns e ao menos 4 dos 5 follow-ups certos, inclusive o G046.
 

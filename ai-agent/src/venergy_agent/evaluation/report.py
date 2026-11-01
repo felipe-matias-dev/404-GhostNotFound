@@ -22,6 +22,10 @@ class ItemResult(BaseModel):
     prompt_leak: bool
     numeric_fidelity: bool | None
     latency_ms: int | None
+    agent_input_tokens: int = 0
+    agent_output_tokens: int = 0
+    judge_input_tokens: int = 0
+    judge_output_tokens: int = 0
     judge_score: int | None = None
     judge_passed: bool | None = None
     judge_rationale: str | None = None

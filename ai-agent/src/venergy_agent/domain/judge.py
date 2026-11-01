@@ -19,3 +19,11 @@ class JudgeVerdict(BaseModel):
         if self.passed != (self.score >= PASS_SCORE):
             raise ValueError(f"passed must be true if and only if score >= {PASS_SCORE}")
         return self
+
+
+class JudgeRun(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    verdict: JudgeVerdict
+    input_tokens: int = Field(0, ge=0)
+    output_tokens: int = Field(0, ge=0)

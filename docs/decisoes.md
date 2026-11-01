@@ -1798,7 +1798,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Decisão:** não criar outra rota, nem mudar os parâmetros `base_inicio`, `base_fim`, `atual_inicio` e `atual_fim`. A base precisa terminar antes do início do atual, ou a rota responde `422`. Se faltar algum mês em um dos períodos, a rota responde `200` com os valores e `n_meses`, e a variação fica nula.
 - **Consequências:** a tela consegue mostrar o que existe sem exibir uma variação enganosa. A regra vale só para esta rota: `GET /receita/comparacao` continua como está. O frontend ainda precisa aceitar trechos de vários meses no seletor.
 
-## DEC-060 · Queda do provedor não pode prender a resposta do agente
+## DEC-061 · Queda do provedor não pode prender a resposta do agente
 
 - **Data:** 31/10/2026 · **Área:** GenAI
 - **Contexto:** em 31/10/2026 o modelo principal respondeu `503` por cerca de 30 minutos. Cada `503` esperava as retentativas antes de passar ao próximo modelo, sem limite de tempo por chamada nem por pergunta. Uma resposta chegou a levar 61 s, e um travamento sem resposta prenderia a tela.
