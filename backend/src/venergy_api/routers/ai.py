@@ -43,6 +43,7 @@ from venergy_api.sessoes_ia import (
     sessao_disponivel,
     sessao_excluida,
 )
+from venergy_api.sse import PING, evento_sse
 
 router = APIRouter(prefix="/ai", tags=["agente de IA"])
 
@@ -202,12 +203,8 @@ async def _responder(
     return RespostaIaSchema.model_validate(auditoria)
 
 
-def _sse(evento: str, dados: str) -> str:
-    return f"event: {evento}\ndata: {dados}\n\n"
-
-
 def _erro_sse(detalhe: str) -> str:
-    return _sse("error", json.dumps({"type": "error", "detail": detalhe}, ensure_ascii=False))
+    return evento_sse("error", json.dumps({"type": "error", "detail": detalhe}, ensure_ascii=False))
 
 
 def _gravar_abandono(
@@ -276,7 +273,7 @@ async def _eventos(
                     proximo = proximo or asyncio.ensure_future(anext(eventos))
                     prontos, _ = await asyncio.wait({proximo}, timeout=INTERVALO_PING_SEGUNDOS)
                     if not prontos:
-                        yield ": ping\n\n"
+                        yield PING
                         continue
                     evento = proximo.result()
                     proximo = None
@@ -284,7 +281,7 @@ async def _eventos(
                         answer = evento.answer
                     else:
                         ultima_etapa = evento
-                        yield _sse(evento.type, evento.model_dump_json())
+                        yield evento_sse(evento.type, evento.model_dump_json())
             except StopAsyncIteration:
                 proximo = None
             except (asyncio.CancelledError, GeneratorExit):
@@ -325,7 +322,7 @@ async def _eventos(
                 )
                 return
             resposta = RespostaIaSchema.model_validate(auditoria)
-            yield _sse(
+            yield evento_sse(
                 "answer",
                 f'{{"type":"answer","answer":{resposta.model_dump_json()}}}',
             )
