@@ -68,6 +68,17 @@ export const Alta: Story = {
 	},
 };
 
+// Ação ao lado da frase de leitura; no app, o botão do insight de IA da tela.
+export const ComAcao: Story = {
+	args: {
+		summaryAction: (
+			<Button variant="outline" size="xs">
+				Insight feito por IA
+			</Button>
+		),
+	},
+};
+
 // Container estreito (coluna ao lado do mapa, celular): a coluna de percentual sai.
 export const Estreito: Story = {
 	decorators: [
