@@ -1,6 +1,8 @@
 """Aviso de que ordens de inspeção mudaram, entregue às telas abertas pelo próprio Postgres."""
 
+import asyncio
 import json
+import sys
 from collections.abc import AsyncIterator, Sequence
 
 import psycopg
@@ -31,6 +33,17 @@ def avisar_mudanca_de_ordem(session: Session, ordem_ids: Sequence[int]) -> None:
         text("SELECT pg_notify(:canal, :payload)"),
         {"canal": CANAL, "payload": json.dumps({"ordem_ids": ids})},
     )
+
+
+def loop_suporta_listen() -> bool:
+    """O psycopg assíncrono não roda no ProactorEventLoop, o padrão do Python no Windows.
+
+    O uvicorn usa o SelectorEventLoop no Linux (Docker, CI) e no Windows com --reload.
+    """
+    ruim = sys.platform == "win32" and isinstance(
+        asyncio.get_running_loop(), asyncio.ProactorEventLoop
+    )
+    return not ruim
 
 
 async def fluxo_de_avisos(database_url: str, intervalo_ping: float) -> AsyncIterator[str]:

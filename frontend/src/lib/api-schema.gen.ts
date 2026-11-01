@@ -2326,6 +2326,15 @@ export interface operations {
                     };
                 };
             };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErroSchema"];
+                };
+            };
         };
     };
     obter_ordem_ordens_inspecao__ordem_id__get: {

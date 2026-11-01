@@ -55,6 +55,7 @@ def test_route_streams_the_events_and_is_not_read_as_an_order_id(
         yield evento_sse("ordens", '{"ordem_ids": [7]}')
 
     monkeypatch.setattr(rota_ordens, "fluxo_de_avisos", fluxo_finito)
+    monkeypatch.setattr(rota_ordens, "loop_suporta_listen", lambda: True)
 
     response = client.get(URL)
 
@@ -62,6 +63,17 @@ def test_route_streams_the_events_and_is_not_read_as_an_order_id(
     assert response.headers["content-type"].startswith("text/event-stream")
     assert response.headers["cache-control"] == "no-cache"
     assert response.text == f'{PING}event: ordens\ndata: {{"ordem_ids": [7]}}\n\n'
+
+
+def test_route_answers_503_instead_of_opening_a_stream_that_would_abort(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(rota_ordens, "loop_suporta_listen", lambda: False)
+
+    response = client.get(URL)
+
+    assert response.status_code == 503
+    assert "--reload" in response.json()["detail"]
 
 
 def test_route_requires_login(engine: Engine, client_for: Callable[..., TestClient]) -> None:

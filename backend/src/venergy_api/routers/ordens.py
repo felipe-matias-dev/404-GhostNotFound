@@ -13,6 +13,7 @@ from venergy_api.avisos_ordens import (
     INTERVALO_PING_SEGUNDOS,
     avisar_mudanca_de_ordem,
     fluxo_de_avisos,
+    loop_suporta_listen,
 )
 from venergy_api.database import SessionDep
 from venergy_api.models import DimUc, OrdemEvento, OrdemInspecao
@@ -145,10 +146,19 @@ def listar_ordens(
             ),
             "content": {"text/event-stream": {"schema": EVENTO_ORDENS_SSE}},
         },
+        status.HTTP_503_SERVICE_UNAVAILABLE: {"model": ErroSchema},
     },
 )
 async def acompanhar_ordens(request: Request) -> StreamingResponse:
     """Avisa a tela, sem ela perguntar, de que ordens foram criadas ou mudaram de status."""
+    # Um 503 antes de abrir o stream: o EventSource não reconecta depois de um status que não
+    # seja 200, e a tela segue funcionando, só sem o tempo real. Abrir e abortar o stream faria
+    # a tela reconectar e refazer as consultas a cada poucos segundos.
+    if not loop_suporta_listen():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Avisos em tempo real indisponíveis neste servidor. No Windows, use --reload.",
+        )
     return StreamingResponse(
         fluxo_de_avisos(request.app.state.settings.database_url, INTERVALO_PING_SEGUNDOS),
         media_type="text/event-stream",
