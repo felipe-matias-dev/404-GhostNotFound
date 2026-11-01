@@ -1217,6 +1217,18 @@ export interface components {
              * Format: date-time
              */
             atualizada_em: string;
+            /**
+             * No Status Desde
+             * Format: date-time
+             */
+            no_status_desde: string;
+            /** Segundos No Status */
+            segundos_no_status: number;
+            /**
+             * Atrasada
+             * @default false
+             */
+            atrasada: boolean;
             /** Eventos */
             eventos: components["schemas"]["EventoSchema"][];
         };
@@ -1240,6 +1252,18 @@ export interface components {
              * Format: date-time
              */
             atualizada_em: string;
+            /**
+             * No Status Desde
+             * Format: date-time
+             */
+            no_status_desde: string;
+            /** Segundos No Status */
+            segundos_no_status: number;
+            /**
+             * Atrasada
+             * @default false
+             */
+            atrasada: boolean;
         };
         /**
          * ParPeriodosSchema

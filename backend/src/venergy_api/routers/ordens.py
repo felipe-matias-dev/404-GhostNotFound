@@ -17,7 +17,14 @@ from venergy_api.avisos_ordens import (
 )
 from venergy_api.database import SessionDep
 from venergy_api.models import DimUc, OrdemEvento, OrdemInspecao
-from venergy_api.ordens import STATUS_ATIVOS, StatusOrdem, TransicaoInvalidaError, validar_transicao
+from venergy_api.ordens import (
+    STATUS_ATIVOS,
+    LimitesDeAtraso,
+    StatusOrdem,
+    TransicaoInvalidaError,
+    esta_atrasada,
+    validar_transicao,
+)
 from venergy_api.schemas import (
     AtualizarOrdemSchema,
     CriarOrdensSchema,
@@ -45,6 +52,25 @@ EVENTO_ORDENS_SSE: dict[str, Any] = {
 UsuarioDePerdasDep = Annotated[UsuarioLogado, Depends(exigir_perfil(Perfil.PERDAS))]
 
 
+def limites_de_atraso(request: Request) -> LimitesDeAtraso:
+    configuracao = request.app.state.settings
+    return LimitesDeAtraso(
+        gerada_dias=configuracao.ordem_atraso_gerada_dias,
+        em_campo_dias=configuracao.ordem_atraso_em_campo_dias,
+    )
+
+
+LimitesDep = Annotated[LimitesDeAtraso, Depends(limites_de_atraso)]
+
+
+def _como_schema[S: OrdemSchema](
+    modelo: type[S], ordem: OrdemInspecao, limites: LimitesDeAtraso
+) -> S:
+    schema = modelo.model_validate(ordem)
+    atrasada = esta_atrasada(schema.status, schema.segundos_no_status, limites)
+    return schema.model_copy(update={"atrasada": atrasada})
+
+
 def _erro_ja_ativas(cod_ucs: list[str]) -> HTTPException:
     return HTTPException(
         status_code=status.HTTP_409_CONFLICT,
@@ -62,7 +88,10 @@ def _erro_ja_ativas(cod_ucs: list[str]) -> HTTPException:
     },
 )
 def criar_ordens(
-    pedido: CriarOrdensSchema, session: SessionDep, usuario: UsuarioDePerdasDep
+    pedido: CriarOrdensSchema,
+    session: SessionDep,
+    usuario: UsuarioDePerdasDep,
+    limites: LimitesDep,
 ) -> list[OrdemSchema]:
     """Gera uma OI por UC, tudo ou nada: se uma UC falhar, nenhuma OI é criada."""
     # Sem FK para a Gold (ver models.OrdemInspecao), a existência da UC é garantida aqui.
@@ -106,13 +135,14 @@ def criar_ordens(
         if getattr(error.orig.diag, "constraint_name", None) == INDICE_UC_ATIVA:
             raise _erro_ja_ativas(pedido.cod_ucs) from error
         raise
-    return [OrdemSchema.model_validate(ordem) for ordem in ordens]
+    return [_como_schema(OrdemSchema, ordem, limites) for ordem in ordens]
 
 
 @router.get("")
 def listar_ordens(
     session: SessionDep,
     filtro: Annotated[OrdensFiltroSchema, Query()],
+    limites: LimitesDep,
 ) -> list[OrdemSchema]:
     """Lista as OIs, das mais recentes para as mais antigas, opcionalmente por status."""
     # Pelo id, e não por criada_em: OIs do mesmo lote têm o mesmo horário (now() da
@@ -131,7 +161,7 @@ def listar_ordens(
     ]
     if predicados:
         consulta = consulta.join(DimUc, DimUc.cod_uc == OrdemInspecao.cod_uc).where(*predicados)
-    return [OrdemSchema.model_validate(ordem) for ordem in session.scalars(consulta)]
+    return [_como_schema(OrdemSchema, ordem, limites) for ordem in session.scalars(consulta)]
 
 
 # Declarada antes de /{ordem_id}: do contrário, "eventos" seria lido como o id de uma ordem (422).
@@ -177,8 +207,8 @@ def _buscar_ordem(session: Session, ordem_id: int, *, travar: bool = False) -> O
 
 
 @router.get("/{ordem_id}", responses={status.HTTP_404_NOT_FOUND: {"model": ErroSchema}})
-def obter_ordem(ordem_id: int, session: SessionDep) -> OrdemDetalheSchema:
-    return OrdemDetalheSchema.model_validate(_buscar_ordem(session, ordem_id))
+def obter_ordem(ordem_id: int, session: SessionDep, limites: LimitesDep) -> OrdemDetalheSchema:
+    return _como_schema(OrdemDetalheSchema, _buscar_ordem(session, ordem_id), limites)
 
 
 @router.patch(
@@ -194,6 +224,7 @@ def atualizar_ordem(
     mudanca: AtualizarOrdemSchema,
     session: SessionDep,
     usuario: UsuarioDePerdasDep,
+    limites: LimitesDep,
 ) -> OrdemDetalheSchema:
     """Muda o status da OI (inclusive cancelar) e registra a mudança no histórico."""
     # Trava a linha até o commit (SELECT ... FOR UPDATE): sem isso, duas mudanças
@@ -220,4 +251,4 @@ def atualizar_ordem(
         ordem.observacao = mudanca.observacao
     avisar_mudanca_de_ordem(session, [ordem.id])
     session.commit()
-    return OrdemDetalheSchema.model_validate(ordem)
+    return _como_schema(OrdemDetalheSchema, ordem, limites)

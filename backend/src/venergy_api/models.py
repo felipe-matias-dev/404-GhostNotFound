@@ -12,14 +12,17 @@ from sqlalchemy import (
     Enum,
     ForeignKey,
     Index,
+    Integer,
     Numeric,
     Text,
+    cast,
     false,
     func,
+    select,
     text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, column_property, mapped_column, relationship
 
 from venergy_api.auth import Perfil
 from venergy_api.database import Base
@@ -403,6 +406,33 @@ class OrdemEvento(Base):
     def autor_nome(self) -> str | None:
         """Nome de quem agiu; vazio sem autor ou se o login não está mais em app.usuarios."""
         return self.autor.nome if self.autor else None
+
+
+# Quando a OI entrou no status atual: o último evento gravado do histórico (maior id, a mesma
+# ordem do histórico), que registra toda mudança de status. Calculado no banco, na mesma consulta
+# da OI, para a lista não fazer uma busca por ordem. Sem evento (OI de antes do histórico), vale
+# a criação. Definido depois das duas classes porque uma referencia a outra.
+OrdemInspecao.no_status_desde = column_property(
+    func.coalesce(
+        select(OrdemEvento.ocorrido_em)
+        .where(OrdemEvento.ordem_id == OrdemInspecao.id)
+        .order_by(OrdemEvento.id.desc())
+        .limit(1)
+        .correlate_except(OrdemEvento)
+        .scalar_subquery(),
+        OrdemInspecao.criada_em,
+    )
+)
+# Segundos inteiros desde essa entrada, pelo relógio do banco, o mesmo que gravou o evento: o
+# relógio do computador de quem olha a tela não entra na conta.
+OrdemInspecao.segundos_no_status = column_property(
+    cast(
+        func.greatest(
+            0, func.floor(func.extract("epoch", func.now() - OrdemInspecao.no_status_desde))
+        ),
+        Integer,
+    )
+)
 
 
 class AiAuditoria(Base):

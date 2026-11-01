@@ -704,6 +704,12 @@ class OrdemSchema(BaseModel):
     observacao: str | None
     criada_em: datetime
     atualizada_em: datetime
+    # Entrada no status atual (último evento) e há quantos segundos, pelo relógio do banco: a tela
+    # soma o tempo desde a resposta e não depende do relógio do computador de quem olha.
+    no_status_desde: datetime
+    segundos_no_status: Annotated[int, Field(ge=0)]
+    # Preenchido pela rota, que conhece os limites (esta_atrasada); a OI no banco não guarda isto.
+    atrasada: bool = False
 
 
 class EventoSchema(BaseModel):

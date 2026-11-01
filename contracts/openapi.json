@@ -4477,6 +4477,21 @@
             "format": "date-time",
             "title": "Atualizada Em"
           },
+          "no_status_desde": {
+            "type": "string",
+            "format": "date-time",
+            "title": "No Status Desde"
+          },
+          "segundos_no_status": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Segundos No Status"
+          },
+          "atrasada": {
+            "type": "boolean",
+            "title": "Atrasada",
+            "default": false
+          },
           "eventos": {
             "items": {
               "$ref": "#/components/schemas/EventoSchema"
@@ -4494,6 +4509,8 @@
           "observacao",
           "criada_em",
           "atualizada_em",
+          "no_status_desde",
+          "segundos_no_status",
           "eventos"
         ],
         "title": "OrdemDetalheSchema",
@@ -4542,6 +4559,21 @@
             "type": "string",
             "format": "date-time",
             "title": "Atualizada Em"
+          },
+          "no_status_desde": {
+            "type": "string",
+            "format": "date-time",
+            "title": "No Status Desde"
+          },
+          "segundos_no_status": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Segundos No Status"
+          },
+          "atrasada": {
+            "type": "boolean",
+            "title": "Atrasada",
+            "default": false
           }
         },
         "type": "object",
@@ -4552,7 +4584,9 @@
           "resultado",
           "observacao",
           "criada_em",
-          "atualizada_em"
+          "atualizada_em",
+          "no_status_desde",
+          "segundos_no_status"
         ],
         "title": "OrdemSchema"
       },
