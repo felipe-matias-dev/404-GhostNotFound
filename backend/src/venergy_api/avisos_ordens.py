@@ -76,7 +76,10 @@ class VagasDeAvisos:
 
 
 async def fluxo_de_avisos(
-    database_url: str, intervalo_ping: float, ao_fechar: Callable[[], None]
+    database_url: str,
+    intervalo_ping: float,
+    ao_fechar: Callable[[], None],
+    sessao_valida: Callable[[], bool],
 ) -> AsyncIterator[str]:
     """Os avisos de ordens como eventos SSE, de uma conexão LISTEN própria por tela aberta.
 
@@ -86,6 +89,9 @@ async def fluxo_de_avisos(
 
     `ao_fechar` roda uma vez quando o fluxo termina, inclusive se a conexão falhar. Só vale para
     um gerador que já começou: quem abre o fluxo lê o primeiro item antes de entregá-lo.
+
+    O login só é conferido na abertura da requisição. `sessao_valida` é conferida a cada ping, e
+    o fluxo termina quando ela deixa de valer: o EventSource reconecta, leva 401 e para.
     """
     try:
         url = (
@@ -101,6 +107,8 @@ async def fluxo_de_avisos(
             while True:
                 async for aviso in conexao.notifies(timeout=intervalo_ping):
                     yield evento_sse(EVENTO, aviso.payload)
+                if not sessao_valida():
+                    return
                 yield PING
     finally:
         ao_fechar()

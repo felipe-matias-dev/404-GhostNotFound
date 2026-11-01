@@ -1,14 +1,18 @@
 import asyncio
 import time
 from collections.abc import AsyncIterator, Callable, Coroutine
+from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
 from typing import Any
 
 import psycopg
 import pytest
+from fastapi import Request
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine, text
 from sqlalchemy.orm import Session
 
+from venergy_api.auth import Perfil, UsuarioLogado, criar_token
 from venergy_api.avisos_ordens import (
     APLICACAO,
     VagasDeAvisos,
@@ -16,6 +20,7 @@ from venergy_api.avisos_ordens import (
     fluxo_de_avisos,
 )
 from venergy_api.routers import ordens as rota_ordens
+from venergy_api.sessao import COOKIE_SESSAO, conferidor_da_sessao
 from venergy_api.sse import PING, evento_sse
 
 URL = "/ordens-inspecao/eventos"
@@ -29,6 +34,10 @@ def rodar[T](corrotina: Coroutine[Any, Any, T]) -> T:
 
 def nada() -> None:
     pass
+
+
+def sempre() -> bool:
+    return True
 
 
 def vagas(client: TestClient) -> VagasDeAvisos:
@@ -61,7 +70,10 @@ def test_route_streams_the_events_and_is_not_read_as_an_order_id(
     engine: Engine, client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     async def fluxo_finito(
-        database_url: str, intervalo_ping: float, ao_fechar: Callable[[], None]
+        database_url: str,
+        intervalo_ping: float,
+        ao_fechar: Callable[[], None],
+        sessao_valida: Callable[[], bool],
     ) -> AsyncIterator[str]:
         try:
             yield PING
@@ -91,6 +103,33 @@ def test_route_answers_503_instead_of_opening_a_stream_that_would_abort(
     assert "--reload" in response.json()["detail"]
 
 
+def test_route_hands_the_stream_a_checker_of_the_request_token(
+    client: TestClient, jwt_secret: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    conferencias: list[bool] = []
+
+    async def fluxo_que_confere(
+        database_url: str,
+        intervalo_ping: float,
+        ao_fechar: Callable[[], None],
+        sessao_valida: Callable[[], bool],
+    ) -> AsyncIterator[str]:
+        try:
+            conferencias.append(sessao_valida())
+            yield PING
+        finally:
+            ao_fechar()
+
+    monkeypatch.setattr(rota_ordens, "fluxo_de_avisos", fluxo_que_confere)
+    monkeypatch.setattr(rota_ordens, "loop_suporta_listen", lambda: True)
+    rafael = UsuarioLogado(login="rafael", nome="Rafael", perfil=Perfil.PERDAS)
+    vencido = criar_token(rafael, jwt_secret, agora=datetime.now(UTC) - timedelta(hours=9))
+    client.cookies.set(COOKIE_SESSAO, vencido)
+
+    assert client.get(URL).status_code == 200
+    assert conferencias == [False]
+
+
 @pytest.mark.parametrize("ocupante", ["teste", "outro"])
 def test_route_answers_429_before_opening_a_stream_without_a_free_slot(
     engine: Engine,
@@ -112,7 +151,10 @@ def test_route_answers_503_and_frees_the_slot_when_the_database_refuses(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     async def banco_lotado(
-        database_url: str, intervalo_ping: float, ao_fechar: Callable[[], None]
+        database_url: str,
+        intervalo_ping: float,
+        ao_fechar: Callable[[], None],
+        sessao_valida: Callable[[], bool],
     ) -> AsyncIterator[str]:
         try:
             raise psycopg.OperationalError("too many clients already")
@@ -148,7 +190,7 @@ def test_route_requires_login(engine: Engine, client_for: Callable[..., TestClie
 
 def test_stream_opens_with_a_ping_only_after_it_is_listening(engine: Engine) -> None:
     async def abrir() -> str:
-        fluxo = fluxo_de_avisos(database_url(engine), 5, nada)
+        fluxo = fluxo_de_avisos(database_url(engine), 5, nada, sempre)
         try:
             async with asyncio.timeout(LIMITE_DO_TESTE):
                 primeiro = await anext(fluxo)
@@ -167,7 +209,7 @@ def test_stream_opens_with_a_ping_only_after_it_is_listening(engine: Engine) -> 
 
 def test_stream_pings_while_nothing_happens(engine: Engine) -> None:
     async def colher() -> list[str]:
-        fluxo = fluxo_de_avisos(database_url(engine), 0.05, nada)
+        fluxo = fluxo_de_avisos(database_url(engine), 0.05, nada, sempre)
         try:
             async with asyncio.timeout(LIMITE_DO_TESTE):
                 return [await anext(fluxo) for _ in range(3)]
@@ -179,7 +221,7 @@ def test_stream_pings_while_nothing_happens(engine: Engine) -> None:
 
 def test_closing_the_stream_releases_its_database_connection(engine: Engine) -> None:
     async def abrir_e_fechar() -> int:
-        fluxo = fluxo_de_avisos(database_url(engine), 5, nada)
+        fluxo = fluxo_de_avisos(database_url(engine), 5, nada, sempre)
         await anext(fluxo)
         abertos = ouvintes_abertos(engine)
         await fluxo.aclose()
@@ -193,7 +235,7 @@ def test_closing_the_stream_calls_ao_fechar_once(engine: Engine) -> None:
     fechamentos: list[None] = []
 
     async def abrir_e_fechar() -> None:
-        fluxo = fluxo_de_avisos(database_url(engine), 5, lambda: fechamentos.append(None))
+        fluxo = fluxo_de_avisos(database_url(engine), 5, lambda: fechamentos.append(None), sempre)
         await anext(fluxo)
         await fluxo.aclose()
 
@@ -208,10 +250,58 @@ def test_a_refused_connection_still_calls_ao_fechar(engine: Engine) -> None:
 
     async def abrir() -> None:
         fluxo = fluxo_de_avisos(
-            sem_banco.render_as_string(hide_password=False), 5, lambda: fechamentos.append(None)
+            sem_banco.render_as_string(hide_password=False),
+            5,
+            lambda: fechamentos.append(None),
+            sempre,
         )
         await anext(fluxo)
 
     with pytest.raises(psycopg.OperationalError):
         rodar(abrir())
     assert len(fechamentos) == 1
+
+
+def test_stream_ends_at_the_ping_after_the_session_stops_being_valid(engine: Engine) -> None:
+    fechamentos: list[None] = []
+    conferencias = iter([True, False])
+
+    async def colher() -> list[str]:
+        fluxo = fluxo_de_avisos(
+            database_url(engine),
+            0.05,
+            lambda: fechamentos.append(None),
+            lambda: next(conferencias),
+        )
+        async with asyncio.timeout(LIMITE_DO_TESTE):
+            return [item async for item in fluxo]
+
+    assert rodar(colher()) == [PING, PING]
+    assert len(fechamentos) == 1
+
+
+SEGREDO = "segredo-de-teste-com-tamanho-suficiente-para-hs256"
+
+
+def requisicao_com_cookie(cookie: str | None) -> Request:
+    headers = [(b"cookie", f"{COOKIE_SESSAO}={cookie}".encode())] if cookie else []
+    app = SimpleNamespace(state=SimpleNamespace(settings=SimpleNamespace(jwt_secret=SEGREDO)))
+    return Request({"type": "http", "headers": headers, "app": app})
+
+
+@pytest.mark.parametrize(
+    ("horas_desde_o_login", "esperado"), [(0, True), (7.9, True), (8.1, False), (None, False)]
+)
+def test_session_checker_follows_the_token_the_request_arrived_with(
+    horas_desde_o_login: float | None, esperado: bool
+) -> None:
+    rafael = UsuarioLogado(login="rafael", nome="Rafael", perfil=Perfil.PERDAS)
+    token = (
+        None
+        if horas_desde_o_login is None
+        else criar_token(
+            rafael, SEGREDO, agora=datetime.now(UTC) - timedelta(hours=horas_desde_o_login)
+        )
+    )
+
+    assert conferidor_da_sessao(requisicao_com_cookie(token))() is esperado

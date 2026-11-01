@@ -58,7 +58,7 @@ from venergy_api.schemas import (
     ResultadoPlanilhaSchema,
     TempoPorEtapaSchema,
 )
-from venergy_api.sessao import UsuarioDep, exigir_perfil
+from venergy_api.sessao import UsuarioDep, conferidor_da_sessao, exigir_perfil
 
 router = APIRouter(prefix="/ordens-inspecao", tags=["ordens de inspeção"])
 
@@ -231,6 +231,7 @@ async def acompanhar_ordens(request: Request, usuario: UsuarioDep) -> StreamingR
         request.app.state.settings.database_url,
         INTERVALO_PING_SEGUNDOS,
         ao_fechar=partial(vagas.liberar, usuario.login),
+        sessao_valida=conferidor_da_sessao(request),
     )
     # O primeiro item (o ping depois do LISTEN) é lido aqui, e não pelo StreamingResponse: um
     # gerador que já começou sempre devolve a vaga ao fechar, mesmo que o cliente saia antes
