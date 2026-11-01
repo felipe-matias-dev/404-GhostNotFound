@@ -1,9 +1,11 @@
 import { WaterfallChart } from "#/components/ui/waterfall-chart";
+import { InsightIa } from "#/features/agente";
 import { CLASSE_ROTULO } from "#/features/filtros";
 import type { ParPeriodos, Recorte } from "#/lib/filtros";
 import { formatBRL, formatPct, formatPeriodoCurto } from "#/lib/format";
 import { causaDoPasso, type Efeito, passosDaPonte } from "../conversions";
 import { useDecomposicao } from "../hooks/use-decomposicao";
+import { useInsightReceita } from "../hooks/use-insight-receita";
 
 export function PonteWaterfall({
 	par,
@@ -19,6 +21,8 @@ export function PonteWaterfall({
 }) {
 	const { data, isPending, isPlaceholderData, isError, refetch } =
 		useDecomposicao(par, recorte);
+	// O insight narra esta ponte: fica ao lado da frase de leitura que ele aprofunda.
+	const insight = useInsightReceita(par, recorte);
 	const passos = data ? passosDaPonte(data) : undefined;
 	const nome = recorte.bairro ?? recorte.municipio;
 	const daClasse = recorte.classe
@@ -69,6 +73,19 @@ export function PonteWaterfall({
 			label={`Ponte de receita${daClasse} ${nome ? `de ${nome}` : "da empresa"}`}
 			steps={passos}
 			summary={resumo}
+			summaryAction={
+				<InsightIa
+					texto={insight.data?.texto}
+					carregando={insight.isFetching}
+					indisponivel={
+						insight.isError ||
+						(insight.data !== undefined && !insight.data.texto)
+					}
+					onGerar={() => {
+						void insight.refetch();
+					}}
+				/>
+			}
 			compareLabel="vs. receita base"
 			percentLabel="Sobre a receita base"
 			loading={isPending || isPlaceholderData}
