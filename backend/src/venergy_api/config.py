@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     # a falha mais antiga sair dela. 0 desliga o limite.
     login_max_falhas: int = Field(5, ge=0)
     login_janela_segundos: int = Field(900, gt=0)
-    # Para onde a API manda os traces do OpenTelemetry (DEC-066), por exemplo o Jaeger do
+    # Para onde a API manda os traces do OpenTelemetry (DEC-068), por exemplo o Jaeger do
     # compose: http://jaeger:4318/v1/traces. Vazio desliga: sem coletor no ar, o exportador
     # encheria o log com falhas de envio.
     rastreamento_endpoint: str | None = None

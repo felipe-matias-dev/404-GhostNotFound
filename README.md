@@ -311,6 +311,18 @@ recarregam a cada mudança. Mudou dependência (`pyproject.toml`, `package.json`
 O passo `mkdir` cria a pasta da Gold com o seu usuário. Sem ele, no Linux, o Docker a cria
 como root e o gerador da amostra não consegue gravar.
 
+### Observabilidade (opcional)
+
+Cada requisição pode virar um trace do OpenTelemetry, com a rota, as consultas ao Postgres e as chamadas ao Gemini, cada uma com a sua duração ([DEC-068](docs/decisoes.md)). Desligado por padrão: o passo a passo acima não precisa disso.
+
+```bash
+# 1. No .env: RASTREAMENTO_ENDPOINT=http://jaeger:4318/v1/traces
+# 2. Sobe o ambiente com o Jaeger
+docker compose --profile observabilidade up -d --wait
+```
+
+Abra http://localhost:16686, escolha o serviço `venergy-api` e clique em **Find Traces**. Para achar uma pergunta da auditoria do agente, busque pela tag `venergy.ai.request_id=<request_id>`. O Jaeger guarda os traces em memória: reiniciar o container apaga todos.
+
 ### Atalhos com `make`
 
 O `Makefile` da raiz só chama os comandos descritos neste README e no CI, para quem prefere um comando curto. Não é obrigatório: tudo continua funcionando com os comandos acima.

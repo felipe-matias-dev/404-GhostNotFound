@@ -1,4 +1,4 @@
-"""Rastreamento opcional das requisições com OpenTelemetry (DEC-066).
+"""Rastreamento opcional das requisições com OpenTelemetry (DEC-068).
 
 Cada requisição vira um trace: a rota, as consultas ao Postgres (do backend e do agente) e as
 chamadas ao modelo, cada uma com a sua duração. Sem `VENERGY_API_RASTREAMENTO_ENDPOINT`, nada é

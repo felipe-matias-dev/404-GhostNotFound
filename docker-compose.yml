@@ -49,7 +49,7 @@ services:
       VENERGY_AGENT_OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       # Uma tentativa por modelo: em caso de falha, passa logo para o próximo (DEC-061).
       VENERGY_AGENT_LLM_RETRY_ATTEMPTS: ${LLM_RETRY_ATTEMPTS:-1}
-      # Traces do OpenTelemetry (DEC-066). Vazio desliga; com o perfil observabilidade, use
+      # Traces do OpenTelemetry (DEC-068). Vazio desliga; com o perfil observabilidade, use
       # http://jaeger:4318/v1/traces no .env.
       VENERGY_API_RASTREAMENTO_ENDPOINT: ${RASTREAMENTO_ENDPOINT:-}
       # Detecção de mudanças por varredura: eventos do sistema de arquivos não atravessam
@@ -90,7 +90,7 @@ services:
 
   jaeger:
     # Opcional: só sobe com --profile observabilidade, e sem ele o resto do ambiente não muda.
-    # Guarda os traces em memória: reiniciar o container apaga todos (DEC-066).
+    # Guarda os traces em memória: reiniciar o container apaga todos (DEC-068).
     image: jaegertracing/jaeger:2.22.0
     profiles: ["observabilidade"]
     ports:
