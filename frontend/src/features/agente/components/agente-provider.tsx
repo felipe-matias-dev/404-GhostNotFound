@@ -9,9 +9,8 @@ import {
 	useRef,
 	useState,
 } from "react";
-import { perguntarAoAgente } from "../api";
+import { type ConsultaAtiva, consultarAgente } from "../consulta";
 import {
-	extrairMensagemErro,
 	gerarTituloSessao,
 	MAX_SESSOES,
 	parseSessoesSalvas,
@@ -26,6 +25,7 @@ export interface AgenteContextValue {
 	escopo: EscopoSugestao;
 	setEscopo: (escopo: EscopoSugestao) => void;
 	enviando: boolean;
+	cancelarConsulta: () => void;
 	widgetAberto: boolean;
 	setWidgetAberto: (aberto: boolean) => void;
 	alternarWidget: () => void;
@@ -76,7 +76,7 @@ export function AgenteProvider({
 	const [widgetAberto, setWidgetAberto] = useState(false);
 	const [chaveCarregada, setChaveCarregada] = useState<string | null>(null);
 	const [localDisponivel, setLocalDisponivel] = useState(true);
-	const enviandoRef = useRef(false);
+	const consultaRef = useRef<ConsultaAtiva | null>(null);
 
 	const sessaoAtiva = useMemo(
 		() =>
@@ -161,33 +161,38 @@ export function AgenteProvider({
 		[],
 	);
 
+	const cancelarConsulta = useCallback(() => {
+		const consulta = consultaRef.current;
+		if (!consulta) return;
+		consultaRef.current = null;
+		consulta.controller.abort();
+		atualizarTurno(consulta.sessionId, consulta.turnoId, {
+			status: "error",
+			erro: "Consulta cancelada. Tente novamente.",
+			etapa: undefined,
+		});
+		setEnviando(false);
+	}, [atualizarTurno]);
+
+	useEffect(() => {
+		if (rota !== "/agente") return;
+		return () => cancelarConsulta();
+	}, [rota, cancelarConsulta]);
+	useEffect(() => () => cancelarConsulta(), [cancelarConsulta]);
+
 	const consultar = useCallback(
-		async (sessionId: string, turnoId: string, question: string) => {
-			if (enviandoRef.current) return;
-			enviandoRef.current = true;
-			setEnviando(true);
-			try {
-				const resposta = await perguntarAoAgente({
-					question,
-					session_id: sessionId,
-				});
-				atualizarTurno(sessionId, turnoId, { status: "completed", resposta });
-			} catch (erro) {
-				atualizarTurno(sessionId, turnoId, {
-					status: "error",
-					erro: extrairMensagemErro(erro),
-				});
-			} finally {
-				enviandoRef.current = false;
-				setEnviando(false);
-			}
-		},
+		(sessionId: string, turnoId: string, question: string) =>
+			consultarAgente(
+				consultaRef,
+				{ sessionId, turnoId, question },
+				{ atualizarTurno, setEnviando },
+			),
 		[atualizarTurno],
 	);
 
 	const enviarPergunta = useCallback(
 		async (perguntaTexto: string) => {
-			if (enviandoRef.current) return;
+			if (consultaRef.current) return;
 			const validacao = validarPergunta(perguntaTexto);
 			if (!validacao.ok) return;
 			const sessionId = sessaoAtiva.sessionId;
@@ -223,7 +228,7 @@ export function AgenteProvider({
 
 	const tentarNovamente = useCallback(
 		async (turnoId: string) => {
-			if (enviandoRef.current) return;
+			if (consultaRef.current) return;
 			const sessao = sessoes.find((atual) =>
 				atual.turnos.some((turno) => turno.id === turnoId),
 			);
@@ -240,6 +245,7 @@ export function AgenteProvider({
 	);
 
 	const novaConversa = useCallback(() => {
+		cancelarConsulta();
 		const nova = novaSessao(usuario);
 		setSessoes((atuais) =>
 			[nova, ...atuais.filter((sessao) => sessao.turnos.length > 0)].slice(
@@ -249,11 +255,15 @@ export function AgenteProvider({
 		);
 		setSessaoAtivaId(nova.sessionId);
 		return nova.sessionId;
-	}, [usuario]);
+	}, [usuario, cancelarConsulta]);
 
-	const selecionarSessao = useCallback((sessionId: string) => {
-		setSessaoAtivaId(sessionId);
-	}, []);
+	const selecionarSessao = useCallback(
+		(sessionId: string) => {
+			if (consultaRef.current?.sessionId !== sessionId) cancelarConsulta();
+			setSessaoAtivaId(sessionId);
+		},
+		[cancelarConsulta],
+	);
 
 	const renomearSessao = useCallback(
 		(sessionId: string, novoTitulo: string) => {
@@ -283,6 +293,7 @@ export function AgenteProvider({
 
 	const removerSessao = useCallback(
 		(sessionId: string) => {
+			if (consultaRef.current?.sessionId === sessionId) cancelarConsulta();
 			setSessoes((atuais) => {
 				const restantes = atuais.filter(
 					(sessao) => sessao.sessionId !== sessionId,
@@ -291,13 +302,14 @@ export function AgenteProvider({
 			});
 			setSessaoAtivaId((atual) => (atual === sessionId ? null : atual));
 		},
-		[usuario],
+		[usuario, cancelarConsulta],
 	);
 
 	const limparHistorico = useCallback(() => {
+		cancelarConsulta();
 		setSessoes([novaSessao(usuario)]);
 		setSessaoAtivaId(null);
-	}, [usuario]);
+	}, [usuario, cancelarConsulta]);
 	const valor = useMemo<AgenteContextValue>(
 		() => ({
 			sessoes,
@@ -305,6 +317,7 @@ export function AgenteProvider({
 			escopo,
 			setEscopo,
 			enviando,
+			cancelarConsulta,
 			widgetAberto,
 			setWidgetAberto,
 			alternarWidget,
@@ -322,6 +335,7 @@ export function AgenteProvider({
 			sessaoAtiva,
 			escopo,
 			enviando,
+			cancelarConsulta,
 			widgetAberto,
 			alternarWidget,
 			novaConversa,

@@ -53,6 +53,21 @@ uma opção de tentar novamente, sem confundir indisponibilidade com credencial 
 Sair ou trocar de usuário limpa as consultas em memória; as UCs recentes ficam
 separadas por login no navegador, sem migrar o histórico compartilhado anterior.
 
+O chat mostra as etapas recebidas de `POST /ai/ask/stream` e só exibe a resposta
+completa no evento final. Minimizar ou fechar o widget só esconde a janela: a consulta
+continua, com o indicador no botão flutuante, e a resposta fica disponível ao reabrir.
+Durante a consulta é possível escrever a próxima pergunta, mas novos envios, sugestões
+e tentativas de repetição não substituem a consulta ativa. O botão **Parar** cancela
+explicitamente e preserva o rascunho. Também cancelam: sair da página `/agente`, criar
+ou trocar de conversa, remover a conversa em andamento, limpar o histórico e sair do
+portal. Perguntas canceladas podem ser tentadas novamente; o abandono conta no limite
+de perguntas e os tokens já informados pelo provedor contam no orçamento (DEC-055).
+Quando o agente pede esclarecimento, o chat exibe a pergunta uma única vez,
+como parte do texto da resposta.
+Falhas de interpretação do stream mostram uma mensagem de erro com opção de tentar
+novamente, sem expor o erro técnico do parser. Uma resposta sem a linha vazia final
+do evento SSE é incompleta: não é exibida como resposta concluída.
+
 ### Filtros das análises
 
 Visão geral, Receita, Rede e Perdas compartilham período, município, bairro e classe
