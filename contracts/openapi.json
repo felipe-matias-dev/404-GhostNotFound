@@ -68,6 +68,16 @@
               }
             }
           },
+          "429": {
+            "description": "Senhas erradas demais para este login e este endereço (DEC-065)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErroSchema"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
