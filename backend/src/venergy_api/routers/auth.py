@@ -2,6 +2,7 @@
 
 from datetime import UTC, datetime
 from functools import lru_cache
+from math import ceil
 
 from fastapi import APIRouter, HTTPException, Request, Response, status
 
@@ -16,6 +17,12 @@ from venergy_api.database import SessionDep
 from venergy_api.models import Usuario
 from venergy_api.schemas import ErroSchema, LoginSchema
 from venergy_api.sessao import COOKIE_SESSAO, UsuarioDep
+from venergy_api.tentativas_login import (
+    ENDERECO_DESCONHECIDO,
+    registrar_tentativa,
+    segundos_de_bloqueio,
+    travar_par,
+)
 
 router = APIRouter(prefix="/auth", tags=["autenticação"])
 
@@ -34,15 +41,70 @@ def _hash_de_ninguem() -> str:
     return gerar_hash("ninguem")
 
 
-@router.post("/login", responses={status.HTTP_401_UNAUTHORIZED: {"model": ErroSchema}})
+def _texto_da_espera(segundos: int) -> str:
+    minutos = ceil(segundos / 60)
+    return f"{minutos} minuto" if minutos == 1 else f"{minutos} minutos"
+
+
+@router.post(
+    "/login",
+    responses={
+        status.HTTP_401_UNAUTHORIZED: {"model": ErroSchema},
+        status.HTTP_429_TOO_MANY_REQUESTS: {
+            "model": ErroSchema,
+            "description": "Senhas erradas demais para este login e este endereço (DEC-065)",
+            "headers": {
+                "Retry-After": {
+                    "description": "Segundos até o par poder tentar de novo",
+                    "schema": {"type": "integer"},
+                }
+            },
+        },
+    },
+)
 def entrar(
     pedido: LoginSchema, session: SessionDep, request: Request, response: Response
 ) -> UsuarioLogado:
+    configuracao = request.app.state.settings
+    limitado = configuracao.login_max_falhas > 0
+    # O endereço da conexão, nunca o X-Forwarded-For: é um cabeçalho que o cliente escreve, e
+    # confiar nele deixaria quem erra senhas trocar de "endereço" a cada tentativa.
+    ip = request.client.host if request.client else ENDERECO_DESCONHECIDO
+
+    if limitado:
+        travar_par(session, pedido.login, ip)
+        espera = segundos_de_bloqueio(
+            session,
+            pedido.login,
+            ip,
+            configuracao.login_max_falhas,
+            configuracao.login_janela_segundos,
+        )
+        if espera is not None:
+            # Antes de conferir a senha, e igual para login que existe ou não: bloqueado, nem a
+            # senha certa entra, e a resposta não revela quais logins existem. A tentativa
+            # bloqueada não é gravada: do contrário o bloqueio se renovaria para sempre.
+            raise HTTPException(
+                status.HTTP_429_TOO_MANY_REQUESTS,
+                f"Muitas tentativas de login. Tente de novo em {_texto_da_espera(espera)}.",
+                headers={"Retry-After": str(espera)},
+            )
+
     usuario = session.get(Usuario, pedido.login)
     senha_certa = conferir_senha(
         pedido.senha, usuario.senha_hash if usuario else _hash_de_ninguem()
     )
-    if usuario is None or not senha_certa:
+    entrou = usuario is not None and senha_certa
+    if limitado:
+        registrar_tentativa(
+            session,
+            pedido.login,
+            ip,
+            sucesso=entrou,
+            janela_segundos=configuracao.login_janela_segundos,
+        )
+        session.commit()
+    if not entrou:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, LOGIN_INVALIDO)
 
     logado = UsuarioLogado(login=usuario.login, nome=usuario.nome, perfil=usuario.perfil)

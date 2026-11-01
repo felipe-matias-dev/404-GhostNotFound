@@ -12,6 +12,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from venergy_api.auditoria import garantir_estrutura_da_auditoria
 from venergy_api.database import create_db_engine
+from venergy_api.models import TentativaLogin
 from venergy_api.visoes_agente import migrar_views_do_agente
 
 logger = logging.getLogger(__name__)
@@ -24,6 +25,8 @@ def garantir_estrutura_do_app(connection: Connection) -> None:
     connection.execute(
         text("ALTER TABLE IF EXISTS app.ordem_evento ADD COLUMN IF NOT EXISTS autor_login text")
     )
+    # Tabela nova (DEC-065): quem atualiza o código sem rodar a carga precisa dela para o login.
+    TentativaLogin.__table__.create(connection, checkfirst=True)
     # Auditoria do agente (DEC-046): tokens, usuário e os índices que o limite e o histórico usam.
     garantir_estrutura_da_auditoria(connection)
     # D1: num banco antigo, as views do agente saem de gold e o acesso dele à Gold acaba.
