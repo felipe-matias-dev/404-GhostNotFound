@@ -40,11 +40,13 @@ const PONTO_CONFIANCA = {
 export function AgenteTurnoItem({
 	turno,
 	onRetry,
+	enviando,
 	compacto = false,
 	mostrarHorario = false,
 }: {
 	turno: TurnoConversa;
 	onRetry: (id: string) => void;
+	enviando: boolean;
 	compacto?: boolean;
 	mostrarHorario?: boolean;
 }) {
@@ -139,6 +141,7 @@ export function AgenteTurnoItem({
 							type="button"
 							variant="outline"
 							size="xs"
+							disabled={enviando}
 							onClick={() => onRetry(turno.id)}
 						>
 							<ArrowsClockwiseIcon aria-hidden />

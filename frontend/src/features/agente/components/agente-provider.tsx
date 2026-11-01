@@ -9,9 +9,8 @@ import {
 	useRef,
 	useState,
 } from "react";
-import { perguntarAoAgente } from "../api";
+import { type ConsultaAtiva, consultarAgente } from "../consulta";
 import {
-	extrairMensagemErro,
 	gerarTituloSessao,
 	MAX_SESSOES,
 	parseSessoesSalvas,
@@ -26,6 +25,7 @@ export interface AgenteContextValue {
 	escopo: EscopoSugestao;
 	setEscopo: (escopo: EscopoSugestao) => void;
 	enviando: boolean;
+	cancelarConsulta: () => void;
 	widgetAberto: boolean;
 	setWidgetAberto: (aberto: boolean) => void;
 	alternarWidget: () => void;
@@ -76,11 +76,7 @@ export function AgenteProvider({
 	const [widgetAberto, setWidgetAberto] = useState(false);
 	const [chaveCarregada, setChaveCarregada] = useState<string | null>(null);
 	const [localDisponivel, setLocalDisponivel] = useState(true);
-	const consultaRef = useRef<{
-		controller: AbortController;
-		sessionId: string;
-		turnoId: string;
-	} | null>(null);
+	const consultaRef = useRef<ConsultaAtiva | null>(null);
 
 	const sessaoAtiva = useMemo(
 		() =>
@@ -185,45 +181,18 @@ export function AgenteProvider({
 	useEffect(() => () => cancelarConsulta(), [cancelarConsulta]);
 
 	const consultar = useCallback(
-		async (sessionId: string, turnoId: string, question: string) => {
-			cancelarConsulta();
-			const controller = new AbortController();
-			consultaRef.current = { controller, sessionId, turnoId };
-			setEnviando(true);
-			try {
-				const resposta = await perguntarAoAgente(
-					{ question, session_id: sessionId },
-					controller.signal,
-					(etapa) => {
-						if (!controller.signal.aborted)
-							atualizarTurno(sessionId, turnoId, { etapa });
-					},
-				);
-				if (!controller.signal.aborted)
-					atualizarTurno(sessionId, turnoId, {
-						status: "completed",
-						resposta,
-						etapa: undefined,
-					});
-			} catch (erro) {
-				if (!controller.signal.aborted)
-					atualizarTurno(sessionId, turnoId, {
-						status: "error",
-						erro: extrairMensagemErro(erro),
-						etapa: undefined,
-					});
-			} finally {
-				if (consultaRef.current?.controller === controller) {
-					consultaRef.current = null;
-					setEnviando(false);
-				}
-			}
-		},
-		[atualizarTurno, cancelarConsulta],
+		(sessionId: string, turnoId: string, question: string) =>
+			consultarAgente(
+				consultaRef,
+				{ sessionId, turnoId, question },
+				{ atualizarTurno, setEnviando },
+			),
+		[atualizarTurno],
 	);
 
 	const enviarPergunta = useCallback(
 		async (perguntaTexto: string) => {
+			if (consultaRef.current) return;
 			const validacao = validarPergunta(perguntaTexto);
 			if (!validacao.ok) return;
 			const sessionId = sessaoAtiva.sessionId;
@@ -259,12 +228,12 @@ export function AgenteProvider({
 
 	const tentarNovamente = useCallback(
 		async (turnoId: string) => {
+			if (consultaRef.current) return;
 			const sessao = sessoes.find((atual) =>
 				atual.turnos.some((turno) => turno.id === turnoId),
 			);
 			const turno = sessao?.turnos.find((atual) => atual.id === turnoId);
 			if (!sessao || !turno) return;
-			cancelarConsulta();
 			atualizarTurno(sessao.sessionId, turnoId, {
 				status: "pending",
 				resposta: undefined,
@@ -272,7 +241,7 @@ export function AgenteProvider({
 			});
 			await consultar(sessao.sessionId, turnoId, turno.question);
 		},
-		[sessoes, atualizarTurno, consultar, cancelarConsulta],
+		[sessoes, atualizarTurno, consultar],
 	);
 
 	const novaConversa = useCallback(() => {
@@ -348,6 +317,7 @@ export function AgenteProvider({
 			escopo,
 			setEscopo,
 			enviando,
+			cancelarConsulta,
 			widgetAberto,
 			setWidgetAberto,
 			alternarWidget,
@@ -365,6 +335,7 @@ export function AgenteProvider({
 			sessaoAtiva,
 			escopo,
 			enviando,
+			cancelarConsulta,
 			widgetAberto,
 			alternarWidget,
 			novaConversa,

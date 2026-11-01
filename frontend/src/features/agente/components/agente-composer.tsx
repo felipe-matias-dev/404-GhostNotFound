@@ -1,4 +1,4 @@
-import { ArrowUpIcon, CaretDownIcon } from "@phosphor-icons/react";
+import { ArrowUpIcon, CaretDownIcon, SquareIcon } from "@phosphor-icons/react";
 import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { LogoMark } from "#/components/layout/logo";
 import { Button } from "#/components/ui/button";
@@ -18,6 +18,7 @@ import type { EscopoSugestao } from "../types";
 export interface AgenteComposerProps {
 	onSubmit: (pergunta: string) => void;
 	enviando: boolean;
+	onStop: () => void;
 	escopo: EscopoSugestao;
 	onEscopoChange: (escopo: EscopoSugestao) => void;
 	placeholder?: string;
@@ -30,6 +31,8 @@ const PLACEHOLDER_PADRAO =
 
 export function AgenteComposer({
 	onSubmit,
+	enviando,
+	onStop,
 	escopo,
 	onEscopoChange,
 	placeholder = PLACEHOLDER_PADRAO,
@@ -39,7 +42,7 @@ export function AgenteComposer({
 	const [valor, setValor] = useState("");
 	const campoRef = useRef<HTMLTextAreaElement>(null);
 	const acimaDoLimite = valor.length > MAX_PERGUNTA_CHARS;
-	const podeEnviar = valor.trim().length > 0 && !acimaDoLimite;
+	const podeEnviar = valor.trim().length > 0 && !enviando && !acimaDoLimite;
 
 	useEffect(() => {
 		if (autoFocus) campoRef.current?.focus();
@@ -109,16 +112,23 @@ export function AgenteComposer({
 							{valor.length}/{MAX_PERGUNTA_CHARS}
 						</span>
 					)}
-					<Button
-						type="button"
-						size="icon-xs"
-						className="rounded-full"
-						disabled={!valor.trim() || acimaDoLimite}
-						aria-label="Enviar pergunta"
-						onClick={dispararEnvio}
-					>
-						<ArrowUpIcon aria-hidden weight="bold" className="size-3.5" />
-					</Button>
+					{enviando ? (
+						<Button type="button" variant="outline" size="xs" onClick={onStop}>
+							<SquareIcon aria-hidden weight="fill" className="size-3" />
+							Parar
+						</Button>
+					) : (
+						<Button
+							type="button"
+							size="icon-xs"
+							className="rounded-full"
+							disabled={!podeEnviar}
+							aria-label="Enviar pergunta"
+							onClick={dispararEnvio}
+						>
+							<ArrowUpIcon aria-hidden weight="bold" className="size-3.5" />
+						</Button>
+					)}
 				</div>
 			</div>
 		</div>

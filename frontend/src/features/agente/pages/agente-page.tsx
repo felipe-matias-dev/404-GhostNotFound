@@ -54,6 +54,7 @@ export function AgentePage() {
 		escopo,
 		setEscopo,
 		enviando,
+		cancelarConsulta,
 		novaConversa,
 		selecionarSessao,
 		renomearSessao,
@@ -346,6 +347,7 @@ export function AgentePage() {
 							autoFocus
 							onSubmit={(texto) => void enviarPergunta(texto)}
 							enviando={enviando}
+							onStop={cancelarConsulta}
 							escopo={escopo}
 							onEscopoChange={setEscopo}
 							placeholder="Pergunte sobre consumo, faturamento, DEC/FEC ou uma UC…"
@@ -386,6 +388,7 @@ export function AgentePage() {
 								<AgenteTurnoItem
 									key={turno.id}
 									turno={turno}
+									enviando={enviando}
 									mostrarHorario={indice === 0}
 									onRetry={(id) => void tentarNovamente(id)}
 								/>
@@ -398,6 +401,7 @@ export function AgentePage() {
 									compacto
 									onSubmit={(texto) => void enviarPergunta(texto)}
 									enviando={enviando}
+									onStop={cancelarConsulta}
 									escopo={escopo}
 									onEscopoChange={setEscopo}
 									placeholder="Responder…"

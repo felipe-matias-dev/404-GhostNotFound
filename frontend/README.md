@@ -56,9 +56,12 @@ separadas por login no navegador, sem migrar o histórico compartilhado anterior
 O chat mostra as etapas recebidas de `POST /ai/ask/stream` e só exibe a resposta
 completa no evento final. Minimizar ou fechar o widget só esconde a janela: a consulta
 continua, com o indicador no botão flutuante, e a resposta fica disponível ao reabrir.
-Sair da página `/agente`, criar ou trocar de conversa, remover a conversa em andamento,
-limpar o histórico, enviar outra pergunta ou sair do portal cancela a consulta;
-perguntas canceladas podem ser tentadas novamente.
+Durante a consulta é possível escrever a próxima pergunta, mas novos envios, sugestões
+e tentativas de repetição não substituem a consulta ativa. O botão **Parar** cancela
+explicitamente e preserva o rascunho. Também cancelam: sair da página `/agente`, criar
+ou trocar de conversa, remover a conversa em andamento, limpar o histórico e sair do
+portal. Perguntas canceladas podem ser tentadas novamente; o abandono conta no limite
+de perguntas e os tokens já informados pelo provedor contam no orçamento (DEC-055).
 Quando o agente pede esclarecimento, o chat exibe a pergunta uma única vez,
 como parte do texto da resposta.
 
