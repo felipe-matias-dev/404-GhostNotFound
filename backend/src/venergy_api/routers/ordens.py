@@ -8,6 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from venergy_api.auth import Perfil, UsuarioLogado
+from venergy_api.avisos_ordens import avisar_mudanca_de_ordem
 from venergy_api.database import SessionDep
 from venergy_api.models import DimUc, OrdemEvento, OrdemInspecao
 from venergy_api.ordens import STATUS_ATIVOS, StatusOrdem, TransicaoInvalidaError, validar_transicao
@@ -82,6 +83,10 @@ def criar_ordens(
     ]
     session.add_all(ordens)
     try:
+        # O flush dá o id às ordens, e o aviso só sai com o commit: se o índice único recusar
+        # a gravação, nenhuma tela é avisada.
+        session.flush()
+        avisar_mudanca_de_ordem(session, [ordem.id for ordem in ordens])
         session.commit()
     except IntegrityError as error:
         session.rollback()
@@ -168,5 +173,6 @@ def atualizar_ordem(
     # de uma volta para GERADA fica só no evento, para não sobrescrevê-la.
     if mudanca.observacao is not None and mudanca.status != StatusOrdem.GERADA:
         ordem.observacao = mudanca.observacao
+    avisar_mudanca_de_ordem(session, [ordem.id])
     session.commit()
     return OrdemDetalheSchema.model_validate(ordem)
