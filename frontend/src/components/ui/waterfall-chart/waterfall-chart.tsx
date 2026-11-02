@@ -61,6 +61,8 @@ export type WaterfallChartProps = {
 	steps?: WaterfallStep[];
 	/** Frase de leitura rápida, acima das barras. */
 	summary?: ReactNode;
+	/** Ação ao lado da frase de leitura (ex.: o insight de IA da tela); abaixo dela se estreito. */
+	summaryAction?: ReactNode;
 	/** Com `sinal`, "+" na alta e "-" na queda, decidido sobre o valor já arredondado. */
 	formatValue?: (value: number, options?: { sinal?: boolean }) => string;
 	/** Complemento do título do tooltip da variação líquida ("Diferença vs. início"). */
@@ -180,6 +182,7 @@ export function WaterfallChart({
 	label,
 	steps,
 	summary,
+	summaryAction,
 	formatValue = formatBRL,
 	compareLabel = "vs. início",
 	percentLabel = "Sobre o total inicial",
@@ -275,7 +278,18 @@ export function WaterfallChart({
 
 	return (
 		<div className={cn(shell, "px-4 py-3")} aria-busy={loading}>
-			{summary && <p className="mb-2 text-body text-text-muted">{summary}</p>}
+			{(summary || summaryAction) && (
+				<div className="mb-2 flex flex-col items-start gap-2 @lg:flex-row @lg:gap-3">
+					{summary && (
+						<p className="min-w-0 flex-1 text-body text-text-muted">
+							{summary}
+						</p>
+					)}
+					{summaryAction && (
+						<div className="shrink-0 @lg:ml-auto">{summaryAction}</div>
+					)}
+				</div>
+			)}
 			<table className="w-full border-collapse">
 				<caption className="sr-only">{label}</caption>
 				<thead className="sr-only">

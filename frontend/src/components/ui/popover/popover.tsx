@@ -2,7 +2,7 @@
 // adaptado aos tokens da marca VE-360:
 // - flutua como o DropdownMenu: surface-2 + border-strong + shadow-overlay;
 // - entrada/saída por opacidade e escala com os estados do Base UI, sem tw-animate-css;
-// - só as partes usadas no portal: raiz, gatilho e conteúdo.
+// - só as partes usadas no portal: raiz, gatilho, conteúdo e fechar.
 import { Popover as PopoverPrimitive } from "@base-ui/react/popover";
 import { cn } from "#/lib/utils";
 
@@ -12,6 +12,10 @@ function Popover({ ...props }: PopoverPrimitive.Root.Props) {
 
 function PopoverTrigger({ ...props }: PopoverPrimitive.Trigger.Props) {
 	return <PopoverPrimitive.Trigger data-slot="popover-trigger" {...props} />;
+}
+
+function PopoverClose({ ...props }: PopoverPrimitive.Close.Props) {
+	return <PopoverPrimitive.Close data-slot="popover-close" {...props} />;
 }
 
 function PopoverContent({
@@ -49,4 +53,4 @@ function PopoverContent({
 	);
 }
 
-export { Popover, PopoverContent, PopoverTrigger };
+export { Popover, PopoverClose, PopoverContent, PopoverTrigger };
