@@ -26,12 +26,6 @@ def _pct(base: Decimal, variacao: Decimal) -> float | None:
     return None if percentual is None else round(percentual, 1)
 
 
-def _sentido(valor: Decimal) -> str:
-    if valor == 0:
-        return "estavel"
-    return "alta" if valor > 0 else "queda"
-
-
 def _recorte(filtro: DecomposicaoFiltroSchema) -> str:
     partes = [filtro.municipio or "todos os municípios"]
     if filtro.bairro:
@@ -88,17 +82,17 @@ def metricas_da_receita(
     if percentual is not None:
         metricas["variacao_receita_pct"] = percentual
 
-    # O texto curto do insight lê estes campos: a partir deles o LLM diz o que pesou sem fazer
-    # conta, e o percentual da base é o número curto que a tela não mostra (DEC-066).
-    preco = tarifa + bandeira
-    for chave, efeito in (("preco", preco), ("volume", volume), ("mix", mix)):
-        parte = _pct(receita_base, efeito)
-        if parte is not None:
-            metricas[f"efeito_{chave}_pct"] = parte
-    metricas["maior_efeito"] = max(
-        (("preco", preco), ("volume", volume), ("mix", mix)), key=lambda par: abs(par[1])
-    )[0]
-    metricas["volume_e_mix_juntos"] = _sentido(volume + mix)
+    # O LLM lê o que ajudou e o que pesou contra sem fazer conta. Cada efeito fica no próprio
+    # sentido: somar volume e mix, ou dar % da base, levou o texto a afirmar o que não houve
+    # ("o preço subiu 12,3%", "a quantidade pesou contra" com volume em alta) (DEC-066).
+    efeitos = (
+        ("preço", tarifa + bandeira),
+        ("quantidade vendida", volume),
+        ("perfil de consumo", mix),
+    )
+    metricas["fatores_a_favor"] = [nome for nome, efeito in efeitos if efeito > 0]
+    metricas["fatores_contra"] = [nome for nome, efeito in efeitos if efeito < 0]
+    metricas["maior_fator"] = max(efeitos, key=lambda par: abs(par[1]))[0]
 
     quedas = sorted(
         (linha for linha in linhas if linha.variacao_receita < 0),
