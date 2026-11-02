@@ -267,7 +267,7 @@ tables:
     foreign_keys:
       - {columns: [cod_uc], references: gold_dim_uc.cod_uc}
     context: Continuidade
-    consumers: [UC 360, agente]
+    consumers: [UC 360, tela DEC/FEC, agente]   # tela DEC/FEC: por que cai, por causa, tipo e UC (DEC-063)
     owner: Dados
     columns:
       cod_ocorrencia:   {type: text,      nullable: false, status: proposta, description: "Código da ocorrência de rede"}

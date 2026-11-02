@@ -516,24 +516,81 @@ class IndicesContinuidadeSchema(BaseModel):
     n_uc_medio: float | None
 
 
-class RankingFiltroSchema(BaseModel):
-    """Período do ranking, obrigatório: a média mensal só existe sobre um período."""
+NivelRecorte = Literal["municipio", "bairro", "alimentador"]
+_ORDEM_NIVEL: dict[str, int] = {"municipio": 0, "bairro": 1, "alimentador": 2}
+
+
+class RecorteContinuidadeFiltroSchema(BaseModel):
+    """Período obrigatório e o recorte opcional: município, bairro (com o município) e classe."""
 
     inicio: Competencia
     fim: Competencia
-    criterio: Literal["dec", "fec"] = "dec"
+    municipio: RequiredText | None = None
+    bairro: RequiredText | None = None
+    classe: Classe | None = None
 
     @model_validator(mode="after")
-    def inicio_ate_o_fim(self) -> "RankingFiltroSchema":
+    def periodo_e_bairro_validos(self) -> "RecorteContinuidadeFiltroSchema":
         _inicio_ate_o_fim(self.inicio, self.fim)
+        # O mesmo nome de bairro pode existir em dois municípios.
+        if self.bairro and not self.municipio:
+            raise ValueError("Informe o município junto com o bairro")
+        return self
+
+    @property
+    def com_recorte(self) -> bool:
+        return any(valor is not None for valor in (self.municipio, self.bairro, self.classe))
+
+
+class RankingFiltroSchema(RecorteContinuidadeFiltroSchema):
+    """Período, critério, recorte e, se quiser, a base da variação de cada linha (DEC-063)."""
+
+    criterio: Literal["dec", "fec"] = "dec"
+    base_inicio: Competencia | None = None
+    base_fim: Competencia | None = None
+
+    @model_validator(mode="after")
+    def base_valida(self) -> "RankingFiltroSchema":
+        if (self.base_inicio is None) != (self.base_fim is None):
+            raise ValueError("Informe o início e o fim do período base, ou nenhum dos dois")
+        if self.base_inicio and self.base_fim:
+            _inicio_ate_o_fim(self.base_inicio, self.base_fim)
+            # Como em /indicadores/comparacao: períodos sobrepostos não são uma comparação.
+            if self.base_fim >= self.inicio:
+                raise ValueError("O período base precisa terminar antes do início do período atual")
         return self
 
 
-class RankingAlimentadorSchema(IndicesContinuidadeSchema):
+class VariacaoContinuidadeSchema(BaseModel):
+    """Variação em % de cada componente contra a base (8.0 = +8,0%).
+
+    Nula com base zero ou nula, ou se faltar algum mês em um dos períodos (DEC-054).
+    """
+
+    dec: float | None
+    fec: float | None
+    horas_interrompidas: float | None
+    n_interrupcoes: float | None
+
+
+class IndicesComBaseSchema(IndicesContinuidadeSchema):
+    # Sem base pedida, os dois ficam nulos. Com base, `base` é nula para a linha sem dado nela.
+    base: IndicesContinuidadeSchema | None = None
+    variacao_pct: VariacaoContinuidadeSchema | None = None
+
+
+class RankingAlimentadorSchema(IndicesComBaseSchema):
     cod_alimentador: RequiredText
 
 
-class RankingContinuidadeSchema(BaseModel):
+class PeriodoBaseContinuidadeSchema(BaseModel):
+    # Nulos sem base pedida. n_meses_base é o divisor da média mensal de UCs na base.
+    base_inicio: Competencia | None = None
+    base_fim: Competencia | None = None
+    n_meses_base: int | None = None
+
+
+class RankingContinuidadeSchema(PeriodoBaseContinuidadeSchema):
     """Os alimentadores do pior para o melhor, e quantos meses entraram na média."""
 
     inicio: Competencia
@@ -544,37 +601,135 @@ class RankingContinuidadeSchema(BaseModel):
     alimentadores: list[RankingAlimentadorSchema]
 
 
-class RecortesFiltroSchema(BaseModel):
-    """Período e onde o gerente está no drill-down: o nível da resposta é o próximo abaixo."""
+class RecortesFiltroSchema(RankingFiltroSchema):
+    """Recorte do drill-down e o nível da resposta: por padrão, o próximo abaixo do filtro."""
 
-    inicio: Competencia
-    fim: Competencia
-    criterio: Literal["dec", "fec"] = "dec"
-    municipio: RequiredText | None = None
-    bairro: RequiredText | None = None
-    classe: Classe | None = None
+    nivel: NivelRecorte | None = None
 
     @model_validator(mode="after")
-    def periodo_e_bairro_validos(self) -> "RecortesFiltroSchema":
-        _inicio_ate_o_fim(self.inicio, self.fim)
-        if self.bairro and not self.municipio:
-            raise ValueError("Informe o município junto com o bairro")
+    def nivel_abaixo_do_filtro(self) -> "RecortesFiltroSchema":
+        filtro = "bairro" if self.bairro else "municipio" if self.municipio else None
+        if self.nivel and filtro and _ORDEM_NIVEL[self.nivel] < _ORDEM_NIVEL[filtro]:
+            raise ValueError(f"O nível {self.nivel} fica acima do filtro de {filtro}")
         return self
 
+    @property
+    def nivel_da_resposta(self) -> NivelRecorte:
+        if self.nivel:
+            return self.nivel
+        if self.bairro:
+            return "alimentador"
+        return "bairro" if self.municipio else "municipio"
 
-class RecorteContinuidadeSchema(IndicesContinuidadeSchema):
+
+class RecorteContinuidadeSchema(IndicesComBaseSchema):
     segmento: RequiredText
+    # Só nas linhas de bairro: o mesmo nome de bairro existe em municípios diferentes.
+    municipio: RequiredText | None = None
 
 
-class RecortesContinuidadeSchema(BaseModel):
-    """DEC e FEC do nível abaixo do filtro, do pior para o melhor."""
+class RecortesContinuidadeSchema(PeriodoBaseContinuidadeSchema):
+    """DEC e FEC de um nível do recorte, do pior para o melhor."""
 
     inicio: Competencia
     fim: Competencia
     criterio: Literal["dec", "fec"]
-    nivel: Literal["municipio", "bairro", "alimentador"]
+    nivel: NivelRecorte
     n_meses: int
     recortes: list[RecorteContinuidadeSchema]
+
+
+class ContinuidadeMensalFiltroSchema(RecorteContinuidadeFiltroSchema):
+    """Período e recorte da série mensal; com alimentador, só ele dentro do recorte."""
+
+    cod_alimentador: RequiredText | None = None
+
+
+class ContinuidadeMensalSchema(BaseModel):
+    """DEC e FEC do recorte numa competência; tudo nulo no mês sem linha no recorte."""
+
+    competencia: Competencia
+    dec: float | None
+    fec: float | None
+    horas_interrompidas: float | None
+    n_interrupcoes: int | None
+    n_uc: int | None
+
+
+class OcorrenciasFiltroSchema(ContinuidadeMensalFiltroSchema):
+    """Período e recorte das ocorrências; geografia e classe são as do cadastro da UC."""
+
+
+class ResumoOcorrenciasFiltroSchema(OcorrenciasFiltroSchema):
+    # Suposições de produto, não limites regulatórios (DEC-063).
+    reincidencia_min: Annotated[int, Field(ge=2, le=100)] = 3
+    longa_h: Annotated[float, Field(gt=0, le=720)] = 4.0
+
+
+class TotalOcorrenciasSchema(BaseModel):
+    # Ocorrências contadas por UC atingida, como o n_interrupcoes da Gold.
+    n_interrupcoes: int
+    horas_interrompidas: float
+    ucs_atingidas: int
+    # UCs com pelo menos `reincidencia_min` interrupções no período.
+    ucs_reincidentes: int
+
+
+class GrupoOcorrenciasSchema(BaseModel):
+    # Nulo é a causa não registrada (OCO-01): fica na lista, nunca é descartada.
+    nome: str | None
+    n_interrupcoes: int
+    horas_interrompidas: float
+
+
+class DuracaoOcorrenciasSchema(BaseModel):
+    # Nulos sem ocorrência no período.
+    mediana_h: float | None
+    p90_h: float | None
+    maxima_h: float | None
+    # Ocorrências com duração >= longa_h.
+    n_longas: int
+
+
+class ResumoOcorrenciasSchema(BaseModel):
+    """Por que a luz cai no recorte: causas, tipos, UCs atingidas e duração."""
+
+    inicio: Competencia
+    fim: Competencia
+    reincidencia_min: int
+    longa_h: float
+    total: TotalOcorrenciasSchema
+    # Das mais horas para as menos.
+    por_causa: list[GrupoOcorrenciasSchema]
+    por_tipo: list[GrupoOcorrenciasSchema]
+    duracao: DuracaoOcorrenciasSchema
+
+
+class UcsAtingidasFiltroSchema(OcorrenciasFiltroSchema):
+    pagina: Annotated[int, Field(ge=1)] = 1
+    tamanho: Annotated[int, Field(ge=1, le=50)] = 10
+
+
+class UcAtingidaSchema(BaseModel):
+    """Uma UC atingida no período, sem titular nem documento."""
+
+    cod_uc: RequiredText
+    # Nulos só se a UC faltar no cadastro (a chave estrangeira do contrato é lógica).
+    municipio: str | None
+    bairro: str | None
+    n_interrupcoes: int
+    horas_interrompidas: float
+    maior_duracao_h: float
+
+
+class UcsAtingidasSchema(BaseModel):
+    """Página das UCs mais atingidas, por horas interrompidas."""
+
+    pagina: int
+    tamanho: int
+    # UCs atingidas no recorte e no período, em todas as páginas.
+    total: int
+    ucs: list[UcAtingidaSchema]
 
 
 class FilaSuspeitaSchema(BaseModel):

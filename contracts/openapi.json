@@ -861,7 +861,7 @@
           "continuidade"
         ],
         "summary": "Get Ranking Alimentadores",
-        "description": "Os piores alimentadores do período, pelo DEC ou pelo FEC.",
+        "description": "Os piores alimentadores do período, pelo DEC ou pelo FEC, no recorte escolhido.",
         "operationId": "get_ranking_alimentadores_continuidade_alimentadores_ranking_get",
         "security": [
           {
@@ -887,93 +887,6 @@
               "type": "string",
               "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
               "title": "Fim"
-            }
-          },
-          {
-            "name": "criterio",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "enum": [
-                "dec",
-                "fec"
-              ],
-              "type": "string",
-              "default": "dec",
-              "title": "Criterio"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RankingContinuidadeSchema"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/continuidade/recortes": {
-      "get": {
-        "tags": [
-          "continuidade"
-        ],
-        "summary": "Get Recortes",
-        "description": "DEC e FEC por município, por bairro de um município ou por alimentador de um bairro.",
-        "operationId": "get_recortes_continuidade_recortes_get",
-        "security": [
-          {
-            "APIKeyCookie": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "inicio",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
-              "title": "Inicio"
-            }
-          },
-          {
-            "name": "fim",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
-              "title": "Fim"
-            }
-          },
-          {
-            "name": "criterio",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "enum": [
-                "dec",
-                "fec"
-              ],
-              "type": "string",
-              "default": "dec",
-              "title": "Criterio"
             }
           },
           {
@@ -1031,6 +944,238 @@
               ],
               "title": "Classe"
             }
+          },
+          {
+            "name": "criterio",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "dec",
+                "fec"
+              ],
+              "type": "string",
+              "default": "dec",
+              "title": "Criterio"
+            }
+          },
+          {
+            "name": "base_inicio",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^\\d{4}-(0[1-9]|1[0-2])$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Base Inicio"
+            }
+          },
+          {
+            "name": "base_fim",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^\\d{4}-(0[1-9]|1[0-2])$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Base Fim"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RankingContinuidadeSchema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/continuidade/recortes": {
+      "get": {
+        "tags": [
+          "continuidade"
+        ],
+        "summary": "Get Recortes",
+        "description": "DEC e FEC por município, por bairro ou por alimentador, dentro do filtro.",
+        "operationId": "get_recortes_continuidade_recortes_get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "inicio",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+              "title": "Inicio"
+            }
+          },
+          {
+            "name": "fim",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+              "title": "Fim"
+            }
+          },
+          {
+            "name": "municipio",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Municipio"
+            }
+          },
+          {
+            "name": "bairro",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Bairro"
+            }
+          },
+          {
+            "name": "classe",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "B1",
+                    "B2",
+                    "B3",
+                    "A4"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Classe"
+            }
+          },
+          {
+            "name": "criterio",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "dec",
+                "fec"
+              ],
+              "type": "string",
+              "default": "dec",
+              "title": "Criterio"
+            }
+          },
+          {
+            "name": "base_inicio",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^\\d{4}-(0[1-9]|1[0-2])$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Base Inicio"
+            }
+          },
+          {
+            "name": "base_fim",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^\\d{4}-(0[1-9]|1[0-2])$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Base Fim"
+            }
+          },
+          {
+            "name": "nivel",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "municipio",
+                    "bairro",
+                    "alimentador"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Nivel"
+            }
           }
         ],
         "responses": {
@@ -1040,6 +1185,453 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/RecortesContinuidadeSchema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/continuidade/mensal": {
+      "get": {
+        "tags": [
+          "continuidade"
+        ],
+        "summary": "Get Mensal",
+        "description": "DEC e FEC do recorte, ou de um alimentador dentro dele, em cada competência.",
+        "operationId": "get_mensal_continuidade_mensal_get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "inicio",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+              "title": "Inicio"
+            }
+          },
+          {
+            "name": "fim",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+              "title": "Fim"
+            }
+          },
+          {
+            "name": "municipio",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Municipio"
+            }
+          },
+          {
+            "name": "bairro",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Bairro"
+            }
+          },
+          {
+            "name": "classe",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "B1",
+                    "B2",
+                    "B3",
+                    "A4"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Classe"
+            }
+          },
+          {
+            "name": "cod_alimentador",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cod Alimentador"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ContinuidadeMensalSchema"
+                  },
+                  "title": "Response Get Mensal Continuidade Mensal Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/continuidade/ocorrencias/resumo": {
+      "get": {
+        "tags": [
+          "continuidade"
+        ],
+        "summary": "Get Resumo Ocorrencias",
+        "description": "Por que a luz cai: causas, tipos, UCs atingidas e reincidentes e a duração.",
+        "operationId": "get_resumo_ocorrencias_continuidade_ocorrencias_resumo_get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "inicio",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+              "title": "Inicio"
+            }
+          },
+          {
+            "name": "fim",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+              "title": "Fim"
+            }
+          },
+          {
+            "name": "municipio",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Municipio"
+            }
+          },
+          {
+            "name": "bairro",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Bairro"
+            }
+          },
+          {
+            "name": "classe",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "B1",
+                    "B2",
+                    "B3",
+                    "A4"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Classe"
+            }
+          },
+          {
+            "name": "cod_alimentador",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cod Alimentador"
+            }
+          },
+          {
+            "name": "reincidencia_min",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 2,
+              "default": 3,
+              "title": "Reincidencia Min"
+            }
+          },
+          {
+            "name": "longa_h",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "maximum": 720,
+              "exclusiveMinimum": 0,
+              "default": 4.0,
+              "title": "Longa H"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResumoOcorrenciasSchema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/continuidade/ocorrencias/ucs": {
+      "get": {
+        "tags": [
+          "continuidade"
+        ],
+        "summary": "Get Ucs Atingidas",
+        "description": "As UCs mais atingidas no período e no recorte, das mais horas para as menos.",
+        "operationId": "get_ucs_atingidas_continuidade_ocorrencias_ucs_get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "inicio",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+              "title": "Inicio"
+            }
+          },
+          {
+            "name": "fim",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+              "title": "Fim"
+            }
+          },
+          {
+            "name": "municipio",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Municipio"
+            }
+          },
+          {
+            "name": "bairro",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Bairro"
+            }
+          },
+          {
+            "name": "classe",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "B1",
+                    "B2",
+                    "B3",
+                    "A4"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Classe"
+            }
+          },
+          {
+            "name": "cod_alimentador",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cod Alimentador"
+            }
+          },
+          {
+            "name": "pagina",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "title": "Pagina"
+            }
+          },
+          {
+            "name": "tamanho",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 50,
+              "minimum": 1,
+              "default": 10,
+              "title": "Tamanho"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UcsAtingidasSchema"
                 }
               }
             }
@@ -3135,6 +3727,81 @@
         "title": "ContinuidadeAlimentadorMensalSchema",
         "description": "DEC e FEC de um alimentador numa competência."
       },
+      "ContinuidadeMensalSchema": {
+        "properties": {
+          "competencia": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+            "title": "Competencia"
+          },
+          "dec": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dec"
+          },
+          "fec": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fec"
+          },
+          "horas_interrompidas": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Horas Interrompidas"
+          },
+          "n_interrupcoes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "N Interrupcoes"
+          },
+          "n_uc": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "N Uc"
+          }
+        },
+        "type": "object",
+        "required": [
+          "competencia",
+          "dec",
+          "fec",
+          "horas_interrompidas",
+          "n_interrupcoes",
+          "n_uc"
+        ],
+        "title": "ContinuidadeMensalSchema",
+        "description": "DEC e FEC do recorte numa competência; tudo nulo no mês sem linha no recorte."
+      },
       "CriarOrdensSchema": {
         "properties": {
           "cod_ucs": {
@@ -3429,6 +4096,55 @@
         ],
         "title": "DistribuicaoQuedaSchema"
       },
+      "DuracaoOcorrenciasSchema": {
+        "properties": {
+          "mediana_h": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mediana H"
+          },
+          "p90_h": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P90 H"
+          },
+          "maxima_h": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maxima H"
+          },
+          "n_longas": {
+            "type": "integer",
+            "title": "N Longas"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mediana_h",
+          "p90_h",
+          "maxima_h",
+          "n_longas"
+        ],
+        "title": "DuracaoOcorrenciasSchema"
+      },
       "ErroSchema": {
         "properties": {
           "detail": {
@@ -3678,6 +4394,36 @@
         ],
         "title": "FilaPaginaSchema",
         "description": "Uma página da fila pela posição no ranking, e quantas UCs a fila tem no filtro."
+      },
+      "GrupoOcorrenciasSchema": {
+        "properties": {
+          "nome": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nome"
+          },
+          "n_interrupcoes": {
+            "type": "integer",
+            "title": "N Interrupcoes"
+          },
+          "horas_interrompidas": {
+            "type": "number",
+            "title": "Horas Interrompidas"
+          }
+        },
+        "type": "object",
+        "required": [
+          "nome",
+          "n_interrupcoes",
+          "horas_interrompidas"
+        ],
+        "title": "GrupoOcorrenciasSchema"
       },
       "HTTPValidationError": {
         "properties": {
@@ -4005,6 +4751,61 @@
         ],
         "title": "IndicadoresPeriodoSchema",
         "description": "Os indicadores da diretoria somados num período, todos calculados no banco."
+      },
+      "IndicesContinuidadeSchema": {
+        "properties": {
+          "dec": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dec"
+          },
+          "fec": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fec"
+          },
+          "horas_interrompidas": {
+            "type": "number",
+            "title": "Horas Interrompidas"
+          },
+          "n_interrupcoes": {
+            "type": "integer",
+            "title": "N Interrupcoes"
+          },
+          "n_uc_medio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "N Uc Medio"
+          }
+        },
+        "type": "object",
+        "required": [
+          "dec",
+          "fec",
+          "horas_interrompidas",
+          "n_interrupcoes",
+          "n_uc_medio"
+        ],
+        "title": "IndicesContinuidadeSchema",
+        "description": "DEC e FEC de um período, calculados sobre os componentes somados."
       },
       "InsightReceitaSchema": {
         "properties": {
@@ -4608,6 +5409,26 @@
             ],
             "title": "N Uc Medio"
           },
+          "base": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IndicesContinuidadeSchema"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "variacao_pct": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VariacaoContinuidadeSchema"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "cod_alimentador": {
             "type": "string",
             "minLength": 1,
@@ -4627,6 +5448,41 @@
       },
       "RankingContinuidadeSchema": {
         "properties": {
+          "base_inicio": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\d{4}-(0[1-9]|1[0-2])$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Inicio"
+          },
+          "base_fim": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\d{4}-(0[1-9]|1[0-2])$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Fim"
+          },
+          "n_meses_base": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "N Meses Base"
+          },
           "inicio": {
             "type": "string",
             "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
@@ -4711,10 +5567,42 @@
             ],
             "title": "N Uc Medio"
           },
+          "base": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IndicesContinuidadeSchema"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "variacao_pct": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VariacaoContinuidadeSchema"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "segmento": {
             "type": "string",
             "minLength": 1,
             "title": "Segmento"
+          },
+          "municipio": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Municipio"
           }
         },
         "type": "object",
@@ -4730,6 +5618,41 @@
       },
       "RecortesContinuidadeSchema": {
         "properties": {
+          "base_inicio": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\d{4}-(0[1-9]|1[0-2])$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Inicio"
+          },
+          "base_fim": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\d{4}-(0[1-9]|1[0-2])$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Fim"
+          },
+          "n_meses_base": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "N Meses Base"
+          },
           "inicio": {
             "type": "string",
             "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
@@ -4779,7 +5702,7 @@
           "recortes"
         ],
         "title": "RecortesContinuidadeSchema",
-        "description": "DEC e FEC do nível abaixo do filtro, do pior para o melhor."
+        "description": "DEC e FEC de um nível do recorte, do pior para o melhor."
       },
       "RespostaIaSchema": {
         "properties": {
@@ -4923,6 +5846,61 @@
         ],
         "title": "ResultadoOrdem"
       },
+      "ResumoOcorrenciasSchema": {
+        "properties": {
+          "inicio": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+            "title": "Inicio"
+          },
+          "fim": {
+            "type": "string",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+            "title": "Fim"
+          },
+          "reincidencia_min": {
+            "type": "integer",
+            "title": "Reincidencia Min"
+          },
+          "longa_h": {
+            "type": "number",
+            "title": "Longa H"
+          },
+          "total": {
+            "$ref": "#/components/schemas/TotalOcorrenciasSchema"
+          },
+          "por_causa": {
+            "items": {
+              "$ref": "#/components/schemas/GrupoOcorrenciasSchema"
+            },
+            "type": "array",
+            "title": "Por Causa"
+          },
+          "por_tipo": {
+            "items": {
+              "$ref": "#/components/schemas/GrupoOcorrenciasSchema"
+            },
+            "type": "array",
+            "title": "Por Tipo"
+          },
+          "duracao": {
+            "$ref": "#/components/schemas/DuracaoOcorrenciasSchema"
+          }
+        },
+        "type": "object",
+        "required": [
+          "inicio",
+          "fim",
+          "reincidencia_min",
+          "longa_h",
+          "total",
+          "por_causa",
+          "por_tipo",
+          "duracao"
+        ],
+        "title": "ResumoOcorrenciasSchema",
+        "description": "Por que a luz cai no recorte: causas, tipos, UCs atingidas e duração."
+      },
       "SessaoIaSchema": {
         "properties": {
           "session_id": {
@@ -5008,6 +5986,34 @@
         "title": "TotaisPeriodoSchema",
         "description": "kWh e receita faturados, somados num período."
       },
+      "TotalOcorrenciasSchema": {
+        "properties": {
+          "n_interrupcoes": {
+            "type": "integer",
+            "title": "N Interrupcoes"
+          },
+          "horas_interrompidas": {
+            "type": "number",
+            "title": "Horas Interrompidas"
+          },
+          "ucs_atingidas": {
+            "type": "integer",
+            "title": "Ucs Atingidas"
+          },
+          "ucs_reincidentes": {
+            "type": "integer",
+            "title": "Ucs Reincidentes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "n_interrupcoes",
+          "horas_interrompidas",
+          "ucs_atingidas",
+          "ucs_reincidentes"
+        ],
+        "title": "TotalOcorrenciasSchema"
+      },
       "Uc360Schema": {
         "properties": {
           "cadastro": {
@@ -5074,6 +6080,92 @@
         ],
         "title": "Uc360Schema",
         "description": "Tudo o que o atendente precisa de uma UC numa tela só."
+      },
+      "UcAtingidaSchema": {
+        "properties": {
+          "cod_uc": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Cod Uc"
+          },
+          "municipio": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Municipio"
+          },
+          "bairro": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bairro"
+          },
+          "n_interrupcoes": {
+            "type": "integer",
+            "title": "N Interrupcoes"
+          },
+          "horas_interrompidas": {
+            "type": "number",
+            "title": "Horas Interrompidas"
+          },
+          "maior_duracao_h": {
+            "type": "number",
+            "title": "Maior Duracao H"
+          }
+        },
+        "type": "object",
+        "required": [
+          "cod_uc",
+          "municipio",
+          "bairro",
+          "n_interrupcoes",
+          "horas_interrompidas",
+          "maior_duracao_h"
+        ],
+        "title": "UcAtingidaSchema",
+        "description": "Uma UC atingida no período, sem titular nem documento."
+      },
+      "UcsAtingidasSchema": {
+        "properties": {
+          "pagina": {
+            "type": "integer",
+            "title": "Pagina"
+          },
+          "tamanho": {
+            "type": "integer",
+            "title": "Tamanho"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "ucs": {
+            "items": {
+              "$ref": "#/components/schemas/UcAtingidaSchema"
+            },
+            "type": "array",
+            "title": "Ucs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "pagina",
+          "tamanho",
+          "total",
+          "ucs"
+        ],
+        "title": "UcsAtingidasSchema",
+        "description": "Página das UCs mais atingidas, por horas interrompidas."
       },
       "UsuarioLogado": {
         "properties": {
@@ -5221,6 +6313,63 @@
         ],
         "title": "VariacaoContaSchema",
         "description": "Por que a conta do mês de referência mudou, em R$, contra o mesmo mês do ano anterior.\n\nAs quatro partes somam exatamente a `diferenca` entre as duas contas."
+      },
+      "VariacaoContinuidadeSchema": {
+        "properties": {
+          "dec": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dec"
+          },
+          "fec": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fec"
+          },
+          "horas_interrompidas": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Horas Interrompidas"
+          },
+          "n_interrupcoes": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "N Interrupcoes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "dec",
+          "fec",
+          "horas_interrompidas",
+          "n_interrupcoes"
+        ],
+        "title": "VariacaoContinuidadeSchema",
+        "description": "Variação em % de cada componente contra a base (8.0 = +8,0%).\n\nNula com base zero ou nula, ou se faltar algum mês em um dos períodos (DEC-054)."
       },
       "VariacaoIndicadoresSchema": {
         "properties": {

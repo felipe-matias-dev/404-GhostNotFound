@@ -263,7 +263,7 @@ export interface paths {
         };
         /**
          * Get Ranking Alimentadores
-         * @description Os piores alimentadores do período, pelo DEC ou pelo FEC.
+         * @description Os piores alimentadores do período, pelo DEC ou pelo FEC, no recorte escolhido.
          */
         get: operations["get_ranking_alimentadores_continuidade_alimentadores_ranking_get"];
         put?: never;
@@ -283,9 +283,69 @@ export interface paths {
         };
         /**
          * Get Recortes
-         * @description DEC e FEC por município, por bairro de um município ou por alimentador de um bairro.
+         * @description DEC e FEC por município, por bairro ou por alimentador, dentro do filtro.
          */
         get: operations["get_recortes_continuidade_recortes_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/continuidade/mensal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Mensal
+         * @description DEC e FEC do recorte, ou de um alimentador dentro dele, em cada competência.
+         */
+        get: operations["get_mensal_continuidade_mensal_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/continuidade/ocorrencias/resumo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Resumo Ocorrencias
+         * @description Por que a luz cai: causas, tipos, UCs atingidas e reincidentes e a duração.
+         */
+        get: operations["get_resumo_ocorrencias_continuidade_ocorrencias_resumo_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/continuidade/ocorrencias/ucs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Ucs Atingidas
+         * @description As UCs mais atingidas no período e no recorte, das mais horas para as menos.
+         */
+        get: operations["get_ucs_atingidas_continuidade_ocorrencias_ucs_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -751,6 +811,24 @@ export interface components {
             horas_interrompidas: number;
         };
         /**
+         * ContinuidadeMensalSchema
+         * @description DEC e FEC do recorte numa competência; tudo nulo no mês sem linha no recorte.
+         */
+        ContinuidadeMensalSchema: {
+            /** Competencia */
+            competencia: string;
+            /** Dec */
+            dec: number | null;
+            /** Fec */
+            fec: number | null;
+            /** Horas Interrompidas */
+            horas_interrompidas: number | null;
+            /** N Interrupcoes */
+            n_interrupcoes: number | null;
+            /** N Uc */
+            n_uc: number | null;
+        };
+        /**
          * CriarOrdensSchema
          * @description UCs escolhidas na fila de suspeitas; gera uma OI para cada uma.
          */
@@ -847,6 +925,17 @@ export interface components {
             /** Sem Queda Identificada */
             sem_queda_identificada: number;
         };
+        /** DuracaoOcorrenciasSchema */
+        DuracaoOcorrenciasSchema: {
+            /** Mediana H */
+            mediana_h: number | null;
+            /** P90 H */
+            p90_h: number | null;
+            /** Maxima H */
+            maxima_h: number | null;
+            /** N Longas */
+            n_longas: number;
+        };
         /**
          * ErroSchema
          * @description Corpo das respostas de erro do FastAPI (HTTPException), documentado no OpenAPI.
@@ -935,6 +1024,15 @@ export interface components {
             pagina: number;
             /** Tamanho */
             tamanho: number;
+        };
+        /** GrupoOcorrenciasSchema */
+        GrupoOcorrenciasSchema: {
+            /** Nome */
+            nome: string | null;
+            /** N Interrupcoes */
+            n_interrupcoes: number;
+            /** Horas Interrompidas */
+            horas_interrompidas: number;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -1029,6 +1127,22 @@ export interface components {
             n_notas: number;
             /** Satisfacao Media */
             satisfacao_media: number | null;
+        };
+        /**
+         * IndicesContinuidadeSchema
+         * @description DEC e FEC de um período, calculados sobre os componentes somados.
+         */
+        IndicesContinuidadeSchema: {
+            /** Dec */
+            dec: number | null;
+            /** Fec */
+            fec: number | null;
+            /** Horas Interrompidas */
+            horas_interrompidas: number;
+            /** N Interrupcoes */
+            n_interrupcoes: number;
+            /** N Uc Medio */
+            n_uc_medio: number | null;
         };
         /**
          * InsightReceitaSchema
@@ -1258,6 +1372,8 @@ export interface components {
             n_interrupcoes: number;
             /** N Uc Medio */
             n_uc_medio: number | null;
+            base?: components["schemas"]["IndicesContinuidadeSchema"] | null;
+            variacao_pct?: components["schemas"]["VariacaoContinuidadeSchema"] | null;
             /** Cod Alimentador */
             cod_alimentador: string;
         };
@@ -1266,6 +1382,12 @@ export interface components {
          * @description Os alimentadores do pior para o melhor, e quantos meses entraram na média.
          */
         RankingContinuidadeSchema: {
+            /** Base Inicio */
+            base_inicio?: string | null;
+            /** Base Fim */
+            base_fim?: string | null;
+            /** N Meses Base */
+            n_meses_base?: number | null;
             /** Inicio */
             inicio: string;
             /** Fim */
@@ -1292,14 +1414,24 @@ export interface components {
             n_interrupcoes: number;
             /** N Uc Medio */
             n_uc_medio: number | null;
+            base?: components["schemas"]["IndicesContinuidadeSchema"] | null;
+            variacao_pct?: components["schemas"]["VariacaoContinuidadeSchema"] | null;
             /** Segmento */
             segmento: string;
+            /** Municipio */
+            municipio?: string | null;
         };
         /**
          * RecortesContinuidadeSchema
-         * @description DEC e FEC do nível abaixo do filtro, do pior para o melhor.
+         * @description DEC e FEC de um nível do recorte, do pior para o melhor.
          */
         RecortesContinuidadeSchema: {
+            /** Base Inicio */
+            base_inicio?: string | null;
+            /** Base Fim */
+            base_fim?: string | null;
+            /** N Meses Base */
+            n_meses_base?: number | null;
             /** Inicio */
             inicio: string;
             /** Fim */
@@ -1370,6 +1502,26 @@ export interface components {
          */
         ResultadoOrdem: "IRREGULAR_CONFIRMADA" | "REGULAR" | "NAO_REALIZADA";
         /**
+         * ResumoOcorrenciasSchema
+         * @description Por que a luz cai no recorte: causas, tipos, UCs atingidas e duração.
+         */
+        ResumoOcorrenciasSchema: {
+            /** Inicio */
+            inicio: string;
+            /** Fim */
+            fim: string;
+            /** Reincidencia Min */
+            reincidencia_min: number;
+            /** Longa H */
+            longa_h: number;
+            total: components["schemas"]["TotalOcorrenciasSchema"];
+            /** Por Causa */
+            por_causa: components["schemas"]["GrupoOcorrenciasSchema"][];
+            /** Por Tipo */
+            por_tipo: components["schemas"]["GrupoOcorrenciasSchema"][];
+            duracao: components["schemas"]["DuracaoOcorrenciasSchema"];
+        };
+        /**
          * SessaoIaSchema
          * @description Uma conversa do usuário com o agente, com os turnos da auditoria em ordem.
          */
@@ -1412,6 +1564,17 @@ export interface components {
             /** Receita Faturada */
             receita_faturada: number;
         };
+        /** TotalOcorrenciasSchema */
+        TotalOcorrenciasSchema: {
+            /** N Interrupcoes */
+            n_interrupcoes: number;
+            /** Horas Interrompidas */
+            horas_interrompidas: number;
+            /** Ucs Atingidas */
+            ucs_atingidas: number;
+            /** Ucs Reincidentes */
+            ucs_reincidentes: number;
+        };
         /**
          * Uc360Schema
          * @description Tudo o que o atendente precisa de uma UC numa tela só.
@@ -1428,6 +1591,38 @@ export interface components {
             atendimentos: components["schemas"]["AtendimentoUcSchema"][];
             /** Inspecoes */
             inspecoes: components["schemas"]["InspecaoUcSchema"][];
+        };
+        /**
+         * UcAtingidaSchema
+         * @description Uma UC atingida no período, sem titular nem documento.
+         */
+        UcAtingidaSchema: {
+            /** Cod Uc */
+            cod_uc: string;
+            /** Municipio */
+            municipio: string | null;
+            /** Bairro */
+            bairro: string | null;
+            /** N Interrupcoes */
+            n_interrupcoes: number;
+            /** Horas Interrompidas */
+            horas_interrompidas: number;
+            /** Maior Duracao H */
+            maior_duracao_h: number;
+        };
+        /**
+         * UcsAtingidasSchema
+         * @description Página das UCs mais atingidas, por horas interrompidas.
+         */
+        UcsAtingidasSchema: {
+            /** Pagina */
+            pagina: number;
+            /** Tamanho */
+            tamanho: number;
+            /** Total */
+            total: number;
+            /** Ucs */
+            ucs: components["schemas"]["UcAtingidaSchema"][];
         };
         /** UsuarioLogado */
         UsuarioLogado: {
@@ -1481,6 +1676,22 @@ export interface components {
             tributos: number;
             /** Leitura Estimada */
             leitura_estimada: boolean;
+        };
+        /**
+         * VariacaoContinuidadeSchema
+         * @description Variação em % de cada componente contra a base (8.0 = +8,0%).
+         *
+         *     Nula com base zero ou nula, ou se faltar algum mês em um dos períodos (DEC-054).
+         */
+        VariacaoContinuidadeSchema: {
+            /** Dec */
+            dec: number | null;
+            /** Fec */
+            fec: number | null;
+            /** Horas Interrompidas */
+            horas_interrompidas: number | null;
+            /** N Interrupcoes */
+            n_interrupcoes: number | null;
         };
         /**
          * VariacaoIndicadoresSchema
@@ -1946,7 +2157,12 @@ export interface operations {
             query: {
                 inicio: string;
                 fim: string;
+                municipio?: string | null;
+                bairro?: string | null;
+                classe?: ("B1" | "B2" | "B3" | "A4") | null;
                 criterio?: "dec" | "fec";
+                base_inicio?: string | null;
+                base_fim?: string | null;
             };
             header?: never;
             path?: never;
@@ -1979,10 +2195,13 @@ export interface operations {
             query: {
                 inicio: string;
                 fim: string;
-                criterio?: "dec" | "fec";
                 municipio?: string | null;
                 bairro?: string | null;
                 classe?: ("B1" | "B2" | "B3" | "A4") | null;
+                criterio?: "dec" | "fec";
+                base_inicio?: string | null;
+                base_fim?: string | null;
+                nivel?: ("municipio" | "bairro" | "alimentador") | null;
             };
             header?: never;
             path?: never;
@@ -1997,6 +2216,118 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RecortesContinuidadeSchema"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_mensal_continuidade_mensal_get: {
+        parameters: {
+            query: {
+                inicio: string;
+                fim: string;
+                municipio?: string | null;
+                bairro?: string | null;
+                classe?: ("B1" | "B2" | "B3" | "A4") | null;
+                cod_alimentador?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContinuidadeMensalSchema"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_resumo_ocorrencias_continuidade_ocorrencias_resumo_get: {
+        parameters: {
+            query: {
+                inicio: string;
+                fim: string;
+                municipio?: string | null;
+                bairro?: string | null;
+                classe?: ("B1" | "B2" | "B3" | "A4") | null;
+                cod_alimentador?: string | null;
+                reincidencia_min?: number;
+                longa_h?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResumoOcorrenciasSchema"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_ucs_atingidas_continuidade_ocorrencias_ucs_get: {
+        parameters: {
+            query: {
+                inicio: string;
+                fim: string;
+                municipio?: string | null;
+                bairro?: string | null;
+                classe?: ("B1" | "B2" | "B3" | "A4") | null;
+                cod_alimentador?: string | null;
+                pagina?: number;
+                tamanho?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UcsAtingidasSchema"];
                 };
             };
             /** @description Validation Error */
