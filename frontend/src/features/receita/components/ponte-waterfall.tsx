@@ -76,6 +76,7 @@ export function PonteWaterfall({
 			summaryAction={
 				<InsightIa
 					texto={insight.data?.texto}
+					origem={insight.data?.origem}
 					carregando={insight.isFetching}
 					indisponivel={
 						insight.isError ||

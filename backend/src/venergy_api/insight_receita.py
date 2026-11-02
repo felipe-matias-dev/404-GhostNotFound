@@ -6,6 +6,7 @@ narra: o agente descarta o texto se algum número dele não for exatamente um va
 em % com 1: com os 15 dígitos de um float, "−3,9%" no texto nunca bateria com −3.912621359.
 """
 
+import re
 from collections.abc import Sequence
 from decimal import ROUND_HALF_UP, Decimal
 
@@ -13,6 +14,18 @@ from venergy_api.schemas import DecomposicaoFiltroSchema, DecomposicaoLinhaSchem
 from venergy_api.variacao import variacao_pct
 
 MAX_QUEDAS = 3
+MIN_SEGMENTOS_PARA_CONTAR = 3
+
+_PLURAL_DO_NIVEL = {"municipio": "municípios", "bairro": "bairros", "classe": "classes"}
+# Palavras que o texto do modelo não pode usar: jargão da ponte, ou o que já saiu errado na
+# medição ("simultaneamente" afirma mais do que a soma de quantidade e perfil garante).
+_TERMOS_PROIBIDOS = re.compile(
+    r"\b(faturamento|simultaneamente|desempenho|segmentos?|efeitos?|mix|volume|recorte)\b|·",
+    re.IGNORECASE,
+)
+# Folga para o modelo reescrever a leitura, sem espaço para ele acrescentar outra conclusão.
+_FOLGA_DO_TEXTO = 40
+_NUMERO = re.compile(r"\d+(?:\.\d{3})*(?:,\d+)?")
 
 _CENTAVOS = Decimal("0.01")
 
@@ -47,10 +60,118 @@ def _queda(linha: DecomposicaoLinhaSchema) -> dict[str, object]:
     return queda
 
 
+def filtro_acima(filtro: DecomposicaoFiltroSchema) -> DecomposicaoFiltroSchema | None:
+    """O recorte que contém este e os seus vizinhos, ou None se já é a empresa inteira."""
+    if filtro.bairro:
+        return filtro.model_copy(update={"bairro": None})
+    if filtro.municipio:
+        return filtro.model_copy(update={"municipio": None})
+    if filtro.classe:
+        return filtro.model_copy(update={"classe": None})
+    return None
+
+
+def _nome_acima(filtro: DecomposicaoFiltroSchema) -> tuple[str, str]:
+    """Como o texto chama o recorte de cima: sujeito ("a empresa") e lugar ("na empresa")."""
+    if filtro.bairro:
+        nome, lugar = filtro.municipio or "", f"em {filtro.municipio}"
+    else:
+        nome, lugar = "a empresa", "na empresa"
+    if filtro.classe and (filtro.bairro or filtro.municipio):
+        return f"{nome} (classe {filtro.classe})", f"{lugar} (classe {filtro.classe})"
+    return nome, lugar
+
+
+def _numero_br(valor: object, casas: int = 1) -> str:
+    return f"{valor:,.{casas}f}".replace(",", "#").replace(".", ",").replace("#", ".")
+
+
+def _variou(pct: float) -> str:
+    if pct == 0:
+        return "ficou estável"
+    return f"{'cresceu' if pct > 0 else 'recuou'} {_numero_br(abs(pct))}%"
+
+
+def _leitura_principal(
+    metricas: dict[str, object], filtro: DecomposicaoFiltroSchema
+) -> tuple[str, str]:
+    """A leitura mais forte do recorte e o texto dela, que a tela não resume (DEC-066).
+
+    A regra é daqui, e não do LLM: ele só redige. Se o texto dele não servir, este é o que a
+    tela mostra.
+    """
+    n = metricas["n_segmentos"]
+    plural = _PLURAL_DO_NIVEL[metricas["nivel_das_linhas"]]
+    todos, dos, artigo = (
+        ("todas as", "das", "as") if plural == "classes" else ("todos os", "dos", "os")
+    )
+    contar = n >= MIN_SEGMENTOS_PARA_CONTAR
+    pct = metricas.get("variacao_receita_pct")
+    pct_acima = metricas.get("variacao_acima_pct")
+    so_preco = metricas["n_segmentos_alta_so_por_preco"]
+    quantidade = metricas["n_segmentos_quantidade_em_queda"]
+    bandeira = metricas.get("bandeira_no_preco_pct")
+    nome_acima, lugar_acima = _nome_acima(filtro)
+
+    if metricas.get("unico_em_queda") and pct is not None and pct_acima is not None:
+        nome = filtro.bairro or filtro.municipio
+        tipo_do_nome = "bairro" if filtro.bairro else "município"
+        return "unico_em_queda", (
+            f"{nome} foi o único {tipo_do_nome} a perder receita {lugar_acima}: "
+            f"{_variou(pct)}, enquanto {nome_acima} {_variou(pct_acima)}."
+        )
+    if contar and metricas["variacao_receita"] > 0 and so_preco * 2 >= n:
+        quantos = f"{todos} {n}" if so_preco == n else f"{so_preco} {dos} {n}"
+        return "alta_depende_do_preco", (
+            f"Em {quantos} {plural}, a receita só subiu por causa do preço: sem ele, a quantidade "
+            "vendida e o perfil de consumo somados a teriam derrubado."
+        )
+    if bandeira is not None and bandeira >= 50:
+        return "bandeira_pesa", (
+            f"{_numero_br(bandeira)}% do ganho de preço veio da bandeira, não da tarifa."
+        )
+    if contar and quantidade == n:
+        return "quantidade_geral", (
+            f"A quantidade vendida caiu em {todos} {n} {plural}: a queda é geral, não localizada."
+        )
+    participacao = metricas.get("maior_queda_participacao_pct")
+    if metricas["n_segmentos_em_queda"] >= 2 and participacao >= 50:
+        return "quedas_concentradas", (
+            f"{metricas['maiores_quedas'][0]['segmento']} responde por "
+            f"{_numero_br(participacao)}% da soma das quedas de receita entre {artigo} {plural}."
+        )
+    if pct is not None and pct_acima is not None:
+        nome = filtro.bairro or filtro.municipio
+        lugar = f"Em {nome}" if nome else f"Na classe {filtro.classe}"
+        return "comparacao_acima", (
+            f"{lugar}, a receita {_variou(pct)}, enquanto {nome_acima} {_variou(pct_acima)}."
+        )
+    if metricas["fatores_a_favor"] or metricas["fatores_contra"]:
+        return "maior_fator", f"O fator que mais pesou neste recorte foi {metricas['maior_fator']}."
+    return "sem_variacao", "A receita não variou entre os dois períodos."
+
+
+def _numeros(texto: str) -> set[Decimal]:
+    return {Decimal(numero.replace(".", "").replace(",", ".")) for numero in _NUMERO.findall(texto)}
+
+
+def texto_aceito(texto: str, metricas: dict[str, object]) -> bool:
+    """Se o texto do modelo diz a leitura escolhida: os mesmos números e sem jargão."""
+    leitura = str(metricas["leitura_texto"])
+    if _TERMOS_PROIBIDOS.search(texto) or len(texto) > len(leitura) + _FOLGA_DO_TEXTO:
+        return False
+    return _numeros(texto) == _numeros(leitura)
+
+
 def metricas_da_receita(
-    filtro: DecomposicaoFiltroSchema, linhas: Sequence[DecomposicaoLinhaSchema]
+    filtro: DecomposicaoFiltroSchema,
+    linhas: Sequence[DecomposicaoLinhaSchema],
+    linhas_acima: Sequence[DecomposicaoLinhaSchema] = (),
 ) -> dict[str, object] | None:
-    """O JSON de métricas do recorte, ou None se não há nenhum segmento para narrar."""
+    """O JSON de métricas do recorte, ou None se não há nenhum segmento para narrar.
+
+    `linhas_acima` são as do recorte de cima (`filtro_acima`), que dão a comparação.
+    """
     if not linhas:
         return None
 
@@ -119,4 +240,27 @@ def metricas_da_receita(
         metricas["maior_queda_participacao_pct"] = round(
             float(quedas[0].variacao_receita / total_das_quedas * 100), 1
         )
+
+    if linhas_acima:
+        base_acima = sum((linha.receita_base for linha in linhas_acima), Decimal(0))
+        variacao_acima = sum(
+            (
+                linha.efeito_tarifa + linha.efeito_bandeira + linha.efeito_volume + linha.efeito_mix
+                for linha in linhas_acima
+            ),
+            Decimal(0),
+        )
+        pct_acima = _pct(base_acima, variacao_acima)
+        if pct_acima is not None:
+            metricas["variacao_acima_pct"] = pct_acima
+        vizinhos_em_queda = [linha.segmento for linha in linhas_acima if linha.variacao_receita < 0]
+        metricas["n_vizinhos"] = len(linhas_acima)
+        metricas["n_vizinhos_em_queda"] = len(vizinhos_em_queda)
+        # Filtro só de classe: as linhas de cima são municípios, e a classe não é uma delas.
+        nome = filtro.bairro or filtro.municipio
+        metricas["unico_em_queda"] = len(
+            linhas_acima
+        ) >= MIN_SEGMENTOS_PARA_CONTAR and vizinhos_em_queda == [nome]
+
+    metricas["leitura_principal"], metricas["leitura_texto"] = _leitura_principal(metricas, filtro)
     return metricas

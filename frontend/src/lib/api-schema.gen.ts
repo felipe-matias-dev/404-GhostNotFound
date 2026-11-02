@@ -1069,6 +1069,8 @@ export interface components {
         InsightReceitaSchema: {
             /** Texto */
             texto: string | null;
+            /** Origem */
+            origem?: ("ia" | "regra") | null;
             /** Metricas */
             metricas: {
                 [key: string]: unknown;

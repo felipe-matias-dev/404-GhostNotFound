@@ -4144,6 +4144,21 @@
             ],
             "title": "Texto"
           },
+          "origem": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "ia",
+                  "regra"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Origem"
+          },
           "metricas": {
             "anyOf": [
               {
