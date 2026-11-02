@@ -238,3 +238,32 @@ def test_without_drops_there_is_no_share() -> None:
     assert metricas is not None
     assert metricas["n_segmentos_em_queda"] == 0
     assert "maior_queda_participacao_pct" not in metricas
+
+
+def test_counts_where_quantity_fell_and_where_only_price_held_the_rise() -> None:
+    linhas = [
+        linha("A", "100", "110", tarifa="20", volume="-10"),
+        linha("B", "100", "95", tarifa="5", volume="-10"),
+        linha("C", "100", "110", tarifa="5", volume="5"),
+    ]
+
+    metricas = metricas_da_receita(filtro(), linhas)
+
+    assert metricas is not None
+    assert metricas["n_segmentos_quantidade_em_queda"] == 2
+    assert metricas["n_segmentos_alta_so_por_preco"] == 1
+
+
+def test_flag_share_of_the_price_effect() -> None:
+    metricas = metricas_da_receita(filtro(), [linha("A", "100", "120", tarifa="5", bandeira="15")])
+
+    assert metricas is not None
+    assert metricas["bandeira_no_preco_pct"] == 75.0
+
+
+def test_flag_share_is_left_out_when_the_parts_do_not_add_up_as_a_share() -> None:
+    contra = metricas_da_receita(filtro(), [linha("A", "100", "110", tarifa="15", bandeira="-5")])
+    queda = metricas_da_receita(filtro(), [linha("A", "100", "95", tarifa="-2", bandeira="-3")])
+
+    assert contra is not None and "bandeira_no_preco_pct" not in contra
+    assert queda is not None and "bandeira_no_preco_pct" not in queda

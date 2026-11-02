@@ -94,6 +94,20 @@ def metricas_da_receita(
     metricas["fatores_contra"] = [nome for nome, efeito in efeitos if efeito < 0]
     metricas["maior_fator"] = max(efeitos, key=lambda par: abs(par[1]))[0]
 
+    # O que a tela não resume: a ponte mostra o total, e estas leituras dizem como ele se
+    # distribui entre os segmentos e de que é feito o ganho de preço (DEC-066).
+    metricas["n_segmentos_quantidade_em_queda"] = sum(
+        1 for linha in linhas if linha.efeito_volume < 0
+    )
+    metricas["n_segmentos_alta_so_por_preco"] = sum(
+        1
+        for linha in linhas
+        if linha.variacao_receita > 0 and linha.efeito_volume + linha.efeito_mix < 0
+    )
+    # Só é "parte do preço" com as duas parcelas a favor: com sinais opostos passaria de 100%.
+    if tarifa >= 0 and bandeira > 0:
+        metricas["bandeira_no_preco_pct"] = round(float(bandeira / (tarifa + bandeira) * 100), 1)
+
     quedas = sorted(
         (linha for linha in linhas if linha.variacao_receita < 0),
         key=lambda linha: (linha.variacao_receita, linha.segmento),
