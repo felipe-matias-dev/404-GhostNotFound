@@ -5,6 +5,16 @@ export {
 } from "./region-map";
 export { RMR_CONTEXTO, RMR_MUNICIPIOS, RMR_VIEWBOX } from "./rmr.gen";
 
-/** Bairros por código IBGE do município (~140 KB): carregados só quando a tela precisa. */
-export const carregarBairrosRmr = () =>
-	import("./rmr-bairros.gen").then((m) => m.RMR_BAIRROS);
+export { useBairrosRmr } from "./use-bairros-rmr";
+/**
+ * Chave para casar o município ou bairro da Gold com o da malha do IBGE: sem acento, caixa
+ * ou espaço sobrando ("Jaboatão dos Guararapes" = "JABOATAO DOS GUARARAPES").
+ */
+export function chaveNome(nome: string): string {
+	return nome
+		.normalize("NFD")
+		.replace(/\p{Diacritic}/gu, "")
+		.toLowerCase()
+		.replace(/\s+/g, " ")
+		.trim();
+}

@@ -1,16 +1,17 @@
 import { useRouter } from "@tanstack/react-router";
 import {
+	chaveNome,
 	RegionMap,
 	type RegionMapShape,
 	RMR_CONTEXTO,
 	RMR_MUNICIPIOS,
 	RMR_VIEWBOX,
+	useBairrosRmr,
 } from "#/components/ui/region-map";
 import { useFiltrosPortal } from "#/features/filtros";
 import type { ParPeriodos, Recorte } from "#/lib/filtros";
 import { formatBRL, formatPct } from "#/lib/format";
 import {
-	chaveNome,
 	EFEITO_CAMPO,
 	EFEITO_ROTULO,
 	type Efeito,
@@ -18,7 +19,6 @@ import {
 	legendaDoMapa,
 	sobreABase,
 } from "../conversions";
-import { useBairrosRmr } from "../hooks/use-bairros-rmr";
 import { useDecomposicao } from "../hooks/use-decomposicao";
 import type { DecomposicaoLinha } from "../types";
 
