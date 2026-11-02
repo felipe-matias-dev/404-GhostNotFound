@@ -3,7 +3,7 @@
 from decimal import Decimal
 from typing import Annotated
 
-from fastapi import APIRouter, Query, status
+from fastapi import APIRouter, Query
 from fastapi.concurrency import run_in_threadpool
 from sqlalchemy import ColumnElement, case, func, or_, select
 from sqlalchemy.orm import InstrumentedAttribute, Session
@@ -18,7 +18,6 @@ from venergy_api.schemas import (
     ComparacaoReceitaSchema,
     DecomposicaoFiltroSchema,
     DecomposicaoLinhaSchema,
-    ErroSchema,
     InsightReceitaSchema,
     KpisMensaisSchema,
     ParPeriodosSchema,
@@ -189,7 +188,7 @@ def get_decomposicao(
     return consultar_decomposicao(filtro, session)
 
 
-@router.get("/insight", responses={status.HTTP_503_SERVICE_UNAVAILABLE: {"model": ErroSchema}})
+@router.get("/insight")
 async def get_insight(
     filtro: Annotated[DecomposicaoFiltroSchema, Query()],
     session: SessionDep,
@@ -209,11 +208,11 @@ async def get_insight(
     chave = chave_do_cache("receita", metricas)
     texto = cache.obter(chave)
     if texto is None:
-        insight = await redator.narrate("receita", metricas)
+        insight = await redator.narrate("receita", metricas) if redator else None
         if insight is None or not texto_aceito(insight.text, metricas):
-            # Provedor fora ou texto recusado: a tela mostra a leitura da regra. Ela não entra
-            # no cache, e o próximo pedido tenta o modelo de novo. Repetir agora não adianta:
-            # com temperatura 0, o modelo escreveria o mesmo texto.
+            # IA desligada, provedor fora ou texto recusado: a tela mostra a leitura da regra.
+            # Ela não entra no cache, e o próximo pedido tenta o modelo de novo. Repetir agora
+            # não adianta: com temperatura 0, o modelo escreveria o mesmo texto.
             return InsightReceitaSchema(
                 texto=metricas["leitura_texto"], origem="regra", metricas=metricas
             )

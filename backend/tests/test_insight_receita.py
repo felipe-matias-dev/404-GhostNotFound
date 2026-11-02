@@ -358,7 +358,7 @@ def test_reading_without_base_revenue_names_the_factor() -> None:
     metricas = metricas_da_receita(filtro(), [linha("Novo", "0", "10", mix="10")])
 
     assert metricas["leitura_principal"] == "maior_fator"
-    assert metricas["leitura_texto"].endswith("perfil de consumo.")
+    assert metricas["leitura_texto"] == "O que mais pesou foi o perfil de consumo."
 
 
 def test_reading_when_nothing_changed() -> None:
@@ -432,3 +432,11 @@ def test_reading_comparison_says_stable_when_the_percentage_is_zero() -> None:
         metricas["leitura_texto"]
         == "Em Pina, a receita ficou estável, enquanto Recife cresceu 10,0%."
     )
+
+
+def test_model_text_cannot_swap_a_rise_with_a_drop() -> None:
+    metricas = {"leitura_texto": "Em Pina, a receita cresceu 5,0%, enquanto Recife recuou 2,0%."}
+
+    assert texto_aceito("Em Pina, a receita subiu 5,0%, enquanto Recife caiu 2,0%.", metricas)
+    assert not texto_aceito("Em Pina, a receita caiu 5,0%, enquanto Recife subiu 2,0%.", metricas)
+    assert not texto_aceito("Em Pina, a receita caiu 5,0%, enquanto Recife recuou 2,0%.", metricas)

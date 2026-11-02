@@ -25,6 +25,12 @@ _TERMOS_PROIBIDOS = re.compile(
 )
 # Folga para o modelo reescrever a leitura, sem espaço para ele acrescentar outra conclusão.
 _FOLGA_DO_TEXTO = 40
+# Sentido de cada afirmação, na ordem do texto. "Ganho" fica de fora: é o nome do efeito do preço.
+_SENTIDO = re.compile(
+    r"\b(?:(?P<alta>cresc\w*|sub\w*|alta|aument\w*)"
+    r"|(?P<queda>recu\w*|ca[ií]\w*|qued\w*|perd\w*|redu\w*|derrub\w*))\b",
+    re.IGNORECASE,
+)
 _NUMERO = re.compile(r"\d+(?:\.\d{3})*(?:,\d+)?")
 
 _CENTAVOS = Decimal("0.01")
@@ -147,7 +153,8 @@ def _leitura_principal(
             f"{lugar}, a receita {_variou(pct)}, enquanto {nome_acima} {_variou(pct_acima)}."
         )
     if metricas["fatores_a_favor"] or metricas["fatores_contra"]:
-        return "maior_fator", f"O fator que mais pesou neste recorte foi {metricas['maior_fator']}."
+        artigo_do_fator = "a" if metricas["maior_fator"] == "quantidade vendida" else "o"
+        return "maior_fator", f"O que mais pesou foi {artigo_do_fator} {metricas['maior_fator']}."
     return "sem_variacao", "A receita não variou entre os dois períodos."
 
 
@@ -155,12 +162,20 @@ def _numeros(texto: str) -> set[Decimal]:
     return {Decimal(numero.replace(".", "").replace(",", ".")) for numero in _NUMERO.findall(texto)}
 
 
+def _sentidos(texto: str) -> list[str | None]:
+    return [encontrado.lastgroup for encontrado in _SENTIDO.finditer(texto)]
+
+
 def texto_aceito(texto: str, metricas: dict[str, object]) -> bool:
-    """Se o texto do modelo diz a leitura escolhida: os mesmos números e sem jargão."""
+    """Se o texto do modelo diz a leitura escolhida: mesmos números e sentidos, sem jargão.
+
+    Sinônimo em outra ordem também é recusado: o custo é mostrar o texto da regra, que diz o
+    mesmo, e nunca uma alta trocada por uma queda.
+    """
     leitura = str(metricas["leitura_texto"])
     if _TERMOS_PROIBIDOS.search(texto) or len(texto) > len(leitura) + _FOLGA_DO_TEXTO:
         return False
-    return _numeros(texto) == _numeros(leitura)
+    return _numeros(texto) == _numeros(leitura) and _sentidos(texto) == _sentidos(leitura)
 
 
 def metricas_da_receita(

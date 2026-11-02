@@ -1,8 +1,8 @@
 // Insight de IA de uma tela, ao lado da frase de leitura que o texto aprofunda. O modelo só é
 // chamado quando o usuário pede ("Gerar insight", com a marca do VE-360, o sinal de "feito
 // pelo agente"); o texto chega aberto numa caixa, que fecha pelo X, por Esc ou clicando fora,
-// e volta pelo botão "Insight feito por IA". Sem texto (narração descartada, falha do provedor
-// ou IA desligada), a tela diz que o insight está indisponível, nunca mostra texto inventado.
+// e volta pelo botão "Insight feito por IA". Sem texto ou com erro da rota, a tela diz que o
+// insight está indisponível, nunca mostra texto inventado.
 // Com `origem` "regra", o texto foi escrito pela regra do backend, e a caixa não o chama de IA.
 import { XIcon } from "@phosphor-icons/react";
 import { useState } from "react";

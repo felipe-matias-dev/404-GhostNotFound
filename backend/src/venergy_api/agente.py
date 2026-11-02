@@ -85,7 +85,8 @@ async def montar_redator_insights(
 ) -> InsightWriter | None:
     """Monta o redator de insights, ou devolve None se a configuração ou o prompt não servirem."""
     settings = _carregar_configuracao(
-        carregar_config, "Insights de IA desativados, as rotas de insight respondem 503"
+        carregar_config,
+        "Insights de IA desativados, as rotas de insight respondem com o texto da regra",
     )
     if settings is None:
         return None
@@ -96,7 +97,7 @@ async def montar_redator_insights(
         # desliga só os insights. O caminho do arquivo não traz segredo, mas a mensagem do
         # sistema operacional não ajuda quem lê: o log diz a versão pedida.
         logger.warning(
-            "Insights de IA desativados, as rotas de insight respondem 503. "
+            "Insights de IA desativados, as rotas de insight respondem com o texto da regra. "
             "Prompt de insight %r não encontrado.",
             settings.insight_prompt_version,
         )
@@ -118,18 +119,10 @@ def get_agente(request: Request) -> TextToSqlAgent:
     return agente
 
 
-def get_redator_insights(request: Request) -> InsightWriter:
-    redator = getattr(request.app.state, "redator_insights", None)
-    if redator is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=(
-                "Os insights de IA estão indisponíveis: configure VENERGY_AGENT_GOOGLE_API_KEY "
-                "e reinicie a API."
-            ),
-        )
-    return redator
+def get_redator_insights(request: Request) -> InsightWriter | None:
+    """O redator, ou None com a IA desligada: quem usa cai no texto da regra, sem 503."""
+    return getattr(request.app.state, "redator_insights", None)
 
 
 AgenteDep = Annotated[TextToSqlAgent, Depends(get_agente)]
-RedatorInsightsDep = Annotated[InsightWriter, Depends(get_redator_insights)]
+RedatorInsightsDep = Annotated[InsightWriter | None, Depends(get_redator_insights)]

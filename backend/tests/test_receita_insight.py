@@ -200,11 +200,11 @@ def test_cut_without_rows_returns_nothing_and_does_not_call_the_model(client_wit
 
 
 @pytest.mark.usefixtures("bridge")
-def test_answers_503_without_the_writer(client: TestClient) -> None:
-    response = client.get("/receita/insight", params=FILTRO)
+def test_answers_with_the_rule_text_without_the_writer(client: TestClient) -> None:
+    corpo = client.get("/receita/insight", params=FILTRO).json()
 
-    assert response.status_code == 503
-    assert "VENERGY_AGENT_GOOGLE_API_KEY" in response.json()["detail"]
+    assert corpo["texto"] == corpo["metricas"]["leitura_texto"]
+    assert corpo["origem"] == "regra"
 
 
 @pytest.mark.usefixtures("bridge")
