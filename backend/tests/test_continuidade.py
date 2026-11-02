@@ -181,6 +181,9 @@ def test_ranking_without_data_in_the_period_is_empty(engine: Engine, client: Tes
         "fim": "2030-02",
         "criterio": "dec",
         "n_meses": 0,
+        "base_inicio": None,
+        "base_fim": None,
+        "n_meses_base": None,
         "alimentadores": [],
     }
 

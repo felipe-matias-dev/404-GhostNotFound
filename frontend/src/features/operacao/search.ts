@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { type Classe, filtrosCompartilhadosShape } from "#/lib/filtros";
+import type { VisaoRede } from "./types";
 
 const mes = z.string().optional().catch(undefined);
 const texto = z.string().trim().min(1).optional().catch(undefined);
@@ -10,11 +11,12 @@ type RedeSearchNormalizada = {
 	inicio?: string;
 	fim?: string;
 	criterio?: "dec" | "fec";
-	serie?: "dec" | "fec";
-	visao?: "alimentadores" | "localidades";
+	visao?: VisaoRede;
 	municipio?: string;
 	bairro?: string;
 	alimentador?: string;
+	/** O alimentador aberto como página no lugar da tabela; sem ele, o painel lateral. */
+	painel?: "inteiro";
 	classe?: Classe;
 	periodo_base?: string;
 };
@@ -24,13 +26,16 @@ export const redeSearchSchema = z
 		inicio: mes,
 		fim: mes,
 		criterio,
-		serie: criterio,
-		visao: z.enum(["alimentadores", "localidades"]).optional().catch(undefined),
+		visao: z
+			.enum(["alimentadores", "bairros", "localidades"])
+			.optional()
+			.catch(undefined),
 		municipio: texto,
 		bairro: texto,
 		classe: filtrosCompartilhadosShape.classe,
 		periodo_base: filtrosCompartilhadosShape.periodo_base,
 		alimentador: texto,
+		painel: z.enum(["inteiro"]).optional().catch(undefined),
 	})
 	.transform((search): RedeSearchNormalizada => {
 		const municipio = search.municipio;
@@ -38,8 +43,6 @@ export const redeSearchSchema = z
 			inicio: search.inicio,
 			fim: search.fim,
 			criterio: search.criterio,
-			// A série só existe com um alimentador aberto: sozinha, não diz nada.
-			serie: search.alimentador ? search.serie : undefined,
 			visao: search.visao,
 			municipio,
 			// Um bairro sem município não tem onde ser procurado.
@@ -47,6 +50,8 @@ export const redeSearchSchema = z
 			classe: search.classe,
 			periodo_base: search.periodo_base,
 			alimentador: search.alimentador,
+			// A página do alimentador só existe com um alimentador aberto.
+			painel: search.alimentador ? search.painel : undefined,
 		};
 	});
 

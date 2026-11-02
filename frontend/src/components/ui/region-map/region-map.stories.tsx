@@ -119,3 +119,16 @@ export const BairroEmFoco: Story = {
 		focusIds: BOA_VIAGEM ? new Set([BOA_VIAGEM.id]) : undefined,
 	},
 };
+
+export const EscalaSequencial: Story = {
+	args: {
+		enabledIds: COM_DADO,
+		colorScale: "sequential",
+		getIntensity: (m) => Math.abs(intensidade(m.id)),
+		legend: {
+			title: "DEC (h/UC)",
+			ticks: ["0", "5", "10"],
+			description: "Quanto maior o DEC, mais intensa a cor.",
+		},
+	},
+};

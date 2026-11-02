@@ -13,7 +13,7 @@ import {
 export const CAMPOS_LOCAIS: Record<DestinoPortal, readonly string[]> = {
 	"/": [],
 	"/receita": ["efeito"],
-	"/rede": ["criterio", "visao", "alimentador", "serie"],
+	"/rede": ["criterio", "visao", "alimentador", "painel"],
 	"/perdas": [
 		"status",
 		"secao",
@@ -138,7 +138,7 @@ function locaisAindaValidos(
 			antes.periodo_atual !== agora.periodo_atual)
 	) {
 		delete local.alimentador;
-		delete local.serie;
+		delete local.painel;
 	}
 	return local;
 }
