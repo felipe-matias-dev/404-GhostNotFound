@@ -10,7 +10,10 @@ from venergy_agent.domain.errors import SqlRejected
 from venergy_agent.domain.sql import ValidatedQuery
 
 TERMINAL_ESCAPE = re.compile(r"\x1b\[[0-9;]*m")
-MONTH_LITERAL = re.compile(r"\d{4}-(0[1-9]|1[0-2])")
+MONTH = r"\d{4}-(?:0[1-9]|1[0-2])"
+MONTH_LITERAL = re.compile(MONTH)
+PERIOD_PAIR = re.compile(rf"({MONTH})/({MONTH})")
+YEAR_PREFIX = re.compile(r"(\d{4})-?%")
 FORBIDDEN_NODES = (exp.DML, exp.DDL, exp.Command, exp.Set, exp.Copy, exp.Into, exp.Lock)
 FORBIDDEN_FUNCTIONS = (
     exp.Anonymous,
@@ -31,12 +34,24 @@ class SqlglotValidator:
 
     @staticmethod
     def _month_literals(root: exp.Expression) -> tuple[str, ...]:
+        months: set[str] = set()
+        for literal in root.find_all(exp.Literal):
+            if not literal.is_string:
+                continue
+            if MONTH_LITERAL.fullmatch(literal.this):
+                months.add(literal.this)
+            elif pair := PERIOD_PAIR.fullmatch(literal.this):
+                months.update(pair.groups())
+        return tuple(sorted(months))
+
+    @staticmethod
+    def _year_prefixes(root: exp.Expression) -> tuple[str, ...]:
         return tuple(
             sorted(
                 {
-                    literal.this
+                    prefix.group(1)
                     for literal in root.find_all(exp.Literal)
-                    if literal.is_string and MONTH_LITERAL.fullmatch(literal.this)
+                    if literal.is_string and (prefix := YEAR_PREFIX.fullmatch(literal.this))
                 }
             )
         )
@@ -52,6 +67,7 @@ class SqlglotValidator:
             applied_limit=applied_limit,
             limit_imposed=limit_imposed,
             periods=self._month_literals(root),
+            years=self._year_prefixes(root),
         )
 
     def _parse(self, sql: str) -> exp.Query:

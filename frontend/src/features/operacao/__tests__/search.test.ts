@@ -10,7 +10,7 @@ describe("redeSearchSchema", () => {
 		expect(search.visao).toBeUndefined();
 	});
 
-	it("preserva a geografia quando a visão global é explícita", () => {
+	it("preserva a geografia na visão de alimentadores", () => {
 		const search = redeSearchSchema.parse({
 			visao: "alimentadores",
 			municipio: "Recife",
@@ -77,21 +77,26 @@ describe("redeSearchSchema", () => {
 		expect(comEspacos.alimentador).toBe("ALM-REC-006");
 	});
 
-	it("remove a série sem alimentador", () => {
-		const sozinha = redeSearchSchema.parse({ serie: "fec" });
-		const comAlimentador = redeSearchSchema.parse({
-			serie: "fec",
+	it("só mantém a página do alimentador com um alimentador aberto", () => {
+		const sozinho = redeSearchSchema.parse({ painel: "inteiro" });
+		const aberto = redeSearchSchema.parse({
+			painel: "inteiro",
+			alimentador: "ALM-A",
+		});
+		const invalido = redeSearchSchema.parse({
+			painel: "metade",
 			alimentador: "ALM-A",
 		});
 
-		expect(sozinha.serie).toBeUndefined();
-		expect(comAlimentador.serie).toBe("fec");
+		expect(sozinho.painel).toBeUndefined();
+		expect(aberto.painel).toBe("inteiro");
+		expect(invalido.painel).toBeUndefined();
 	});
 
 	it("barra critério e visão desconhecidos", () => {
 		const search = redeSearchSchema.parse({
 			criterio: "dec",
-			visao: "bairros",
+			visao: "ucs",
 		});
 
 		expect(search.criterio).toBe("dec");

@@ -26,9 +26,9 @@ Unidades usadas: `R$` (reais); `R$/kWh` (reais por quilowatt-hora); `kWh` (quilo
 | Métrica | Definição e fórmula | Observações |
 |---|---|---|
 | `kwh_faturado` | Energia faturada da UC na competência, já líquida de geração própria. Vale `kwh_leitura` (o consumo apurado) quando o consumo não é negativo; a **leitura atual** quando o consumo é negativo e há medidor instalado na competência (troca de medidor); e o **valor absoluto** quando o consumo é negativo sem medidor novo (sinal invertido). A regra usada fica em `origem_kwh`. | A fatura não tem kWh. A regra foi validada contra o kWh implícito da fatura, e as duas correções são exclusivas e completas ([DEC-023](decisoes.md)). O consumo da leitura já é líquido de GD, como o case descreve. Limpeza: LEI-03 a LEI-07. |
-| `tarifa_media` | `receita_energia ÷ kwh_faturado`. Vazia quando `kwh_faturado = 0` (ex.: GD que compensa todo o consumo). | Base confirmada na [DEC-066](decisoes.md). |
+| `tarifa_media` | `receita_energia ÷ kwh_faturado`. Vazia quando `kwh_faturado = 0` (ex.: GD que compensa todo o consumo). | Base confirmada na [DEC-073](decisoes.md). |
 | `receita_faturada` | Valor emitido na fatura da competência: energia + tributos. | Limpeza: FAT-03 (formato monetário). |
-| `receita_energia` | Valor da energia na fatura, sem tributos. Base do PVM e da tarifa média ([DEC-066](decisoes.md)). | A variação percentual da receita é a mesma com e sem tributos; a base muda só os valores absolutos. |
+| `receita_energia` | Valor da energia na fatura, sem tributos. Base do PVM e da tarifa média ([DEC-073](decisoes.md)). | A variação percentual da receita é a mesma com e sem tributos; a base muda só os valores absolutos. |
 | DEC | Duração equivalente de interrupção por UC: `horas_interrompidas ÷ n_uc`, em horas, com `n_uc` = UCs faturadas (PRODIST). Em um período, divide-se pela média mensal de `n_uc`. | `horas_interrompidas` é em UC·h (soma das durações das ocorrências das UCs do alimentador no mês). Ocorrência que vira o mês entra no mês da abertura. Os valores são simplificados pelo case: servem para comparar alimentadores e períodos, não para comparar com os limites regulatórios. Limpeza: OCO-01 a OCO-03. |
 | FEC | Frequência equivalente de interrupção por UC: `n_interrupcoes ÷ n_uc`, com `n_uc` = UCs faturadas. Em um período, divide-se pela média mensal de `n_uc`. | No case, cada ocorrência corresponde a uma UC interrompida. |
 | Satisfação média | `soma_notas ÷ n_notas` sobre o recorte escolhido. | Guarda-se a soma e a contagem, e não a média, para agregar corretamente. Limpeza: ATD-01. |
@@ -98,10 +98,10 @@ Faturamento por UC e competência.
 | `kwh_leitura` | numeric(16,3) | não | kWh | proposta | Consumo apurado na leitura, sem correção (consumo_kwh da Silver). Pode ser negativo; guardado para rastrear a correção. |
 | `origem_kwh` | text (leitura, leitura_atual_troca_medidor, consumo_absoluto) | não |  | proposta | Regra que gerou kwh_faturado: o próprio consumo da leitura (consumo não negativo); a leitura atual quando o consumo é negativo e há medidor instalado na competência (troca de medidor); ou o valor absoluto quando o consumo é negativo sem medidor novo (sinal invertido). |
 | `receita_faturada` | numeric(14,2) | não | R$ | proposta | Valor total emitido na fatura da competência (energia + tributos). |
-| `receita_energia` | numeric(14,2) | não | R$ | proposta | Valor da energia na fatura, sem tributos. Base da receita no PVM e na tarifa média (DEC-023, confirmada na DEC-066). |
+| `receita_energia` | numeric(14,2) | não | R$ | proposta | Valor da energia na fatura, sem tributos. Base da receita no PVM e na tarifa média (DEC-023, confirmada na DEC-073). |
 | `tributos` | numeric(14,2) | não | R$ | proposta | Tributos cobrados na fatura. |
 | `receita_arrecadada` | numeric(14,2) | sim | R$ | proposta | Valor efetivamente pago. |
-| `tarifa_media` | double precision | sim | R$/kWh | proposta | Receita de energia dividida pela energia faturada (sem tributos). receita_energia ÷ kwh_faturado (DEC-023, DEC-066); NULL quando kwh_faturado = 0 (ex.: GD que compensa todo o consumo). |
+| `tarifa_media` | double precision | sim | R$/kWh | proposta | Receita de energia dividida pela energia faturada (sem tributos). receita_energia ÷ kwh_faturado (DEC-023, DEC-073); NULL quando kwh_faturado = 0 (ex.: GD que compensa todo o consumo). |
 | `bandeira` | text (verde, amarela, vermelha_p1, vermelha_p2) | sim |  | proposta | Bandeira tarifária da competência (acréscimo mensal). A Silver usa Verde, Amarela, Vermelha P1 e Vermelha P2; a Gold converte para este formato. |
 | `data_vencimento` | date | não |  | proposta | Data de vencimento da fatura. |
 | `data_pagamento` | date | sim |  | proposta | Data em que a fatura foi paga; vazia quando não foi paga. A Silver converte o ano 9999 (código de não pago) em nulo (FAT-04). |
@@ -135,8 +135,8 @@ Decomposição da variação de receita entre dois períodos (PVM com efeito mix
 | `bairro` | text | não |  | proposta | Bairro. |
 | `classe` | text (B1, B2, B3, A4) | não |  | proposta | Classe de consumo (B1, B2, B3, A4). |
 | `possui_gd` | boolean | não |  | proposta | A UC tinha geração própria conectada no último mês do período atual; o efeito GD é o efeito volume das linhas com possui_gd = true. DEC-023: separa a queda de volume da GD do restante sem coluna de efeito própria. O grupo vale para a UC nos dois períodos: quem conectou a GD entre eles fica no grupo com GD de ambos os lados (DEC-023). |
-| `receita_base` | numeric(14,2) | não | R$ | proposta | Receita de energia (sem tributos) no período base. Base: receita_energia (DEC-023, DEC-066). |
-| `receita_atual` | numeric(14,2) | não | R$ | proposta | Receita de energia (sem tributos) no período atual. Base: receita_energia (DEC-023, DEC-066). |
+| `receita_base` | numeric(14,2) | não | R$ | proposta | Receita de energia (sem tributos) no período base. Base: receita_energia (DEC-023, DEC-073). |
+| `receita_atual` | numeric(14,2) | não | R$ | proposta | Receita de energia (sem tributos) no período atual. Base: receita_energia (DEC-023, DEC-073). |
 | `efeito_preco` | numeric(14,2) | não | R$ | proposta | Parte da variação de receita explicada pela mudança de preço: efeito_tarifa + efeito_bandeira. |
 | `efeito_tarifa` | numeric(14,2) | não | R$ | proposta | Parte do efeito preço explicada pelo reajuste da tarifa base, sem a bandeira. |
 | `efeito_bandeira` | numeric(14,2) | não | R$ | proposta | Parte do efeito preço explicada pelo acréscimo da bandeira tarifária (meses com bandeira amarela ou vermelha). Método na DEC-029: a bandeira é um acréscimo fixo por kWh; efeito_tarifa usa a receita sem o acréscimo. |
@@ -240,7 +240,7 @@ Interrupções que afetaram cada UC (UC 360).
 
 - **Grão:** UC × ocorrência
 - **Chave:** `cod_ocorrencia`
-- **Consumidores:** UC 360, agente
+- **Consumidores:** UC 360, tela DEC/FEC ("Por que cai", DEC-072), agente
 - **Chave estrangeira (lógica):** cod_uc → gold_dim_uc.cod_uc
 - **Decisões de limpeza que afetam esta tabela:** OCO-01 a OCO-04
 
@@ -345,7 +345,7 @@ Ponte do faturamento e da energia, do número bruto até o usado nos indicadores
 | `receita_faturada_orfas` | numeric(14,2) | não | R$ | proposta | Parte da receita total em faturas de UCs fora do cadastro. Ficam fora do fato por UC, mas nunca são descartadas (FAT-05). |
 | `receita_faturada_cadastro` | numeric(14,2) | não | R$ | proposta | Receita total das UCs do cadastro; igual à soma de receita_faturada em gold_fato_faturamento_mensal. |
 | `tributos_cadastro` | numeric(14,2) | não | R$ | proposta | Tributos das faturas das UCs do cadastro. |
-| `receita_energia_cadastro` | numeric(14,2) | não | R$ | proposta | Receita de energia das UCs do cadastro, base dos indicadores e do PVM (DEC-066). |
+| `receita_energia_cadastro` | numeric(14,2) | não | R$ | proposta | Receita de energia das UCs do cadastro, base dos indicadores e do PVM (DEC-073). |
 | `n_faturas_orfas` | integer | não | contagem | proposta | Faturas de UCs fora do cadastro. |
 | `kwh_leitura_total` | numeric(16,3) | não | kWh | proposta | Soma do consumo apurado nas leituras, sem correção. As UCs fora do cadastro não têm leitura, então a ponte de energia é só do cadastro. |
 | `kwh_correcao_troca_medidor` | numeric(16,3) | não | kWh | proposta | Ajuste das trocas de medidor: leitura atual no lugar do consumo negativo. Soma de (kwh_faturado - kwh_leitura) onde origem_kwh = leitura_atual_troca_medidor. |
@@ -386,7 +386,7 @@ Espelho de `open_questions` em [`contracts/gold_schema.yaml`](../contracts/gold_
 - Titular na UC 360 (DECIDIDO, DEC-023): a Gold traz só titular_mascarado (iniciais) e documento_mascarado (3 últimos dígitos), ambos sensitive. Não há cod_cliente: a origem não tem código de cliente e, no dataset, cada titular tem uma UC só, exceto um documento de preenchimento repetido em um grupo de UCs cadastradas sem nenhum medidor (verificado: o grupo é exatamente o das UCs sem medidor, e o documento não é nulo). Esse grupo são as UCs de teste do cadastro (UC-12, DEC-067).
 - Gold fora do repositório (DECIDIDO, DEC-004 e DEC-024): os CSVs da Gold ficam no Volume do Databricks e em data/gold/, fora do Git; no repositório público só sobe o resultado agregado que a DEC-024 permite.
 - classe x subgrupo (DECIDIDO: opção B, DEC-023): o glossário do case chama de 'classe de consumo' os grupos B1, B2, B3 e A4, e o B3 junta comercial e poder público; a diretoria pergunta por 'receita comercial' e 'volume residencial', e a Silver traz as duas informações (classe com 5 nomes e subgrupo_tarifario B1/B2/B3/A4, com cada classe em um só subgrupo). Opção A: classe passa a ter os 5 nomes e subgrupo guarda B1/B2/B3/A4. Opção B: classe continua B1/B2/B3/A4, como no case, e entra uma coluna nova com os 5 nomes. A opção A muda o domínio de classe, que hoje é usado pelo backend (teste do contrato) e pela camada semântica do agente (regra 'classe tem exatamente B1, B2, B3 e A4' e exemplos); a opção B só acrescenta coluna.
-- Base da receita (DECIDIDO, DEC-066): o teste declarado da DEC-023 foi feito no diagnóstico (docs/diagnostico-receita.md, seções 2 e 4): a receita varia +8,00% com e sem tributos. O teste não distingue as duas definições, porque no dataset os tributos são uma proporção fixa da fatura; receita_energia continua a base do PVM e da tarifa_media pelo conceito: tributos não são receita da distribuidora. Nenhum número mudou.
+- Base da receita (DECIDIDO, DEC-073): o teste declarado da DEC-023 foi feito no diagnóstico (docs/diagnostico-receita.md, seções 2 e 4): a receita varia +8,00% com e sem tributos. O teste não distingue as duas definições, porque no dataset os tributos são uma proporção fixa da fatura; receita_energia continua a base do PVM e da tarifa_media pelo conceito: tributos não são receita da distribuidora. Nenhum número mudou.
 - kwh_faturado x consumo_kwh (VALIDADO, DEC-023): a fatura não tem kWh, e a energia faturada vem do consumo_kwh das leituras. O case diz que a energia da GD é abatida do consumo faturado. Teste: para as UCs com GD, a queda do consumo médio depois da conexão (até 12 meses de cada lado, mínimo 6) dividida pela energia injetada média mensal fica em torno de 1 (mediana próxima de 1, todas dentro de 0,7 a 1,3), então o consumo da leitura já é líquido de GD e não precisa de correção.
 - Regra de kwh_faturado (VALIDADA contra a fatura, DEC-023): troca de medidor -> leitura_atual; consumo negativo sem troca (sinal invertido) -> valor absoluto; demais -> consumo_kwh. Teste: o kWh implícito da fatura (valor_energia ÷ tarifa mediana do subgrupo na competência, calculada só com leituras limpas) reproduz kwh_faturado dentro de 2% em todos os grupos sinalizados. Os dois grupos de leitura negativa são exclusivos e completos: todas as leituras sinalizadas pelo notebook de Silver são negativas, e cada uma cai em exatamente uma regra.
 - Efeito bandeira e efeito GD (DECIDIDO, DEC-023): efeito_preco passa a ser efeito_tarifa + efeito_bandeira, e possui_gd entra no grão de gold_receita_decomposicao, de modo que o efeito GD é o efeito volume das linhas com possui_gd = true. Método (DECIDIDO, DEC-029): no dado, a bandeira é um acréscimo fixo por kWh, igual em todas as classes; efeito_tarifa usa a receita sem o acréscimo, e efeito_bandeira a variação do acréscimo. As parcelas fecham com a variação total por construção (conferido por trava).

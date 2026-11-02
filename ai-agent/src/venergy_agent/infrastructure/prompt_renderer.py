@@ -14,6 +14,7 @@ from venergy_agent.domain.semantic import (
 from venergy_agent.domain.sql import AttemptFeedback, QueryResult, SqlDraft
 
 PLACEHOLDER = re.compile(r"\{\{(\w+)\}\}")
+TECHNICAL_NAME = re.compile(r"\b[a-zA-Z]+_\w+")
 REDACTED = "[redigido]"
 
 
@@ -140,7 +141,7 @@ def render_answer_user(
         f"{column} ({units[column]})" if column in units else column for column in result.columns
     )
     rows = "\n".join(json.dumps(row, ensure_ascii=False, default=str) for row in result.rows)
-    assumptions = "\n".join(f"- {item}" for item in draft.assumptions) or "(nenhuma)"
+    assumptions = "\n".join(f"- {_in_words(item)}" for item in draft.assumptions) or "(nenhuma)"
     data = "\n".join(
         [
             f"colunas: {columns}",
@@ -154,6 +155,10 @@ def render_answer_user(
     return "\n\n".join(
         [delimited("pergunta", question.text, nonce), delimited("dados", data, nonce)]
     )
+
+
+def _in_words(text: str) -> str:
+    return TECHNICAL_NAME.sub(lambda name: name.group().replace("_", " "), text)
 
 
 def render_insight_system(template: str, nonce: str) -> str:

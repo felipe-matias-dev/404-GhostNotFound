@@ -29,19 +29,6 @@ export function filtroAoAbrir(
 	return null;
 }
 
-/**
- * Chave para casar o município ou bairro da Gold com o da malha do IBGE: sem acento, caixa
- * ou espaço sobrando ("Jaboatão dos Guararapes" = "JABOATAO DOS GUARARAPES").
- */
-export function chaveNome(nome: string): string {
-	return nome
-		.normalize("NFD")
-		.replace(/\p{Diacritic}/gu, "")
-		.toLowerCase()
-		.replace(/\s+/g, " ")
-		.trim();
-}
-
 // Escala do mapa, em fração da receita base: abaixo de 0,5% é estável; 10% ou mais satura.
 const ESTAVEL = 0.005;
 const SATURA = 0.1;

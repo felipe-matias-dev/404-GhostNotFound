@@ -100,7 +100,7 @@ Configuração: `google-gla:gemini-3.1-flash-lite`, `prompt_version` v2, narrada
 
 ### Juiz (`--judge`)
 
-Avalia clareza e fidelidade da resposta em português (spec §9.4), com a rubrica `prompts/judge/v1/judge.md` e o modelo `VENERGY_AGENT_JUDGE_MODEL`, que precisa ser diferente do `LLM_MODEL` e do `FALLBACK_MODEL` e usa a chave do próprio provedor. Só julga itens `answered` de rodada narrada, na amostra ou na Gold real: `--judge` com `--sql-only` é recusado. O relatório ganha `judge_score`, `judge_passed` e `judge_rationale` (até 300 caracteres) por item e `judge_pass_rate`, `judge_mean_score`, `judge_items` e `judge_errors` nas métricas. O juiz ainda não foi calibrado com uma pessoa: o resultado dele não decide merge (spec §9.4).
+Avalia clareza e fidelidade da resposta em português (spec §9.4), com a rubrica `prompts/judge/v1/judge.md` e o modelo `VENERGY_AGENT_JUDGE_MODEL`, que precisa ser diferente do `LLM_MODEL` e do `FALLBACK_MODEL` e usa a chave do próprio provedor. Só julga itens `answered` de rodada narrada, na amostra ou na Gold real: `--judge` com `--sql-only` é recusado. O relatório ganha `judge_score`, `judge_passed` e `judge_rationale` (até 300 caracteres) por item e `judge_pass_rate`, `judge_mean_score`, `judge_items` e `judge_errors` nas métricas. O juiz foi calibrado em 01/11/2026 por uma pessoa, em 15 itens da amostra: 14 de 15 com o mesmo `passed` e diferença média absoluta de 0,33 (DEC-047, spec §9.4).
 
 ### Antes de rodar a avaliação na amostra
 
