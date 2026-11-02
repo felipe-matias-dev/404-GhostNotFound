@@ -543,7 +543,7 @@ class RecorteContinuidadeFiltroSchema(BaseModel):
 
 
 class RankingFiltroSchema(RecorteContinuidadeFiltroSchema):
-    """Período, critério, recorte e, se quiser, a base da variação de cada linha (DEC-063)."""
+    """Período, critério, recorte e, se quiser, a base da variação de cada linha (DEC-072)."""
 
     criterio: Literal["dec", "fec"] = "dec"
     base_inicio: Competencia | None = None
@@ -661,7 +661,7 @@ class OcorrenciasFiltroSchema(ContinuidadeMensalFiltroSchema):
 
 
 class ResumoOcorrenciasFiltroSchema(OcorrenciasFiltroSchema):
-    # Suposições de produto, não limites regulatórios (DEC-063).
+    # Suposições de produto, não limites regulatórios (DEC-072).
     reincidencia_min: Annotated[int, Field(ge=2, le=100)] = 3
     longa_h: Annotated[float, Field(gt=0, le=720)] = 4.0
 
@@ -859,6 +859,36 @@ class OrdemSchema(BaseModel):
     observacao: str | None
     criada_em: datetime
     atualizada_em: datetime
+    # Entrada no status atual (último evento) e há quantos segundos, pelo relógio do banco: a tela
+    # soma o tempo desde a resposta e não depende do relógio do computador de quem olha.
+    no_status_desde: datetime
+    segundos_no_status: Annotated[int, Field(ge=0)]
+    # Preenchido pela rota, que conhece os limites (esta_atrasada); a OI no banco não guarda isto.
+    atrasada: bool = False
+
+
+class LinhaConcluidaSchema(BaseModel):
+    aba: str
+    linha: int
+    cod_uc: str
+    ordem_id: int
+    resultado: ResultadoOrdem
+
+
+class LinhaRejeitadaSchema(BaseModel):
+    aba: str
+    linha: int
+    # Vazio quando a própria célula da UC estava em branco.
+    cod_uc: str | None
+    motivo: str
+
+
+class ResultadoPlanilhaSchema(BaseModel):
+    """O que o envio da planilha de campo fez: ordens concluídas e linhas que ficaram de fora."""
+
+    linhas_lidas: int
+    concluidas: list[LinhaConcluidaSchema]
+    rejeitadas: list[LinhaRejeitadaSchema]
 
 
 class EventoSchema(BaseModel):
@@ -872,6 +902,17 @@ class EventoSchema(BaseModel):
     # Nome para a tela, lido de app.usuarios; vazio se o login não existe mais lá.
     autor_nome: str | None
     ocorrido_em: datetime
+
+
+class TempoPorEtapaSchema(BaseModel):
+    """Quanto as OIs levam em uma etapa ativa, contando só as passagens já encerradas."""
+
+    etapa: StatusOrdem
+    # Quantas passagens entraram na conta: sem ele, a mediana de uma passagem só pareceria firme.
+    n: Annotated[int, Field(ge=0)]
+    # Nulos quando n é 0. Em segundos, para a tela escolher a unidade.
+    mediana_segundos: float | None
+    p90_segundos: float | None
 
 
 class OrdemDetalheSchema(OrdemSchema):

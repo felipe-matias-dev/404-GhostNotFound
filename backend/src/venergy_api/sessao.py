@@ -29,6 +29,17 @@ def usuario_atual(
 UsuarioDep = Annotated[UsuarioLogado, Depends(usuario_atual)]
 
 
+def conferidor_da_sessao(request: Request) -> Callable[[], bool]:
+    """Diz, a qualquer momento, se o token com que a requisição chegou ainda vale.
+
+    Para respostas longas (SSE), em que o login é conferido só na abertura. O token não é
+    guardado no servidor (DEC-049): isto pega a expiração, não um logout feito em outra aba.
+    """
+    token = request.cookies.get(COOKIE_SESSAO)
+    segredo = request.app.state.settings.jwt_secret
+    return lambda: token is not None and ler_token(token, segredo) is not None
+
+
 def exigir_perfil(*perfis: Perfil) -> Callable[[UsuarioLogado], UsuarioLogado]:
     def verificar(usuario: UsuarioDep) -> UsuarioLogado:
         if usuario.perfil not in perfis:

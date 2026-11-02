@@ -1,8 +1,8 @@
 import json
 
 from venergy_agent.domain.answer import AgentAnswer, AnswerStatus, Confidence
-from venergy_agent.domain.errors import ErrorKind, QueryExecutionError, SqlRejected
-from venergy_agent.domain.judge import JudgeVerdict
+from venergy_agent.domain.errors import ErrorKind, ModelCallFailed, QueryExecutionError, SqlRejected
+from venergy_agent.domain.judge import JudgeRun, JudgeVerdict
 from venergy_agent.domain.sql import QueryResult, ValidatedQuery
 from venergy_agent.evaluation.runner import EvaluationRunner
 
@@ -556,6 +556,8 @@ class ScriptedJudge:
         verdict = self.verdicts[question]
         if isinstance(verdict, Exception):
             raise verdict
+        if isinstance(verdict, JudgeVerdict):
+            return JudgeRun(verdict=verdict)
         return verdict
 
 
@@ -636,6 +638,38 @@ async def test_judge_metrics_aggregate_the_judged_items():
     assert report.metrics["judge_pass_rate"] == 0.5
     assert report.metrics["judge_mean_score"] == 3.5
     assert report.metrics["judge_errors"] == 0
+
+
+async def test_tokens_of_the_agent_and_the_judge_are_totaled_in_the_metrics():
+    judge = ScriptedJudge(
+        {
+            "Q1": JudgeRun(
+                verdict=JudgeVerdict(score=5, passed=True, rationale="ok"),
+                input_tokens=100,
+                output_tokens=20,
+            )
+        }
+    )
+    answer = make_answer().model_copy(update={"input_tokens": 300, "output_tokens": 40})
+    evaluation = judged_runner({"Q1": answer}, judge)
+
+    report = await run(evaluation, [golden("G001", "Q1", COUNT_SQL)])
+
+    assert report.metrics["agent_input_tokens"] == 300
+    assert report.metrics["agent_output_tokens"] == 40
+    assert report.metrics["judge_input_tokens"] == 100
+    assert report.metrics["judge_output_tokens"] == 20
+
+
+async def test_tokens_of_a_failed_judge_call_still_count_and_the_error_is_recorded():
+    judge = ScriptedJudge({"Q1": ModelCallFailed(input_tokens=50, output_tokens=5)})
+    evaluation = judged_runner({"Q1": make_answer()}, judge)
+
+    report = await run(evaluation, [golden("G001", "Q1", COUNT_SQL)])
+
+    assert report.metrics["judge_errors"] == 1
+    assert report.metrics["judge_input_tokens"] == 50
+    assert report.metrics["judge_output_tokens"] == 5
 
 
 async def test_without_a_judge_the_judge_metrics_are_empty():

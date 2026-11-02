@@ -7,16 +7,22 @@ from pydantic_ai.providers.google import GoogleProvider
 from pydantic_ai.providers.openrouter import OpenRouterProvider
 
 from venergy_agent.config import PROVIDER_KEYS, AgentSettings
+from venergy_agent.infrastructure.guarded_model import GuardedModel
 
 TRANSIENT_STATUS_CODES = [429, 503]
 
 
 def build_model(settings: AgentSettings) -> Model:
-    primary = _build(settings.llm_model, settings)
-    fallbacks = [_build(model, settings) for model in settings.fallback_models]
-    if not fallbacks:
-        return primary
-    return FallbackModel(primary, *fallbacks)
+    configured = (settings.llm_model, *settings.fallback_models)
+    models = [
+        GuardedModel(
+            _build(model, settings),
+            settings.llm_request_timeout_seconds,
+            settings.llm_cooldown_seconds if position < len(configured) - 1 else 0,
+        )
+        for position, model in enumerate(configured)
+    ]
+    return FallbackModel(*models) if len(models) > 1 else models[0]
 
 
 def build_judge_model(settings: AgentSettings) -> Model:

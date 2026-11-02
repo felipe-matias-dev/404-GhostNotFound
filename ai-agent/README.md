@@ -81,7 +81,7 @@ Os itens de follow-up (`follow_up_of`) rodam logo depois da pergunta de origem, 
 
 ### Comparar rodadas
 
-`make eval-compare` não chama o modelo. Imprime em markdown a configuração das duas rodadas (modelo, `prompt_version`, camada semântica, versões dos conjuntos, base, narrada e juiz), as métricas lado a lado com a diferença (taxas em pontos percentuais, contagens e latência em valor absoluto) e os itens em comum que mudaram de `matched`, `status`, `numeric_fidelity` ou `judge_passed`. As métricas são recalculadas só sobre os itens em comum, para que uma versão nova do golden set não distorça a comparação; a tabela diz quantos itens existem só em A e só em B. Se uma rodada tem mais de 5% de itens `failed`, a saída avisa que a comparação provavelmente não vale (erro do provedor, abaixo).
+`make eval-compare` não chama o modelo. Rodadas anteriores à medição de tokens gravam esses totais como 0, então a diferença de tokens só vale entre rodadas novas. Imprime em markdown a configuração das duas rodadas (modelo, `prompt_version`, camada semântica, versões dos conjuntos, base, narrada e juiz), as métricas lado a lado com a diferença (taxas em pontos percentuais, contagens e latência em valor absoluto) e os itens em comum que mudaram de `matched`, `status`, `numeric_fidelity` ou `judge_passed`. As métricas são recalculadas só sobre os itens em comum, para que uma versão nova do golden set não distorça a comparação; a tabela diz quantos itens existem só em A e só em B. Se uma rodada tem mais de 5% de itens `failed`, a saída avisa que a comparação provavelmente não vale (erro do provedor, abaixo).
 
 Última rodada válida, comparada com a linha de base (nenhuma das duas teve `failed`):
 
@@ -100,7 +100,7 @@ Configuração: `google-gla:gemini-3.1-flash-lite`, `prompt_version` v2, narrada
 
 ### Juiz (`--judge`)
 
-Avalia clareza e fidelidade da resposta em português (spec §9.4), com a rubrica `prompts/judge/v1/judge.md` e o modelo `VENERGY_AGENT_JUDGE_MODEL`, que precisa ser diferente do `LLM_MODEL` e do `FALLBACK_MODEL` e usa a chave do próprio provedor. Só julga itens `answered` de rodada narrada, na amostra ou na Gold real: `--judge` com `--sql-only` é recusado. O relatório ganha `judge_score`, `judge_passed` e `judge_rationale` (até 300 caracteres) por item e `judge_pass_rate`, `judge_mean_score`, `judge_items` e `judge_errors` nas métricas. O juiz ainda não foi calibrado com uma pessoa: o resultado dele não decide merge (spec §9.4).
+Avalia clareza e fidelidade da resposta em português (spec §9.4), com a rubrica `prompts/judge/v1/judge.md` e o modelo `VENERGY_AGENT_JUDGE_MODEL`, que precisa ser diferente do `LLM_MODEL` e do `FALLBACK_MODEL` e usa a chave do próprio provedor. Só julga itens `answered` de rodada narrada, na amostra ou na Gold real: `--judge` com `--sql-only` é recusado. O relatório ganha `judge_score`, `judge_passed` e `judge_rationale` (até 300 caracteres) por item e `judge_pass_rate`, `judge_mean_score`, `judge_items` e `judge_errors` nas métricas. O juiz foi calibrado em 01/11/2026 por uma pessoa, em 15 itens da amostra: 14 de 15 com o mesmo `passed` e diferença média absoluta de 0,33 (DEC-047, spec §9.4).
 
 ### Antes de rodar a avaliação na amostra
 
@@ -135,7 +135,7 @@ Follow-up ("e em Olinda?" depois de uma pergunta sobre Recife) e orçamento de t
 | Variável | Para quê |
 |---|---|
 | `VENERGY_AGENT_HISTORY_TURNS` | Turnos anteriores da sessão que o gerador de SQL recebe. Padrão `3`, `0` desliga a memória |
-| `VENERGY_AGENT_SESSION_TOKEN_BUDGET` | Tokens (entrada + saída do gerador de SQL) que cada usuário pode gastar na API (no agente isolado, cada sessão). Padrão `200000`, `0` desliga. Esgotado, o agente responde `refused` sem chamar o modelo |
+| `VENERGY_AGENT_SESSION_TOKEN_BUDGET` | Tokens (entrada + saída do gerador de SQL e do redator) que cada usuário pode gastar na API (no agente isolado, cada sessão). Padrão `200000`, `0` desliga. Esgotado, o agente responde `refused` sem chamar o modelo |
 | `VENERGY_AGENT_PROMPT_VERSION` | `v3` (padrão) lê o histórico; `v2` e `v1` o ignoram |
 
 - O histórico vem da auditoria do backend (`app.ai_auditoria`), e não do agente: o usuário `venergy_agent` nunca lê o schema `app`. O agente isolado (terminal, avaliação) só tem memória com o adapter em memória (`InMemoryConversationHistory`).

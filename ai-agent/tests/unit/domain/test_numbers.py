@@ -71,3 +71,25 @@ def test_digits_inside_a_code_in_the_text_are_not_numbers(text):
 
 def test_a_negative_number_in_the_text_is_still_checked():
     assert unsupported_numbers("O efeito mix foi de -999", [Decimal("-10.5")]) == ("999",)
+
+
+@pytest.mark.parametrize(
+    ("text", "value"),
+    [
+        ("nota 3,89", Decimal("3.89368")),
+        ("nota 3,90", 3.895467),
+        ("R$ 98,56", Decimal("98.562205")),
+        ("DEC de 2,42", 2.4199999570846558),
+        ("1,9 hora", Decimal("1.9135965")),
+    ],
+)
+def test_a_value_rounded_to_the_decimals_written_is_supported(text, value):
+    assert unsupported_numbers(text, [value]) == ()
+
+
+def test_a_value_rounded_the_wrong_way_is_reported():
+    assert unsupported_numbers("nota 3,88", [Decimal("3.89368")]) == ("3,88",)
+
+
+def test_an_integer_must_match_a_value_exactly():
+    assert unsupported_numbers("3 canais", [2.6]) == ("3",)

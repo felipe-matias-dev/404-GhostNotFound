@@ -303,6 +303,20 @@ def test_answer_user_prompt_delimits_question_and_data_and_redacts_the_label():
     assert "- suposição" in prompt
 
 
+def test_answer_user_prompt_writes_technical_names_of_the_assumptions_in_words():
+    question = Question(text="receita?", session_id="s1")
+    draft = SqlDraft(
+        status=DraftStatus.OK,
+        sql="SELECT 1",
+        assumptions=("A fatura é a receita_faturada de cada cod_uc.",),
+    )
+    result = QueryResult(columns=("a",), rows=({"a": 1},), row_count=1, truncated=False)
+
+    prompt = render_answer_user(question, draft, result, NONCE)
+
+    assert "- A fatura é a receita faturada de cada cod uc." in prompt
+
+
 def test_answer_user_prompt_labels_the_columns_that_have_a_unit():
     question = Question(text="receita?", session_id="s1")
     draft = SqlDraft(status=DraftStatus.OK, sql="SELECT 1")

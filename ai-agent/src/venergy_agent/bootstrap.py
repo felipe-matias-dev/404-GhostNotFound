@@ -54,6 +54,7 @@ async def build_agent(
         history_turns=settings.history_turns,
         usage=usage,
         session_token_budget=settings.session_token_budget,
+        answer_deadline_seconds=settings.answer_deadline_seconds,
     )
 
 

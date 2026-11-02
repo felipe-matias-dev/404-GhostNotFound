@@ -60,10 +60,10 @@ Cada parte do sistema responde à pergunta de uma pessoa da V-Energy.
 
 | Quem | Pergunta | Onde é respondida | Estado |
 |---|---|---|---|
-| **Henrique**, diretor comercial | Por que a receita não acompanhou a tarifa, e onde ela caiu? | Telas **Visão geral** (indicadores comercial, de rede e de atendimento) e **Receita** (ponte em cascata, mapa da Região Metropolitana do Recife, drill-down município → bairro → classe) | Pronto |
+| **Henrique**, diretor comercial | Por que a receita não acompanhou a tarifa, e onde ela caiu? | Telas **Visão geral** (indicadores comercial, de rede e de atendimento) e **Receita** (ponte em cascata, mapa da Região Metropolitana do Recife, drill-down município → bairro → classe e insight de IA da ponte gerado sob pedido, [DEC-069](docs/decisoes.md#dec-069--insight-de-ia-ao-lado-da-leitura-que-ele-narra)) | Pronto |
 | **Rafael**, gerente de perdas | Quais unidades inspecionar primeiro, e em que pé está cada ordem? | Tela **Perdas**: ordens de inspeção em Kanban ou tabela, com gerar, enviar a campo, concluir e cancelar. Fila de suspeitas em `GET /fila-suspeitas` | Ordens prontas; fila pronta na API, tela em construção |
 | **Camila**, atendimento | O que aconteceu com esta unidade consumidora, e por que a conta veio alta? | `GET /unidades-consumidoras/{cod_uc}/visao-360`: cadastro, consumo de 12 meses contra o ano anterior, faturas em aberto, medidor, interrupções, chamados e a regra da conta alta ([DEC-044](docs/decisoes.md#dec-044--visão-360-da-unidade-consumidora-rota-única-janela-da-gold-e-regra-da-conta-alta)). A conta é explicada em reais: a diferença contra o mesmo mês do ano anterior vem dividida em consumo, tarifa, bandeira e tributos, e as partes somam a diferença ([DEC-057](docs/decisoes.md#dec-057--variação-da-conta-da-unidade-consumidora-dividida-por-motivo)) | API pronta, tela em construção |
-| **Beatriz**, operação | Quais alimentadores e regiões têm o pior DEC e FEC, quem piorou e por que a luz cai? | Tela **Rede**: DEC, FEC, horas interrompidas, interrupções e UCs do recorte contra o período base; ranking de alimentadores no recorte, ranking de todos os bairros ou descida município → bairro → alimentador, com a variação de cada linha contra a base, busca, ordenação por coluna e trilha no topo; no alimentador, DEC e FEC mensais dentro do recorte contra o recorte inteiro e "Por que cai": horas por causa e por tipo, UCs atingidas e reincidentes, duração das ocorrências e as UCs mais atingidas ([DEC-033](docs/decisoes.md#dec-033--dec-e-fec-por-período-e-recorte-e-a-fila-de-suspeitas-paginada), [DEC-062](docs/decisoes.md#dec-062--tela-de-rede-indicadores-do-recorte-contra-a-base-e-histórico-contra-a-empresa), [DEC-063](docs/decisoes.md#dec-063--tela-de-rede-quem-piorou-onde-atacar-e-por-que-cai)) | Pronto |
+| **Beatriz**, operação | Quais alimentadores e regiões têm o pior DEC e FEC, quem piorou e por que a luz cai? | Tela **Rede**: DEC, FEC, horas interrompidas, interrupções e UCs do recorte contra o período base; ranking de alimentadores no recorte, ranking de todos os bairros ou descida município → bairro → alimentador, com a variação de cada linha contra a base, busca, ordenação por coluna e trilha no topo; no alimentador, DEC e FEC mensais dentro do recorte contra o recorte inteiro e "Por que cai": horas por causa e por tipo, UCs atingidas e reincidentes, duração das ocorrências e as UCs mais atingidas ([DEC-033](docs/decisoes.md#dec-033--dec-e-fec-por-período-e-recorte-e-a-fila-de-suspeitas-paginada), [DEC-071](docs/decisoes.md#dec-071--tela-de-rede-indicadores-do-recorte-contra-a-base-e-histórico-contra-a-empresa), [DEC-072](docs/decisoes.md#dec-072--tela-de-rede-quem-piorou-onde-atacar-e-por-que-cai)) | Pronto |
 | **Patrícia**, diretora de TI | Os dados são confiáveis e seguros? Dá para perguntar em português? | Pipeline com travas de qualidade, agente Text-to-SQL em `POST /ai/ask` com auditoria e insight de IA em `GET /receita/insight` | Pipeline e API prontos; chat no portal em construção |
 
 A Rede também localiza a continuidade num mapa único da RMR: o mesmo seletor **DEC | FEC** da tabela troca a cor dos municípios e dos bairros. DEC mede horas sem energia por UC; FEC, interrupções por UC. A intensidade vai de zero ao maior índice das regiões da malha no período e classe escolhidos, sem classificar conformidade regulatória. Clicar filtra a tela; regiões sem correspondência geográfica continuam na tabela, com aviso no mapa.
@@ -203,7 +203,7 @@ estimada ganha um aviso. Fórmula e limites em
 
 ## Decisões que defendemos
 
-O registro completo, com 55 decisões numeradas e as suposições, está em [`docs/decisoes.md`](docs/decisoes.md). Estas são as que mais mudam o produto.
+O registro completo, com 62 decisões numeradas e as suposições, está em [`docs/decisoes.md`](docs/decisoes.md). Estas são as que mais mudam o produto.
 
 **PostgreSQL com schemas `gold` e `app`** · [DEC-002](docs/decisoes.md#dec-002--banco-local-postgresql)
 - **Problema:** o agente precisa de um usuário que só lê, e a recarga da Gold não pode apagar o trabalho de campo.
@@ -218,12 +218,36 @@ O registro completo, com 55 decisões numeradas e as suposições, está em [`do
 - **Efeito:** sem login a API responde 401 e com o perfil errado, 403; o Rafael é o único que mexe nas ordens de inspeção.
 - **Portal:** `/login` integrado ao cookie, menu e entrada por cargo, retorno a links de dados após autenticar e saída com limpeza do cache. A entrada usa a marca animada e uma rede elétrica ilustrativa, com pausa e movimento reduzido; detalhes em [Login e perfis](frontend/README.md#login-e-perfis).
 
+**Limite de tentativas de login, sem captcha** · [DEC-065](docs/decisoes.md#dec-065--limite-de-tentativas-de-login-por-login-e-endereço)
+- **Problema:** o login não tinha freio, e o portal tem cinco logins conhecidos para alguém testar senhas.
+- **Decisão:** cinco senhas erradas do mesmo login e do mesmo endereço em 15 minutos bloqueiam o par (`429` com o tempo de espera). Bloqueado, nem a senha certa entra, e a resposta é igual para login que existe ou não. O contador fica no banco, e as tentativas simultâneas passam uma de cada vez.
+- **Descartado:** captcha, que depende de serviço externo e de internet e quebraria o teste do clone limpo; e bloquear só pelo login, que deixaria qualquer um trancar a conta do Rafael.
+- **Efeito:** o chute de senha para depois de cinco tentativas, sem dependência nova. Atrás de um proxy (Vite, Docker) o endereço é o do proxy, e o limite vira por login; está na decisão.
+
 **Ordens de inspeção como máquina de estados garantida no banco** · [DEC-009](docs/decisoes.md#dec-009--modelo-das-ordens-de-inspeção)
 - **Decisão:** status `GERADA → EM_CAMPO → CONCLUIDA` ou `CANCELADA` (com volta de `EM_CAMPO` para `GERADA`, [DEC-048](docs/decisoes.md#dec-048--ordem-em-campo-pode-voltar-para-gerada)), histórico em `app.ordem_evento` e no máximo uma ordem ativa por unidade consumidora, garantida por índice único parcial.
 - **Por que no banco:** uma checagem só no Python deixaria passar duas requisições simultâneas.
 - **Sem FK para a Gold:** a carga apagaria as ordens ou falharia.
 - **Descartado:** rotas por ação (`/concluir`, `/cancelar`), que espalham a validação.
 - **Efeito:** cada visita fica no histórico, e o resultado registrado mede se a fila de suspeitas acerta.
+
+**Planilha de campo: exportar as ordens em campo e subir o resultado** · [DEC-062](docs/decisoes.md#dec-062--planilha-de-campo-exportar-as-ordens-em-campo-e-subir-o-resultado)
+- **Problema:** a equipe volta de campo com uma planilha, e digitar cada resultado ordem por ordem é o retrabalho que o Rafael quer evitar.
+- **Decisão:** `GET /ordens-inspecao/planilha` exporta as ordens em campo no formato de `inspecoes.xlsx`, e `POST /ordens-inspecao/planilha` liga cada linha à ordem em campo da unidade consumidora, conclui as válidas e devolve as rejeitadas com o motivo. As regras de limpeza são as da Silver (grafias do resultado, datas, vírgula decimal), mais o ponto de milhar digitado à mão.
+- **Descartado:** tudo ou nada, porque uma linha escrita errada travaria o arquivo inteiro; e concluir ordem que ainda não foi enviada a campo, que pularia a máquina de estados.
+- **Efeito:** a planilha exportada volta pelo upload sem remontar nada, reenviar o mesmo arquivo não muda nada, e o histórico mostra quem subiu a planilha. Tipo, kWh, data e inspetor ficam no texto da observação. A tela de Perdas tem os botões de baixar e de enviar, com a tabela das linhas rejeitadas; a planilha sai com seleção em resultado, data e kWh.
+
+**Tela de ordens que se atualiza sozinha** · [DEC-063](docs/decisoes.md#dec-063--ordens-de-inspeção-em-tempo-real-aviso-no-commit-e-sse)
+- **Problema:** dois analistas de perdas olham a mesma ordem, e quem não recarrega a página vê o status antigo.
+- **Decisão:** quem muda uma ordem dispara um `pg_notify` do Postgres na mesma transação, e `GET /ordens-inspecao/eventos` (SSE) repassa o aviso às telas abertas, que refazem a consulta. Um lote ou uma planilha é um aviso só.
+- **Descartado:** WebSocket, porque o fluxo é só do servidor para a tela, e uma fila em memória, que avisaria antes do commit.
+- **Efeito:** o aviso só sai se o banco confirmou a mudança. Com 20 mudanças simultâneas da mesma ordem, uma passa, 19 recebem 409 e as telas são avisadas uma vez (`python -m venergy_api.demo_concorrencia`).
+
+**Quanto tempo cada ordem está parada** · [DEC-064](docs/decisoes.md#dec-064--tempo-das-ordens-no-status-e-por-etapa)
+- **Problema:** uma ordem esquecida em campo só aparecia para quem abria o histórico dela.
+- **Decisão:** cada cartão do Kanban mostra há quanto tempo a ordem está no status atual, contando ao vivo, e o selo "Atrasada" (mais de 5 dias gerada ou 10 em campo, prazos supostos e ajustáveis no `.env`). `GET /ordens-inspecao/tempos-por-etapa` dá a mediana e o p90 por etapa, com o número de passagens.
+- **Descartado:** calcular o tempo no navegador a partir da data, porque o relógio errado do computador daria um contador errado; e a média, que uma ordem esquecida distorce.
+- **Efeito:** o Rafael vê o que está parado sem abrir ordem por ordem. O tempo sai do histórico das ordens, que é dado do backend, e não da Gold.
 
 **DEC e FEC calculados a partir dos componentes** · [DEC-033](docs/decisoes.md#dec-033--dec-e-fec-por-período-e-recorte-e-a-fila-de-suspeitas-paginada)
 - **Problema:** DEC e FEC não se somam nem se tiram a média entre alimentadores ou bairros.
@@ -241,7 +265,7 @@ O registro completo, com 55 decisões numeradas e as suposições, está em [`do
 
 **Agente só sobre views validadas por parser, e o LLM só narra** · [ADR-03 e ADR-04](docs/arquitetura.md#7-decisões-técnicas)
 - **Descartado:** SQL livre e ferramentas parametrizadas.
-- **Efeito:** mesmo com o prompt manipulado, o banco não aceita escrita. O insight das telas narra um JSON de métricas da Gold e é descartado se citar um número que não está nele.
+- **Efeito:** mesmo com o prompt manipulado, o banco não aceita escrita. O insight das telas narra um JSON de métricas da Gold e é descartado se citar um número que não está nele. No portal, ele fica ao lado da leitura do gráfico que narra e só chama o modelo quando a pessoa clica em **Gerar insight** ([DEC-069](docs/decisoes.md#dec-069--insight-de-ia-ao-lado-da-leitura-que-ele-narra)).
 
 **Workflow mensal e reprocessamento completo** · [DEC-039](docs/decisoes.md#dec-039--workflow-do-databricks-e-agendamento-mensal)
 - **Agendamento:** dia 6, D+5 do fechamento do faturamento. Os detalhes estão em [Workflow no Databricks](#workflow-no-databricks).
@@ -300,6 +324,18 @@ recarregam a cada mudança. Mudou dependência (`pyproject.toml`, `package.json`
 
 O passo `mkdir` cria a pasta da Gold com o seu usuário. Sem ele, no Linux, o Docker a cria
 como root e o gerador da amostra não consegue gravar.
+
+### Observabilidade (opcional)
+
+Cada requisição pode virar um trace do OpenTelemetry, com a rota, as consultas ao Postgres e as chamadas ao Gemini, cada uma com a sua duração ([DEC-068](docs/decisoes.md)). Desligado por padrão: o passo a passo acima não precisa disso.
+
+```bash
+# 1. No .env: RASTREAMENTO_ENDPOINT=http://jaeger:4318/v1/traces
+# 2. Sobe o ambiente com o Jaeger
+docker compose --profile observabilidade up -d --wait
+```
+
+Abra http://localhost:16686, escolha o serviço `venergy-api` e clique em **Find Traces**. Para achar uma pergunta da auditoria do agente, busque pela tag `venergy.ai.request_id=<request_id>`. O Jaeger guarda os traces em memória: reiniciar o container apaga todos.
 
 ### Atalhos com `make`
 

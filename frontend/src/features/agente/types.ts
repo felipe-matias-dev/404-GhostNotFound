@@ -22,6 +22,7 @@ export interface TurnoConversa {
 	status: TurnoStatus;
 	resposta?: RespostaIa;
 	erro?: string;
+	etapa?: string;
 }
 
 export interface SessaoConversa {

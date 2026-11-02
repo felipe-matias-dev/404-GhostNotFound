@@ -85,7 +85,9 @@
 #          divisão inteira) também devolve. A nota do G046 perde o trecho de antes da memória.
 #   0.17.0 GenAI (30/10/2026): a referência do G105 devolve só o município e o bairro, para aceitar a queda com qualquer
 #          sinal. revisado_por do G105 volta a null até Dados conferir.
-versao: 0.17.0
+#   0.18.0 Dados (31/10/2026, issue #90): revisado_por do G105 preenchido (Alisson Ramos), conferido na Gold real.
+#          Só a assinatura e a nota mudam; a referência é a da 0.17.0.
+versao: 0.18.0
 status: rascunho
 
 itens:
@@ -1190,5 +1192,5 @@ itens:
     expected_status: answered
     datasets: [gold_real]
     follow_up_of: null
-    notes: "Versão answered do G044, a pergunta do Henrique (issue #90, item 5): os dois períodos e a medida (kWh) estão explícitos, como no G057 e no G059. Bairro sempre com o município. O G044 continua clarify. A referência foi executada na Gold oficial pelo caminho do agente e volta com resultado (GenAI, 30/10/2026). Conferido por Dados no PR #97 (Alisson Ramos, 30/10/2026). Mudança na 0.17.0 (GenAI, 30/10/2026): a referência devolve só o município e o bairro. Com a variação, uma resposta certa que mostrasse a queda como número positivo era marcada como errada. Revisado_por volta a null até Dados conferir."
-    revisado_por: null
+    notes: "Versão answered do G044, a pergunta do Henrique (issue #90, item 5): os dois períodos e a medida (kWh) estão explícitos, como no G057 e no G059. Bairro sempre com o município. O G044 continua clarify. A referência foi executada na Gold oficial pelo caminho do agente e volta com resultado (GenAI, 30/10/2026). Conferido por Dados no PR #97 (Alisson Ramos, 30/10/2026). Mudança na 0.17.0 (GenAI, 30/10/2026): a referência devolve só o município e o bairro. Com a variação, uma resposta certa que mostrasse a queda como número positivo era marcada como errada. Revisado_por volta a null até Dados conferir. Conferência de Dados (31/10/2026): a referência nova foi executada na Gold real pelo caminho do agente, já com as views no schema semantic (D1), e devolve o mesmo município e bairro da 0.15.0, sem empate no primeiro lugar. A pergunta pede o bairro, então comparar só município e bairro é o certo; a medida em kWh continua no ORDER BY, e uma resposta que ordene pela queda em percentual não é a pedida. Revisado por Dados."
+    revisado_por: "Alisson Ramos"

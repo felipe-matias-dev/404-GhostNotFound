@@ -12,14 +12,17 @@ from sqlalchemy import (
     Enum,
     ForeignKey,
     Index,
+    Integer,
     Numeric,
     Text,
+    cast,
     false,
     func,
+    select,
     text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, column_property, mapped_column, relationship
 
 from venergy_api.auth import Perfil
 from venergy_api.database import Base
@@ -405,6 +408,33 @@ class OrdemEvento(Base):
         return self.autor.nome if self.autor else None
 
 
+# Quando a OI entrou no status atual: o último evento gravado do histórico (maior id, a mesma
+# ordem do histórico), que registra toda mudança de status. Calculado no banco, na mesma consulta
+# da OI, para a lista não fazer uma busca por ordem. Sem evento (OI de antes do histórico), vale
+# a criação. Definido depois das duas classes porque uma referencia a outra.
+OrdemInspecao.no_status_desde = column_property(
+    func.coalesce(
+        select(OrdemEvento.ocorrido_em)
+        .where(OrdemEvento.ordem_id == OrdemInspecao.id)
+        .order_by(OrdemEvento.id.desc())
+        .limit(1)
+        .correlate_except(OrdemEvento)
+        .scalar_subquery(),
+        OrdemInspecao.criada_em,
+    )
+)
+# Segundos inteiros desde essa entrada, pelo relógio do banco, o mesmo que gravou o evento: o
+# relógio do computador de quem olha a tela não entra na conta.
+OrdemInspecao.segundos_no_status = column_property(
+    cast(
+        func.greatest(
+            0, func.floor(func.extract("epoch", func.now() - OrdemInspecao.no_status_desde))
+        ),
+        Integer,
+    )
+)
+
+
 class AiAuditoria(Base):
     """Uma resposta do agente de IA, gravada como ele a devolveu: a trilha de auditoria."""
 
@@ -459,6 +489,31 @@ class Usuario(Base):
     perfil: Mapped[Perfil] = mapped_column(_enum_como_texto(Perfil, "ck_usuarios_perfil"))
     # Só o hash Argon2: com a tabela vazada, ninguém lê as senhas.
     senha_hash: Mapped[str]
+
+
+class TentativaLogin(Base):
+    """Uma tentativa de login, certa ou errada: a base do limite de tentativas (DEC-065).
+
+    Sem chave estrangeira para usuarios: o login digitado pode nem existir, e o limite trata os
+    dois casos do mesmo jeito. O endereço vem da conexão, nunca de um cabeçalho que o cliente
+    escreve.
+    """
+
+    __tablename__ = "tentativa_login"
+    __table_args__ = (
+        Index("ix_tentativa_login_par", "login", "ip", "ocorrida_em"),
+        {"schema": "app"},
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    login: Mapped[str]
+    ip: Mapped[str]
+    sucesso: Mapped[bool]
+    # clock_timestamp(), e não now(): o now() é o início da transação, e quem esperou a trava do
+    # par seria gravado com um instante anterior ao da tentativa que passou antes dele.
+    ocorrida_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.clock_timestamp()
+    )
 
 
 class AiSessao(Base):

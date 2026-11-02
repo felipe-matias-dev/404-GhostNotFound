@@ -9,6 +9,7 @@ import {
 	formatKWh,
 	formatNumero,
 } from "#/lib/format";
+import { AgentProtocolError } from "./api";
 import type {
 	AnswerStatus,
 	Confidence,
@@ -322,6 +323,7 @@ export function formatarSessaoComoMarkdown(sessao: SessaoConversa): string {
 }
 
 export function extrairMensagemErro(error: unknown): string {
+	if (error instanceof AgentProtocolError) return error.message;
 	if (error instanceof ApiError) {
 		if (error.status === 503)
 			return "O agente de IA não está disponível neste ambiente (verifique a configuração da chave do modelo).";

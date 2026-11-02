@@ -6,8 +6,8 @@ from typing import Any, Literal, Protocol
 
 from venergy_agent.application.ports import AnswerJudge, QueryExecutor, SqlValidator, TextToSqlAgent
 from venergy_agent.domain.answer import AgentAnswer, AnswerStatus
-from venergy_agent.domain.errors import SqlRejected
-from venergy_agent.domain.judge import JudgeVerdict
+from venergy_agent.domain.errors import ModelCallFailed, SqlRejected
+from venergy_agent.domain.judge import JudgeRun
 from venergy_agent.evaluation.metrics import (
     is_rejected,
     leaks_prompt,
@@ -158,7 +158,8 @@ class EvaluationRunner:
         matched = None
         if reference is not None:
             matched = await self._matched(answer, reference, reference_sql or "")
-        verdict, judge_error = await self._verdict(question, answer)
+        judged_run, judge_error, judge_input, judge_output = await self._verdict(question, answer)
+        verdict = judged_run.verdict if judged_run else None
         return ItemResult(
             **common,
             status=answer.status,
@@ -172,6 +173,10 @@ class EvaluationRunner:
                 else None
             ),
             latency_ms=answer.latency_ms,
+            agent_input_tokens=answer.input_tokens,
+            agent_output_tokens=answer.output_tokens,
+            judge_input_tokens=judge_input,
+            judge_output_tokens=judge_output,
             judge_score=verdict.score if verdict else None,
             judge_passed=verdict.passed if verdict else None,
             judge_rationale=verdict.rationale[:RATIONALE_MAX_CHARS] if verdict else None,
@@ -180,13 +185,16 @@ class EvaluationRunner:
 
     async def _verdict(
         self, question: str, answer: AgentAnswer
-    ) -> tuple[JudgeVerdict | None, bool]:
+    ) -> tuple[JudgeRun | None, bool, int, int]:
         if self._judge is None or not self._narrated or answer.status is not AnswerStatus.ANSWERED:
-            return None, False
+            return None, False, 0, 0
         try:
-            return await self._judge.judge(question, answer), False
+            run = await self._judge.judge(question, answer)
+            return run, False, run.input_tokens, run.output_tokens
+        except ModelCallFailed as error:
+            return None, True, error.input_tokens, error.output_tokens
         except Exception:
-            return None, True
+            return None, True, 0, 0
         finally:
             if self._pause_seconds:
                 await asyncio.sleep(self._pause_seconds)
@@ -281,6 +289,10 @@ def compute_metrics(items: Sequence[ItemResult]) -> dict[str, float | int | None
         if judged
         else None,
         "judge_items": len(judged),
+        "agent_input_tokens": sum(item.agent_input_tokens for item in items),
+        "agent_output_tokens": sum(item.agent_output_tokens for item in items),
+        "judge_input_tokens": sum(item.judge_input_tokens for item in items),
+        "judge_output_tokens": sum(item.judge_output_tokens for item in items),
         "judge_errors": sum(item.judge_error for item in items),
         "reference_errors": sum(item.reference_error for item in items),
         "reference_empty": sum(item.reference_empty for item in items),
