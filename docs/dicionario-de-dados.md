@@ -240,7 +240,7 @@ Interrupções que afetaram cada UC (UC 360).
 
 - **Grão:** UC × ocorrência
 - **Chave:** `cod_ocorrencia`
-- **Consumidores:** UC 360, agente
+- **Consumidores:** UC 360, tela DEC/FEC ("Por que cai", DEC-063), agente
 - **Chave estrangeira (lógica):** cod_uc → gold_dim_uc.cod_uc
 - **Decisões de limpeza que afetam esta tabela:** OCO-01 a OCO-04
 

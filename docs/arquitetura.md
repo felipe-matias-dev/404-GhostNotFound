@@ -138,7 +138,7 @@ Proposta v0 que serve de base para `contracts/gold_schema.yaml`. O contrato é a
 | `gold_kpis_segmento_mensal` | competência × município × bairro × classe × GD | Receita, Rede, Atendimento | Filtros da diretoria, portal, agente |
 | `gold_reconciliacao_faturamento` | competência | Receita | Diagnóstico, tela Receita, agente (ponte do faturamento e da energia) |
 | `gold_continuidade_alimentador_mensal` | alimentador × competência | Continuidade | Tela DEC/FEC, agente |
-| `gold_interrupcoes_uc` | UC × ocorrência | Continuidade | UC 360 |
+| `gold_interrupcoes_uc` | UC × ocorrência | Continuidade | UC 360, tela Rede ("Por que cai") |
 | `gold_atendimentos_uc` | UC × chamado | Relacionamento | UC 360, agente |
 | `gold_medidor_uc` | UC × medidor vigente | Relacionamento | UC 360, score |
 | `gold_fila_suspeitas` | 1 linha por UC suspeita | Perdas | Tela Perdas, OIs |
