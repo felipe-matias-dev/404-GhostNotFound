@@ -1,5 +1,5 @@
 import asyncio
-from collections.abc import Callable, Iterator
+from collections.abc import AsyncIterator, Callable, Iterator
 
 import pytest
 from fastapi.testclient import TestClient
@@ -12,6 +12,7 @@ from pydantic_ai import Agent
 from pydantic_ai.models.test import TestModel
 from sqlalchemy import Engine
 from venergy_agent.domain.answer import AgentAnswer, AnswerStatus, Confidence
+from venergy_agent.domain.events import AnswerEvent, Stage, StageEvent
 
 from venergy_api.agente import get_agente
 from venergy_api.auth import Perfil
@@ -22,27 +23,35 @@ PERGUNTA = "Qual foi a receita faturada em 2024-06?"
 SESSAO = "3f2b8c1e-5d4a-4e7b-9a60-1c2d3e4f5a6b"
 
 
+def resposta() -> AgentAnswer:
+    return AgentAnswer(
+        answer="A receita faturada de 2024-06 foi de R$ 1.234,50.",
+        status=AnswerStatus.ANSWERED,
+        sql="SELECT competencia, receita_faturada FROM semantic.sem_kpis_mensais LIMIT 200",
+        rows=({"competencia": "2024-06", "receita_faturada": 1234.5},),
+        row_count=1,
+        truncated=False,
+        confidence=Confidence.HIGH,
+        sources=("sem_kpis_mensais",),
+        assumptions=(),
+        clarification=None,
+        refused_reason=None,
+        request_id="req-rastreada",
+        model="google-gla:gemini-3.1-flash-lite",
+        prompt_version="v3",
+        latency_ms=850,
+        input_tokens=1200,
+        output_tokens=80,
+    )
+
+
 class AgenteFalso:
     async def ask(self, question: str, session_id: str) -> AgentAnswer:
-        return AgentAnswer(
-            answer="A receita faturada de 2024-06 foi de R$ 1.234,50.",
-            status=AnswerStatus.ANSWERED,
-            sql="SELECT competencia, receita_faturada FROM semantic.sem_kpis_mensais LIMIT 200",
-            rows=({"competencia": "2024-06", "receita_faturada": 1234.5},),
-            row_count=1,
-            truncated=False,
-            confidence=Confidence.HIGH,
-            sources=("sem_kpis_mensais",),
-            assumptions=(),
-            clarification=None,
-            refused_reason=None,
-            request_id="req-rastreada",
-            model="google-gla:gemini-3.1-flash-lite",
-            prompt_version="v3",
-            latency_ms=850,
-            input_tokens=1200,
-            output_tokens=80,
-        )
+        return resposta()
+
+    async def stream(self, question: str, session_id: str) -> AsyncIterator[object]:
+        yield StageEvent(stage=Stage.QUERYING, attempt=1)
+        yield AnswerEvent(answer=resposta())
 
 
 @pytest.fixture
@@ -88,12 +97,17 @@ def consultas(spans: InMemorySpanExporter) -> list[ReadableSpan]:
     return [s for s in spans.get_finished_spans() if s.attributes.get("db.system") == "postgresql"]
 
 
+# No stream, o span é lido de dentro do gerador que a resposta percorre, e não da rota: é onde o
+# contexto da requisição poderia se perder.
+@pytest.mark.parametrize("rota", ["/ai/ask", "/ai/ask/stream"])
 def test_the_agent_answer_goes_to_the_request_span(
-    rastreado: Callable[[], tuple[TestClient, TracerProvider]], spans: InMemorySpanExporter
+    rota: str,
+    rastreado: Callable[[], tuple[TestClient, TracerProvider]],
+    spans: InMemorySpanExporter,
 ) -> None:
     client, _ = rastreado()
 
-    response = client.post("/ai/ask", json={"question": PERGUNTA, "session_id": SESSAO})
+    response = client.post(rota, json={"question": PERGUNTA, "session_id": SESSAO})
 
     assert response.status_code == 200, response.text
     atributos = requisicao(spans).attributes
