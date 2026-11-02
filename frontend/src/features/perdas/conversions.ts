@@ -3,6 +3,7 @@ import type {
 	AcaoOrdem,
 	EventoOrdem,
 	Ordem,
+	OrdemDaTela,
 	ResultadoOrdem,
 	StatusOrdem,
 	VisaoOrdens,
@@ -120,20 +121,23 @@ export function limiteFinalizadas(alturaViewport: number): number {
 	return limite;
 }
 
-export type ColunaFinalizada = { visiveis: Ordem[]; total: number };
-
-export type OrdensKanbanAgrupadas = {
-	GERADA: Ordem[];
-	EM_CAMPO: Ordem[];
-	CONCLUIDA: ColunaFinalizada;
-	CANCELADA: ColunaFinalizada;
+export type ColunaFinalizada<T extends Ordem = Ordem> = {
+	visiveis: T[];
+	total: number;
 };
 
-function colunaFinalizada(
-	ordens: Ordem[],
+export type OrdensKanbanAgrupadas<T extends Ordem = Ordem> = {
+	GERADA: T[];
+	EM_CAMPO: T[];
+	CONCLUIDA: ColunaFinalizada<T>;
+	CANCELADA: ColunaFinalizada<T>;
+};
+
+function colunaFinalizada<T extends Ordem>(
+	ordens: T[],
 	status: StatusOrdem,
 	limite: number,
-): ColunaFinalizada {
+): ColunaFinalizada<T> {
 	const todas = ordens.filter((ordem) => ordem.status === status);
 	const visiveis = [...todas]
 		.sort((a, b) => {
@@ -148,10 +152,10 @@ function colunaFinalizada(
  * Separa as OIs do Kanban: ativas inteiras, na ordem da API (mais recentes primeiro), e
  * finalizadas pelas atualizadas mais recentes, cortadas no `limite` da altura da tela.
  */
-export function agruparOrdensKanban(
-	ordens: Ordem[],
+export function agruparOrdensKanban<T extends Ordem>(
+	ordens: T[],
 	limite: number,
-): OrdensKanbanAgrupadas {
+): OrdensKanbanAgrupadas<T> {
 	return {
 		GERADA: ordens.filter((ordem) => ordem.status === "GERADA"),
 		EM_CAMPO: ordens.filter((ordem) => ordem.status === "EM_CAMPO"),
@@ -178,4 +182,22 @@ export function lerCodigosUc(texto: string): CodigosUcLidos {
 
 export function lerVisaoSalva(valor: string | null): VisaoOrdens {
 	return valor === "tabela" ? "tabela" : "kanban";
+}
+
+/** Carimba a lista com o instante em que chegou, para o contador de cada OI partir dele. */
+export function paraOrdensDaTela(
+	ordens: Ordem[],
+	recebidaEm: number,
+): OrdemDaTela[] {
+	return ordens.map((ordem) => ({ ...ordem, recebida_em: recebidaEm }));
+}
+
+/**
+ * Há quantos segundos a OI está no status atual: o que o servidor mediu na resposta mais o tempo
+ * que passou no navegador desde então. Um relógio que andou para trás não desfaz o que o servidor
+ * já contou.
+ */
+export function segundosNoStatus(ordem: OrdemDaTela, agora: number): number {
+	const decorrido = Math.max(0, agora - ordem.recebida_em);
+	return ordem.segundos_no_status + Math.floor(decorrido / 1000);
 }

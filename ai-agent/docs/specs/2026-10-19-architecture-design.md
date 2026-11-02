@@ -307,7 +307,7 @@ Comparar o texto do SQL não vale como métrica: duas consultas diferentes podem
 - Antes de confiar no juiz, calibrar com uma amostra pequena avaliada por uma pessoa.
 - **Implementado** (DEC-047): `domain/judge.py` (`JudgeVerdict`, `PASS_SCORE = 4`: `passed` é verdadeiro se e só se `score >= 4`), porta `AnswerJudge`, adapter `PydanticAiAnswerJudge` e rubrica `prompts/judge/v1/judge.md`, com pergunta, resposta e linhas delimitadas por nonce.
 - O juiz só avalia itens `answered` de rodada narrada, na amostra ou na Gold real (DEC-015, aceita em 29/10/2026): `--judge` é recusado com `--sql-only`. Um erro do provedor no juiz deixa os campos nulos e conta em `judge_errors`.
-- **Calibração pendente:** em 15 itens `answered`, uma pessoa dá a nota 1–5 sem ver a do juiz. O juiz passa a contar com concordância de `passed` em pelo menos 12 de 15 e diferença média absoluta de nota até 1; senão a rubrica vai para `judge/v2`. Até lá, o resultado do juiz não decide merge.
+- **Calibração feita (01/11/2026, issue #116):** em 15 itens `answered` da amostra, com notas humanas às cegas, `passed` igual em 14 de 15 e diferença média absoluta de 0,33, contra o critério de 12 de 15 e até 1 ponto. A rubrica continua na v1 e o juiz passa a contar (DEC-047), com as ressalvas registradas lá: uma pessoa só e amostra sintética. Mudar a rubrica, o modelo do juiz ou o texto avaliado exige recalibrar.
 
 ### 9.5 Encaixe na arquitetura
 
@@ -666,7 +666,7 @@ Pedidos a abrir como issue para a área dona. O GenAI não altera esses arquivos
 
 **Diferenciais, só depois dos obrigatórios:**
 - follow-up com memória (G1-10, DEC-046): feito na branch `feat/ai-agent-memoria-orcamento`. A avaliação exercita a memória nos follow-ups: o runner roda cada cadeia numa sessão própria, com `InMemoryConversationHistory` e o recorder de turnos (nas duas bases, DEC-015 aceita). Falta a rodada da regra de merge (DEC-016): `make eval ONLY=golden` com `VENERGY_AGENT_PROMPT_VERSION=v2` contra o padrão v3 (sem regressão nos itens comuns e ao menos 4 dos 5 follow-ups certos, inclusive o G046: G046, G099, G100, G102, G103), `make eval ONLY=red_team` na v3 e `make eval-compare`; sem cota do Gemini na data, fica pendente. Critérios no plano `docs/plans/2026-10-29-memoria-e-orcamento.md`;
-- LLM as a judge (§9.4): código feito na branch `feat/ai-agent-avaliacao-comparativa-juiz` (DEC-047); falta a calibração com uma pessoa e a primeira rodada com o juiz (sem cota);
+- LLM as a judge (§9.4): código feito na branch `feat/ai-agent-avaliacao-comparativa-juiz` (DEC-047); calibração feita em 01/11/2026 (14 de 15, DEC-047); falta a rodada final narrada com o juiz;
 - avaliação automatizada a cada mudança, com tabela comparativa de experimentos (G2-08): `make eval` e `make eval-compare` feitos na mesma branch, com a tabela da última rodada válida no README do agente;
 - rate limit e orçamento de tokens por sessão (§7, DEC-046): feitos na branch da memória (orçamento no agente, limite no backend);
 - eventos de progresso para SSE (item 10: PR #39, rascunho, e issue #38). É alteração futura, por decisão do time em 24/10/2026.

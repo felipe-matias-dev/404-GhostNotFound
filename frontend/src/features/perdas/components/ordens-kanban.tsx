@@ -15,10 +15,12 @@ import { useLimiteFinalizadas } from "../hooks/use-limite-finalizadas";
 import {
 	type AcaoOrdem,
 	type Ordem,
+	type OrdemDaTela,
 	STATUS_ORDEM,
 	type StatusOrdem,
 } from "../types";
 import { OrdemAcoesBotoes } from "./ordem-acoes-botoes";
+import { TempoNoStatus } from "./tempo-no-status";
 
 // Ocupa a área toda da tela: `flex-1` preenche a altura que sobra na página, e as colunas
 // esticam junto (alvo de soltar até o fim da tela, mesmo com poucas OIs).
@@ -49,7 +51,7 @@ export function OrdensKanban({
 	pendente,
 	onVerTodas,
 }: {
-	ordens: Ordem[] | undefined;
+	ordens: OrdemDaTela[] | undefined;
 	loading: boolean;
 	error: string | null;
 	onRetry: () => void;
@@ -63,10 +65,13 @@ export function OrdensKanban({
 		() => agruparOrdensKanban(ordens ?? [], limite),
 		[ordens, limite],
 	);
-	const [arrastando, setArrastando] = useState<Ordem | null>(null);
+	const [arrastando, setArrastando] = useState<OrdemDaTela | null>(null);
 	const [colunaAlvo, setColunaAlvo] = useState<StatusOrdem | null>(null);
 
-	const colunas: Record<StatusOrdem, { cartoes: Ordem[]; total: number }> = {
+	const colunas: Record<
+		StatusOrdem,
+		{ cartoes: OrdemDaTela[]; total: number }
+	> = {
 		GERADA: { cartoes: grupos.GERADA, total: grupos.GERADA.length },
 		EM_CAMPO: { cartoes: grupos.EM_CAMPO, total: grupos.EM_CAMPO.length },
 		CONCLUIDA: {
@@ -179,17 +184,17 @@ function ColunaKanban({
 	onSoltar,
 }: {
 	status: StatusOrdem;
-	cartoes: Ordem[];
+	cartoes: OrdemDaTela[];
 	total: number;
 	limite: number;
-	arrastando: Ordem | null;
+	arrastando: OrdemDaTela | null;
 	destacada: boolean;
 	pendente: (id: number) => boolean;
 	onAcao: (acao: AcaoOrdem, ordem: Ordem) => void;
 	onHistorico: (ordem: Ordem) => void;
 	onVerTodas: (status: "CONCLUIDA" | "CANCELADA") => void;
 	onDestacar: (status: StatusOrdem | null) => void;
-	onIniciarArraste: (ordem: Ordem) => void;
+	onIniciarArraste: (ordem: OrdemDaTela) => void;
 	onFinalizarArraste: () => void;
 	onSoltar: (status: StatusOrdem) => void;
 }) {
@@ -311,11 +316,11 @@ function CartaoKanban({
 	onIniciarArraste,
 	onFinalizarArraste,
 }: {
-	ordem: Ordem;
+	ordem: OrdemDaTela;
 	pendente: boolean;
 	onAcao: (acao: AcaoOrdem, ordem: Ordem) => void;
 	onHistorico: (ordem: Ordem) => void;
-	onIniciarArraste: (ordem: Ordem) => void;
+	onIniciarArraste: (ordem: OrdemDaTela) => void;
 	onFinalizarArraste: () => void;
 }) {
 	const ativa = ordem.status === "GERADA" || ordem.status === "EM_CAMPO";
@@ -353,6 +358,12 @@ function CartaoKanban({
 				{ativa ? "Criada em " : "Atualizada em "}
 				{formatDataHora(ativa ? ordem.criada_em : ordem.atualizada_em)}
 			</p>
+
+			{ativa && (
+				<p className="text-small text-text-muted">
+					<TempoNoStatus ordem={ordem} />
+				</p>
+			)}
 
 			{ordem.status === "CONCLUIDA" && ordem.resultado && (
 				<Badge className="self-start">
