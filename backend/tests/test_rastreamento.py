@@ -131,6 +131,19 @@ def test_health_leaves_no_trace_not_even_its_query(
     assert spans.get_finished_spans() == ()
 
 
+def test_the_live_orders_stream_leaves_no_trace(
+    rastreado: Callable[[], tuple[TestClient, TracerProvider]], spans: InMemorySpanExporter
+) -> None:
+    client, _ = rastreado()
+
+    # POST, e não GET: a rota do tempo real só aceita GET e abriria um stream sem fim. O filtro
+    # olha só a URL, então qualquer método nela tem que ficar fora do rastreamento.
+    response = client.post("/ordens-inspecao/eventos")
+
+    assert response.status_code in (404, 405)
+    assert spans.get_finished_spans() == ()
+
+
 def test_model_spans_carry_no_question_prompt_or_answer(
     rastreado: Callable[[], tuple[TestClient, TracerProvider]], spans: InMemorySpanExporter
 ) -> None:

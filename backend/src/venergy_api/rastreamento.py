@@ -28,7 +28,7 @@ NOME_DO_SERVICO = "venergy-api"
 # A saúde é chamada pelo healthcheck do compose a cada poucos segundos e encheria o painel. O
 # tempo real das ordens é uma conexão aberta por minutos, que viraria uma barra só escondendo o
 # resto. O /ai/ask/stream fica: dura segundos e é o caminho da pergunta ao agente.
-ROTAS_FORA_DO_RASTREAMENTO = r"/health$,/ordens/eventos"
+ROTAS_FORA_DO_RASTREAMENTO = r"/health$,/ordens-inspecao/eventos"
 
 
 class SoTracesDeRequisicao(Sampler):
