@@ -116,9 +116,16 @@ def _indices_por_linha(
         colunas.append(func.count().filter(na_base).label("linhas_base"))
         # Variação nula com mês faltando em um dos lados (DEC-054): 6 meses contra 12
         # pareceria uma queda de 50% que não existiu. Com base zero ou nula, nula também.
-        completos = n_meses == meses_no_calendario(
-            filtro.inicio, filtro.fim
-        ) and n_meses_base == meses_no_calendario(filtro.base_inicio, filtro.base_fim)
+        # Vale para a tabela e para cada linha: o alimentador que entrou no meio da base teria
+        # a média de UCs dividida pelos meses todos, e o índice da base sairia maior.
+        meses_atual = meses_no_calendario(filtro.inicio, filtro.fim)
+        meses_base = meses_no_calendario(filtro.base_inicio, filtro.base_fim)
+        mes = distinct(tabela.competencia)
+        colunas += [
+            func.count(mes).filter(no_atual).label("meses_atual"),
+            func.count(mes).filter(na_base).label("meses_base"),
+        ]
+        completos = n_meses == meses_atual and n_meses_base == meses_base
         if completos:
             do_atual = {c.key: c.element for c in atual}
             colunas += [
@@ -146,8 +153,12 @@ def _indices_por_linha(
     for linha in session.execute(consulta):
         valores = dict(linha._mapping)
         saida = {k: v for k, v in valores.items() if not k.startswith(("base_", "variacao_"))}
-        saida.pop("linhas_base", None)
+        for chave in ("linhas_base", "meses_atual", "meses_base"):
+            saida.pop(chave, None)
         if com_base:
+            linha_completa = (
+                valores["meses_atual"] == meses_atual and valores["meses_base"] == meses_base
+            )
             saida["base"] = (
                 IndicesContinuidadeSchema(
                     **{
@@ -161,7 +172,7 @@ def _indices_por_linha(
             )
             saida["variacao_pct"] = VariacaoContinuidadeSchema(
                 **{
-                    nome: valores.get(f"variacao_{nome}")
+                    nome: valores.get(f"variacao_{nome}") if linha_completa else None
                     for nome in VariacaoContinuidadeSchema.model_fields
                 }
             )

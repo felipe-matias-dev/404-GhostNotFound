@@ -196,6 +196,29 @@ def test_variation_is_null_when_a_month_is_missing_in_either_period(
         assert set(linha["variacao_pct"].values()) == {None}
 
 
+def test_variation_is_null_for_a_feeder_missing_a_month_of_its_own(
+    engine: Engine, client: TestClient
+) -> None:
+    # A tabela tem os dois meses da base, mas o AL-PARCIAL só aparece em fevereiro: a média
+    # de UCs dele na base seria dividida por 2 meses, e o DEC da base sairia em dobro.
+    store_feeders(
+        engine,
+        [
+            *(("AL-A", f"2025-0{mes}", 100, 10, 20.0) for mes in range(1, 5)),
+            *(("AL-PARCIAL", f"2025-0{mes}", 100, 10, 20.0) for mes in range(2, 5)),
+        ],
+    )
+
+    result = get(
+        client, RANKING, inicio="2025-03", fim="2025-04", base_inicio="2025-01", base_fim="2025-02"
+    )
+
+    linhas = {a["cod_alimentador"]: a for a in result["alimentadores"]}
+    assert linhas["AL-A"]["variacao_pct"]["dec"] == pytest.approx(0.0)
+    assert linhas["AL-PARCIAL"]["base"] is not None
+    assert set(linhas["AL-PARCIAL"]["variacao_pct"].values()) == {None}
+
+
 def test_without_base_the_rows_have_no_base_nor_variation(
     engine: Engine, client: TestClient
 ) -> None:
