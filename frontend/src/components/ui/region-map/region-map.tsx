@@ -663,16 +663,16 @@ export function RegionMap({
 			{hover && (
 				<div
 					aria-hidden
-					className="pointer-events-none absolute z-10 flex max-w-56 flex-col rounded-md border border-border-strong bg-surface-2 px-2 py-1 text-small text-text shadow-overlay"
+					className="pointer-events-none absolute z-10 flex w-max max-w-56 flex-col rounded-md border border-border-strong bg-surface-2 px-2 py-1 text-small text-text shadow-overlay"
 					style={{
-						left: hover.x,
+						left: `clamp(7.5rem, ${hover.x}px, calc(100% - 7.5rem))`,
 						top: hover.y,
 						transform: "translate(-50%, calc(-100% - 12px))",
 					}}
 				>
 					<span className="truncate font-medium">{hover.shape.nome}</span>
 					{describe?.(hover.shape) && (
-						<span className="truncate text-text-muted tabular-nums">
+						<span className="whitespace-pre-line text-text-muted tabular-nums">
 							{describe(hover.shape)}
 						</span>
 					)}
