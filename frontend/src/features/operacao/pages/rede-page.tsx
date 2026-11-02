@@ -1,19 +1,30 @@
 import {
 	getRouteApi,
+	Link,
 	useLocation,
 	useRouterState,
 } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef } from "react";
+import { HeaderTrilha } from "#/components/layout/header";
 import { Pagina } from "#/components/layout/pagina";
+import {
+	Breadcrumb,
+	BreadcrumbItem,
+	BreadcrumbLink,
+	BreadcrumbList,
+	BreadcrumbPage,
+	BreadcrumbSeparator,
+} from "#/components/ui/breadcrumb";
 import {
 	SegmentedControl,
 	type SegmentedOption,
 } from "#/components/ui/segmented-control";
-import { useFiltrosPortal } from "#/features/filtros";
+import { CLASSE_ROTULO, useFiltrosPortal } from "#/features/filtros";
 import { useIndicadoresMensais } from "#/features/indicadores";
 import type { ParPeriodos } from "#/lib/filtros";
 import { AlimentadorSheet } from "../components/alimentador-sheet";
 import { ContinuidadeTable } from "../components/continuidade-table";
+import { IndicadoresRede } from "../components/indicadores-rede";
 import { linhasDoRanking } from "../conversions";
 import {
 	useRankingContinuidade,
@@ -63,6 +74,10 @@ export function RedePage() {
 	const municipio = filtros.municipio;
 	const bairro = filtros.bairro;
 	const classe = filtros.classe;
+	const recorte = useMemo(
+		() => ({ municipio, bairro, classe }),
+		[municipio, bairro, classe],
+	);
 	// Com recorte, o ranking global não se aplica; a preferência explícita volta sem recorte.
 	const comRecorte = Boolean(municipio || bairro || classe);
 	const visaoSalva: VisaoRede =
@@ -86,7 +101,7 @@ export function RedePage() {
 	const recortes = useRecortesContinuidade(
 		periodo,
 		criterio,
-		{ municipio, bairro, classe },
+		recorte,
 		visao === "localidades",
 	);
 	const serie = useSerieAlimentador(periodo, alimentador);
@@ -131,6 +146,13 @@ export function RedePage() {
 					? `Bairros de ${municipio}`
 					: "Municípios";
 
+	const localidade = bairro
+		? `${bairro}, ${municipio}`
+		: (municipio ?? "Empresa inteira");
+	const tituloIndicadores = classe
+		? `${localidade} · ${CLASSE_ROTULO[classe]}`
+		: localidade;
+
 	// A forma canônica da tela: período compartilhado, padrões omitidos e campos sem sentido fora.
 	const alvo = useMemo<RedeSearch>(
 		() => ({
@@ -170,6 +192,9 @@ export function RedePage() {
 	const tituloRef = useRef<HTMLHeadingElement>(null);
 	const opener = useRef<HTMLElement | null>(null);
 	const abertoAnterior = useRef(Boolean(alimentador));
+	// Descer ou subir de nível troca a tabela inteira: o foco vai ao novo título, que anuncia
+	// onde o usuário está. Mudanças vindas da barra de filtros não roubam o foco.
+	const focarTitulo = useRef(false);
 
 	// Sem período não há padrão a gravar; com ele, a URL bruta fora da forma canônica é trocada.
 	// Durante uma navegação a URL bruta anda à frente do search validado: normalizar ali
@@ -184,6 +209,13 @@ export function RedePage() {
 			resetScroll: false,
 		});
 	}, [temPeriodo, navegando, precisaNormalizar, alvo, navigate]);
+
+	// biome-ignore lint/correctness/useExhaustiveDependencies: o efeito reage à troca de nível.
+	useEffect(() => {
+		if (!focarTitulo.current) return;
+		focarTitulo.current = false;
+		tituloRef.current?.focus();
+	}, [municipio, bairro]);
 
 	const ir = (proximo: Partial<RedeSearch>, replace = false) =>
 		navigate({
@@ -215,6 +247,7 @@ export function RedePage() {
 		opener.current =
 			ativo instanceof HTMLElement && ativo !== document.body ? ativo : null;
 		if (atual === "municipio") {
+			focarTitulo.current = true;
 			void ir({
 				visao: "localidades",
 				municipio: linha.segmento,
@@ -224,6 +257,7 @@ export function RedePage() {
 			return;
 		}
 		if (atual === "bairro") {
+			focarTitulo.current = true;
 			void ir({
 				visao: "localidades",
 				bairro: linha.segmento,
@@ -269,8 +303,85 @@ export function RedePage() {
 			? "Maiores índices primeiro"
 			: `Maiores índices primeiro · ${n_meses} ${n_meses === 1 ? "mês" : "meses"} com dados na base`;
 
+	// Subir pela trilha volta ao nível de cima sem perder classe, período nem critério.
+	const subir = (proximo: Partial<RedeSearch>) => ({
+		...alvo,
+		visao: "localidades" as const,
+		alimentador: undefined,
+		...proximo,
+	});
+
 	return (
 		<Pagina className="max-w-none">
+			{visao === "localidades" && municipio && (
+				<HeaderTrilha>
+					<Breadcrumb aria-label="Recorte da rede" className="min-w-0">
+						<BreadcrumbList>
+							<BreadcrumbSeparator />
+							<BreadcrumbItem>
+								<BreadcrumbLink
+									render={
+										<Link
+											to="/rede"
+											search={subir({
+												municipio: undefined,
+												bairro: undefined,
+											})}
+											onClick={() => {
+												focarTitulo.current = true;
+											}}
+										/>
+									}
+								>
+									Municípios
+								</BreadcrumbLink>
+							</BreadcrumbItem>
+							<BreadcrumbSeparator />
+							<BreadcrumbItem className="min-w-0">
+								{bairro ? (
+									<BreadcrumbLink
+										render={
+											<Link
+												to="/rede"
+												search={subir({ bairro: undefined })}
+												onClick={() => {
+													focarTitulo.current = true;
+												}}
+											/>
+										}
+									>
+										{municipio}
+									</BreadcrumbLink>
+								) : (
+									<BreadcrumbPage className="truncate">
+										{municipio}
+									</BreadcrumbPage>
+								)}
+							</BreadcrumbItem>
+							{bairro && (
+								<>
+									<BreadcrumbSeparator />
+									<BreadcrumbItem className="min-w-0">
+										<BreadcrumbPage className="truncate">
+											{bairro}
+										</BreadcrumbPage>
+									</BreadcrumbItem>
+								</>
+							)}
+						</BreadcrumbList>
+					</Breadcrumb>
+				</HeaderTrilha>
+			)}
+
+			{periodo && par && (
+				<IndicadoresRede
+					titulo={tituloIndicadores}
+					periodoAtual={par}
+					periodoBase={filtros.periodo_base}
+					recorte={recorte}
+				/>
+			)}
+
 			<section
 				aria-labelledby="rede-titulo"
 				className="flex min-w-0 flex-col gap-3"
