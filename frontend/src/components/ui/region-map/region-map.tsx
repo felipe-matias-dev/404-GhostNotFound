@@ -70,9 +70,16 @@ const mix = (cor: string, pct: number, sobre: string) =>
 	`color-mix(in oklab, ${cor} ${pct.toFixed(1)}%, ${sobre})`;
 
 /** Cor e brilho da intensidade; `apagado` (fora do foco) guarda só um resto da cor, sem brilho. */
-function corDaIntensidade(intensidade: number, apagado = false) {
+function corDaIntensidade(
+	intensidade: number,
+	apagado = false,
+	sequencial = false,
+) {
 	const t = Math.min(1, Math.abs(intensidade));
-	const cor = intensidade < 0 ? "var(--color-danger)" : "var(--color-success)";
+	const cor =
+		sequencial || intensidade < 0
+			? "var(--color-danger)"
+			: "var(--color-success)";
 	if (apagado)
 		return {
 			t: 0,
@@ -102,6 +109,7 @@ function corDaIntensidade(intensidade: number, apagado = false) {
 }
 
 const LEGEND_GRADIENT = `linear-gradient(to right, ${mix("var(--color-danger)", 75, "var(--color-surface-2)")}, var(--color-surface-2), ${mix("var(--color-success)", 75, "var(--color-surface-2)")})`;
+const SEQUENTIAL_GRADIENT = `linear-gradient(to right, var(--color-surface-2), ${mix("var(--color-danger)", 75, "var(--color-surface-2)")})`;
 
 type View = { x: number; y: number; w: number; h: number };
 
@@ -120,6 +128,8 @@ export type RegionMapProps = {
 	 * neutro. Sem ela, todas ficam neutras.
 	 */
 	getIntensity?: (shape: RegionMapShape) => number;
+	/** Sequencial: de 0 (neutro) a 1 (danger), para índices em que maior é pior. */
+	colorScale?: "diverging" | "sequential";
 	/**
 	 * Regiões que servem de fundo para sub-regiões desenhadas por cima (ex.: o município
 	 * com os bairros dele): ficam em cinza neutro, para que frestas entre as malhas não
@@ -188,6 +198,7 @@ export function RegionMap({
 	selectedId = null,
 	enabledIds,
 	getIntensity,
+	colorScale = "diverging",
 	containerIds,
 	focusIds,
 	highlightId = null,
@@ -534,6 +545,7 @@ export function RegionMap({
 								fill: corDaIntensidade(
 									getIntensity?.(shape) ?? 0,
 									apagado(shape.id),
+									colorScale === "sequential",
 								).fill,
 							};
 					if (!enabled)
@@ -600,6 +612,7 @@ export function RegionMap({
 						cor: corDaIntensidade(
 							containerIds?.has(s.id) ? 0 : (getIntensity?.(s) ?? 0),
 							apagado(s.id),
+							colorScale === "sequential",
 						),
 					}))
 					.sort((a, b) => a.cor.t - b.cor.t)
@@ -716,14 +729,19 @@ export function RegionMap({
 					<div
 						aria-hidden
 						className="h-2.5 w-36 rounded-sm border border-border-strong"
-						style={{ backgroundImage: LEGEND_GRADIENT }}
+						style={{
+							backgroundImage:
+								colorScale === "sequential"
+									? SEQUENTIAL_GRADIENT
+									: LEGEND_GRADIENT,
+						}}
 					/>
 					<div
 						aria-hidden
 						className="mt-0.5 flex justify-between text-small text-text-muted tabular-nums"
 					>
-						{legend.ticks.map((tick) => (
-							<span key={tick}>{tick}</span>
+						{([0, 1, 2] as const).map((posicao) => (
+							<span key={posicao}>{legend.ticks[posicao]}</span>
 						))}
 					</div>
 					{semDado.some((s) => !containerIds?.has(s.id)) && (
