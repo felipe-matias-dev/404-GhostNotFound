@@ -574,7 +574,8 @@ class VariacaoContinuidadeSchema(BaseModel):
 
 
 class IndicesComBaseSchema(IndicesContinuidadeSchema):
-    # Sem base pedida, os dois ficam nulos. Com base, `base` é nula para a linha sem dado nela.
+    # Sem base pedida, os dois ficam nulos. Com base, `base` é nula para a linha sem dado nela
+    # ou sem algum mês que a tabela tem na base.
     base: IndicesContinuidadeSchema | None = None
     variacao_pct: VariacaoContinuidadeSchema | None = None
 

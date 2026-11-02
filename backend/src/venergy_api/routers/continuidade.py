@@ -159,6 +159,9 @@ def _indices_por_linha(
             linha_completa = (
                 valores["meses_atual"] == meses_atual and valores["meses_base"] == meses_base
             )
+            # A base da linha divide pela média de UCs dos meses da tabela: com mês faltando
+            # na linha, ela sairia maior que a real. Mês ausente na tabela inteira não pesa.
+            base_completa = valores["meses_base"] == n_meses_base
             saida["base"] = (
                 IndicesContinuidadeSchema(
                     **{
@@ -167,7 +170,7 @@ def _indices_por_linha(
                         if k.startswith("base_")
                     }
                 )
-                if valores["linhas_base"]
+                if valores["linhas_base"] and base_completa
                 else None
             )
             saida["variacao_pct"] = VariacaoContinuidadeSchema(
