@@ -133,6 +133,7 @@ export type DataTableProps<T> = {
 
 // Classes estáticas para o Tailwind gerar: tabela a partir do ponto, cards abaixo dele.
 const BREAKPOINTS = {
+	xl: { table: "@xl:block", cards: "@xl:hidden" },
 	"3xl": { table: "@3xl:block", cards: "@3xl:hidden" },
 	"4xl": { table: "@4xl:block", cards: "@4xl:hidden" },
 	"5xl": { table: "@5xl:block", cards: "@5xl:hidden" },
@@ -513,7 +514,8 @@ export function DataTable<T>({
 										key={column.id}
 										scope="col"
 										aria-sort={isSortable(column) ? state : undefined}
-										className="min-w-0 font-normal"
+										// Sem `text-left`, o navegador centraliza o `<th>` das colunas que não ordenam.
+										className="min-w-0 text-left font-normal"
 									>
 										{isSortable(column) ? (
 											<button
