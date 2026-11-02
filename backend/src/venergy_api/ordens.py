@@ -4,6 +4,7 @@ Ficam aqui, e não no router, para que a máquina de estados seja testada sem ba
 consultada de um lugar só por qualquer endpoint que mude o status de uma OI.
 """
 
+from dataclasses import dataclass
 from enum import StrEnum
 
 
@@ -51,3 +52,20 @@ def validar_transicao(atual: StatusOrdem, novo: StatusOrdem) -> None:
     """Levanta TransicaoInvalidaError se a mudança de status não for permitida."""
     if novo not in TRANSICOES[atual]:
         raise TransicaoInvalidaError(atual, novo)
+
+
+SEGUNDOS_POR_DIA = 86_400
+
+
+@dataclass(frozen=True)
+class LimitesDeAtraso:
+    """Dias que uma OI pode ficar em cada status ativo antes de ser considerada atrasada."""
+
+    gerada_dias: int
+    em_campo_dias: int
+
+
+def esta_atrasada(status: StatusOrdem, segundos_no_status: int, limites: LimitesDeAtraso) -> bool:
+    """Atrasada é a OI ativa que passou do limite do seu status; as finalizadas nunca atrasam."""
+    dias = {StatusOrdem.GERADA: limites.gerada_dias, StatusOrdem.EM_CAMPO: limites.em_campo_dias}
+    return status in dias and segundos_no_status > dias[status] * SEGUNDOS_POR_DIA

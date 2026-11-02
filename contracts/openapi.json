@@ -1982,6 +1982,98 @@
         }
       }
     },
+    "/ordens-inspecao/eventos": {
+      "get": {
+        "tags": [
+          "ordens de inspeção"
+        ],
+        "summary": "Acompanhar Ordens",
+        "description": "Avisa a tela, sem ela perguntar, de que ordens foram criadas ou mudaram de status.",
+        "operationId": "acompanhar_ordens_ordens_inspecao_eventos_get",
+        "responses": {
+          "200": {
+            "description": "Eventos SSE: `ordens`, com os ids das ordens que mudaram (ou `null`, se foram muitas), e ping de comentário. A tela refaz a consulta ao receber.",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "properties": {
+                    "ordem_ids": {
+                      "items": {
+                        "type": "integer"
+                      },
+                      "type": [
+                        "array",
+                        "null"
+                      ]
+                    }
+                  },
+                  "type": "object",
+                  "required": [
+                    "ordem_ids"
+                  ]
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Telas demais com o tempo real abertas, do usuário ou no servidor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErroSchema"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErroSchema"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ]
+      }
+    },
+    "/ordens-inspecao/tempos-por-etapa": {
+      "get": {
+        "tags": [
+          "ordens de inspeção"
+        ],
+        "summary": "Tempos Por Etapa",
+        "description": "Mediana e p90 do tempo que as OIs passaram em cada etapa ativa, com o número de passagens.\n\nCalculado sobre o histórico (app.ordem_evento), que é dado do backend. Cada evento abre uma\npassagem pela etapa em que a OI entrou e ela termina no evento seguinte da mesma OI; a\npassagem em curso ainda não tem fim e fica de fora. Uma OI que volta para GERADA conta duas.",
+        "operationId": "tempos_por_etapa_ordens_inspecao_tempos_por_etapa_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TempoPorEtapaSchema"
+                  },
+                  "type": "array",
+                  "title": "Response Tempos Por Etapa Ordens Inspecao Tempos Por Etapa Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ]
+      }
+    },
     "/ordens-inspecao/planilha": {
       "get": {
         "tags": [
@@ -4618,6 +4710,21 @@
             "format": "date-time",
             "title": "Atualizada Em"
           },
+          "no_status_desde": {
+            "type": "string",
+            "format": "date-time",
+            "title": "No Status Desde"
+          },
+          "segundos_no_status": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Segundos No Status"
+          },
+          "atrasada": {
+            "type": "boolean",
+            "title": "Atrasada",
+            "default": false
+          },
           "eventos": {
             "items": {
               "$ref": "#/components/schemas/EventoSchema"
@@ -4635,6 +4742,8 @@
           "observacao",
           "criada_em",
           "atualizada_em",
+          "no_status_desde",
+          "segundos_no_status",
           "eventos"
         ],
         "title": "OrdemDetalheSchema",
@@ -4683,6 +4792,21 @@
             "type": "string",
             "format": "date-time",
             "title": "Atualizada Em"
+          },
+          "no_status_desde": {
+            "type": "string",
+            "format": "date-time",
+            "title": "No Status Desde"
+          },
+          "segundos_no_status": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Segundos No Status"
+          },
+          "atrasada": {
+            "type": "boolean",
+            "title": "Atrasada",
+            "default": false
           }
         },
         "type": "object",
@@ -4693,7 +4817,9 @@
           "resultado",
           "observacao",
           "criada_em",
-          "atualizada_em"
+          "atualizada_em",
+          "no_status_desde",
+          "segundos_no_status"
         ],
         "title": "OrdemSchema"
       },
@@ -5198,6 +5324,49 @@
           "CANCELADA"
         ],
         "title": "StatusOrdem"
+      },
+      "TempoPorEtapaSchema": {
+        "properties": {
+          "etapa": {
+            "$ref": "#/components/schemas/StatusOrdem"
+          },
+          "n": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "N"
+          },
+          "mediana_segundos": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mediana Segundos"
+          },
+          "p90_segundos": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P90 Segundos"
+          }
+        },
+        "type": "object",
+        "required": [
+          "etapa",
+          "n",
+          "mediana_segundos",
+          "p90_segundos"
+        ],
+        "title": "TempoPorEtapaSchema",
+        "description": "Quanto as OIs levam em uma etapa ativa, contando só as passagens já encerradas."
       },
       "TotaisPeriodoSchema": {
         "properties": {

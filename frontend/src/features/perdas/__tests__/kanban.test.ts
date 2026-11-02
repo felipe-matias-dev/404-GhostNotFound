@@ -2,15 +2,15 @@ import { describe, expect, it } from "vitest";
 import { agruparOrdensKanban, limiteFinalizadas } from "../conversions";
 import type { Ordem } from "../types";
 
-const BASE: Pick<
-	Ordem,
-	"cod_uc" | "resultado" | "observacao" | "criada_em" | "atualizada_em"
-> = {
+const BASE: Omit<Ordem, "id" | "status"> = {
 	cod_uc: "0001",
 	resultado: null,
 	observacao: null,
 	criada_em: "2026-10-01T00:00:00Z",
 	atualizada_em: "2026-10-01T00:00:00Z",
+	no_status_desde: "2026-10-01T00:00:00Z",
+	segundos_no_status: 0,
+	atrasada: false,
 };
 
 function ordem(mudanca: Partial<Ordem> & Pick<Ordem, "id" | "status">): Ordem {

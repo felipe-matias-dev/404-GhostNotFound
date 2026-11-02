@@ -704,6 +704,12 @@ class OrdemSchema(BaseModel):
     observacao: str | None
     criada_em: datetime
     atualizada_em: datetime
+    # Entrada no status atual (último evento) e há quantos segundos, pelo relógio do banco: a tela
+    # soma o tempo desde a resposta e não depende do relógio do computador de quem olha.
+    no_status_desde: datetime
+    segundos_no_status: Annotated[int, Field(ge=0)]
+    # Preenchido pela rota, que conhece os limites (esta_atrasada); a OI no banco não guarda isto.
+    atrasada: bool = False
 
 
 class LinhaConcluidaSchema(BaseModel):
@@ -741,6 +747,17 @@ class EventoSchema(BaseModel):
     # Nome para a tela, lido de app.usuarios; vazio se o login não existe mais lá.
     autor_nome: str | None
     ocorrido_em: datetime
+
+
+class TempoPorEtapaSchema(BaseModel):
+    """Quanto as OIs levam em uma etapa ativa, contando só as passagens já encerradas."""
+
+    etapa: StatusOrdem
+    # Quantas passagens entraram na conta: sem ele, a mediana de uma passagem só pareceria firme.
+    n: Annotated[int, Field(ge=0)]
+    # Nulos quando n é 0. Em segundos, para a tela escolher a unidade.
+    mediana_segundos: float | None
+    p90_segundos: float | None
 
 
 class OrdemDetalheSchema(OrdemSchema):

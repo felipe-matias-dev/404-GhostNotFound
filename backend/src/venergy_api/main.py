@@ -14,6 +14,7 @@ from venergy_api.agente import (
     montar_agente,
     montar_redator_insights,
 )
+from venergy_api.avisos_ordens import VagasDeAvisos
 from venergy_api.config import Settings, get_settings
 from venergy_api.estrutura_app import garantir_estrutura_na_subida
 from venergy_api.insights import CacheInsights
@@ -58,6 +59,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # testes (sem lifespan) também precisa dele.
     app.state.cache_insights = CacheInsights()
     app.state.ai_travas = {}
+    # Uma contagem por processo: a API roda com um processo só (Dockerfile e compose).
+    app.state.vagas_avisos_ordens = VagasDeAvisos(
+        settings.ordens_avisos_por_usuario, settings.ordens_avisos_total
+    )
     # A dependência de login lê o segredo daqui, e não de get_settings(): os testes montam o
     # app com as próprias configurações.
     app.state.settings = settings

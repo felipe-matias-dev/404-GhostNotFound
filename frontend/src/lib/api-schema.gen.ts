@@ -415,6 +415,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/ordens-inspecao/eventos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Acompanhar Ordens
+         * @description Avisa a tela, sem ela perguntar, de que ordens foram criadas ou mudaram de status.
+         */
+        get: operations["acompanhar_ordens_ordens_inspecao_eventos_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ordens-inspecao/tempos-por-etapa": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Tempos Por Etapa
+         * @description Mediana e p90 do tempo que as OIs passaram em cada etapa ativa, com o número de passagens.
+         *
+         *     Calculado sobre o histórico (app.ordem_evento), que é dado do backend. Cada evento abre uma
+         *     passagem pela etapa em que a OI entrou e ela termina no evento seguinte da mesma OI; a
+         *     passagem em curso ainda não tem fim e fica de fora. Uma OI que volta para GERADA conta duas.
+         */
+        get: operations["tempos_por_etapa_ordens_inspecao_tempos_por_etapa_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/ordens-inspecao/planilha": {
         parameters: {
             query?: never;
@@ -1252,6 +1296,18 @@ export interface components {
              * Format: date-time
              */
             atualizada_em: string;
+            /**
+             * No Status Desde
+             * Format: date-time
+             */
+            no_status_desde: string;
+            /** Segundos No Status */
+            segundos_no_status: number;
+            /**
+             * Atrasada
+             * @default false
+             */
+            atrasada: boolean;
             /** Eventos */
             eventos: components["schemas"]["EventoSchema"][];
         };
@@ -1275,6 +1331,18 @@ export interface components {
              * Format: date-time
              */
             atualizada_em: string;
+            /**
+             * No Status Desde
+             * Format: date-time
+             */
+            no_status_desde: string;
+            /** Segundos No Status */
+            segundos_no_status: number;
+            /**
+             * Atrasada
+             * @default false
+             */
+            atrasada: boolean;
         };
         /**
          * ParPeriodosSchema
@@ -1465,6 +1533,19 @@ export interface components {
          * @enum {string}
          */
         StatusOrdem: "GERADA" | "EM_CAMPO" | "CONCLUIDA" | "CANCELADA";
+        /**
+         * TempoPorEtapaSchema
+         * @description Quanto as OIs levam em uma etapa ativa, contando só as passagens já encerradas.
+         */
+        TempoPorEtapaSchema: {
+            etapa: components["schemas"]["StatusOrdem"];
+            /** N */
+            n: number;
+            /** Mediana Segundos */
+            mediana_segundos: number | null;
+            /** P90 Segundos */
+            p90_segundos: number | null;
+        };
         /**
          * TotaisPeriodoSchema
          * @description kWh e receita faturados, somados num período.
@@ -2360,6 +2441,66 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    acompanhar_ordens_ordens_inspecao_eventos_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Eventos SSE: `ordens`, com os ids das ordens que mudaram (ou `null`, se foram muitas), e ping de comentário. A tela refaz a consulta ao receber. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": {
+                        ordem_ids: number[] | null;
+                    };
+                };
+            };
+            /** @description Telas demais com o tempo real abertas, do usuário ou no servidor. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErroSchema"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErroSchema"];
+                };
+            };
+        };
+    };
+    tempos_por_etapa_ordens_inspecao_tempos_por_etapa_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TempoPorEtapaSchema"][];
                 };
             };
         };
