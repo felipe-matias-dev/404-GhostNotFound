@@ -27,6 +27,7 @@ import {
 } from "../components/alimentador-sheet";
 import { ContinuidadeTable } from "../components/continuidade-table";
 import { IndicadoresRede } from "../components/indicadores-rede";
+import { MapaContinuidade } from "../components/mapa-continuidade";
 import { linhasDoRanking } from "../conversions";
 import {
 	useContinuidadeMensal,
@@ -39,6 +40,7 @@ import type {
 	LinhaContinuidade,
 	NivelRecorte,
 	Periodo,
+	Recorte,
 	VisaoRede,
 } from "../types";
 
@@ -267,6 +269,11 @@ export function RedePage() {
 	const escolherCriterio = (proximo: Criterio) =>
 		void ir({ criterio: proximo === "dec" ? undefined : proximo });
 
+	const escolherRecorte = (proximo: Recorte) => {
+		focarTitulo.current = true;
+		void ir({ ...proximo, alimentador: undefined, painel: undefined });
+	};
+
 	// Abrir a linha grava o nível que a resposta atual oferece, nunca o da resposta anterior.
 	const abrirLinha = (linha: LinhaContinuidade) => {
 		const atual =
@@ -486,7 +493,7 @@ export function RedePage() {
 									options={VISOES}
 								/>
 								<SegmentedControl
-									label="Critério da tabela"
+									label="Indicador da rede"
 									value={criterio}
 									onValueChange={escolherCriterio}
 									options={CRITERIOS}
@@ -494,30 +501,42 @@ export function RedePage() {
 							</div>
 						</div>
 
-						{periodo ? (
-							<ContinuidadeTable
-								rows={rows}
-								nivel={nivel}
-								criterio={criterio}
-								periodoBase={base ? parBase : undefined}
-								resetKey={[
-									visao,
-									periodo.inicio,
-									periodo.fim,
-									criterio,
-									municipio ?? "",
-									bairro ?? "",
-									classe ?? "",
-								].join("|")}
-								loading={carregando}
-								refreshing={atualizando}
-								error={erroTabela}
-								onRetry={() => void ativa.refetch()}
-								onOpen={abrirLinha}
-							/>
-						) : (
-							<p className="text-body text-text-muted">{SEM_PERIODO}</p>
-						)}
+						<div className="grid gap-5 lg:grid-cols-[clamp(18rem,26%,24rem)_minmax(0,1fr)] lg:items-start">
+							{periodo && (
+								<MapaContinuidade
+									periodo={periodo}
+									recorte={recorte}
+									criterio={criterio}
+									onChange={escolherRecorte}
+								/>
+							)}
+							<div className="min-w-0">
+								{periodo ? (
+									<ContinuidadeTable
+										rows={rows}
+										nivel={nivel}
+										criterio={criterio}
+										periodoBase={base ? parBase : undefined}
+										resetKey={[
+											visao,
+											periodo.inicio,
+											periodo.fim,
+											criterio,
+											municipio ?? "",
+											bairro ?? "",
+											classe ?? "",
+										].join("|")}
+										loading={carregando}
+										refreshing={atualizando}
+										error={erroTabela}
+										onRetry={() => void ativa.refetch()}
+										onOpen={abrirLinha}
+									/>
+								) : (
+									<p className="text-body text-text-muted">{SEM_PERIODO}</p>
+								)}
+							</div>
+						</div>
 					</section>
 				</>
 			)}
