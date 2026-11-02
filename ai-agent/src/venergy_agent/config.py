@@ -33,7 +33,7 @@ class AgentSettings(BaseSettings):
     prompt_version: str = "v3"
     prompts_dir: Path = AGENT_ROOT / "prompts"
     answer_prompt_version: str = "v3"
-    insight_prompt_version: str = "v2"
+    insight_prompt_version: str = "v3"
     judge_model: str = "google-gla:gemini-3.5-flash-lite"
     judge_prompt_version: str = "v1"
     answer_sample_rows: int = Field(20, gt=0)

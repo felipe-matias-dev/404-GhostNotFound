@@ -1069,6 +1069,8 @@ export interface components {
         InsightReceitaSchema: {
             /** Texto */
             texto: string | null;
+            /** Origem */
+            origem?: ("ia" | "regra") | null;
             /** Metricas */
             metricas: {
                 [key: string]: unknown;
@@ -1973,15 +1975,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-            /** @description Service Unavailable */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErroSchema"];
                 };
             };
         };

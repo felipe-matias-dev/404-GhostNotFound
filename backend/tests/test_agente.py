@@ -247,17 +247,14 @@ def test_api_starts_with_the_insight_writer_stored_in_the_app_state(
         assert client.app.state.redator_insights is redator
 
 
-def test_insight_dependency_answers_503_when_there_is_no_writer() -> None:
+def test_insight_dependency_gives_nothing_when_there_is_no_writer() -> None:
     app = FastAPI()
 
     @app.get("/probe")
-    def probe(redator: RedatorInsightsDep) -> dict[str, str]:
-        return {}
+    def probe(redator: RedatorInsightsDep) -> dict[str, bool]:
+        return {"sem_redator": redator is None}
 
-    response = TestClient(app).get("/probe")
-
-    assert response.status_code == 503
-    assert "VENERGY_AGENT_GOOGLE_API_KEY" in response.json()["detail"]
+    assert TestClient(app).get("/probe").json() == {"sem_redator": True}
 
 
 @pytest.fixture

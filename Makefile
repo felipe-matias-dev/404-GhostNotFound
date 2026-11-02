@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help setup env up down db sample load test test-backend test-agent eval eval-compare lint frontend-check openapi ci
+.PHONY: help setup env up down db sample load test test-backend test-agent eval eval-compare eval-insights lint frontend-check openapi ci
 
 help:
 	@echo Alvos do V-Energy Grid 360, use: make alvo
@@ -14,6 +14,7 @@ help:
 	@echo make test-backend - testes do backend
 	@echo make test-agent - testes do agente de IA
 	@echo make eval - avalia o agente e grava eval/runs/, usa o modelo: DATASET ONLY JUDGE SQL_ONLY
+	@echo make eval-insights - rodada fixa dos insights da Receita na Gold, usa o modelo
 	@echo make eval-compare - compara duas rodadas, sem modelo: A=eval/runs/x.json B=eval/runs/y.json, caminhos relativos a ai-agent/
 	@echo make lint - hooks do pre-commit em todos os arquivos, igual ao CI, requer make setup
 	@echo make frontend-check - checagem de tipos e build do frontend
@@ -59,6 +60,9 @@ eval: db
 
 eval-compare:
 	uv --directory ai-agent run --frozen python -m venergy_agent.evaluation.compare $(A) $(B) $(if $(SKIP),--skip $(SKIP))
+
+eval-insights:
+	uv --directory backend run python -m venergy_api.avaliar_insights
 
 lint:
 	uvx pre-commit run --all-files

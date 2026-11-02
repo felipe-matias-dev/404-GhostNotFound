@@ -15,8 +15,8 @@ export function useInsightReceita(
 		// de um recorte continua no cache e reaparece ao voltar a ele.
 		enabled: false,
 		// Sem placeholder: o texto de outro recorte citaria números que a tela não mostra.
-		// Sem retry: o 503 (IA desligada) só muda reiniciando a API, e a falha do provedor já
-		// volta como texto vazio; o usuário pode tentar de novo.
+		// Sem retry: IA desligada e falha do provedor já voltam com o texto da regra (DEC-066), e
+		// o usuário pode tentar de novo.
 		retry: false,
 	});
 }

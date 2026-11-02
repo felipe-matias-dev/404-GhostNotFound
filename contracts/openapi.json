@@ -760,16 +760,6 @@
               }
             }
           },
-          "503": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErroSchema"
-                }
-              }
-            },
-            "description": "Service Unavailable"
-          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -4143,6 +4133,21 @@
               }
             ],
             "title": "Texto"
+          },
+          "origem": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "ia",
+                  "regra"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Origem"
           },
           "metricas": {
             "anyOf": [

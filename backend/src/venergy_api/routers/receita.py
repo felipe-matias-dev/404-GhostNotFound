@@ -3,14 +3,14 @@
 from decimal import Decimal
 from typing import Annotated
 
-from fastapi import APIRouter, Query, status
+from fastapi import APIRouter, Query
 from fastapi.concurrency import run_in_threadpool
 from sqlalchemy import ColumnElement, case, func, or_, select
 from sqlalchemy.orm import InstrumentedAttribute, Session
 
 from venergy_api.agente import RedatorInsightsDep
 from venergy_api.database import SessionDep
-from venergy_api.insight_receita import metricas_da_receita
+from venergy_api.insight_receita import filtro_acima, metricas_da_receita, texto_aceito
 from venergy_api.insights import CacheInsightsDep, chave_do_cache
 from venergy_api.models import DimUc, FatoFaturamentoMensal, KpisMensais, ReceitaDecomposicao
 from venergy_api.schemas import (
@@ -18,7 +18,6 @@ from venergy_api.schemas import (
     ComparacaoReceitaSchema,
     DecomposicaoFiltroSchema,
     DecomposicaoLinhaSchema,
-    ErroSchema,
     InsightReceitaSchema,
     KpisMensaisSchema,
     ParPeriodosSchema,
@@ -189,7 +188,7 @@ def get_decomposicao(
     return consultar_decomposicao(filtro, session)
 
 
-@router.get("/insight", responses={status.HTTP_503_SERVICE_UNAVAILABLE: {"model": ErroSchema}})
+@router.get("/insight")
 async def get_insight(
     filtro: Annotated[DecomposicaoFiltroSchema, Query()],
     session: SessionDep,
@@ -200,17 +199,23 @@ async def get_insight(
     # A sessão do backend é síncrona: a consulta sai do laço de eventos para não travar as
     # outras requisições, como na gravação da auditoria.
     linhas = await run_in_threadpool(consultar_decomposicao, filtro, session)
-    metricas = metricas_da_receita(filtro, linhas)
+    acima = filtro_acima(filtro)
+    linhas_acima = await run_in_threadpool(consultar_decomposicao, acima, session) if acima else []
+    metricas = metricas_da_receita(filtro, linhas, linhas_acima)
     if metricas is None:
         return InsightReceitaSchema(texto=None, metricas=None)
 
     chave = chave_do_cache("receita", metricas)
     texto = cache.obter(chave)
     if texto is None:
-        insight = await redator.narrate("receita", metricas)
-        # None: o redator descartou o texto (número fora das métricas) ou o provedor falhou.
-        # A tela aparece sem insight, e a falha não fica no cache.
-        if insight is not None:
-            texto = insight.text
-            cache.guardar(chave, texto)
-    return InsightReceitaSchema(texto=texto, metricas=metricas)
+        insight = await redator.narrate("receita", metricas) if redator else None
+        if insight is None or not texto_aceito(insight.text, metricas):
+            # IA desligada, provedor fora ou texto recusado: a tela mostra a leitura da regra.
+            # Ela não entra no cache, e o próximo pedido tenta o modelo de novo. Repetir agora
+            # não adianta: com temperatura 0, o modelo escreveria o mesmo texto.
+            return InsightReceitaSchema(
+                texto=metricas["leitura_texto"], origem="regra", metricas=metricas
+            )
+        texto = insight.text
+        cache.guardar(chave, texto)
+    return InsightReceitaSchema(texto=texto, origem="ia", metricas=metricas)

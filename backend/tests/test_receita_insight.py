@@ -14,19 +14,24 @@ from venergy_api.models import ReceitaDecomposicao
 BASE = "2024-01/2024-12"
 ATUAL = "2025-01/2025-12"
 FILTRO = {"periodo_base": BASE, "periodo_atual": ATUAL}
-TEXTO = "A receita caiu no período."
+ECO = object()
 
 
 class RedatorFalso:
-    """Devolve os textos combinados, em ordem, sem chamar o Gemini, e guarda o que recebeu."""
+    """Devolve os textos combinados, em ordem, sem chamar o Gemini, e guarda o que recebeu.
 
-    def __init__(self, *textos: str | None) -> None:
-        self.textos = list(textos) or [TEXTO]
+    `ECO` repete a leitura das métricas: um texto que o backend aceita.
+    """
+
+    def __init__(self, *textos: object) -> None:
+        self.textos = list(textos) or [ECO]
         self.chamadas: list[tuple[str, dict]] = []
 
     async def narrate(self, screen: str, metrics: dict) -> Insight | None:
         self.chamadas.append((screen, metrics))
         texto = self.textos[min(len(self.chamadas), len(self.textos)) - 1]
+        if texto is ECO:
+            texto = metrics["leitura_texto"]
         return None if texto is None else Insight(text=texto, metrics_used=tuple(metrics))
 
 
@@ -74,7 +79,7 @@ def bridge(add_lines: Callable[..., None]) -> None:
 def client_with_writer(
     engine: Engine, client_for: Callable[[Engine], TestClient]
 ) -> Callable[..., tuple[TestClient, RedatorFalso]]:
-    def build(*textos: str | None) -> tuple[TestClient, RedatorFalso]:
+    def build(*textos: object) -> tuple[TestClient, RedatorFalso]:
         client = client_for(engine)
         redator = RedatorFalso(*textos)
         client.app.dependency_overrides[get_redator_insights] = lambda: redator
@@ -91,7 +96,8 @@ def test_returns_the_text_and_the_metrics_that_sustain_it(client_with_writer) ->
 
     assert response.status_code == 200, response.text
     corpo = response.json()
-    assert corpo["texto"] == TEXTO
+    assert corpo["texto"] == corpo["metricas"]["leitura_texto"]
+    assert corpo["origem"] == "ia"
     assert corpo["metricas"]["receita_base"] == 230.0
     assert corpo["metricas"]["variacao_receita"] == -25.0
     assert corpo["metricas"]["nivel_das_linhas"] == "municipio"
@@ -124,14 +130,25 @@ def test_respects_the_cut_chosen_on_the_screen(client_with_writer) -> None:
 
 
 @pytest.mark.usefixtures("bridge")
-def test_text_is_null_when_the_writer_rejects_it(client_with_writer) -> None:
+def test_the_rule_text_is_shown_when_the_writer_fails(client_with_writer) -> None:
     client, _ = client_with_writer(None)
 
-    response = client.get("/receita/insight", params=FILTRO)
+    corpo = client.get("/receita/insight", params=FILTRO).json()
 
-    assert response.status_code == 200
-    assert response.json()["texto"] is None
-    assert response.json()["metricas"]["receita_base"] == 230.0
+    assert corpo["texto"] == corpo["metricas"]["leitura_texto"]
+    assert corpo["origem"] == "regra"
+
+
+@pytest.mark.usefixtures("bridge")
+def test_the_rule_text_is_shown_when_the_model_text_does_not_say_the_reading(
+    client_with_writer,
+) -> None:
+    client, _ = client_with_writer("O desempenho foi ruim.")
+
+    corpo = client.get("/receita/insight", params=FILTRO).json()
+
+    assert corpo["texto"] == corpo["metricas"]["leitura_texto"]
+    assert corpo["origem"] == "regra"
 
 
 @pytest.mark.usefixtures("bridge")
@@ -150,25 +167,24 @@ def test_a_reloaded_gold_is_narrated_again(
     client_with_writer, add_lines: Callable[..., None]
 ) -> None:
     # O cache é pelo conteúdo das métricas: se a Gold muda, a chave muda e o insight é refeito.
-    client, redator = client_with_writer("Primeiro.", "Segundo.")
+    client, redator = client_with_writer()
 
-    first = client.get("/receita/insight", params=FILTRO).json()
+    client.get("/receita/insight", params=FILTRO)
     add_lines(decomposition_line("Jaboatão", "Piedade", "B1", "40", "20", "-20"))
-    second = client.get("/receita/insight", params=FILTRO).json()
+    client.get("/receita/insight", params=FILTRO)
 
-    assert (first["texto"], second["texto"]) == ("Primeiro.", "Segundo.")
     assert len(redator.chamadas) == 2
 
 
 @pytest.mark.usefixtures("bridge")
 def test_a_failed_narration_is_not_cached(client_with_writer) -> None:
-    client, redator = client_with_writer(None, "Agora deu certo.")
+    client, redator = client_with_writer(None, ECO)
 
     first = client.get("/receita/insight", params=FILTRO).json()
     second = client.get("/receita/insight", params=FILTRO).json()
 
-    assert first["texto"] is None
-    assert second["texto"] == "Agora deu certo."
+    assert first["origem"] == "regra"
+    assert second["origem"] == "ia"
     assert len(redator.chamadas) == 2
 
 
@@ -179,16 +195,16 @@ def test_cut_without_rows_returns_nothing_and_does_not_call_the_model(client_wit
     response = client.get("/receita/insight", params={**FILTRO, "municipio": "Gotham"})
 
     assert response.status_code == 200
-    assert response.json() == {"texto": None, "metricas": None}
+    assert response.json() == {"texto": None, "origem": None, "metricas": None}
     assert redator.chamadas == []
 
 
 @pytest.mark.usefixtures("bridge")
-def test_answers_503_without_the_writer(client: TestClient) -> None:
-    response = client.get("/receita/insight", params=FILTRO)
+def test_answers_with_the_rule_text_without_the_writer(client: TestClient) -> None:
+    corpo = client.get("/receita/insight", params=FILTRO).json()
 
-    assert response.status_code == 503
-    assert "VENERGY_AGENT_GOOGLE_API_KEY" in response.json()["detail"]
+    assert corpo["texto"] == corpo["metricas"]["leitura_texto"]
+    assert corpo["origem"] == "regra"
 
 
 @pytest.mark.usefixtures("bridge")
@@ -201,3 +217,25 @@ def test_validates_the_filter_like_the_decomposition(client_with_writer) -> None
     assert sem_par.status_code == 422
     assert bairro_sem_municipio.status_code == 422
     assert redator.chamadas == []
+
+
+@pytest.mark.usefixtures("bridge")
+def test_a_cut_is_compared_with_the_one_above(client_with_writer) -> None:
+    client, _ = client_with_writer()
+
+    params = {**FILTRO, "municipio": "Recife", "bairro": "Boa Viagem"}
+    metricas = client.get("/receita/insight", params=params).json()["metricas"]
+
+    assert metricas["n_vizinhos"] == 2
+    assert metricas["n_vizinhos_em_queda"] == 1
+    assert metricas["variacao_acima_pct"] == -3.3
+
+
+@pytest.mark.usefixtures("bridge")
+def test_the_whole_company_has_nothing_above(client_with_writer) -> None:
+    client, _ = client_with_writer()
+
+    metricas = client.get("/receita/insight", params=FILTRO).json()["metricas"]
+
+    assert "variacao_acima_pct" not in metricas
+    assert "n_vizinhos" not in metricas

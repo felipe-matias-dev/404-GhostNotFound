@@ -2,7 +2,7 @@ from decimal import Decimal
 
 from venergy_agent.domain.numbers import unsupported_numbers
 
-from venergy_api.insight_receita import metricas_da_receita
+from venergy_api.insight_receita import filtro_acima, metricas_da_receita, texto_aceito
 from venergy_api.schemas import DecomposicaoFiltroSchema, DecomposicaoLinhaSchema
 
 BASE = "2024-01/2024-12"
@@ -195,3 +195,248 @@ def _valores(valor: object):
 def _brl(numero: float, casas: int = 2) -> str:
     texto = f"{numero:,.{casas}f}"
     return texto.replace(",", "#").replace(".", ",").replace("#", ".")
+
+
+def test_factors_keep_each_effect_in_its_own_direction() -> None:
+    linhas = [linha("Recife", "1000", "1080", tarifa="100", bandeira="20", volume="-50", mix="10")]
+
+    metricas = metricas_da_receita(filtro(), linhas)
+
+    assert metricas is not None
+    assert metricas["fatores_a_favor"] == ["preço", "perfil de consumo"]
+    assert metricas["fatores_contra"] == ["quantidade vendida"]
+    assert metricas["maior_fator"] == "preço"
+
+
+def test_an_effect_of_zero_is_on_neither_side() -> None:
+    metricas = metricas_da_receita(filtro(), [linha("A", "100", "95", volume="-5")])
+
+    assert metricas is not None
+    assert metricas["fatores_a_favor"] == []
+    assert metricas["fatores_contra"] == ["quantidade vendida"]
+
+
+def test_drops_are_counted_and_the_worst_share_is_over_all_drops() -> None:
+    linhas = [
+        linha("A", "100", "25"),
+        linha("B", "100", "90"),
+        linha("C", "100", "90"),
+        linha("D", "100", "95"),
+        linha("E", "100", "130"),
+    ]
+
+    metricas = metricas_da_receita(filtro(), linhas)
+
+    assert metricas is not None
+    assert metricas["n_segmentos_em_queda"] == 4
+    assert metricas["maior_queda_participacao_pct"] == 75.0
+
+
+def test_without_drops_there_is_no_share() -> None:
+    metricas = metricas_da_receita(filtro(), [linha("A", "100", "120", volume="20")])
+
+    assert metricas is not None
+    assert metricas["n_segmentos_em_queda"] == 0
+    assert "maior_queda_participacao_pct" not in metricas
+
+
+def test_counts_where_quantity_fell_and_where_only_price_held_the_rise() -> None:
+    linhas = [
+        linha("A", "100", "110", tarifa="20", volume="-10"),
+        linha("B", "100", "95", tarifa="5", volume="-10"),
+        linha("C", "100", "110", tarifa="5", volume="5"),
+    ]
+
+    metricas = metricas_da_receita(filtro(), linhas)
+
+    assert metricas is not None
+    assert metricas["n_segmentos_quantidade_em_queda"] == 2
+    assert metricas["n_segmentos_alta_so_por_preco"] == 1
+
+
+def test_flag_share_of_the_price_effect() -> None:
+    metricas = metricas_da_receita(filtro(), [linha("A", "100", "120", tarifa="5", bandeira="15")])
+
+    assert metricas is not None
+    assert metricas["bandeira_no_preco_pct"] == 75.0
+
+
+def test_flag_share_is_left_out_when_the_parts_do_not_add_up_as_a_share() -> None:
+    contra = metricas_da_receita(filtro(), [linha("A", "100", "110", tarifa="15", bandeira="-5")])
+    queda = metricas_da_receita(filtro(), [linha("A", "100", "95", tarifa="-2", bandeira="-3")])
+
+    assert contra is not None and "bandeira_no_preco_pct" not in contra
+    assert queda is not None and "bandeira_no_preco_pct" not in queda
+
+
+def _preco_sustenta(segmento: str) -> DecomposicaoLinhaSchema:
+    return linha(segmento, "100", "110", tarifa="20", volume="-10")
+
+
+def test_reading_alta_depende_do_preco() -> None:
+    linhas = [_preco_sustenta(nome) for nome in "ABC"] + [
+        linha("D", "100", "110", tarifa="5", volume="5")
+    ]
+
+    metricas = metricas_da_receita(filtro(), linhas)
+
+    assert metricas["leitura_principal"] == "alta_depende_do_preco"
+    assert metricas["leitura_texto"].startswith("Em 3 dos 4 municípios, a receita só subiu")
+
+
+def test_reading_says_all_when_every_segment_depends_on_price() -> None:
+    metricas = metricas_da_receita(filtro(), [_preco_sustenta(nome) for nome in "ABC"])
+
+    assert metricas["leitura_texto"].startswith("Em todos os 3 municípios,")
+
+
+def test_reading_bandeira_pesa() -> None:
+    linhas = [linha("A", "100", "120", tarifa="5", bandeira="15")]
+
+    metricas = metricas_da_receita(filtro(), linhas)
+
+    assert metricas["leitura_principal"] == "bandeira_pesa"
+    assert metricas["leitura_texto"].startswith("75,0% do ganho de preço")
+
+
+def test_reading_quantidade_geral_when_revenue_fell() -> None:
+    linhas = [linha(nome, "100", "95", volume="-5") for nome in "ABC"]
+
+    metricas = metricas_da_receita(filtro(), linhas)
+
+    assert metricas["leitura_principal"] == "quantidade_geral"
+
+
+def test_reading_quedas_concentradas() -> None:
+    linhas = [
+        linha("A", "100", "20", tarifa="-80"),
+        linha("B", "100", "90", tarifa="-10"),
+        linha("C", "100", "110", volume="10"),
+    ]
+
+    metricas = metricas_da_receita(filtro(), linhas)
+
+    assert metricas["leitura_principal"] == "quedas_concentradas"
+    assert metricas["leitura_texto"].startswith("A responde por 88,9% da soma das quedas")
+
+
+def test_reading_unico_em_queda_compares_with_the_city() -> None:
+    corte = filtro(municipio="Abreu e Lima", bairro="Planalto")
+    linhas = [linha("B3", "100", "98", volume="-2", nivel="classe")]
+    acima = [
+        linha("Planalto", "100", "98", volume="-2", nivel="bairro"),
+        linha("Centro", "100", "120", volume="20", nivel="bairro"),
+        linha("Timbó", "100", "120", volume="20", nivel="bairro"),
+    ]
+
+    metricas = metricas_da_receita(corte, linhas, acima)
+
+    assert metricas["leitura_principal"] == "unico_em_queda"
+    assert metricas["leitura_texto"] == (
+        "Planalto foi o único bairro a perder receita em Abreu e Lima: recuou 2,0%, "
+        "enquanto Abreu e Lima cresceu 12,7%."
+    )
+
+
+def test_reading_comparison_is_what_a_small_cut_gets() -> None:
+    corte = filtro(municipio="Abreu e Lima", bairro="Caetés")
+    linhas = [linha("B1", "100", "120", volume="20", nivel="classe")]
+    acima = [
+        linha("Caetés", "100", "120", volume="20", nivel="bairro"),
+        linha("Centro", "100", "100", nivel="bairro"),
+    ]
+
+    metricas = metricas_da_receita(corte, linhas, acima)
+
+    assert metricas["leitura_principal"] == "comparacao_acima"
+    assert metricas["leitura_texto"] == (
+        "Em Caetés, a receita cresceu 20,0%, enquanto Abreu e Lima cresceu 10,0%."
+    )
+
+
+def test_reading_without_base_revenue_names_the_factor() -> None:
+    metricas = metricas_da_receita(filtro(), [linha("Novo", "0", "10", mix="10")])
+
+    assert metricas["leitura_principal"] == "maior_fator"
+    assert metricas["leitura_texto"] == "O que mais pesou foi o perfil de consumo."
+
+
+def test_reading_when_nothing_changed() -> None:
+    metricas = metricas_da_receita(filtro(), [linha("A", "100", "100")])
+
+    assert metricas["leitura_principal"] == "sem_variacao"
+
+
+def test_the_cut_above_drops_the_most_specific_filter() -> None:
+    assert filtro_acima(filtro()) is None
+    assert filtro_acima(filtro(classe="B1")).classe is None
+    assert filtro_acima(filtro(municipio="Recife", classe="B1")).municipio is None
+    acima = filtro_acima(filtro(municipio="Recife", bairro="Pina"))
+    assert (acima.municipio, acima.bairro) == ("Recife", None)
+
+
+def test_model_text_needs_the_same_numbers_as_the_reading() -> None:
+    metricas = {"leitura_texto": "Em 73 dos 86 bairros, a receita só subiu por causa do preço."}
+
+    assert texto_aceito("A receita só subiu pelo preço em 73 dos 86 bairros.", metricas)
+    assert not texto_aceito("A receita só subiu pelo preço em 73 bairros.", metricas)
+    assert not texto_aceito("Em 73 dos 86 bairros, e 12,3% a mais.", metricas)
+
+
+def test_model_text_cannot_use_jargon() -> None:
+    metricas = {"leitura_texto": "A receita só subiu por causa do preço."}
+
+    assert not texto_aceito("O efeito preço segurou a receita.", metricas)
+    assert not texto_aceito("O faturamento subiu.", metricas)
+
+
+def test_reading_agrees_with_classes_in_the_feminine() -> None:
+    corte = filtro(municipio="Recife", bairro="Pina")
+    linhas = [_preco_sustenta(nome) for nome in ("B1", "B2", "B3")]
+    linhas = [item.model_copy(update={"nivel": "classe"}) for item in linhas]
+
+    metricas = metricas_da_receita(corte, linhas)
+
+    assert metricas["leitura_texto"].startswith("Em todas as 3 classes,")
+
+
+def test_reading_compares_a_class_with_the_company() -> None:
+    linhas = [linha("Recife", "100", "120", volume="20")]
+    acima = [linha("Recife", "200", "220", volume="20")]
+
+    metricas = metricas_da_receita(filtro(classe="A4"), linhas, acima)
+
+    assert metricas["leitura_texto"] == (
+        "Na classe A4, a receita cresceu 20,0%, enquanto a empresa cresceu 10,0%."
+    )
+
+
+def test_model_text_cannot_add_another_conclusion() -> None:
+    metricas = {"leitura_texto": "74,0% do ganho de preço veio da bandeira, não da tarifa."}
+    extra = " O resultado foi impulsionado pelo preço e pelo perfil de consumo, apesar da queda."
+
+    assert not texto_aceito(metricas["leitura_texto"] + extra, metricas)
+
+
+def test_reading_comparison_says_stable_when_the_percentage_is_zero() -> None:
+    corte = filtro(municipio="Recife", bairro="Pina")
+    linhas = [linha("B1", "100", "100", nivel="classe")]
+    acima = [
+        linha("Pina", "100", "100", nivel="bairro"),
+        linha("Boa Vista", "100", "120", volume="20", nivel="bairro"),
+    ]
+
+    metricas = metricas_da_receita(corte, linhas, acima)
+
+    assert (
+        metricas["leitura_texto"]
+        == "Em Pina, a receita ficou estável, enquanto Recife cresceu 10,0%."
+    )
+
+
+def test_model_text_cannot_swap_a_rise_with_a_drop() -> None:
+    metricas = {"leitura_texto": "Em Pina, a receita cresceu 5,0%, enquanto Recife recuou 2,0%."}
+
+    assert texto_aceito("Em Pina, a receita subiu 5,0%, enquanto Recife caiu 2,0%.", metricas)
+    assert not texto_aceito("Em Pina, a receita caiu 5,0%, enquanto Recife subiu 2,0%.", metricas)
+    assert not texto_aceito("Em Pina, a receita caiu 5,0%, enquanto Recife recuou 2,0%.", metricas)

@@ -218,7 +218,7 @@ Recorte da tela no topo (ex.: `Receita › Recife ▾ › Boa Viagem ▾`): a p�
 
 `visaoGeral` (KPIs), `receita` (preço × volume), `unidadeConsumidora` (visão 360), `perdas` (fila e ordens de inspeção), `operacao` (DEC/FEC), `agente` (chat e insights de IA), `auth` (perfis, quando entrar).
 
-Insight de IA de uma tela (DEC-069): `InsightIa` (`#/features/agente`) vai ao lado da frase de leitura do gráfico que ele narra; na Receita, pelo `summaryAction` da ponte (`WaterfallChart`), com o hook `useInsightReceita`. O modelo só é chamado no clique em "Gerar insight" (a query tem `enabled: false` e o clique faz `refetch`); o texto abre numa caixa e o botão vira "Insight feito por IA". Sem texto (narração descartada, falha do provedor ou `503`), aparece "Insight indisponível." com "Tentar de novo".
+Insight de IA de uma tela (DEC-069): `InsightIa` (`#/features/agente`) vai ao lado da frase de leitura do gráfico que ele narra; na Receita, pelo `summaryAction` da ponte (`WaterfallChart`), com o hook `useInsightReceita`. O modelo só é chamado no clique em "Gerar insight" (a query tem `enabled: false` e o clique faz `refetch`); o texto abre numa caixa e o botão vira "Insight feito por IA". Se o provedor falhar, o texto for recusado ou a IA estiver desligada, a API manda a leitura da regra, e a caixa mostra "Leitura automática" (DEC-066). Sem texto ou com erro da rota, aparece "Insight indisponível." com "Tentar de novo".
 
 ### Visão 360 da unidade consumidora
 
