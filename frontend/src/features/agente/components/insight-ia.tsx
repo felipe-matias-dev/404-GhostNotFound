@@ -1,8 +1,9 @@
 // Insight de IA de uma tela, ao lado da frase de leitura que o texto aprofunda. O modelo só é
 // chamado quando o usuário pede ("Gerar insight", com a marca do VE-360, o sinal de "feito
 // pelo agente"); o texto chega aberto numa caixa, que fecha pelo X, por Esc ou clicando fora,
-// e volta pelo botão "Insight feito por IA". Sem texto (narração descartada, falha do provedor
-// ou IA desligada), a tela diz que o insight está indisponível, nunca mostra texto inventado.
+// e volta pelo botão "Insight feito por IA". Sem texto ou com erro da rota, a tela diz que o
+// insight está indisponível, nunca mostra texto inventado.
+// Com `origem` "regra", o texto foi escrito pela regra do backend, e a caixa não o chama de IA.
 import { XIcon } from "@phosphor-icons/react";
 import { useState } from "react";
 import { LogoMark } from "#/components/layout/logo";
@@ -15,16 +16,19 @@ import {
 } from "#/components/ui/popover";
 import { cn } from "#/lib/utils";
 
-const TITULO = "Insight feito por IA";
+const TITULO_IA = "Insight feito por IA";
+const TITULO_REGRA = "Leitura automática";
 
 export function InsightIa({
 	texto,
+	origem = "ia",
 	carregando = false,
 	indisponivel = false,
 	onGerar,
 	className,
 }: {
 	texto?: string | null;
+	origem?: "ia" | "regra" | null;
 	carregando?: boolean;
 	/** Já houve tentativa e não veio texto. */
 	indisponivel?: boolean;
@@ -61,6 +65,7 @@ export function InsightIa({
 		);
 	}
 	if (texto) {
+		const titulo = origem === "regra" ? TITULO_REGRA : TITULO_IA;
 		return (
 			<Popover open={aberto} onOpenChange={setAberto}>
 				<PopoverTrigger
@@ -71,16 +76,16 @@ export function InsightIa({
 					)}
 				>
 					<LogoMark className="size-3.5 text-accent-text" />
-					{TITULO}
+					{titulo}
 				</PopoverTrigger>
 				<PopoverContent
 					align="end"
-					aria-label={TITULO}
+					aria-label={titulo}
 					className="flex w-[min(28rem,calc(100vw-1.5rem))] flex-col gap-3 p-4"
 				>
 					<div className="flex items-center gap-2">
 						<LogoMark className="size-4 text-accent-text" />
-						<p className="font-medium text-body text-text">{TITULO}</p>
+						<p className="font-medium text-body text-text">{titulo}</p>
 						<PopoverClose
 							aria-label="Fechar insight"
 							className={cn(
@@ -93,8 +98,9 @@ export function InsightIa({
 					</div>
 					<p className="text-body text-text">{texto}</p>
 					<p className="border-t border-border pt-3 text-small text-text-muted">
-						Gerado por IA a partir das métricas desta tela. Todo número do texto
-						foi conferido com elas.
+						{origem === "regra"
+							? "Escrito por regra a partir das métricas deste recorte, sem IA."
+							: "Gerado por IA a partir das métricas deste recorte. Todo número do texto foi conferido com elas."}
 					</p>
 				</PopoverContent>
 			</Popover>

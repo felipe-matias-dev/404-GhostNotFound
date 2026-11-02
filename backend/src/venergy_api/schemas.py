@@ -278,9 +278,10 @@ class DecomposicaoLinhaSchema(BaseModel):
 class InsightReceitaSchema(BaseModel):
     """O insight de IA da tela de Receita e as métricas que sustentam cada número do texto."""
 
-    # Vazio quando o redator recusa o texto (número fora das métricas) ou falha: a tela
-    # aparece sem insight. Também vazio, sem chamar o modelo, se o recorte não tem segmentos.
+    # Se o redator falha ou o texto dele não serve, vem a leitura escrita pela regra do backend,
+    # e `origem` diz qual dos dois é. Vazio só se o recorte não tem segmentos, sem chamar o modelo.
     texto: str | None
+    origem: Literal["ia", "regra"] | None = None
     metricas: dict[str, Any] | None
 
 
