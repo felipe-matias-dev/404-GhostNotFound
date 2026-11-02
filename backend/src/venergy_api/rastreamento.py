@@ -25,6 +25,12 @@ from venergy_api.config import Settings
 
 NOME_DO_SERVICO = "venergy-api"
 
+# Quanto o envio de um lote espera pelo coletor. O padrão do exportador é 10 s, com novas
+# tentativas dentro dele: com o Jaeger fora do ar, o envio do último lote segurava o desligamento
+# da API por uns 9 s, perto dos 10 s em que o `docker compose stop` mata o processo. Um trace é
+# diagnóstico, então perder um lote vale menos do que travar o desligamento.
+TEMPO_MAXIMO_DE_ENVIO_SEGUNDOS = 2
+
 # A saúde é chamada pelo healthcheck do compose a cada poucos segundos e encheria o painel. O
 # tempo real das ordens é uma conexão aberta por minutos, que viraria uma barra só escondendo o
 # resto. O /ai/ask/stream fica: dura segundos e é o caminho da pergunta ao agente.
@@ -67,7 +73,11 @@ def configurar_rastreamento(
         if not settings.rastreamento_endpoint:
             return None
         # Em lote e numa thread à parte: enviar span por span atrasaria cada resposta.
-        processador = BatchSpanProcessor(OTLPSpanExporter(endpoint=settings.rastreamento_endpoint))
+        processador = BatchSpanProcessor(
+            OTLPSpanExporter(
+                endpoint=settings.rastreamento_endpoint, timeout=TEMPO_MAXIMO_DE_ENVIO_SEGUNDOS
+            )
+        )
 
     # O provider vai explícito para cada instrumentação, nunca como o global do processo: o
     # global só pode ser definido uma vez, e cada teste monta a API com o seu.
