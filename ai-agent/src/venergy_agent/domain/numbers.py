@@ -1,6 +1,6 @@
 import re
 from collections.abc import Iterable
-from decimal import Decimal, InvalidOperation
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
 PT_BR_NUMBER = re.compile(r"(?<![\d.,])(?<![^\W\d_])(?<![^\W\d_]-)\d+(?:[.,]\d+)*")
 MACHINE_NUMBER = re.compile(r"\d+(?:\.\d+)?")
@@ -24,12 +24,27 @@ def _numbers_in_value(value: object) -> set[Decimal]:
     return {Decimal(token) for token in MACHINE_NUMBER.findall(text)}
 
 
+def _rounds_to(value: Decimal, number: Decimal, decimals: int) -> bool:
+    try:
+        return value.quantize(Decimal(1).scaleb(-decimals), rounding=ROUND_HALF_UP) == number
+    except InvalidOperation:
+        return False
+
+
+def _supported(token: str, known: set[Decimal]) -> bool:
+    number = _from_pt_br(token)
+    if number is None:
+        return False
+    if number in known:
+        return True
+    _, comma, decimals = token.rpartition(",")
+    if not comma:
+        return False
+    return any(_rounds_to(value, number, len(decimals)) for value in known)
+
+
 def unsupported_numbers(text: str, values: Iterable[object]) -> tuple[str, ...]:
     known: set[Decimal] = set()
     for value in values:
         known |= _numbers_in_value(value)
-    return tuple(
-        token
-        for token in PT_BR_NUMBER.findall(text)
-        if (number := _from_pt_br(token)) is None or number not in known
-    )
+    return tuple(token for token in PT_BR_NUMBER.findall(text) if not _supported(token, known))

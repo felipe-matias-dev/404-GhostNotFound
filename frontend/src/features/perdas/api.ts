@@ -1,5 +1,5 @@
 import type { SortState } from "#/components/ui/data-table";
-import { api, unwrap } from "#/lib/api";
+import { API_URL, api, unwrap } from "#/lib/api";
 import type { Recorte } from "#/lib/filtros";
 import {
 	type AtualizarOrdem,
@@ -14,9 +14,14 @@ export const ordensKeys = {
 	lista: (status: StatusOrdem | undefined, recorte: Recorte) =>
 		[...ordensKeys.all, { status, ...recorte }] as const,
 	detalhe: (id: number) => [...ordensKeys.all, "detalhe", id] as const,
+	// Começa por `all`: a invalidação por esse prefixo (aviso de mudança de ordem) renova o resumo.
+	temposPorEtapa: ["ordens-inspecao", "tempos-por-etapa"] as const,
 };
 
 export const filaKey = ["fila-suspeitas"] as const;
+
+/** Fluxo SSE do backend com os avisos de ordens criadas ou alteradas (`GET /ordens-inspecao/eventos`). */
+export const URL_AVISOS_ORDENS = `${API_URL}/ordens-inspecao/eventos`;
 export const distribuicaoQuedaKey = (recorte: Recorte) =>
 	["distribuicao-queda", recorte] as const;
 export const TAMANHO_PAGINA = 20;
@@ -67,6 +72,10 @@ export function listarOrdens(
 			params: { query: { ...recorte, status } },
 		}),
 	);
+}
+
+export function temposPorEtapa() {
+	return unwrap(api.GET("/ordens-inspecao/tempos-por-etapa"));
 }
 
 export function obterOrdem(id: number) {
