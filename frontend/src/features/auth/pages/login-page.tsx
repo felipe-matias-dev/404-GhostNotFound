@@ -12,8 +12,8 @@ import { useState } from "react";
 import { Logo } from "#/components/layout/logo";
 import { Button } from "#/components/ui/button";
 import { FloatingLabelInput } from "#/components/ui/floating-label";
-import { ApiError } from "#/lib/api";
 import { EnergyNetwork } from "../components/energy-network";
+import { falhaDoLogin } from "../conversions";
 import { useLogin } from "../hooks/use-auth";
 import "../login.css";
 
@@ -24,7 +24,8 @@ export function LoginPage() {
 	const [showPassword, setShowPassword] = useState(false);
 	const [paused, setPaused] = useState(false);
 	const [entered, setEntered] = useState(false);
-	const invalid = login.error instanceof ApiError && login.error.status === 401;
+	const falha = login.error ? falhaDoLogin(login.error) : null;
+	const invalid = falha?.credenciaisInvalidas ?? false;
 
 	return (
 		<main
@@ -125,7 +126,7 @@ export function LoginPage() {
 							</Button>
 						</div>
 
-						{login.error && (
+						{falha && (
 							<div
 								role="alert"
 								className="mt-2 flex items-start gap-2 rounded-md bg-danger-subtle p-3 text-body text-danger"
@@ -134,11 +135,7 @@ export function LoginPage() {
 									aria-hidden="true"
 									className="mt-0.5 size-4 shrink-0"
 								/>
-								<p>
-									{invalid
-										? "Usuário ou senha inválidos. Confira os dados e tente novamente."
-										: "Não foi possível entrar no portal. Tente novamente em instantes."}
-								</p>
+								<p>{falha.mensagem}</p>
 							</div>
 						)}
 

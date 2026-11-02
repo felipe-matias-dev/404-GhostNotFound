@@ -16,6 +16,7 @@ from venergy_api.carga import drop_agent_views
 from venergy_api.config import Settings
 from venergy_api.database import Base, create_db_engine, get_session
 from venergy_api.main import create_app
+from venergy_api.models import TentativaLogin
 from venergy_api.sessao import usuario_atual
 
 FRONTEND_ORIGIN = "http://localhost:3000"
@@ -97,7 +98,11 @@ def client_for(tmp_path: Path, perfil: Perfil) -> Callable[..., TestClient]:
                 yield session
 
         app.dependency_overrides[get_session] = override_get_session
-        if not sem_login:
+        if sem_login:
+            # O login de verdade grava a tentativa, e a tabela nasce na subida (lifespan), que
+            # o TestClient sem `with` não roda.
+            TentativaLogin.__table__.create(engine, checkfirst=True)
+        else:
             usuario = UsuarioLogado(login="teste", nome="Teste", perfil=perfil)
             app.dependency_overrides[usuario_atual] = lambda: usuario
         return TestClient(app)

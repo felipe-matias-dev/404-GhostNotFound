@@ -55,6 +55,7 @@ export function AgenteWidget() {
 		escopo,
 		setEscopo,
 		enviando,
+		cancelarConsulta,
 		widgetAberto,
 		setWidgetAberto,
 		alternarWidget,
@@ -213,6 +214,7 @@ export function AgenteWidget() {
 										<AgenteTurnoItem
 											key={turno.id}
 											turno={turno}
+											enviando={enviando}
 											compacto
 											mostrarHorario={indice === 0}
 											onRetry={(id) => void tentarNovamente(id)}
@@ -228,6 +230,7 @@ export function AgenteWidget() {
 								compacto
 								onSubmit={(texto) => void enviarPergunta(texto)}
 								enviando={enviando}
+								onStop={cancelarConsulta}
 								escopo={escopo}
 								onEscopoChange={setEscopo}
 								placeholder={
