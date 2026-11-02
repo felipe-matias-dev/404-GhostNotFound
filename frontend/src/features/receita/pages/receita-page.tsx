@@ -130,13 +130,15 @@ export function ReceitaPage() {
 	return (
 		<Pagina className="max-w-none">
 			<div className="grid gap-5 lg:grid-cols-[clamp(20rem,26%,28rem)_minmax(0,1fr)] lg:items-start">
+				{/* Alto como a área visível sem rolar: 159px = moldura do painel e Header (62px), barra de
+				    filtros numa linha (57px) e respiro de cima e de baixo da Pagina (40px). */}
 				<MapaRecorte
 					par={par}
 					recorte={recorte}
 					efeito={causa}
 					destaque={destaque}
 					onChange={alterar}
-					className="h-96 lg:sticky lg:top-5 lg:h-[calc(100svh-8rem)]"
+					className="h-96 lg:sticky lg:top-5 lg:h-[calc(100svh-159px)]"
 				/>
 				<section
 					aria-label="Decomposição de receita"
