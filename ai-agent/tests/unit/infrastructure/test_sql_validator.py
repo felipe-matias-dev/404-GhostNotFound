@@ -114,6 +114,28 @@ def test_months_used_as_literals_in_the_query_are_reported(validator):
     assert query.periods == ("2025-01", "2025-06")
 
 
+def test_both_months_of_a_period_pair_are_reported(validator):
+    query = validator.validate(
+        "SELECT sum(efeito_bandeira) FROM sem_faturamento_mensal "
+        "WHERE periodo_base = '2022-07/2023-06' AND periodo_atual = '2025-07/2026-06'",
+        ALLOWED,
+    )
+
+    assert query.periods == ("2022-07", "2023-06", "2025-07", "2026-06")
+
+
+def test_years_used_as_month_prefixes_are_reported(validator):
+    query = validator.validate(
+        "SELECT sum(CASE WHEN competencia LIKE '2024-%' THEN receita_faturada END), "
+        "sum(CASE WHEN competencia LIKE '2025%' THEN receita_faturada END) "
+        "FROM sem_faturamento_mensal WHERE municipio LIKE 'Rec%' AND bandeira <> '1999'",
+        ALLOWED,
+    )
+
+    assert query.years == ("2024", "2025")
+    assert query.periods == ()
+
+
 def test_accepts_single_select_on_allowed_view(validator):
     query = validator.validate("SELECT municipio FROM sem_uc", ALLOWED)
 

@@ -95,6 +95,11 @@ MONTH_NAMES = (
     "novembro",
     "dezembro",
 )
+MONTH_DATE = re.compile(
+    rf"\b(?:{'|'.join(MONTH_NAMES)})(?:/|\s+de\s+)\d{{4}}\b"
+    rf"|\b(?:{'|'.join(name[:3] for name in MONTH_NAMES)})/\d{{4}}\b"
+    r"|\b\d{1,2}/\d{4}\b|\b\d{4}-\d{2}\b"
+)
 FALLBACK_MAX_ROWS = 5
 FALLBACK_MAX_COLUMNS = 4
 MISSING_VALUE = "sem valor"
@@ -516,7 +521,7 @@ class AskUseCase:
             result, draft, validated, _period(result) or _endpoints(validated.periods)
         )
         text = await self._narrate(
-            question, draft, visible, text, _period(visible), validated.periods, spent, started
+            question, draft, visible, text, _period(visible), validated, spent, started
         )
 
         return AgentAnswer(
@@ -546,7 +551,7 @@ class AskUseCase:
         visible: QueryResult,
         fallback: str,
         period: tuple[str, str] | None,
-        filtered_periods: tuple[str, ...],
+        validated: ValidatedQuery,
         spent: _Spent,
         started: float,
     ) -> str:
@@ -597,8 +602,8 @@ class AskUseCase:
             )
             return fallback
 
-        required = period if period is not None else _endpoints(filtered_periods)
-        if required is not None and not all(_mentions(narrative, value) for value in required):
+        required = period if period is not None else _endpoints(validated.periods)
+        if required is not None and not _names_period(narrative, required):
             self._log(
                 question.request_id,
                 question.session_id,
@@ -609,7 +614,8 @@ class AskUseCase:
 
         values = [
             visible.row_count,
-            *filtered_periods,
+            *validated.periods,
+            *validated.years,
             *(value for row in visible.rows for value in row.values()),
         ]
         unsupported = unsupported_numbers(narrative, values)
@@ -811,6 +817,16 @@ def _period_sentence(period: tuple[str, str]) -> str:
     if first == last:
         return f" Período: {first}."
     return f" Período: {first} a {last}."
+
+
+def _names_period(text: str, period: tuple[str, str]) -> bool:
+    if all(_mentions(text, value) for value in period):
+        return True
+    first, last = period
+    if not (first.endswith("-01") and last.endswith("-12")):
+        return False
+    years_alone = MONTH_DATE.sub(" ", text.lower())
+    return all(re.search(rf"\b{year}\b", years_alone) for year in {first[:4], last[:4]})
 
 
 def _mentions(text: str, competencia: str) -> bool:
