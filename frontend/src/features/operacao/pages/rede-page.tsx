@@ -4,7 +4,7 @@ import {
 	useLocation,
 	useRouterState,
 } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef } from "react";
+import { Fragment, useEffect, useMemo, useRef } from "react";
 import { HeaderTrilha } from "#/components/layout/header";
 import { Pagina } from "#/components/layout/pagina";
 import {
@@ -20,16 +20,14 @@ import {
 	type SegmentedOption,
 } from "#/components/ui/segmented-control";
 import { CLASSE_ROTULO, useFiltrosPortal } from "#/features/filtros";
-import { useIndicadoresMensais } from "#/features/indicadores";
-import type { ParPeriodos } from "#/lib/filtros";
 import { AlimentadorSheet } from "../components/alimentador-sheet";
 import { ContinuidadeTable } from "../components/continuidade-table";
 import { IndicadoresRede } from "../components/indicadores-rede";
 import { linhasDoRanking } from "../conversions";
 import {
+	useContinuidadeMensal,
 	useRankingContinuidade,
 	useRecortesContinuidade,
-	useSerieAlimentador,
 } from "../hooks/use-continuidade";
 import type { RedeSearch } from "../search";
 import type {
@@ -47,9 +45,18 @@ const CRITERIOS: readonly SegmentedOption<Criterio>[] = [
 	{ value: "fec", label: "FEC" },
 ];
 
+const VISOES: readonly SegmentedOption<VisaoRede>[] = [
+	{ value: "alimentadores", label: "Alimentadores" },
+	{ value: "bairros", label: "Bairros" },
+	{ value: "localidades", label: "Localidades" },
+];
+
 const SEM_PERIODO = "Escolha um período para consultar a continuidade.";
 
-const RECORTE_GLOBAL = "Limpe o recorte para consultar todos os alimentadores";
+const paraPeriodo = (par: string | undefined): Periodo | undefined => {
+	const [inicio, fim] = par?.split("/") ?? [];
+	return inicio && fim ? { inicio, fim } : undefined;
+};
 
 export function RedePage() {
 	const search = route.useSearch();
@@ -63,11 +70,16 @@ export function RedePage() {
 		select: (local) => local.search,
 	}) as Record<string, unknown>;
 	const par = filtros.periodo_atual;
-	const periodo = useMemo<Periodo | undefined>(() => {
-		if (!par) return undefined;
-		const [inicio, fim] = par.split("/");
-		return inicio && fim ? { inicio, fim } : undefined;
-	}, [par]);
+	const periodo = useMemo(() => paraPeriodo(par), [par]);
+	// A variação de cada linha é contra a base compartilhada; uma base que não termina antes
+	// do período atual não é comparação (a API recusaria), e a coluna some.
+	const parBase = filtros.periodo_base;
+	const base = useMemo(() => {
+		const candidata = paraPeriodo(parBase);
+		return candidata && periodo && candidata.fim < periodo.inicio
+			? candidata
+			: undefined;
+	}, [parBase, periodo]);
 
 	const criterio: Criterio = search.criterio ?? "dec";
 	const alimentador = search.alimentador;
@@ -78,43 +90,39 @@ export function RedePage() {
 		() => ({ municipio, bairro, classe }),
 		[municipio, bairro, classe],
 	);
-	// Com recorte, o ranking global não se aplica; a preferência explícita volta sem recorte.
-	const comRecorte = Boolean(municipio || bairro || classe);
-	const visaoSalva: VisaoRede =
-		buscaBruta.visao === "localidades" ? "localidades" : "alimentadores";
-	const visao: VisaoRede = comRecorte ? "localidades" : visaoSalva;
+	const visao: VisaoRede = search.visao ?? "alimentadores";
 
-	const visoes = useMemo<readonly SegmentedOption<VisaoRede>[]>(
-		() => [
-			{ value: "alimentadores", label: "Alimentadores", disabled: comRecorte },
-			{ value: "localidades", label: "Localidades" },
-		],
-		[comRecorte],
-	);
-
-	// Hooks em ordem fixa; a consulta da visão inativa fica desligada por skipToken.
+	// Hooks em ordem fixa; a consulta da visão inativa fica desligada por skipToken. As três
+	// visões respeitam o recorte da barra comum.
 	const ranking = useRankingContinuidade(
 		periodo,
 		criterio,
-		visao === "alimentadores" && !comRecorte,
+		recorte,
+		base,
+		visao === "alimentadores",
 	);
 	const recortes = useRecortesContinuidade(
 		periodo,
 		criterio,
 		recorte,
-		visao === "localidades",
+		visao === "bairros" ? "bairro" : undefined,
+		base,
+		visao !== "alimentadores",
 	);
-	const serie = useSerieAlimentador(periodo, alimentador);
-	// A referência do painel é a empresa inteira, como o histórico do alimentador, que também
-	// ignora o recorte; só é pedida com o painel aberto.
-	const parEmpresa: ParPeriodos | undefined =
-		alimentador && filtros.periodo_atual && filtros.periodo_base
-			? {
-					periodo_base: filtros.periodo_base,
-					periodo_atual: filtros.periodo_atual,
-				}
-			: undefined;
-	const empresa = useIndicadoresMensais(parEmpresa, {});
+	// O painel mostra o alimentador dentro do recorte contra o recorte inteiro (a empresa, sem
+	// recorte); as duas séries só são pedidas com ele aberto.
+	const serie = useContinuidadeMensal(
+		periodo,
+		recorte,
+		alimentador,
+		Boolean(alimentador),
+	);
+	const referencia = useContinuidadeMensal(
+		periodo,
+		recorte,
+		undefined,
+		Boolean(alimentador),
+	);
 
 	const ativa = visao === "alimentadores" ? ranking : recortes;
 	const rows: LinhaContinuidade[] | undefined =
@@ -135,23 +143,33 @@ export function RedePage() {
 	const nivel: NivelRecorte =
 		visao === "alimentadores"
 			? "alimentador"
-			: (recortes.data?.nivel ?? nivelEsperado);
+			: visao === "bairros"
+				? "bairro"
+				: (recortes.data?.nivel ?? nivelEsperado);
 
 	const titulo =
 		visao === "alimentadores"
-			? "Alimentadores"
-			: bairro
-				? `Alimentadores em ${bairro}`
-				: municipio
+			? bairro || municipio
+				? `Alimentadores em ${bairro ?? municipio}`
+				: "Alimentadores"
+			: visao === "bairros"
+				? municipio
 					? `Bairros de ${municipio}`
-					: "Municípios";
+					: "Bairros"
+				: bairro
+					? `Alimentadores em ${bairro}`
+					: municipio
+						? `Bairros de ${municipio}`
+						: "Municípios";
 
-	const localidade = bairro
-		? `${bairro}, ${municipio}`
-		: (municipio ?? "Empresa inteira");
+	const geografia = bairro ? `${bairro}, ${municipio}` : municipio;
 	const tituloIndicadores = classe
-		? `${localidade} · ${CLASSE_ROTULO[classe]}`
-		: localidade;
+		? `${geografia ?? "Empresa inteira"} · ${CLASSE_ROTULO[classe]}`
+		: (geografia ?? "Empresa inteira");
+	// O nome do recorte no painel; sem recorte, a referência é a empresa.
+	const nomeRecorte =
+		[geografia, classe && CLASSE_ROTULO[classe]].filter(Boolean).join(" · ") ||
+		undefined;
 
 	// A forma canônica da tela: período compartilhado, padrões omitidos e campos sem sentido fora.
 	const alvo = useMemo<RedeSearch>(
@@ -160,7 +178,7 @@ export function RedePage() {
 			fim: periodo?.fim,
 			periodo_base: filtros.periodo_base,
 			criterio: criterio === "dec" ? undefined : criterio,
-			visao: visaoSalva === "localidades" ? "localidades" : undefined,
+			visao: visao === "alimentadores" ? undefined : visao,
 			municipio,
 			bairro,
 			classe,
@@ -171,7 +189,7 @@ export function RedePage() {
 			periodo?.fim,
 			filtros.periodo_base,
 			criterio,
-			visaoSalva,
+			visao,
 			municipio,
 			bairro,
 			classe,
@@ -225,15 +243,12 @@ export function RedePage() {
 			resetScroll: false,
 		});
 
-	// Trocar de visão fecha o painel, mas nunca limpa o recorte compartilhado: com recorte, a
-	// opção global está desabilitada.
-	const escolherVisao = (proxima: VisaoRede) => {
-		if (proxima === "alimentadores" && comRecorte) return;
+	// Trocar de visão fecha o painel, mas nunca limpa o recorte compartilhado.
+	const escolherVisao = (proxima: VisaoRede) =>
 		void ir({
-			visao: proxima === "localidades" ? "localidades" : undefined,
+			visao: proxima === "alimentadores" ? undefined : proxima,
 			alimentador: undefined,
 		});
-	};
 
 	const escolherCriterio = (proximo: Criterio) =>
 		void ir({ criterio: proximo === "dec" ? undefined : proximo });
@@ -246,6 +261,17 @@ export function RedePage() {
 		const ativo = document.activeElement;
 		opener.current =
 			ativo instanceof HTMLElement && ativo !== document.body ? ativo : null;
+		// Um bairro da lista plana leva aos alimentadores dele, com o município no recorte.
+		if (visao === "bairros") {
+			focarTitulo.current = true;
+			void ir({
+				visao: undefined,
+				municipio: linha.municipio ?? municipio,
+				bairro: linha.segmento,
+				alimentador: undefined,
+			});
+			return;
+		}
 		if (atual === "municipio") {
 			focarTitulo.current = true;
 			void ir({
@@ -303,71 +329,71 @@ export function RedePage() {
 			? "Maiores índices primeiro"
 			: `Maiores índices primeiro · ${n_meses} ${n_meses === 1 ? "mês" : "meses"} com dados na base`;
 
-	// Subir pela trilha volta ao nível de cima sem perder classe, período nem critério.
+	// Subir pela trilha volta ao nível de cima sem perder visão, classe, período nem critério.
 	const subir = (proximo: Partial<RedeSearch>) => ({
 		...alvo,
-		visao: "localidades" as const,
 		alimentador: undefined,
 		...proximo,
 	});
 
+	// A trilha do Header: o recorte. Cada nível acima do último é um link que volta à tabela
+	// naquele nível.
+	const trilha: {
+		id: string;
+		rotulo: string;
+		search: RedeSearch;
+	}[] = [];
+	if (municipio) {
+		trilha.push({
+			id: "raiz",
+			rotulo: visao === "localidades" ? "Municípios" : "Empresa inteira",
+			search: subir({ municipio: undefined, bairro: undefined }),
+		});
+	}
+	if (municipio) {
+		trilha.push({
+			id: "municipio",
+			rotulo: municipio,
+			search: subir({ bairro: undefined }),
+		});
+	}
+	if (bairro) trilha.push({ id: "bairro", rotulo: bairro, search: subir({}) });
+
 	return (
 		<Pagina className="max-w-none">
-			{visao === "localidades" && municipio && (
+			{trilha.length > 0 && (
 				<HeaderTrilha>
 					<Breadcrumb aria-label="Recorte da rede" className="min-w-0">
 						<BreadcrumbList>
-							<BreadcrumbSeparator />
-							<BreadcrumbItem>
-								<BreadcrumbLink
-									render={
-										<Link
-											to="/rede"
-											search={subir({
-												municipio: undefined,
-												bairro: undefined,
-											})}
-											onClick={() => {
-												focarTitulo.current = true;
-											}}
-										/>
-									}
-								>
-									Municípios
-								</BreadcrumbLink>
-							</BreadcrumbItem>
-							<BreadcrumbSeparator />
-							<BreadcrumbItem className="min-w-0">
-								{bairro ? (
-									<BreadcrumbLink
-										render={
-											<Link
-												to="/rede"
-												search={subir({ bairro: undefined })}
-												onClick={() => {
-													focarTitulo.current = true;
-												}}
-											/>
-										}
-									>
-										{municipio}
-									</BreadcrumbLink>
-								) : (
-									<BreadcrumbPage className="truncate">
-										{municipio}
-									</BreadcrumbPage>
-								)}
-							</BreadcrumbItem>
-							{bairro && (
-								<>
-									<BreadcrumbSeparator />
-									<BreadcrumbItem className="min-w-0">
-										<BreadcrumbPage className="truncate">
-											{bairro}
-										</BreadcrumbPage>
-									</BreadcrumbItem>
-								</>
-							)}
+							{trilha.map((nivel, indice) => {
+								const ultimo = indice === trilha.length - 1;
+								return (
+									<Fragment key={nivel.id}>
+										<BreadcrumbSeparator />
+										<BreadcrumbItem className="min-w-0">
+											{ultimo ? (
+												<BreadcrumbPage className="truncate">
+													{nivel.rotulo}
+												</BreadcrumbPage>
+											) : (
+												<BreadcrumbLink
+													render={
+														<Link
+															to="/rede"
+															search={nivel.search}
+															onClick={() => {
+																focarTitulo.current = true;
+															}}
+														/>
+													}
+												>
+													{nivel.rotulo}
+												</BreadcrumbLink>
+											)}
+										</BreadcrumbItem>
+									</Fragment>
+								);
+							})}
 						</BreadcrumbList>
 					</Breadcrumb>
 				</HeaderTrilha>
@@ -403,7 +429,7 @@ export function RedePage() {
 							label="Visão da rede"
 							value={visao}
 							onValueChange={escolherVisao}
-							options={visoes}
+							options={VISOES}
 						/>
 						<SegmentedControl
 							label="Critério da tabela"
@@ -414,15 +440,12 @@ export function RedePage() {
 					</div>
 				</div>
 
-				{comRecorte && (
-					<p className="text-small text-text-muted">{RECORTE_GLOBAL}</p>
-				)}
-
 				{periodo ? (
 					<ContinuidadeTable
 						rows={rows}
 						nivel={nivel}
 						criterio={criterio}
+						periodoBase={base ? parBase : undefined}
 						resetKey={[
 							visao,
 							periodo.inicio,
@@ -444,11 +467,13 @@ export function RedePage() {
 			</section>
 
 			<AlimentadorSheet
+				aberto={Boolean(alimentador)}
 				alimentador={alimentador}
 				periodo={periodo}
-				fromRecorte={comRecorte}
+				recorte={recorte}
+				nomeRecorte={nomeRecorte}
 				linhas={serie.data}
-				empresa={empresa.data}
+				referencia={referencia.data}
 				loading={serie.isLoading}
 				refreshing={serie.isFetching && !serie.isLoading}
 				failed={serie.isError}

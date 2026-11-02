@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { type Classe, filtrosCompartilhadosShape } from "#/lib/filtros";
+import type { VisaoRede } from "./types";
 
 const mes = z.string().optional().catch(undefined);
 const texto = z.string().trim().min(1).optional().catch(undefined);
@@ -10,7 +11,7 @@ type RedeSearchNormalizada = {
 	inicio?: string;
 	fim?: string;
 	criterio?: "dec" | "fec";
-	visao?: "alimentadores" | "localidades";
+	visao?: VisaoRede;
 	municipio?: string;
 	bairro?: string;
 	alimentador?: string;
@@ -23,7 +24,10 @@ export const redeSearchSchema = z
 		inicio: mes,
 		fim: mes,
 		criterio,
-		visao: z.enum(["alimentadores", "localidades"]).optional().catch(undefined),
+		visao: z
+			.enum(["alimentadores", "bairros", "localidades"])
+			.optional()
+			.catch(undefined),
 		municipio: texto,
 		bairro: texto,
 		classe: filtrosCompartilhadosShape.classe,

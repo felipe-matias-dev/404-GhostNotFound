@@ -6,14 +6,21 @@ import {
 	type DataTableColumn,
 	type SortState,
 } from "#/components/ui/data-table";
+import { KpiDelta } from "#/components/ui/kpi-card";
 import {
 	Tooltip,
 	TooltipContent,
 	TooltipTrigger,
 } from "#/components/ui/tooltip";
-import { formatHoras, formatIndice, formatNumero } from "#/lib/format";
+import {
+	formatHoras,
+	formatIndice,
+	formatNumero,
+	formatPct,
+	formatPeriodoCurto,
+} from "#/lib/format";
 import { cn } from "#/lib/utils";
-import { filtrarSegmentos } from "../conversions";
+import { filtrarSegmentos, linhasDaTabela } from "../conversions";
 import { INDICADORES_REDE } from "../indicadores";
 import type {
 	Criterio,
@@ -45,6 +52,11 @@ const AJUDA = [
 	["UCs (média)", INDICADORES_REDE.n_uc_medio.hint],
 ] as const;
 
+const AJUDA_VARIACAO = [
+	"Variação",
+	"Do índice escolhido no período atual contra o período base, na mesma conta. Vazia quando a linha não existe na base, quando a base é zero ou quando falta algum mês em um dos períodos.",
+] as const;
+
 /** O que a linha abre: histórico do alimentador, os bairros de um município ou os de um bairro. */
 const rotulo = (nivel: NivelRecorte, segmento: string) => {
 	if (nivel === "alimentador") return `histórico do alimentador ${segmento}`;
@@ -56,6 +68,8 @@ export type ContinuidadeTableProps = {
 	rows: LinhaContinuidade[] | undefined;
 	nivel: NivelRecorte;
 	criterio: Criterio;
+	/** Período base da variação ("AAAA-MM/AAAA-MM"); sem ele, a coluna não aparece. */
+	periodoBase: string | undefined;
 	resetKey: string;
 	loading: boolean;
 	refreshing: boolean;
@@ -68,6 +82,7 @@ export function ContinuidadeTable({
 	rows,
 	nivel,
 	criterio,
+	periodoBase,
 	resetKey,
 	loading,
 	refreshing,
@@ -90,12 +105,7 @@ export function ContinuidadeTable({
 	// A posição é a da ordem da API, antes da busca e da ordenação local: o ranking não muda
 	// quando a tabela é reordenada ou filtrada.
 	const linhas = useMemo<LinhaTabela[] | undefined>(
-		() =>
-			rows &&
-			filtrarSegmentos(
-				rows.map((linha, indice) => ({ ...linha, posicao: indice + 1 })),
-				termo,
-			),
+		() => rows && filtrarSegmentos(linhasDaTabela(rows), termo),
 		[rows, termo],
 	);
 
@@ -105,13 +115,13 @@ export function ContinuidadeTable({
 			id: "segmento",
 			header: identificador,
 			width: "minmax(0, 1.4fr)",
-			value: (linha) => linha.segmento,
+			value: (linha) => linha.rotulo,
 			cell: (linha) => (
 				<span className="flex min-w-0 items-baseline gap-2">
 					<span className="w-7 shrink-0 text-right text-small tabular-nums text-text-muted">
 						{linha.posicao}º
 					</span>
-					<span className="truncate">{linha.segmento}</span>
+					<span className="truncate">{linha.rotulo}</span>
 				</span>
 			),
 		},
@@ -160,7 +170,40 @@ export function ContinuidadeTable({
 			value: (linha) => linha.n_uc_medio,
 			cell: (linha) => formatNumero(linha.n_uc_medio),
 		},
+		...(periodoBase
+			? [
+					{
+						id: "variacao",
+						header: `Var. ${criterio.toUpperCase()}`,
+						width: "minmax(112px, 0.8fr)",
+						align: "end",
+						numeric: true,
+						value: (linha) => linha.variacao_pct?.[criterio] ?? null,
+						cell: (linha) => {
+							const variacao = linha.variacao_pct?.[criterio];
+							return variacao == null ? (
+								<span className="text-text-muted">{formatPct(null)}</span>
+							) : (
+								<KpiDelta
+									value={variacao / 100}
+									favorable="down"
+									className="justify-end"
+								/>
+							);
+						},
+					} satisfies DataTableColumn<LinhaTabela>,
+				]
+			: []),
 	];
+	const ajuda = periodoBase
+		? [
+				...AJUDA,
+				[
+					`${AJUDA_VARIACAO[0]} (vs. ${formatPeriodoCurto(periodoBase)})`,
+					AJUDA_VARIACAO[1],
+				] as const,
+			]
+		: AJUDA;
 
 	// Linhas de outro recorte ainda não abrem; a falha de uma atualização mantém as atuais.
 	const clicavel = !loading && rows !== undefined;
@@ -214,7 +257,7 @@ export function ContinuidadeTable({
 						</TooltipTrigger>
 						<TooltipContent className="max-w-sm">
 							<dl className="flex flex-col gap-1.5">
-								{AJUDA.map(([nome, definicao]) => (
+								{ajuda.map(([nome, definicao]) => (
 									<div key={nome}>
 										<dt className="font-medium">{nome}</dt>
 										<dd>{definicao}</dd>
@@ -243,8 +286,8 @@ export function ContinuidadeTable({
 				columns={colunas}
 				rows={linhas}
 				resetKey={`${resetKey}|${busca}`}
-				getRowId={(linha) => linha.segmento}
-				getRowLabel={(linha) => rotulo(nivel, linha.segmento)}
+				getRowId={(linha) => linha.id}
+				getRowLabel={(linha) => rotulo(nivel, linha.rotulo)}
 				loading={loading || refreshing}
 				error={rows === undefined ? error : null}
 				onRetry={onRetry}

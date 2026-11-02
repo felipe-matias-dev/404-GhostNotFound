@@ -10,7 +10,7 @@ describe("redeSearchSchema", () => {
 		expect(search.visao).toBeUndefined();
 	});
 
-	it("preserva a geografia quando a visão global é explícita", () => {
+	it("preserva a geografia na visão de alimentadores", () => {
 		const search = redeSearchSchema.parse({
 			visao: "alimentadores",
 			municipio: "Recife",
@@ -80,7 +80,7 @@ describe("redeSearchSchema", () => {
 	it("barra critério e visão desconhecidos", () => {
 		const search = redeSearchSchema.parse({
 			criterio: "dec",
-			visao: "bairros",
+			visao: "ucs",
 		});
 
 		expect(search.criterio).toBe("dec");
