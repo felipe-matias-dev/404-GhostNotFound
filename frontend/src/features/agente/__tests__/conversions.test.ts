@@ -9,11 +9,10 @@ import {
 	formatarSessaoComoMarkdown,
 	gerarTituloSessao,
 	MAX_PERGUNTA_CHARS,
-	MAX_SESSOES,
 	nomeAmigavelView,
-	parseSessoesSalvas,
 	rotuloConfianca,
 	rotuloStatusResposta,
+	sessaoDaApi,
 	validarPergunta,
 } from "../conversions";
 import type { ExemploPergunta, RespostaIa, SessaoConversa } from "../types";
@@ -244,94 +243,54 @@ describe("formatarCelulaResultado", () => {
 	});
 });
 
-describe("parseSessoesSalvas", () => {
-	it("devolve nada sem conteúdo", () => {
-		expect(parseSessoesSalvas(null)).toEqual([]);
-		expect(parseSessoesSalvas("")).toEqual([]);
-	});
-
-	it("ignora JSON inválido ou que não é lista", () => {
-		expect(parseSessoesSalvas("{")).toEqual([]);
-		expect(parseSessoesSalvas('{"sessionId":"a"}')).toEqual([]);
-	});
-
-	it("descarta itens inválidos e turnos pendentes", () => {
-		const salvo = JSON.stringify([
-			null,
-			{ sessionId: 1 },
-			sessao("a"),
-			{
-				...sessao("b"),
-				turnos: [
-					{
-						id: "pendente",
-						question: "Qual o FEC?",
-						criadoEm: "2026-10-01T10:00:00.000Z",
-						status: "pending",
-					},
-				],
-			},
-			{
-				...sessao("c"),
-				turnos: [
-					{
-						id: "sem-resposta",
-						question: "Qual o FEC?",
-						criadoEm: "2026-10-01T10:00:00.000Z",
-						status: "completed",
-					},
-				],
-			},
-		]);
-		const sessoes = parseSessoesSalvas(salvo);
-		expect(sessoes.map((item) => item.sessionId)).toEqual(["a"]);
-		expect(sessoes[0].turnos[0].resposta?.status).toBe("answered");
-	});
-
-	it("mantém turnos com erro, para permitir tentar de novo", () => {
-		const salvo = JSON.stringify([
-			{
-				...sessao("a"),
-				turnos: [
-					{
-						id: "erro",
-						question: "Qual o FEC?",
-						criadoEm: "2026-10-01T10:00:00.000Z",
-						status: "error",
-						erro: "Não foi possível concluir a consulta ao agente.",
-					},
-				],
-			},
-		]);
-		const [sessaoSalva] = parseSessoesSalvas(salvo);
-		expect(sessaoSalva.turnos[0]).toMatchObject({
-			status: "error",
-			erro: "Não foi possível concluir a consulta ao agente.",
-		});
-	});
-
-	it("limita o histórico ao máximo de sessões", () => {
-		const salvo = JSON.stringify(
-			Array.from({ length: MAX_SESSOES + 5 }, (_, indice) =>
-				sessao(`s${indice}`),
-			),
+describe("sessaoDaApi", () => {
+	it("cada registro da auditoria vira um turno respondido, na ordem", () => {
+		const { session_id: _, ...registro } = resposta(
+			"A receita foi de R$ 10,00.",
 		);
-		const sessoes = parseSessoesSalvas(salvo);
-		expect(sessoes).toHaveLength(MAX_SESSOES);
-		expect(sessoes[0].sessionId).toBe("s0");
-	});
-
-	it("preserva favorita e usuarioLogin quando salvos", () => {
-		const salvo = JSON.stringify([
+		const sessao = sessaoDaApi(
 			{
-				...sessao("fav-1"),
-				usuarioLogin: "henrique",
+				session_id: "s1",
+				titulo: "Receita de junho",
 				favorita: true,
+				criada_em: "2026-10-01T10:00:00Z",
+				atualizada_em: "2026-10-01T10:05:00Z",
+				turnos: [
+					{
+						...registro,
+						audit_id: 7,
+						pergunta: "Qual a receita?",
+						criado_em: "2026-10-01T10:00:00Z",
+					},
+					{
+						...registro,
+						audit_id: 9,
+						pergunta: "E em julho?",
+						criado_em: "2026-10-01T10:05:00Z",
+					},
+				],
 			},
+			"henrique",
+		);
+
+		expect(sessao).toMatchObject({
+			sessionId: "s1",
+			usuarioLogin: "henrique",
+			titulo: "Receita de junho",
+			favorita: true,
+			atualizadaEm: "2026-10-01T10:05:00Z",
+		});
+		expect(
+			sessao.turnos.map((turno) => [turno.id, turno.question, turno.status]),
+		).toEqual([
+			["7", "Qual a receita?", "completed"],
+			["9", "E em julho?", "completed"],
 		]);
-		const [sessaoSalva] = parseSessoesSalvas(salvo);
-		expect(sessaoSalva.usuarioLogin).toBe("henrique");
-		expect(sessaoSalva.favorita).toBe(true);
+		expect(sessao.turnos[0].resposta).toMatchObject({
+			session_id: "s1",
+			answer: "A receita foi de R$ 10,00.",
+		});
+		expect(sessao.turnos[0].resposta).not.toHaveProperty("pergunta");
 	});
 });
 

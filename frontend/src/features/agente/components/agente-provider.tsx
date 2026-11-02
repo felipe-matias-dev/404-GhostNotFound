@@ -9,12 +9,13 @@ import {
 	useRef,
 	useState,
 } from "react";
+import { ApiError } from "#/lib/api";
+import { alterarSessaoIa, buscarSessoesIa, excluirSessaoIa } from "../api";
 import { type ConsultaAtiva, consultarAgente } from "../consulta";
 import {
 	gerarTituloSessao,
 	MAX_SESSOES,
-	parseSessoesSalvas,
-	SESSOES_STORAGE_KEY,
+	sessaoDaApi,
 	validarPergunta,
 } from "../conversions";
 import type { EscopoSugestao, SessaoConversa, TurnoConversa } from "../types";
@@ -60,6 +61,18 @@ function novaSessao(usuarioLogin?: string): SessaoConversa {
 	};
 }
 
+// A conversa só existe no servidor depois da primeira resposta: é a auditoria que a cria.
+function noServidor(
+	sessao: SessaoConversa | undefined,
+): sessao is SessaoConversa {
+	return sessao?.turnos.some((turno) => turno.resposta) ?? false;
+}
+
+// 404: a conversa já não existe para este usuário, e não há o que desfazer na tela.
+function semConversa(erro: unknown) {
+	return erro instanceof ApiError && erro.status === 404;
+}
+
 export function AgenteProvider({
 	children,
 	usuario,
@@ -67,15 +80,12 @@ export function AgenteProvider({
 	children: ReactNode;
 	usuario: string;
 }) {
-	const chave = `${SESSOES_STORAGE_KEY}:${usuario}`;
 	const rota = useLocation({ select: (loc) => loc.pathname });
 	const [sessoes, setSessoes] = useState(() => [novaSessao(usuario)]);
 	const [sessaoAtivaId, setSessaoAtivaId] = useState<string | null>(null);
 	const [escopo, setEscopo] = useState<EscopoSugestao>("Todos os dados");
 	const [enviando, setEnviando] = useState(false);
 	const [widgetAberto, setWidgetAberto] = useState(false);
-	const [chaveCarregada, setChaveCarregada] = useState<string | null>(null);
-	const [localDisponivel, setLocalDisponivel] = useState(true);
 	const consultaRef = useRef<ConsultaAtiva | null>(null);
 
 	const sessaoAtiva = useMemo(
@@ -85,33 +95,29 @@ export function AgenteProvider({
 		[sessoes, sessaoAtivaId],
 	);
 
+	// O histórico é do usuário no banco (GET /ai/sessions), e segue o login em qualquer
+	// computador. Sem resposta da API, a conversa nova continua disponível.
 	useEffect(() => {
-		function carregar(): SessaoConversa[] {
-			try {
-				const salvas = parseSessoesSalvas(localStorage.getItem(chave));
-				return salvas.length > 0 ? salvas : [novaSessao(usuario)];
-			} catch {
-				setLocalDisponivel(false);
-				return [novaSessao(usuario)];
-			}
-		}
-		const iniciais = carregar();
-		setSessoes(iniciais);
-		setSessaoAtivaId(iniciais[0].sessionId);
-		setChaveCarregada(chave);
-	}, [chave, usuario]);
-
-	useEffect(() => {
-		if (chaveCarregada !== chave || !localDisponivel) return;
-		try {
-			const persistiveis = sessoes
-				.filter((sessao) => sessao.turnos.length > 0)
-				.slice(0, MAX_SESSOES);
-			localStorage.setItem(chave, JSON.stringify(persistiveis));
-		} catch {
-			setLocalDisponivel(false);
-		}
-	}, [sessoes, chaveCarregada, localDisponivel, chave]);
+		const controller = new AbortController();
+		setSessoes([novaSessao(usuario)]);
+		setSessaoAtivaId(null);
+		buscarSessoesIa(controller.signal)
+			.then((lista) => {
+				const salvas = lista.map((sessao) => sessaoDaApi(sessao, usuario));
+				setSessoes((atuais) => {
+					// Uma pergunta feita antes de a lista chegar continua na tela, no topo.
+					const emAndamento = atuais.filter(
+						(sessao) =>
+							sessao.turnos.length > 0 &&
+							!salvas.some((salva) => salva.sessionId === sessao.sessionId),
+					);
+					const todas = [...emAndamento, ...salvas];
+					return todas.length > 0 ? todas : atuais;
+				});
+			})
+			.catch(() => {});
+		return () => controller.abort();
+	}, [usuario]);
 
 	useEffect(() => {
 		if (rota === "/agente") setWidgetAberto(false);
@@ -265,51 +271,78 @@ export function AgenteProvider({
 		[cancelarConsulta],
 	);
 
+	const alterarSessao = useCallback(
+		(
+			sessionId: string,
+			mudanca:
+				| Pick<SessaoConversa, "titulo">
+				| Pick<SessaoConversa, "favorita">,
+		) => {
+			const sessao = sessoes.find((atual) => atual.sessionId === sessionId);
+			if (!sessao) return;
+			const aplicar = (valores: Partial<SessaoConversa>) =>
+				setSessoes((atuais) =>
+					atuais.map((atual) =>
+						atual.sessionId === sessionId ? { ...atual, ...valores } : atual,
+					),
+				);
+			aplicar(mudanca);
+			if (!noServidor(sessao)) return;
+			// Falhou no servidor: a tela volta ao que ele guarda, para não mostrar o que não ficou.
+			alterarSessaoIa(sessionId, mudanca).catch((erro) => {
+				if (!semConversa(erro))
+					aplicar({ titulo: sessao.titulo, favorita: sessao.favorita });
+			});
+		},
+		[sessoes],
+	);
+
 	const renomearSessao = useCallback(
 		(sessionId: string, novoTitulo: string) => {
 			const limpo = novoTitulo.trim().replace(/\s+/g, " ");
-			if (!limpo) return;
-			const agora = new Date().toISOString();
-			setSessoes((atuais) =>
-				atuais.map((sessao) =>
-					sessao.sessionId === sessionId
-						? { ...sessao, titulo: limpo.slice(0, 80), atualizadaEm: agora }
-						: sessao,
-				),
-			);
+			if (limpo) alterarSessao(sessionId, { titulo: limpo.slice(0, 80) });
 		},
-		[],
+		[alterarSessao],
 	);
 
-	const alternarFavorita = useCallback((sessionId: string) => {
-		setSessoes((atuais) =>
-			atuais.map((sessao) =>
-				sessao.sessionId === sessionId
-					? { ...sessao, favorita: !sessao.favorita }
-					: sessao,
-			),
-		);
+	const alternarFavorita = useCallback(
+		(sessionId: string) => {
+			const sessao = sessoes.find((atual) => atual.sessionId === sessionId);
+			if (sessao) alterarSessao(sessionId, { favorita: !sessao.favorita });
+		},
+		[sessoes, alterarSessao],
+	);
+
+	const excluirNoServidor = useCallback((sessao: SessaoConversa) => {
+		if (!noServidor(sessao)) return;
+		// Falhou no servidor: a conversa volta para a lista, porque ela continua lá.
+		excluirSessaoIa(sessao.sessionId).catch((erro) => {
+			if (!semConversa(erro)) setSessoes((atuais) => [...atuais, sessao]);
+		});
 	}, []);
 
 	const removerSessao = useCallback(
 		(sessionId: string) => {
 			if (consultaRef.current?.sessionId === sessionId) cancelarConsulta();
+			const sessao = sessoes.find((atual) => atual.sessionId === sessionId);
 			setSessoes((atuais) => {
 				const restantes = atuais.filter(
-					(sessao) => sessao.sessionId !== sessionId,
+					(atual) => atual.sessionId !== sessionId,
 				);
 				return restantes.length > 0 ? restantes : [novaSessao(usuario)];
 			});
 			setSessaoAtivaId((atual) => (atual === sessionId ? null : atual));
+			if (sessao) excluirNoServidor(sessao);
 		},
-		[usuario, cancelarConsulta],
+		[sessoes, usuario, cancelarConsulta, excluirNoServidor],
 	);
 
 	const limparHistorico = useCallback(() => {
 		cancelarConsulta();
+		for (const sessao of sessoes) excluirNoServidor(sessao);
 		setSessoes([novaSessao(usuario)]);
 		setSessaoAtivaId(null);
-	}, [usuario, cancelarConsulta]);
+	}, [sessoes, usuario, cancelarConsulta, excluirNoServidor]);
 	const valor = useMemo<AgenteContextValue>(
 		() => ({
 			sessoes,

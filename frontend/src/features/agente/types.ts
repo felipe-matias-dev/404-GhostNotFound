@@ -3,6 +3,9 @@ import type { components } from "#/lib/api-schema.gen";
 export type PerguntaIa = components["schemas"]["PerguntaIaSchema"];
 export type RespostaIa = components["schemas"]["RespostaIaSchema"];
 export type AuditoriaIa = components["schemas"]["AuditoriaIaSchema"];
+export type SessaoIa = components["schemas"]["SessaoIaSchema"];
+export type AlteracaoSessaoIa =
+	components["schemas"]["AlteracaoSessaoIaSchema"];
 export type AnswerStatus = components["schemas"]["AnswerStatus"];
 export type Confidence = components["schemas"]["Confidence"];
 

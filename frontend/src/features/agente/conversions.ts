@@ -15,14 +15,11 @@ import type {
 	Confidence,
 	EscopoSugestao,
 	ExemploPergunta,
-	RespostaIa,
 	SessaoConversa,
-	TurnoConversa,
+	SessaoIa,
 } from "./types";
 
 export const MAX_PERGUNTA_CHARS = 500;
-
-export const SESSOES_STORAGE_KEY = "venergy:agente-sessoes";
 
 export const MAX_SESSOES = 15;
 
@@ -213,83 +210,29 @@ export function formatarTempoRelativo(iso: string, agora = Date.now()): string {
 	return formatDataHora(iso);
 }
 
-function parseTurno(item: unknown): TurnoConversa | null {
-	if (typeof item !== "object" || item === null) return null;
-	const turno = item as Record<string, unknown>;
-	if (
-		typeof turno.id !== "string" ||
-		typeof turno.question !== "string" ||
-		typeof turno.criadoEm !== "string" ||
-		!turno.question.trim()
-	)
-		return null;
-	if (turno.status === "completed") {
-		if (typeof turno.resposta !== "object" || turno.resposta === null)
-			return null;
-		return {
-			id: turno.id,
-			question: turno.question,
-			criadoEm: turno.criadoEm,
-			status: "completed",
-			resposta: turno.resposta as RespostaIa,
-		};
-	}
-	if (turno.status === "error") {
-		return {
-			id: turno.id,
-			question: turno.question,
-			criadoEm: turno.criadoEm,
-			status: "error",
-			erro: typeof turno.erro === "string" ? turno.erro : undefined,
-		};
-	}
-	return null;
-}
-
-function parseSessao(item: unknown): SessaoConversa | null {
-	if (typeof item !== "object" || item === null) return null;
-	const sessao = item as Record<string, unknown>;
-	if (
-		typeof sessao.sessionId !== "string" ||
-		!sessao.sessionId ||
-		typeof sessao.titulo !== "string" ||
-		typeof sessao.criadaEm !== "string" ||
-		typeof sessao.atualizadaEm !== "string" ||
-		!Array.isArray(sessao.turnos)
-	)
-		return null;
-	const turnos = sessao.turnos
-		.map(parseTurno)
-		.filter((turno): turno is TurnoConversa => turno !== null);
-	if (turnos.length === 0) return null;
+/**
+ * A conversa como o backend guarda (`GET /ai/sessions`): cada turno é um registro da
+ * auditoria, e a resposta é a mesma que o `POST /ai/ask` devolveu.
+ */
+export function sessaoDaApi(
+	sessao: SessaoIa,
+	usuarioLogin: string,
+): SessaoConversa {
 	return {
-		sessionId: sessao.sessionId,
-		usuarioLogin:
-			typeof sessao.usuarioLogin === "string" ? sessao.usuarioLogin : undefined,
-		titulo: sessao.titulo || gerarTituloSessao(turnos[0].question),
-		favorita: sessao.favorita === true,
-		criadaEm: sessao.criadaEm,
-		atualizadaEm: sessao.atualizadaEm,
-		turnos,
+		sessionId: sessao.session_id,
+		usuarioLogin,
+		titulo: sessao.titulo,
+		favorita: sessao.favorita,
+		criadaEm: sessao.criada_em,
+		atualizadaEm: sessao.atualizada_em,
+		turnos: sessao.turnos.map(({ pergunta, criado_em, ...resposta }) => ({
+			id: String(resposta.audit_id),
+			question: pergunta,
+			criadoEm: criado_em,
+			status: "completed",
+			resposta: { ...resposta, session_id: sessao.session_id },
+		})),
 	};
-}
-
-export function parseSessoesSalvas(raw: string | null): SessaoConversa[] {
-	if (!raw) return [];
-	let dados: unknown;
-	try {
-		dados = JSON.parse(raw);
-	} catch {
-		return [];
-	}
-	if (!Array.isArray(dados)) return [];
-	const sessoes: SessaoConversa[] = [];
-	for (const item of dados) {
-		const sessao = parseSessao(item);
-		if (sessao) sessoes.push(sessao);
-		if (sessoes.length === MAX_SESSOES) break;
-	}
-	return sessoes;
 }
 
 export function formatarSessaoComoMarkdown(sessao: SessaoConversa): string {
