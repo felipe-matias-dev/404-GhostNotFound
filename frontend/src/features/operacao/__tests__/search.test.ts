@@ -77,6 +77,22 @@ describe("redeSearchSchema", () => {
 		expect(comEspacos.alimentador).toBe("ALM-REC-006");
 	});
 
+	it("só mantém a página do alimentador com um alimentador aberto", () => {
+		const sozinho = redeSearchSchema.parse({ painel: "inteiro" });
+		const aberto = redeSearchSchema.parse({
+			painel: "inteiro",
+			alimentador: "ALM-A",
+		});
+		const invalido = redeSearchSchema.parse({
+			painel: "metade",
+			alimentador: "ALM-A",
+		});
+
+		expect(sozinho.painel).toBeUndefined();
+		expect(aberto.painel).toBe("inteiro");
+		expect(invalido.painel).toBeUndefined();
+	});
+
 	it("barra critério e visão desconhecidos", () => {
 		const search = redeSearchSchema.parse({
 			criterio: "dec",

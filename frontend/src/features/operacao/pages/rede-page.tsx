@@ -20,7 +20,11 @@ import {
 	type SegmentedOption,
 } from "#/components/ui/segmented-control";
 import { CLASSE_ROTULO, useFiltrosPortal } from "#/features/filtros";
-import { AlimentadorSheet } from "../components/alimentador-sheet";
+import { cn } from "#/lib/utils";
+import {
+	AlimentadorPagina,
+	AlimentadorSheet,
+} from "../components/alimentador-sheet";
 import { ContinuidadeTable } from "../components/continuidade-table";
 import { IndicadoresRede } from "../components/indicadores-rede";
 import { linhasDoRanking } from "../conversions";
@@ -82,6 +86,8 @@ export function RedePage() {
 	}, [parBase, periodo]);
 
 	const criterio: Criterio = search.criterio ?? "dec";
+	// O mesmo alimentador, num painel sobre a tabela ou como página no lugar dela, na URL.
+	const inteiro = Boolean(search.alimentador) && search.painel === "inteiro";
 	const alimentador = search.alimentador;
 	const municipio = filtros.municipio;
 	const bairro = filtros.bairro;
@@ -183,6 +189,7 @@ export function RedePage() {
 			bairro,
 			classe,
 			alimentador,
+			painel: inteiro ? "inteiro" : undefined,
 		}),
 		[
 			periodo?.inicio,
@@ -194,6 +201,7 @@ export function RedePage() {
 			bairro,
 			classe,
 			alimentador,
+			inteiro,
 		],
 	);
 	const temPeriodo = Boolean(periodo);
@@ -210,6 +218,12 @@ export function RedePage() {
 	const tituloRef = useRef<HTMLHeadingElement>(null);
 	const opener = useRef<HTMLElement | null>(null);
 	const abertoAnterior = useRef(Boolean(alimentador));
+	const tituloAlimentadorRef = useRef<HTMLHeadingElement>(null);
+
+	// Abrir como página troca o conteúdo inteiro: o foco vai ao título do alimentador.
+	useEffect(() => {
+		if (inteiro) tituloAlimentadorRef.current?.focus();
+	}, [inteiro]);
 	// Descer ou subir de nível troca a tabela inteira: o foco vai ao novo título, que anuncia
 	// onde o usuário está. Mudanças vindas da barra de filtros não roubam o foco.
 	const focarTitulo = useRef(false);
@@ -294,8 +308,14 @@ export function RedePage() {
 		void ir({ alimentador: linha.segmento });
 	};
 
-	// Fechar remove só o alimentador; tabela, recorte, período e página ficam.
-	const fecharPainel = () => void ir({ alimentador: undefined });
+	// Fechar remove só o alimentador e o tamanho do painel; tabela, recorte, período e página
+	// ficam.
+	const fecharPainel = () =>
+		void ir({ alimentador: undefined, painel: undefined });
+
+	// Abrir como página entra no histórico: Voltar devolve o painel lateral.
+	const alternarTamanho = () =>
+		void ir({ painel: inteiro ? undefined : "inteiro" });
 
 	// O kit devolve o foco a quem abriu; sem ele (deep link, card desmontado), vai ao título.
 	useEffect(() => {
@@ -333,17 +353,20 @@ export function RedePage() {
 	const subir = (proximo: Partial<RedeSearch>) => ({
 		...alvo,
 		alimentador: undefined,
+		painel: undefined,
 		...proximo,
 	});
 
-	// A trilha do Header: o recorte. Cada nível acima do último é um link que volta à tabela
-	// naquele nível.
+	// A trilha do Header: o recorte e, com a página do alimentador aberta, o alimentador. Cada
+	// nível acima do último é um link que volta à tabela naquele nível.
+	const paginaAlimentador = inteiro && alimentador ? alimentador : undefined;
 	const trilha: {
 		id: string;
 		rotulo: string;
+		codigo?: boolean;
 		search: RedeSearch;
 	}[] = [];
-	if (municipio) {
+	if (municipio || paginaAlimentador) {
 		trilha.push({
 			id: "raiz",
 			rotulo: visao === "localidades" ? "Municípios" : "Empresa inteira",
@@ -358,6 +381,14 @@ export function RedePage() {
 		});
 	}
 	if (bairro) trilha.push({ id: "bairro", rotulo: bairro, search: subir({}) });
+	if (paginaAlimentador) {
+		trilha.push({
+			id: "alimentador",
+			rotulo: paginaAlimentador,
+			codigo: true,
+			search: alvo,
+		});
+	}
 
 	return (
 		<Pagina className="max-w-none">
@@ -372,7 +403,12 @@ export function RedePage() {
 										<BreadcrumbSeparator />
 										<BreadcrumbItem className="min-w-0">
 											{ultimo ? (
-												<BreadcrumbPage className="truncate">
+												<BreadcrumbPage
+													className={cn(
+														"truncate",
+														nivel.codigo && "font-mono",
+													)}
+												>
 													{nivel.rotulo}
 												</BreadcrumbPage>
 											) : (
@@ -399,75 +435,95 @@ export function RedePage() {
 				</HeaderTrilha>
 			)}
 
-			{periodo && par && (
-				<IndicadoresRede
-					titulo={tituloIndicadores}
-					periodoAtual={par}
-					periodoBase={filtros.periodo_base}
+			{paginaAlimentador ? (
+				<AlimentadorPagina
+					alimentador={paginaAlimentador}
+					tituloRef={tituloAlimentadorRef}
+					periodo={periodo}
 					recorte={recorte}
+					nomeRecorte={nomeRecorte}
+					linhas={serie.data}
+					referencia={referencia.data}
+					loading={serie.isLoading}
+					refreshing={serie.isFetching && !serie.isLoading}
+					failed={serie.isError}
+					onRetry={() => void serie.refetch()}
+					onClose={fecharPainel}
+					onRecolher={alternarTamanho}
 				/>
+			) : (
+				<>
+					{periodo && par && (
+						<IndicadoresRede
+							titulo={tituloIndicadores}
+							periodoAtual={par}
+							periodoBase={filtros.periodo_base}
+							recorte={recorte}
+						/>
+					)}
+
+					<section
+						aria-labelledby="rede-titulo"
+						className="flex min-w-0 flex-col gap-3"
+					>
+						<div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
+							<div className="flex min-w-0 flex-col gap-1">
+								<h2
+									id="rede-titulo"
+									ref={tituloRef}
+									tabIndex={-1}
+									className="text-heading rounded-sm outline-none focus-visible:ring-3 focus-visible:ring-focus-ring/50"
+								>
+									{titulo}
+								</h2>
+								<p className="text-small text-text-muted">{legenda}</p>
+							</div>
+							<div className="flex flex-wrap items-center gap-2">
+								<SegmentedControl
+									label="Visão da rede"
+									value={visao}
+									onValueChange={escolherVisao}
+									options={VISOES}
+								/>
+								<SegmentedControl
+									label="Critério da tabela"
+									value={criterio}
+									onValueChange={escolherCriterio}
+									options={CRITERIOS}
+								/>
+							</div>
+						</div>
+
+						{periodo ? (
+							<ContinuidadeTable
+								rows={rows}
+								nivel={nivel}
+								criterio={criterio}
+								periodoBase={base ? parBase : undefined}
+								resetKey={[
+									visao,
+									periodo.inicio,
+									periodo.fim,
+									criterio,
+									municipio ?? "",
+									bairro ?? "",
+									classe ?? "",
+								].join("|")}
+								loading={carregando}
+								refreshing={atualizando}
+								error={erroTabela}
+								onRetry={() => void ativa.refetch()}
+								onOpen={abrirLinha}
+							/>
+						) : (
+							<p className="text-body text-text-muted">{SEM_PERIODO}</p>
+						)}
+					</section>
+				</>
 			)}
 
-			<section
-				aria-labelledby="rede-titulo"
-				className="flex min-w-0 flex-col gap-3"
-			>
-				<div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
-					<div className="flex min-w-0 flex-col gap-1">
-						<h2
-							id="rede-titulo"
-							ref={tituloRef}
-							tabIndex={-1}
-							className="text-heading rounded-sm outline-none focus-visible:ring-3 focus-visible:ring-focus-ring/50"
-						>
-							{titulo}
-						</h2>
-						<p className="text-small text-text-muted">{legenda}</p>
-					</div>
-					<div className="flex flex-wrap items-center gap-2">
-						<SegmentedControl
-							label="Visão da rede"
-							value={visao}
-							onValueChange={escolherVisao}
-							options={VISOES}
-						/>
-						<SegmentedControl
-							label="Critério da tabela"
-							value={criterio}
-							onValueChange={escolherCriterio}
-							options={CRITERIOS}
-						/>
-					</div>
-				</div>
-
-				{periodo ? (
-					<ContinuidadeTable
-						rows={rows}
-						nivel={nivel}
-						criterio={criterio}
-						periodoBase={base ? parBase : undefined}
-						resetKey={[
-							visao,
-							periodo.inicio,
-							periodo.fim,
-							criterio,
-							municipio ?? "",
-							bairro ?? "",
-							classe ?? "",
-						].join("|")}
-						loading={carregando}
-						refreshing={atualizando}
-						error={erroTabela}
-						onRetry={() => void ativa.refetch()}
-						onOpen={abrirLinha}
-					/>
-				) : (
-					<p className="text-body text-text-muted">{SEM_PERIODO}</p>
-				)}
-			</section>
-
 			<AlimentadorSheet
-				aberto={Boolean(alimentador)}
+				aberto={Boolean(alimentador) && !inteiro}
 				alimentador={alimentador}
 				periodo={periodo}
 				recorte={recorte}
@@ -479,6 +535,7 @@ export function RedePage() {
 				failed={serie.isError}
 				onRetry={() => void serie.refetch()}
 				onClose={fecharPainel}
+				onExpandir={alternarTamanho}
 			/>
 		</Pagina>
 	);

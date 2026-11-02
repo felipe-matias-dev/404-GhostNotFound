@@ -15,6 +15,8 @@ type RedeSearchNormalizada = {
 	municipio?: string;
 	bairro?: string;
 	alimentador?: string;
+	/** O alimentador aberto como página no lugar da tabela; sem ele, o painel lateral. */
+	painel?: "inteiro";
 	classe?: Classe;
 	periodo_base?: string;
 };
@@ -33,6 +35,7 @@ export const redeSearchSchema = z
 		classe: filtrosCompartilhadosShape.classe,
 		periodo_base: filtrosCompartilhadosShape.periodo_base,
 		alimentador: texto,
+		painel: z.enum(["inteiro"]).optional().catch(undefined),
 	})
 	.transform((search): RedeSearchNormalizada => {
 		const municipio = search.municipio;
@@ -47,6 +50,8 @@ export const redeSearchSchema = z
 			classe: search.classe,
 			periodo_base: search.periodo_base,
 			alimentador: search.alimentador,
+			// A página do alimentador só existe com um alimentador aberto.
+			painel: search.alimentador ? search.painel : undefined,
 		};
 	});
 
