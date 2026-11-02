@@ -40,11 +40,13 @@ const PONTO_CONFIANCA = {
 export function AgenteTurnoItem({
 	turno,
 	onRetry,
+	enviando,
 	compacto = false,
 	mostrarHorario = false,
 }: {
 	turno: TurnoConversa;
 	onRetry: (id: string) => void;
+	enviando: boolean;
 	compacto?: boolean;
 	mostrarHorario?: boolean;
 }) {
@@ -119,13 +121,16 @@ export function AgenteTurnoItem({
 
 			<div className="min-w-0 space-y-3">
 				{turno.status === "pending" && (
-					<p className="inline-flex items-center gap-2 text-small text-text-muted motion-safe:animate-pulse">
+					<output
+						aria-live="polite"
+						className="inline-flex items-center gap-2 text-small text-text-muted motion-safe:animate-pulse"
+					>
 						<SpinnerGapIcon
 							aria-hidden
 							className="size-3.5 shrink-0 motion-safe:animate-spin"
 						/>
-						Pensando…
-					</p>
+						{turno.etapa ?? "Pensando…"}
+					</output>
 				)}
 
 				{turno.status === "error" && (
@@ -136,6 +141,7 @@ export function AgenteTurnoItem({
 							type="button"
 							variant="outline"
 							size="xs"
+							disabled={enviando}
 							onClick={() => onRetry(turno.id)}
 						>
 							<ArrowsClockwiseIcon aria-hidden />
@@ -203,14 +209,6 @@ export function AgenteTurnoItem({
 						<p className="whitespace-pre-line text-body text-text">
 							{resposta.answer}
 						</p>
-
-						{resposta.status === "clarify" &&
-							resposta.clarification &&
-							resposta.clarification !== resposta.answer && (
-								<p className="rounded-md border border-info bg-info-subtle p-2.5 text-body text-text">
-									{resposta.clarification}
-								</p>
-							)}
 
 						{resposta.status !== "answered" &&
 							resposta.refused_reason &&
