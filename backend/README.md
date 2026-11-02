@@ -219,6 +219,7 @@ Variáveis lidas do `.env` (veja `.env.example`):
 | `VENERGY_API_ORDENS_AVISOS_TOTAL` | O mesmo, somando todos os logins. Cada tela usa uma conexão do Postgres. Padrão: `50` |
 | `VENERGY_API_LOGIN_MAX_FALHAS` | Senhas erradas do mesmo login e do mesmo endereço, dentro da janela, antes do bloqueio (`429`). `0` desliga. Padrão: `5` |
 | `VENERGY_API_LOGIN_JANELA_SEGUNDOS` | Janela do limite acima, em segundos. Padrão: `900` (15 minutos) |
+| `VENERGY_API_RASTREAMENTO_ENDPOINT` | Para onde a API manda os traces do OpenTelemetry (DEC-068), como `http://localhost:4318/v1/traces`. Vazio desliga. Padrão: vazio |
 
 Os caminhos são relativos à pasta `backend/`, de onde os comandos rodam.
 

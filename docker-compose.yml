@@ -1,6 +1,7 @@
 # Ambiente local do V-Energy Grid 360: banco, API e frontend. Na raiz, com o .env criado:
 #   tudo:          docker compose up -d --wait   (portal em http://localhost:3000)
 #   só o banco:    docker compose up -d --wait db   (para rodar API e frontend fora do Docker)
+#   com traces:    docker compose --profile observabilidade up -d --wait   (Jaeger em http://localhost:16686)
 services:
   db:
     image: postgres:17-alpine
@@ -48,6 +49,9 @@ services:
       VENERGY_AGENT_OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       # Uma tentativa por modelo: em caso de falha, passa logo para o próximo (DEC-061).
       VENERGY_AGENT_LLM_RETRY_ATTEMPTS: ${LLM_RETRY_ATTEMPTS:-1}
+      # Traces do OpenTelemetry (DEC-068). Vazio desliga; com o perfil observabilidade, use
+      # http://jaeger:4318/v1/traces no .env.
+      VENERGY_API_RASTREAMENTO_ENDPOINT: ${RASTREAMENTO_ENDPOINT:-}
       # Detecção de mudanças por varredura: eventos do sistema de arquivos não atravessam
       # o volume no Docker Desktop do Windows.
       WATCHFILES_FORCE_POLLING: "true"
@@ -83,6 +87,16 @@ services:
     depends_on:
       api:
         condition: service_healthy
+
+  jaeger:
+    # Opcional: só sobe com --profile observabilidade, e sem ele o resto do ambiente não muda.
+    # Guarda os traces em memória: reiniciar o container apaga todos (DEC-068).
+    image: jaegertracing/jaeger:2.22.0
+    profiles: ["observabilidade"]
+    ports:
+      # Só a interface, e só no localhost. O OTLP (4318) fica na rede do compose: só a API
+      # manda traces para ele.
+      - "127.0.0.1:${JAEGER_PORT:-16686}:16686"
 
 volumes:
   pgdata:
