@@ -195,3 +195,62 @@ def _valores(valor: object):
 def _brl(numero: float, casas: int = 2) -> str:
     texto = f"{numero:,.{casas}f}"
     return texto.replace(",", "#").replace(".", ",").replace("#", ".")
+
+
+def test_effects_also_come_as_a_share_of_the_base_revenue() -> None:
+    linhas = [linha("Recife", "1000", "1080", tarifa="100", bandeira="20", volume="-30", mix="-10")]
+
+    metricas = metricas_da_receita(filtro(), linhas)
+
+    assert metricas is not None
+    assert metricas["efeito_preco_pct"] == 12.0
+    assert metricas["efeito_volume_pct"] == -3.0
+    assert metricas["efeito_mix_pct"] == -1.0
+
+
+def test_effect_shares_are_left_out_when_there_is_no_base_revenue() -> None:
+    metricas = metricas_da_receita(filtro(), [linha("Novo", "0", "10", volume="10")])
+
+    assert metricas is not None
+    assert "efeito_volume_pct" not in metricas
+
+
+def test_reading_says_which_effect_weighed_most_and_where_volume_and_mix_went() -> None:
+    linhas = [linha("Recife", "1000", "1080", tarifa="100", bandeira="20", volume="-30", mix="-10")]
+
+    metricas = metricas_da_receita(filtro(), linhas)
+
+    assert metricas is not None
+    assert metricas["maior_efeito"] == "preco"
+    assert metricas["volume_e_mix_juntos"] == "queda"
+
+
+def test_volume_and_mix_can_offset_each_other() -> None:
+    metricas = metricas_da_receita(filtro(), [linha("A", "100", "100", volume="-5", mix="5")])
+
+    assert metricas is not None
+    assert metricas["volume_e_mix_juntos"] == "estavel"
+
+
+def test_drops_are_counted_and_the_worst_share_is_over_all_drops() -> None:
+    linhas = [
+        linha("A", "100", "25"),
+        linha("B", "100", "90"),
+        linha("C", "100", "90"),
+        linha("D", "100", "95"),
+        linha("E", "100", "130"),
+    ]
+
+    metricas = metricas_da_receita(filtro(), linhas)
+
+    assert metricas is not None
+    assert metricas["n_segmentos_em_queda"] == 4
+    assert metricas["maior_queda_participacao_pct"] == 75.0
+
+
+def test_without_drops_there_is_no_share() -> None:
+    metricas = metricas_da_receita(filtro(), [linha("A", "100", "120", volume="20")])
+
+    assert metricas is not None
+    assert metricas["n_segmentos_em_queda"] == 0
+    assert "maior_queda_participacao_pct" not in metricas

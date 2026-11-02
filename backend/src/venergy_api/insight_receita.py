@@ -26,6 +26,12 @@ def _pct(base: Decimal, variacao: Decimal) -> float | None:
     return None if percentual is None else round(percentual, 1)
 
 
+def _sentido(valor: Decimal) -> str:
+    if valor == 0:
+        return "estavel"
+    return "alta" if valor > 0 else "queda"
+
+
 def _recorte(filtro: DecomposicaoFiltroSchema) -> str:
     partes = [filtro.municipio or "todos os municípios"]
     if filtro.bairro:
@@ -82,9 +88,27 @@ def metricas_da_receita(
     if percentual is not None:
         metricas["variacao_receita_pct"] = percentual
 
+    # O texto curto do insight lê estes campos: a partir deles o LLM diz o que pesou sem fazer
+    # conta, e o percentual da base é o número curto que a tela não mostra (DEC-066).
+    preco = tarifa + bandeira
+    for chave, efeito in (("preco", preco), ("volume", volume), ("mix", mix)):
+        parte = _pct(receita_base, efeito)
+        if parte is not None:
+            metricas[f"efeito_{chave}_pct"] = parte
+    metricas["maior_efeito"] = max(
+        (("preco", preco), ("volume", volume), ("mix", mix)), key=lambda par: abs(par[1])
+    )[0]
+    metricas["volume_e_mix_juntos"] = _sentido(volume + mix)
+
     quedas = sorted(
         (linha for linha in linhas if linha.variacao_receita < 0),
         key=lambda linha: (linha.variacao_receita, linha.segmento),
     )
     metricas["maiores_quedas"] = [_queda(linha) for linha in quedas[:MAX_QUEDAS]]
+    metricas["n_segmentos_em_queda"] = len(quedas)
+    if quedas:
+        total_das_quedas = sum((linha.variacao_receita for linha in quedas), Decimal(0))
+        metricas["maior_queda_participacao_pct"] = round(
+            float(quedas[0].variacao_receita / total_das_quedas * 100), 1
+        )
     return metricas

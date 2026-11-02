@@ -1887,3 +1887,9 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   - **Atrás de um proxy o endereço visto é o do proxy.** No desenvolvimento (Vite) e no Docker todos os usuários chegam com o mesmo endereço, e o limite vira, na prática, por login. Em produção seria preciso confiar no cabeçalho do proxy de verdade (`--proxy-headers` e `--forwarded-allow-ips` do uvicorn). Para o case, local e de demonstração, é aceitável, mas é o ponto que a banca pode perguntar;
   - **trocar de login a cada tentativa não é coberto** pelo par login e endereço. Com cinco logins conhecidos, é o risco aceito;
   - **na demonstração, cinco erros de senha do `rafael` trancam o login dele por 15 minutos para todos**, porque o proxy faz todas as tentativas chegarem com o mesmo endereço (primeiro item acima): quem alcança a tela de login consegue trancar um usuário por esse tempo, sem afetar os outros usuários. Para liberar na hora: `docker compose exec db psql -U venergy -d venergy -c "DELETE FROM app.tentativa_login"`, ou `VENERGY_API_LOGIN_MAX_FALHAS=0` no `.env`;
+
+## DEC-066 · Insight da Receita dá a conclusão, não repete a tela
+
+- **Contexto:** o insight da tela de Receita (prompt `insight/v2`) recitava os valores que a ponte da receita já mostra ao lado, com até oito números de R$ por texto.
+- **Decisão:** o prompt `insight/v3` passa a ser o padrão: no máximo duas frases e dois números, com a conclusão primeiro e o ponto de atenção do recorte. O backend acrescenta ao JSON os efeitos como percentual da receita base, `maior_efeito`, `volume_e_mix_juntos`, `n_segmentos_em_queda` e `maior_queda_participacao_pct`. O cálculo fica no backend e o LLM continua só narrando, com todo número conferido contra o JSON (DEC-019).
+- **Medição:** três recortes, com métricas montadas à mão a partir das telas: todos os textos foram aceitos e ficaram com até dois números. Ainda não foi medido pela rota `GET /receita/insight`.
