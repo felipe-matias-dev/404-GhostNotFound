@@ -62,6 +62,7 @@ class ValidatedQuery(BaseModel):
     applied_limit: int
     limit_imposed: bool
     periods: tuple[str, ...] = ()
+    years: tuple[str, ...] = ()
 
 
 class QueryResult(BaseModel):

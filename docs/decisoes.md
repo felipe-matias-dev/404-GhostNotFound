@@ -67,6 +67,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | 30/10/2026 | DEC-060: filtros compartilhados viajam na URL (`municipio`, `bairro`, `classe` e o par de períodos) entre Visão geral, Receita, Rede e Perdas; filtros próprios de cada tela ficam só na memória da sessão | Trocar de tela não perde o recorte nem repete a escolha, e um link reproduz a análise; a URL continua sendo a fonte da verdade | João Euclides |
 | 30/10/2026 | DEC-058: em Perdas o período é só contexto, e a consulta individual de UC mostra o histórico completo, fora do recorte | A fila é um retrato da Gold sem competência e as ordens são estado atual; a visão 360 é o registro completo da UC, e limitá-la esconderia contas antigas em aberto | João Euclides |
 | 30/10/2026 | DEC-059: ordem de UC ausente do cadastro da Gold some da lista quando há recorte de município, bairro ou classe, e continua visível sem recorte | A localização só existe em `gold_dim_uc` e não pode ser inventada; a ordem sobrevive à recarga (DEC-009) e o gerente não pode perdê-la | João Euclides |
+| 02/11/2026 | DEC-070: a checagem da narrativa do agente aceita o valor da linha arredondado às casas escritas, os dois meses de um par `AAAA-MM/AAAA-MM`, o ano de um prefixo `AAAA-%` e o ano sozinho quando o filtro cobre anos inteiros; as suposições chegam ao redator sem nomes técnicos | Na Gold real, 9 de 10 respostas saíam no texto de reserva; a maior parte era narrativa correta descartada pela própria checagem | Luis Felipe |
 
 ## DEC-001 · Localização dos arquivos de origem (landing)
 
@@ -1963,3 +1964,26 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   - **o Jaeger guarda os traces em memória:** reiniciar o container apaga todos. Na demonstração, nada é reiniciado depois de preparada;
   - **os spans `;` são o teste de conexão do pool** do SQLAlchemy (`pool_pre_ping`), que o dialeto do psycopg faz com uma consulta vazia;
   - **com `--reload` ou vários workers, cada processo instrumenta a si mesmo** na criação do app, e os traces de todos chegam ao mesmo Jaeger.
+
+## DEC-070 · Checagem da narrativa sem descartar texto correto
+
+- **Data:** 02/11/2026 · **Área:** GenAI · **Autor:** Luis Felipe · **Revisa:** DEC-019 (arredondamento) e a regra de período (G1-05)
+- **Contexto:** no teste do juiz na Gold real (PR #123), 9 de 10 respostas `answered` saíram no texto de reserva ("A consulta devolveu N linha(s)"), e o juiz reprovou todas por clareza. O log de cada etapa mostrou que o estouro de tempo explicava só 2 casos. Nos outros, o modelo escreveu uma narrativa e a checagem do agente a descartou:
+  - **número arredondado:** "3,89" para 3,89368 e "2,42" para um `dec` gravado como 2,4199999…;
+  - **período que o validador não lia:** `LIKE '2024-%'` e o par `'2022-07/2023-06'` da decomposição não entravam como período, e "2024" ou "julho de 2022" viravam número sem suporte;
+  - **ano inteiro:** com o filtro de `2025-01` a `2025-12`, "em 2025" não contava como período;
+  - **suposição com nome técnico:** o gerador de SQL escreve as suposições com nomes de coluna (`receita_faturada`), o prompt da narração manda repeti-las, e a checagem de nome técnico descarta o texto inteiro.
+- **Decisão:**
+  - **Arredondamento:** um número escrito com casas decimais é aceito se for o valor de alguma linha arredondado (meia para cima) para essas casas. Número inteiro continua tendo de ser igual a um valor; "3" não vale por 2,6.
+  - **Períodos do SQL:** o validador devolve os dois meses de um literal `AAAA-MM/AAAA-MM` como período e, em `ValidatedQuery.years`, o ano de um literal `AAAA-%` ou `AAAA%`. Os anos valem só na checagem de números; não viram período obrigatório.
+  - **Ano inteiro:** quando o período vai de janeiro de um ano a dezembro de outro (ou do mesmo), a narrativa que cita cada ano sozinho é aceita. Ano preso a um mês não conta: "em dezembro de 2025" continua sendo descartado para o filtro do ano todo.
+  - **Suposições em palavras:** antes de ir para o redator, cada nome técnico das suposições vira palavras (`receita_faturada` → "receita faturada"), como no texto de reserva. A checagem de nome técnico na narrativa não muda.
+- **Evidência:**
+  - Testes unitários para cada regra, inclusive os limites: arredondamento errado e inteiro continuam reprovados, e mês com ano continua não valendo pelo ano.
+  - Reaplicação das 5 narrativas reais capturadas, com o mesmo SQL executado na Gold real e sem chamar o modelo: a `main` aceitava 2 de 5; com esta decisão, 5 de 5 (G003, G013, G017, G063 e G068).
+  - Medição ao vivo nos mesmos 10 itens da Gold real, com o juiz e só o `gemini-3.1-flash-lite` (sem modelos de reserva): narrativa aceita em 8 de 10, antes 1 de 10; juiz aprovou 8 de 10 (média 4,4), antes 1 de 10 (média 2,8); fidelidade numérica de 80%, antes 44,4%; execução 10 de 10; latência p50 de 3,9 s e p95 de 17,4 s. Os 2 textos de reserva restantes (G003 e G104) vieram de falha da chamada ao modelo, não da checagem.
+  - Na primeira tentativa de medir, no mesmo dia, a cadeia inteira estava fora: o `gemini-3.1-flash-lite` respondeu 503 (sobrecarga), o `gemini-3.5-flash` atingiu o limite gratuito de 20 pedidos por dia (429) e os modelos gratuitos do OpenRouter responderam 429; 4 de 10 perguntas estouraram o prazo de 30 s.
+- **Fora desta decisão:**
+  - **Provedor:** o texto de reserva também aparece quando nenhum modelo da cadeia responde a tempo. Para a demonstração, a chave precisa ter cota além do nível gratuito, e a cadeia não deve depender de modelos gratuitos.
+  - **Frase inventada:** no G017, uma narrativa aceita disse que novembro era o "único mês de 2025 com dados", quando a consulta só pedia o maior mês. A checagem de números não pega afirmação sem número; corrigir isso é mudança de prompt e passa pela regra da DEC-016.
+  - **Texto de reserva em português natural:** continua com o grupo (PR #123).

@@ -642,6 +642,59 @@ async def test_a_range_in_the_sql_filter_needs_both_ends_in_the_narrative(layer)
     assert answer.answer.startswith("A consulta devolveu 1 linha(s).")
 
 
+@pytest.mark.parametrize("text", ["Em 2025 havia 3 UCs.", "No ano de 2025, havia 3 UCs."])
+async def test_a_whole_year_in_the_sql_filter_can_be_named_by_the_year(layer, text):
+    writer = FixedWriter(text=text)
+    year_sql = (
+        "SELECT count(*) AS total FROM sem_faturamento_mensal "
+        "WHERE competencia BETWEEN '2025-01' AND '2025-12'"
+    )
+
+    answer = await use_case(
+        layer,
+        ScriptedGenerator(generation(sql=year_sql)),
+        executor=ScriptedExecutor(table(("total",), (3,))),
+        writer=writer,
+    ).ask("quantas em 2025?", "s1")
+
+    assert answer.answer == text
+
+
+async def test_whole_years_need_both_years_named(layer):
+    writer = FixedWriter(text="Em 2025 havia 3 UCs.")
+    years_sql = (
+        "SELECT count(*) AS total FROM sem_faturamento_mensal "
+        "WHERE competencia BETWEEN '2024-01' AND '2025-12'"
+    )
+
+    answer = await use_case(
+        layer,
+        ScriptedGenerator(generation(sql=years_sql)),
+        executor=ScriptedExecutor(table(("total",), (3,))),
+        writer=writer,
+    ).ask("quantas em 2024 e 2025?", "s1")
+
+    assert answer.answer.startswith("A consulta devolveu 1 linha(s).")
+
+
+async def test_a_year_used_as_a_filter_prefix_can_be_cited(layer):
+    writer = FixedWriter(text="A receita foi de R$ 10,00 em 2024 e de R$ 12,00 em 2025.")
+    years_sql = (
+        "SELECT sum(CASE WHEN competencia LIKE '2024-%' THEN receita_faturada END) AS r24, "
+        "sum(CASE WHEN competencia LIKE '2025-%' THEN receita_faturada END) AS r25 "
+        "FROM sem_faturamento_mensal"
+    )
+
+    answer = await use_case(
+        layer,
+        ScriptedGenerator(generation(sql=years_sql)),
+        executor=ScriptedExecutor(table(("r24", "r25"), (10, 12))),
+        writer=writer,
+    ).ask("quanto cresceu entre 2024 e 2025?", "s1")
+
+    assert answer.answer == "A receita foi de R$ 10,00 em 2024 e de R$ 12,00 em 2025."
+
+
 async def test_a_year_from_another_month_is_not_taken_as_the_period(layer):
     writer = FixedWriter(text="Entre dezembro de 2024 e janeiro de 2025 havia 3 UCs.")
     executor = ScriptedExecutor(table(("competencia", "total"), ("2025-01", 3), ("2025-12", 3)))
