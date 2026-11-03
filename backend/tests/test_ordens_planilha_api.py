@@ -251,6 +251,42 @@ def test_the_exported_file_filled_in_comes_back_through_the_upload(client: TestC
     assert "(inspeção OI-" in ordem["observacao"]
 
 
+def test_a_visit_not_done_concludes_the_order_and_keeps_the_reason(client: TestClient) -> None:
+    ordem_id = gerar_ordem(client, "0001")
+    livro = baixar(client)
+    aba = livro.active
+    aba["E2"], aba["H2"] = "NÃO REALIZADA", "imóvel fechado, ninguém atendeu"
+    arquivo = BytesIO()
+    livro.save(arquivo)
+
+    corpo = enviar(client, arquivo.getvalue()).json()
+
+    assert [(c["ordem_id"], c["resultado"]) for c in corpo["concluidas"]] == [
+        (ordem_id, "NAO_REALIZADA")
+    ]
+    ordem = detalhe(client, ordem_id)
+    assert (ordem["status"], ordem["resultado"]) == ("CONCLUIDA", "NAO_REALIZADA")
+    assert (ordem["tipo_irregularidade"], ordem["kwh_recuperado"]) == (None, None)
+    assert ordem["observacao"] == (
+        "Planilha de campo: visita não realizada: imóvel fechado, ninguém atendeu "
+        f"(inspeção OI-{ordem_id})"
+    )
+    assert ordem["eventos"][-1]["observacao"] == ordem["observacao"]
+
+
+def test_a_visit_not_done_with_irregularity_data_is_rejected_and_the_order_stays(
+    client: TestClient,
+) -> None:
+    ordem_id = gerar_ordem(client, "0001")
+    linha = ["INS-3", "0001", None, None, "NÃO REALIZADA", "BY-PASS", 10]
+
+    corpo = enviar(client, xlsx(linha)).json()
+
+    assert corpo["concluidas"] == []
+    assert "Visita não realizada com tipo" in corpo["rejeitadas"][0]["motivo"]
+    assert detalhe(client, ordem_id)["status"] == "EM_CAMPO"
+
+
 def test_the_export_restricts_the_columns_the_field_team_fills(client: TestClient) -> None:
     gerar_ordem(client, "0001")
     aba = baixar(client).active
