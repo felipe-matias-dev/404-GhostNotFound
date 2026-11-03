@@ -222,7 +222,7 @@ def test_export_lists_only_the_orders_in_the_field_with_the_upload_header(
 
     assert linhas[0] == tuple(COLUNAS_EXPORTACAO)
     assert linhas[1:] == [
-        (f"OI-{em_campo}", "0001", None, None, None, None, None, "Recife", "Boa Viagem")
+        (f"OI-{em_campo}", "0001", None, None, None, None, None, None, "Recife", "Boa Viagem")
     ]
 
 
@@ -258,7 +258,7 @@ def test_the_export_restricts_the_columns_the_field_team_fills(client: TestClien
     por_coluna = {str(v.sqref).split(":")[0][0]: v for v in aba.data_validations.dataValidation}
 
     assert por_coluna["E"].type == "list"
-    assert por_coluna["E"].formula1 == '"CONFIRMADA,SEM IRREGULARIDADE"'
+    assert por_coluna["E"].formula1 == '"CONFIRMADA,SEM IRREGULARIDADE,NÃO REALIZADA"'
     assert por_coluna["C"].type == "date"
     assert por_coluna["G"].type == "decimal"
 

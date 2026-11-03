@@ -76,7 +76,17 @@ def test_no_irregularity_becomes_regular() -> None:
 def test_visit_not_done_is_its_own_result_and_keeps_the_reason() -> None:
     (linha,) = ler_planilha(
         uma_aba(
-            ["INS-9", "0009", "2025-08-14", "Fulano", "NÃO REALIZADA", None, None, "imóvel fechado"]
+            [
+                "INS-9",
+                "0009",
+                "2025-08-14",
+                "Fulano",
+                "NÃO REALIZADA",
+                None,
+                None,
+                "imóvel fechado",
+            ],
+            cabecalho=[*CABECALHO, "observacao"],
         )
     ).validas
 
