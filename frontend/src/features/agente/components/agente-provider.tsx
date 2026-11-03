@@ -13,8 +13,12 @@ import { ApiError } from "#/lib/api";
 import { alterarSessaoIa, buscarSessoesIa, excluirSessaoIa } from "../api";
 import { type ConsultaAtiva, consultarAgente } from "../consulta";
 import {
+	type CamposSessao,
+	desfazerAlteracao,
 	gerarTituloSessao,
 	MAX_SESSOES,
+	mesclarSessoes,
+	reinserirSessao,
 	sessaoDaApi,
 	validarPergunta,
 } from "../conversions";
@@ -38,6 +42,8 @@ export interface AgenteContextValue {
 	limparHistorico: () => void;
 	enviarPergunta: (perguntaTexto: string) => Promise<void>;
 	tentarNovamente: (turnoId: string) => Promise<void>;
+	/** O histórico do servidor não carregou: a tela mostra só a conversa nova. */
+	historicoIndisponivel: boolean;
 }
 
 const AgenteContext = createContext<AgenteContextValue | null>(null);
@@ -62,10 +68,8 @@ function novaSessao(usuarioLogin?: string): SessaoConversa {
 }
 
 // A conversa só existe no servidor depois da primeira resposta: é a auditoria que a cria.
-function noServidor(
-	sessao: SessaoConversa | undefined,
-): sessao is SessaoConversa {
-	return sessao?.turnos.some((turno) => turno.resposta) ?? false;
+function noServidor(sessao: SessaoConversa): boolean {
+	return sessao.turnos.some((turno) => turno.resposta);
 }
 
 // 404: a conversa já não existe para este usuário, e não há o que desfazer na tela.
@@ -86,7 +90,12 @@ export function AgenteProvider({
 	const [escopo, setEscopo] = useState<EscopoSugestao>("Todos os dados");
 	const [enviando, setEnviando] = useState(false);
 	const [widgetAberto, setWidgetAberto] = useState(false);
+	const [historicoIndisponivel, setHistoricoIndisponivel] = useState(false);
 	const consultaRef = useRef<ConsultaAtiva | null>(null);
+	// Conversas com pergunta enviada: o servidor pode já ter gravado a auditoria delas.
+	const perguntadas = useRef(new Set<string>());
+	// Título e estrela mudados antes da primeira resposta, enviados quando ela chega.
+	const pendentes = useRef(new Map<string, CamposSessao>());
 
 	const sessaoAtiva = useMemo(
 		() =>
@@ -101,21 +110,20 @@ export function AgenteProvider({
 		const controller = new AbortController();
 		setSessoes([novaSessao(usuario)]);
 		setSessaoAtivaId(null);
+		setHistoricoIndisponivel(false);
+		perguntadas.current.clear();
+		pendentes.current.clear();
 		buscarSessoesIa(controller.signal)
 			.then((lista) => {
 				const salvas = lista.map((sessao) => sessaoDaApi(sessao, usuario));
 				setSessoes((atuais) => {
-					// Uma pergunta feita antes de a lista chegar continua na tela, no topo.
-					const emAndamento = atuais.filter(
-						(sessao) =>
-							sessao.turnos.length > 0 &&
-							!salvas.some((salva) => salva.sessionId === sessao.sessionId),
-					);
-					const todas = [...emAndamento, ...salvas];
+					const todas = mesclarSessoes(atuais, salvas);
 					return todas.length > 0 ? todas : atuais;
 				});
 			})
-			.catch(() => {});
+			.catch(() => {
+				if (!controller.signal.aborted) setHistoricoIndisponivel(true);
+			});
 		return () => controller.abort();
 	}, [usuario]);
 
@@ -202,6 +210,7 @@ export function AgenteProvider({
 			const validacao = validarPergunta(perguntaTexto);
 			if (!validacao.ok) return;
 			const sessionId = sessaoAtiva.sessionId;
+			perguntadas.current.add(sessionId);
 			const turnoId = crypto.randomUUID();
 			const agora = new Date().toISOString();
 			setSessoes((atuais) =>
@@ -271,30 +280,70 @@ export function AgenteProvider({
 		[cancelarConsulta],
 	);
 
+	const enviarAlteracao = useCallback(
+		(sessionId: string, enviado: CamposSessao, anterior: CamposSessao) => {
+			alterarSessaoIa(sessionId, enviado)
+				.then((salva) =>
+					setSessoes((atuais) =>
+						atuais.map((atual) =>
+							atual.sessionId === sessionId
+								? { ...atual, atualizadaEm: salva.atualizada_em }
+								: atual,
+						),
+					),
+				)
+				.catch((erro) => {
+					if (semConversa(erro)) return;
+					// Falhou no servidor: a tela volta ao que ele guarda, campo a campo.
+					setSessoes((atuais) =>
+						atuais.map((atual) =>
+							atual.sessionId === sessionId
+								? desfazerAlteracao(atual, enviado, anterior)
+								: atual,
+						),
+					);
+				});
+		},
+		[],
+	);
+
+	// A primeira resposta cria a conversa no servidor: só então título e estrela vão para lá.
+	useEffect(() => {
+		for (const [sessionId, campos] of pendentes.current) {
+			const sessao = sessoes.find((atual) => atual.sessionId === sessionId);
+			if (!sessao) {
+				pendentes.current.delete(sessionId);
+				continue;
+			}
+			if (!noServidor(sessao)) continue;
+			pendentes.current.delete(sessionId);
+			// O que o servidor tem sem alteração: a primeira pergunta como título, sem estrela.
+			const padrao = {
+				titulo: sessao.turnos[0].question.slice(0, 80),
+				favorita: false,
+			};
+			enviarAlteracao(sessionId, campos, padrao);
+		}
+	}, [sessoes, enviarAlteracao]);
+
 	const alterarSessao = useCallback(
-		(
-			sessionId: string,
-			mudanca:
-				| Pick<SessaoConversa, "titulo">
-				| Pick<SessaoConversa, "favorita">,
-		) => {
+		(sessionId: string, mudanca: CamposSessao) => {
 			const sessao = sessoes.find((atual) => atual.sessionId === sessionId);
 			if (!sessao) return;
-			const aplicar = (valores: Partial<SessaoConversa>) =>
-				setSessoes((atuais) =>
-					atuais.map((atual) =>
-						atual.sessionId === sessionId ? { ...atual, ...valores } : atual,
-					),
-				);
-			aplicar(mudanca);
-			if (!noServidor(sessao)) return;
-			// Falhou no servidor: a tela volta ao que ele guarda, para não mostrar o que não ficou.
-			alterarSessaoIa(sessionId, mudanca).catch((erro) => {
-				if (!semConversa(erro))
-					aplicar({ titulo: sessao.titulo, favorita: sessao.favorita });
-			});
+			const anterior = { titulo: sessao.titulo, favorita: sessao.favorita };
+			setSessoes((atuais) =>
+				atuais.map((atual) =>
+					atual.sessionId === sessionId ? { ...atual, ...mudanca } : atual,
+				),
+			);
+			if (noServidor(sessao)) enviarAlteracao(sessionId, mudanca, anterior);
+			else
+				pendentes.current.set(sessionId, {
+					...pendentes.current.get(sessionId),
+					...mudanca,
+				});
 		},
-		[sessoes],
+		[sessoes, enviarAlteracao],
 	);
 
 	const renomearSessao = useCallback(
@@ -313,18 +362,27 @@ export function AgenteProvider({
 		[sessoes, alterarSessao],
 	);
 
-	const excluirNoServidor = useCallback((sessao: SessaoConversa) => {
-		if (!noServidor(sessao)) return;
-		// Falhou no servidor: a conversa volta para a lista, porque ela continua lá.
-		excluirSessaoIa(sessao.sessionId).catch((erro) => {
-			if (!semConversa(erro)) setSessoes((atuais) => [...atuais, sessao]);
-		});
-	}, []);
+	const excluirNoServidor = useCallback(
+		(sessao: SessaoConversa, indice: number) => {
+			pendentes.current.delete(sessao.sessionId);
+			// Com pergunta enviada, o DELETE vai mesmo sem resposta na tela: ele espera a
+			// pergunta em andamento terminar (DEC-053), e a conversa não volta na próxima carga.
+			if (!noServidor(sessao) && !perguntadas.current.has(sessao.sessionId))
+				return;
+			excluirSessaoIa(sessao.sessionId).catch((erro) => {
+				if (!semConversa(erro))
+					setSessoes((atuais) => reinserirSessao(atuais, sessao, indice));
+			});
+		},
+		[],
+	);
 
 	const removerSessao = useCallback(
 		(sessionId: string) => {
 			if (consultaRef.current?.sessionId === sessionId) cancelarConsulta();
-			const sessao = sessoes.find((atual) => atual.sessionId === sessionId);
+			const indice = sessoes.findIndex(
+				(atual) => atual.sessionId === sessionId,
+			);
 			setSessoes((atuais) => {
 				const restantes = atuais.filter(
 					(atual) => atual.sessionId !== sessionId,
@@ -332,14 +390,16 @@ export function AgenteProvider({
 				return restantes.length > 0 ? restantes : [novaSessao(usuario)];
 			});
 			setSessaoAtivaId((atual) => (atual === sessionId ? null : atual));
-			if (sessao) excluirNoServidor(sessao);
+			if (indice >= 0) excluirNoServidor(sessoes[indice], indice);
 		},
 		[sessoes, usuario, cancelarConsulta, excluirNoServidor],
 	);
 
 	const limparHistorico = useCallback(() => {
 		cancelarConsulta();
-		for (const sessao of sessoes) excluirNoServidor(sessao);
+		sessoes.forEach((sessao, indice) => {
+			excluirNoServidor(sessao, indice);
+		});
 		setSessoes([novaSessao(usuario)]);
 		setSessaoAtivaId(null);
 	}, [sessoes, usuario, cancelarConsulta, excluirNoServidor]);
@@ -362,6 +422,7 @@ export function AgenteProvider({
 			limparHistorico,
 			enviarPergunta,
 			tentarNovamente,
+			historicoIndisponivel,
 		}),
 		[
 			sessoes,
@@ -379,6 +440,7 @@ export function AgenteProvider({
 			limparHistorico,
 			enviarPergunta,
 			tentarNovamente,
+			historicoIndisponivel,
 		],
 	);
 

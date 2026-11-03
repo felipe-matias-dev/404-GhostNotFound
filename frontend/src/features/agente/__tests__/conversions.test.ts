@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ApiError } from "#/lib/api";
 import {
+	desfazerAlteracao,
 	ESCOPOS_AGENTE,
 	EXEMPLOS_PERGUNTAS,
 	extrairMensagemErro,
@@ -9,7 +10,9 @@ import {
 	formatarSessaoComoMarkdown,
 	gerarTituloSessao,
 	MAX_PERGUNTA_CHARS,
+	mesclarSessoes,
 	nomeAmigavelView,
+	reinserirSessao,
 	rotuloConfianca,
 	rotuloStatusResposta,
 	sessaoDaApi,
@@ -291,6 +294,86 @@ describe("sessaoDaApi", () => {
 			answer: "A receita foi de R$ 10,00.",
 		});
 		expect(sessao.turnos[0].resposta).not.toHaveProperty("pergunta");
+	});
+});
+
+function vazia(sessionId: string): SessaoConversa {
+	return { ...sessao(sessionId), turnos: [] };
+}
+
+describe("mesclarSessoes", () => {
+	it("mantém a versão local com mais turnos, para um follow-up não sumir", () => {
+		const doServidor = sessao("s1");
+		const local = {
+			...sessao("s1"),
+			turnos: [
+				...sessao("s1").turnos,
+				{ ...sessao("s1").turnos[0], id: "follow-up" },
+			],
+		};
+
+		const [unica] = mesclarSessoes([local], [doServidor]);
+
+		expect(unica.turnos.map((turno) => turno.id)).toEqual([
+			"s1-turno",
+			"follow-up",
+		]);
+	});
+
+	it("põe primeiro as conversas só locais e descarta a conversa vazia", () => {
+		const resultado = mesclarSessoes(
+			[vazia("nova"), sessao("local")],
+			[sessao("s1")],
+		);
+
+		expect(resultado.map((item) => item.sessionId)).toEqual(["local", "s1"]);
+	});
+
+	it("fica com a do servidor quando ela tem mais turnos", () => {
+		const doServidor = {
+			...sessao("s1"),
+			turnos: [
+				...sessao("s1").turnos,
+				{ ...sessao("s1").turnos[0], id: "outro" },
+			],
+		};
+
+		expect(mesclarSessoes([sessao("s1")], [doServidor])[0]).toBe(doServidor);
+	});
+});
+
+describe("desfazerAlteracao", () => {
+	it("desfaz só o campo enviado, e só se a tela ainda mostra o valor enviado", () => {
+		const tela = { ...sessao("s1", "Novo nome"), favorita: true };
+
+		expect(
+			desfazerAlteracao(tela, { titulo: "Novo nome" }, { titulo: "Antigo" }),
+		).toMatchObject({ titulo: "Antigo", favorita: true });
+		expect(
+			desfazerAlteracao(
+				tela,
+				{ titulo: "Nome mais antigo" },
+				{ titulo: "Antigo" },
+			),
+		).toMatchObject({ titulo: "Novo nome" });
+	});
+});
+
+describe("reinserirSessao", () => {
+	it("volta para a posição em que estava", () => {
+		const lista = [sessao("a"), sessao("c")];
+
+		expect(
+			reinserirSessao(lista, sessao("b"), 1).map((item) => item.sessionId),
+		).toEqual(["a", "b", "c"]);
+	});
+
+	it("nunca fica atrás de uma conversa vazia", () => {
+		const lista = [vazia("nova")];
+
+		expect(
+			reinserirSessao(lista, sessao("b"), 3).map((item) => item.sessionId),
+		).toEqual(["b", "nova"]);
 	});
 });
 

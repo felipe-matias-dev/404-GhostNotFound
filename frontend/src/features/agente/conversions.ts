@@ -235,6 +235,63 @@ export function sessaoDaApi(
 	};
 }
 
+export type CamposSessao = Partial<Pick<SessaoConversa, "titulo" | "favorita">>;
+
+/**
+ * Junta as conversas da tela com as do servidor. A de mesmo id fica com a versão que tem
+ * mais turnos: uma pergunta feita antes de a lista chegar não some. A conversa vazia sai.
+ */
+export function mesclarSessoes(
+	locais: SessaoConversa[],
+	doServidor: SessaoConversa[],
+): SessaoConversa[] {
+	const comTurnos = new Map(
+		locais
+			.filter((sessao) => sessao.turnos.length > 0)
+			.map((sessao) => [sessao.sessionId, sessao]),
+	);
+	const salvas = doServidor.map((salva) => {
+		const local = comTurnos.get(salva.sessionId);
+		comTurnos.delete(salva.sessionId);
+		return local && local.turnos.length >= salva.turnos.length ? local : salva;
+	});
+	return [...comTurnos.values(), ...salvas];
+}
+
+/**
+ * Desfaz uma alteração que o servidor recusou: só os campos que ela mudou, e só se a tela
+ * ainda mostra o valor enviado (uma alteração mais nova não é desfeita por uma antiga).
+ */
+export function desfazerAlteracao(
+	sessao: SessaoConversa,
+	enviado: CamposSessao,
+	anterior: CamposSessao,
+): SessaoConversa {
+	const desfeita = { ...sessao };
+	if (
+		"titulo" in enviado &&
+		sessao.titulo === enviado.titulo &&
+		anterior.titulo
+	)
+		desfeita.titulo = anterior.titulo;
+	if ("favorita" in enviado && sessao.favorita === enviado.favorita)
+		desfeita.favorita = anterior.favorita;
+	return desfeita;
+}
+
+/** Devolve à lista uma conversa cuja exclusão falhou, na posição em que ela estava. */
+export function reinserirSessao(
+	lista: SessaoConversa[],
+	sessao: SessaoConversa,
+	indice: number,
+): SessaoConversa[] {
+	const outras = lista.filter((atual) => atual.sessionId !== sessao.sessionId);
+	const primeiraVazia = outras.findIndex((atual) => atual.turnos.length === 0);
+	const limite = primeiraVazia === -1 ? outras.length : primeiraVazia;
+	outras.splice(Math.min(indice, limite), 0, sessao);
+	return outras;
+}
+
 export function formatarSessaoComoMarkdown(sessao: SessaoConversa): string {
 	const blocos = [`# ${sessao.titulo}`];
 	for (const turno of sessao.turnos) {
