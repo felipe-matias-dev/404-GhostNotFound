@@ -2036,6 +2036,216 @@
         }
       }
     },
+    "/fila-suspeitas/indicadores": {
+      "get": {
+        "tags": [
+          "fila de suspeitas"
+        ],
+        "summary": "Get Indicadores",
+        "description": "Suspeitas, ordens e o acerto das inspeções (portal e Gold) no recorte pedido.",
+        "operationId": "get_indicadores_fila_suspeitas_indicadores_get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "municipio",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Municipio"
+            }
+          },
+          {
+            "name": "bairro",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Bairro"
+            }
+          },
+          {
+            "name": "classe",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "B1",
+                    "B2",
+                    "B3",
+                    "A4"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Classe"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IndicadoresPerdasSchema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/fila-suspeitas/recortes": {
+      "get": {
+        "tags": [
+          "fila de suspeitas"
+        ],
+        "summary": "Get Recortes",
+        "description": "Suspeitas por município ou bairro, para o mapa; o bairro leva o município junto.",
+        "operationId": "get_recortes_fila_suspeitas_recortes_get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "municipio",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Municipio"
+            }
+          },
+          {
+            "name": "bairro",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Bairro"
+            }
+          },
+          {
+            "name": "classe",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "B1",
+                    "B2",
+                    "B3",
+                    "A4"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Classe"
+            }
+          },
+          {
+            "name": "nivel",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "municipio",
+                    "bairro"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Nivel"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecortesFilaSchema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/fila-suspeitas/distribuicao-queda": {
       "get": {
         "tags": [
@@ -2343,6 +2553,24 @@
                 }
               ],
               "title": "Leituras Estimadas Max"
+            }
+          },
+          {
+            "name": "sem_inspecao_meses",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 120,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Sem Inspecao Meses"
             }
           }
         ],
@@ -3351,6 +3579,52 @@
   },
   "components": {
     "schemas": {
+      "AcertoInspecoesSchema": {
+        "properties": {
+          "inspecoes": {
+            "type": "integer",
+            "title": "Inspecoes"
+          },
+          "irregulares": {
+            "type": "integer",
+            "title": "Irregulares"
+          },
+          "regulares": {
+            "type": "integer",
+            "title": "Regulares"
+          },
+          "nao_realizadas": {
+            "type": "integer",
+            "title": "Nao Realizadas"
+          },
+          "taxa_irregularidade": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Taxa Irregularidade"
+          },
+          "kwh_recuperado": {
+            "type": "number",
+            "title": "Kwh Recuperado"
+          }
+        },
+        "type": "object",
+        "required": [
+          "inspecoes",
+          "irregulares",
+          "regulares",
+          "nao_realizadas",
+          "taxa_irregularidade",
+          "kwh_recuperado"
+        ],
+        "title": "AcertoInspecoesSchema",
+        "description": "Inspeções de uma origem (portal ou Gold) e o quanto acertaram."
+      },
       "AlteracaoSessaoIaSchema": {
         "properties": {
           "titulo": {
@@ -4584,6 +4858,16 @@
               }
             ],
             "title": "Queda Percentual"
+          },
+          "ultima_inspecao": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UltimaInspecaoSchema"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -4593,7 +4877,8 @@
           "motivos",
           "kwh_recuperavel_est",
           "ordem_ativa",
-          "queda_percentual"
+          "queda_percentual",
+          "ultima_inspecao"
         ],
         "title": "FilaItemSchema",
         "description": "Uma UC da fila e a ordem ativa dela, para a tela não oferecer o que daria 409."
@@ -4843,6 +5128,55 @@
         ],
         "title": "IndicadoresMensalSchema",
         "description": "Indicadores de uma competência no recorte: sem fato no recorte, a soma é nula.\n\nO recorte pode não ter fatura na competência (ou nenhuma linha), e zero seria inventar dado:\no mês continua na série para mostrar o buraco (DEC-030)."
+      },
+      "IndicadoresPerdasSchema": {
+        "properties": {
+          "suspeitas": {
+            "type": "integer",
+            "title": "Suspeitas"
+          },
+          "suspeitas_sem_ordem_ativa": {
+            "type": "integer",
+            "title": "Suspeitas Sem Ordem Ativa"
+          },
+          "kwh_recuperavel_est_sem_ordem": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kwh Recuperavel Est Sem Ordem"
+          },
+          "ordens_geradas": {
+            "type": "integer",
+            "title": "Ordens Geradas"
+          },
+          "ordens_em_campo": {
+            "type": "integer",
+            "title": "Ordens Em Campo"
+          },
+          "portal": {
+            "$ref": "#/components/schemas/AcertoInspecoesSchema"
+          },
+          "gold": {
+            "$ref": "#/components/schemas/AcertoInspecoesSchema"
+          }
+        },
+        "type": "object",
+        "required": [
+          "suspeitas",
+          "suspeitas_sem_ordem_ativa",
+          "kwh_recuperavel_est_sem_ordem",
+          "ordens_geradas",
+          "ordens_em_campo",
+          "portal",
+          "gold"
+        ],
+        "title": "IndicadoresPerdasSchema",
+        "description": "Os números do alto da tela de Perdas, no recorte pedido."
       },
       "IndicadoresPeriodoSchema": {
         "properties": {
@@ -6093,6 +6427,54 @@
         ],
         "title": "RecorteContinuidadeSchema"
       },
+      "RecorteFilaSchema": {
+        "properties": {
+          "segmento": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Segmento"
+          },
+          "municipio": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Municipio"
+          },
+          "suspeitas": {
+            "type": "integer",
+            "title": "Suspeitas"
+          },
+          "suspeitas_sem_ordem_ativa": {
+            "type": "integer",
+            "title": "Suspeitas Sem Ordem Ativa"
+          },
+          "kwh_recuperavel_est": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kwh Recuperavel Est"
+          }
+        },
+        "type": "object",
+        "required": [
+          "segmento",
+          "suspeitas",
+          "suspeitas_sem_ordem_ativa",
+          "kwh_recuperavel_est"
+        ],
+        "title": "RecorteFilaSchema"
+      },
       "RecortesContinuidadeSchema": {
         "properties": {
           "base_inicio": {
@@ -6180,6 +6562,32 @@
         ],
         "title": "RecortesContinuidadeSchema",
         "description": "DEC e FEC de um nível do recorte, do pior para o melhor."
+      },
+      "RecortesFilaSchema": {
+        "properties": {
+          "nivel": {
+            "type": "string",
+            "enum": [
+              "municipio",
+              "bairro"
+            ],
+            "title": "Nivel"
+          },
+          "recortes": {
+            "items": {
+              "$ref": "#/components/schemas/RecorteFilaSchema"
+            },
+            "type": "array",
+            "title": "Recortes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "nivel",
+          "recortes"
+        ],
+        "title": "RecortesFilaSchema",
+        "description": "Suspeitas por município ou bairro, das que mais valem inspecionar para as que menos."
       },
       "RespostaIaSchema": {
         "properties": {
@@ -6716,6 +7124,39 @@
         ],
         "title": "UcsAtingidasSchema",
         "description": "Página das UCs mais atingidas, por horas interrompidas."
+      },
+      "UltimaInspecaoSchema": {
+        "properties": {
+          "data": {
+            "type": "string",
+            "format": "date",
+            "title": "Data"
+          },
+          "resultado": {
+            "type": "string",
+            "enum": [
+              "irregularidade_confirmada",
+              "sem_irregularidade"
+            ],
+            "title": "Resultado"
+          },
+          "origem": {
+            "type": "string",
+            "enum": [
+              "gold",
+              "portal"
+            ],
+            "title": "Origem"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "resultado",
+          "origem"
+        ],
+        "title": "UltimaInspecaoSchema",
+        "description": "A inspeção de campo mais recente da UC, da Gold ou concluída no portal."
       },
       "UsuarioLogado": {
         "properties": {
