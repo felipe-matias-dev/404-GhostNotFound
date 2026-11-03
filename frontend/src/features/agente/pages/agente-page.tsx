@@ -358,13 +358,10 @@ export function AgentePage() {
 							Conectado à camada Gold · 9 views auditáveis
 						</p>
 						{historicoIndisponivel && (
-							<p
-								role="status"
-								className="text-center text-small text-text-muted"
-							>
+							<output className="block text-center text-small text-text-muted">
 								Não foi possível carregar suas conversas anteriores. Você pode
 								perguntar normalmente.
-							</p>
+							</output>
 						)}
 						{mostrarExemplos && (
 							<section aria-label="Exemplos de perguntas" className="space-y-3">
