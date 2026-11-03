@@ -55,6 +55,8 @@ export function listarFila(
 					medidor_eletromecanico: filtros.medidorEletromecanico,
 					leituras_estimadas_min: filtros.leiturasEstimadas?.[0],
 					leituras_estimadas_max: filtros.leiturasEstimadas?.[1],
+					sem_ordem_ativa: filtros.semOrdemAtiva,
+					sem_inspecao_meses: filtros.semInspecaoMeses,
 					ordenar_por: ordenacaoDaColuna(sort?.columnId),
 					direcao: sort?.direction ?? "asc",
 				},

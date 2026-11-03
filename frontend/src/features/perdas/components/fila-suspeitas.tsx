@@ -18,7 +18,7 @@ import {
 import { useSession } from "#/features/auth";
 import { useFiltrosPortal } from "#/features/filtros";
 import type { components } from "#/lib/api-schema.gen";
-import { formatKWh } from "#/lib/format";
+import { formatData, formatKWh } from "#/lib/format";
 import { filaKey, listarFila, TAMANHO_PAGINA } from "../api";
 import { mensagemErroOrdem } from "../conversions";
 import { useCriarOrdens } from "../hooks/use-criar-ordens";
@@ -89,6 +89,16 @@ const COLUNAS: DataTableColumn<FilaItem>[] = [
 			),
 	},
 	{
+		id: "ultima_inspecao",
+		header: "Última inspeção",
+		width: "190px",
+		cell: (item) => (
+			<span className="text-text-muted">
+				<UltimaInspecaoTexto inspecao={item.ultima_inspecao} />
+			</span>
+		),
+	},
+	{
 		id: "ordem_ativa",
 		header: "Ordem ativa",
 		width: "120px",
@@ -97,6 +107,17 @@ const COLUNAS: DataTableColumn<FilaItem>[] = [
 			item.ordem_ativa ? `#${item.ordem_ativa.id}` : "Sem ordem",
 	},
 ];
+
+function UltimaInspecaoTexto({
+	inspecao,
+}: {
+	inspecao: FilaItem["ultima_inspecao"] | undefined;
+}) {
+	if (!inspecao) return "Nunca";
+	return `${formatData(inspecao.data)} · ${
+		inspecao.resultado === "irregularidade_confirmada" ? "Irregular" : "Regular"
+	} (${inspecao.origem === "gold" ? "Gold" : "Portal"})`;
+}
 
 function UcDaFila({ codUc }: { codUc: string }) {
 	const { searchPara } = useFiltrosPortal();
@@ -183,7 +204,20 @@ export function FilaSuspeitas({ onVerOrdens }: { onVerOrdens: () => void }) {
 		filtros.queda !== null ||
 		filtros.medidorEletromecanico ||
 		filtros.leiturasEstimadas !== null ||
+		filtros.semOrdemAtiva ||
+		filtros.semInspecaoMeses !== null ||
 		Object.keys(recorte).length > 0;
+	const itensSelecionados = elegiveis.filter((item) =>
+		selecionadasValidas.includes(item.cod_uc),
+	);
+	const comEstimativa = itensSelecionados.filter(
+		(item) => item.kwh_recuperavel_est != null,
+	);
+	const kwhSelecionado = comEstimativa.reduce(
+		(soma, item) => soma + Number(item.kwh_recuperavel_est),
+		0,
+	);
+	const semEstimativa = itensSelecionados.length - comEstimativa.length;
 
 	const assinatura = [
 		search.municipio,
@@ -194,6 +228,8 @@ export function FilaSuspeitas({ onVerOrdens }: { onVerOrdens: () => void }) {
 		search.medidor_eletromecanico,
 		search.leituras_estimadas_min,
 		search.leituras_estimadas_max,
+		search.sem_ordem_ativa,
+		search.sem_inspecao_meses,
 		pagina,
 		search.ordenar_por,
 		search.direcao,
@@ -246,6 +282,16 @@ export function FilaSuspeitas({ onVerOrdens }: { onVerOrdens: () => void }) {
 								? `${data.total} ${data.total === 1 ? "suspeita" : "suspeitas"}`
 								: "Carregando fila…"}
 					</span>
+					{itensSelecionados.length > 0 && (
+						<span className="ml-2">
+							{comEstimativa.length > 0
+								? `· ${formatKWh(kwhSelecionado)}/mês estimados`
+								: "· sem estimativa de energia"}
+							{comEstimativa.length > 0 &&
+								semEstimativa > 0 &&
+								` (${semEstimativa} sem estimativa)`}
+						</span>
+					)}
 					{isPlaceholderData && <output className="ml-2">Atualizando…</output>}
 					{canEdit && (
 						<span className="ml-2">Selecione UCs sem ordem ativa.</span>
@@ -349,6 +395,14 @@ export function FilaSuspeitas({ onVerOrdens }: { onVerOrdens: () => void }) {
 							? detalhe.motivos.join("\n\n")
 							: "Não informado"}
 					</p>
+					<div className="grid gap-1 px-4 pt-4">
+						<h3 className="text-small font-medium text-text-muted">
+							Última inspeção
+						</h3>
+						<p className="text-body">
+							<UltimaInspecaoTexto inspecao={detalhe?.ultima_inspecao} />
+						</p>
+					</div>
 				</SheetContent>
 			</Sheet>
 		</section>

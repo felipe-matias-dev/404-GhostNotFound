@@ -22,6 +22,8 @@ export const CAMPOS_LOCAIS: Record<DestinoPortal, readonly string[]> = {
 		"medidor_eletromecanico",
 		"leituras_estimadas_min",
 		"leituras_estimadas_max",
+		"sem_ordem_ativa",
+		"sem_inspecao_meses",
 		"pagina",
 		"ordenar_por",
 		"direcao",

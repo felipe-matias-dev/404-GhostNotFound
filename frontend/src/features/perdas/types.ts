@@ -46,16 +46,23 @@ export const ORDENACAO_FILA = [
 
 export type OrdenacaoFila = (typeof ORDENACAO_FILA)[number];
 
+/** Janelas, em meses, do filtro "ocultar UCs inspecionadas nos últimos"; a API aceita 1 a 120. */
+export const MESES_SEM_INSPECAO = [6, 12, 24, 36] as const;
+
 export type FiltrosFila = {
 	queda: [number, number] | null;
 	medidorEletromecanico: boolean;
 	leiturasEstimadas: [number, number] | null;
+	semOrdemAtiva: boolean;
+	semInspecaoMeses: number | null;
 };
 
 export const FILTROS_FILA_INICIAIS: FiltrosFila = {
 	queda: null,
 	medidorEletromecanico: false,
 	leiturasEstimadas: null,
+	semOrdemAtiva: false,
+	semInspecaoMeses: null,
 };
 
 export type ResultadoPlanilha =
