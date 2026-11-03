@@ -1833,9 +1833,10 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Decisão:** as duas pontas usam a mesma rota e o mesmo formato:
   - **Exportar.** `GET /ordens-inspecao/planilha` (só o perfil `perdas`) baixa um XLSX com as ordens `EM_CAMPO`, uma por
     linha, com as colunas de `inspecoes.xlsx` (`id_inspecao`, `id_uc`, `data`, `inspetor`, `resultado`,
-    `tipo_irregularidade`, `kwh_recuperado`) e, ao final, `municipio` e `bairro` para a equipe saber onde fica a unidade. O
+    `tipo_irregularidade`, `kwh_recuperado`), a coluna `observacao` (o motivo, em texto livre) e, ao final, `municipio` e
+    `bairro` para a equipe saber onde fica a unidade. O
     `id_inspecao` sai como `OI-<id da ordem>` e `id_uc` já vem preenchido; o resto fica em branco para a equipe preencher. A planilha já sai com seleção nas colunas: `resultado` é uma lista
-    (`CONFIRMADA` ou `SEM IRREGULARIDADE`), `data` aceita só data e `kwh_recuperado` só número maior ou igual a zero. É um apoio
+    (`CONFIRMADA`, `SEM IRREGULARIDADE` ou `NÃO REALIZADA`), `data` aceita só data e `kwh_recuperado` só número maior ou igual a zero. É um apoio
     à equipe: o upload continua conferindo tudo, porque um valor colado por cima da lista passa pela planilha;
     Exporta só as ordens em campo, porque são as únicas que o upload pode concluir: a linha exportada sempre corresponde a uma
     ordem que dá para concluir. Sem ordens em campo, o arquivo sai só com o cabeçalho;
@@ -1855,15 +1856,27 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   - **Regras da Silver, mais o milhar digitado.** `resultado` aceita as grafias `IRREGULARIDADE CONFIRMADA`, `CONFIRMADA` (→
     `IRREGULAR_CONFIRMADA`), `SEM IRREGULARIDADE` e `NADA CONSTA` (→ `REGULAR`). Tipo ausente (`-`, `N/A`, `NULL`, vazio),
     data em quatro formatos e kWh com vírgula decimal são tratados como no pipeline. Confirmada exige tipo e kWh maior que
-    zero; sem irregularidade exige tipo vazio e kWh zero; kWh negativo é rejeitado. UC repetida: vale a primeira linha. A
+    zero; sem irregularidade exige tipo vazio e kWh zero; kWh negativo é rejeitado. `NÃO REALIZADA` e `NAO REALIZADA` (→
+    `NAO_REALIZADA`, DEC-009) seguem a mesma regra do sem irregularidade, com tipo vazio e kWh zero. Esse resultado não vinha da
+    Silver (o pipeline só conhece os dois primeiros): entrou em 03/11/2026, porque o modal de conclusão já o aceitava e a
+    planilha ficou com menos resultados que a tela. UC repetida: vale a primeira linha. A
     única diferença para a Silver é o ponto de milhar em texto digitado: "1.234,5" e "1.234" valem 1.234,5 e 1.234 kWh. A
     Silver só troca a vírgula por ponto, o que basta para a planilha do case (a INSP-07 só cataloga a vírgula decimal, e a
     trava da Silver garante que nenhum kWh virou nulo), mas leria "1.234" digitado à mão como 1,234 kWh. Célula numérica do
     Excel não passa por essa regra;
   - **Dados extras na observação.** A ordem só guarda resultado e observação; tipo, kWh, data, inspetor e código da inspeção
     entram no texto ("Planilha de campo: desvio direto, 120,5 kWh recuperados, inspetor Fulano, 12/08/2025 (inspeção INS-1)").
+  - **Motivo da equipe.** A coluna opcional `observacao` (também lida como `observação`) vale para qualquer resultado, como o
+    campo "Observação (opcional)" do modal, e entra depois dos dados, antes do código da inspeção ("Planilha de campo: visita
+    não realizada, inspetor Fulano, 14/08/2025: imóvel fechado (inspeção OI-7)"). É o que separa o imóvel fechado do acesso
+    negado ao medir os dias de campo perdidos (DEC-009). Passando de 1.000 caracteres, o corte é no motivo, e não na
+    referência da inspeção. Uma planilha sem a coluna continua valendo, e o motivo é dado: aparece escapado no cartão e no
+    histórico. A coluna não é obrigatória em `NÃO REALIZADA`, para ficar igual ao modal;
 - **Descartado:**
   - **tudo ou nada**, porque uma linha errada travaria o arquivo inteiro e o aceite pede o relatório de rejeitadas;
+  - **aceitar `CANCELADA` na planilha**, porque cancelar é uma transição (`EM_CAMPO → CANCELADA`) e não um resultado de
+    inspeção, e o upload só conclui. Visita que não aconteceu por falta de acesso é `NÃO REALIZADA`, que mede dia de campo
+    perdido; cancelada é visita que deixou de ser necessária (DEC-009);
   - **enviar a campo e concluir no mesmo upload**, que cria um envio no histórico que ninguém fez;
   - **aba de instruções na planilha**, descartada por uma lista de seleção nas próprias colunas, que evita o erro em vez de explicá-lo
     (e o upload teria de ignorar a aba);
