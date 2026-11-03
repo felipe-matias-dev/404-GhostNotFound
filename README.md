@@ -290,6 +290,9 @@ docker compose run --rm api python -m venergy_api.carga
 docker compose run --rm api python -m venergy_api.usuarios
 ```
 
+O passo 3 usa a amostra sintética, que não tem nenhum dado da V-Energy. Para rodar com a Gold real, gerada pelo pipeline
+no Databricks, veja [Usar a Gold real no portal](#usar-a-gold-real-no-portal).
+
 | O quê | Onde |
 |---|---|
 | Portal | http://localhost:3000 |
@@ -429,6 +432,80 @@ execução completa roda as quatro tasks.
 
 **Para reexecutar:** em **Jobs & Pipelines → v_energy_workflow**, clique em **Run now** uma vez.
 
+### Montar o pipeline do zero
+
+Requer um workspace do Databricks com Unity Catalog e compute serverless (o Job usa o ambiente serverless versão 6) e os
+arquivos do dataset, entregues em `.zip` na plataforma do case. Os dados não estão no repositório
+([DEC-004](docs/decisoes.md#dec-004--entrega-da-gold-em-datagold)).
+
+1. **Catálogo, schemas e landing.** No SQL Editor, ou numa célula `%sql` de um notebook:
+
+   ```sql
+   CREATE CATALOG IF NOT EXISTS v_energy;
+   CREATE SCHEMA IF NOT EXISTS v_energy.default;
+   CREATE SCHEMA IF NOT EXISTS v_energy.bronze;
+   CREATE VOLUME IF NOT EXISTS v_energy.default.landing;
+   ```
+
+   Os schemas `silver`, `gold` e `qualidade` e o volume dos CSVs (`v_energy.gold.csv`) são criados pelos próprios notebooks.
+   A landing fica fora da `bronze` para que apagar a Bronze nunca apague os originais
+   ([DEC-001](docs/decisoes.md#dec-001--localização-dos-arquivos-de-origem-landing)).
+
+2. **Arquivos na landing.** Descompacte os `.zip` no computador. Em **Catalog → v_energy → default → Volumes → landing**, use
+   **Upload to this volume** para cada arquivo e crie a pasta `leituras` (**Create directory**) para os 5 CSVs de leituras:
+
+   ```text
+   /Volumes/v_energy/default/landing/
+   ├── unidades_consumidoras.csv
+   ├── faturas.csv
+   ├── medidores.csv
+   ├── ocorrencias_rede.csv
+   ├── geracao_distribuida.csv
+   ├── atendimentos.json
+   ├── inspecoes.xlsx
+   └── leituras/            (os 5 CSVs, um por ano, e nada além deles)
+   ```
+
+   Os nomes precisam ser exatamente esses. O `Landing_to_Bronze` para com erro se um arquivo faltar ou estiver vazio, ou se
+   `leituras/` não tiver exatamente 5 CSVs.
+
+3. **Job.** Em **Jobs & Pipelines → Create → Job**, abra a edição do Job em YAML e cole o conteúdo de
+   [`v_energy_workflow.yaml`](data-engineering/workflow/v_energy_workflow.yaml), que foi exportado dessa mesma tela. Os
+   notebooks são lidos direto da branch `main` do GitHub, então não é preciso copiá-los para o workspace. Se a edição em YAML
+   não estiver disponível, crie as 4 tasks na interface, com a origem **Git** (repositório deste projeto, branch `main`) e
+   compute serverless:
+
+   | Task | Notebook | Depende de | Parâmetros |
+   |---|---|---|---|
+   | `landing_to_bronze` | `data-engineering/notebooks/Landing_to_Bronze` | — | `gravar = sim`, `landing_path = /Volumes/v_energy/default/landing`, `exigir_idempotencia = nao` |
+   | `bronze_to_silver` | `data-engineering/notebooks/Bronze_to_Silver` | `landing_to_bronze` | `gravar = sim` |
+   | `silver_to_gold_export` | `data-engineering/notebooks/Silver_to_Gold` | `bronze_to_silver` | `gravar = sim`, `exportar_csv = sim`, `schema_gold = gold` |
+   | `testes_qualidade` | `data-engineering/notebooks/Testes_Qualidade_Gold` | `silver_to_gold_export` | — |
+
+   O agendamento (mensal, dia 6, pausado) e o tempo máximo de 2 horas estão no YAML.
+
+4. **Execução.** Clique em **Run now**. A execução leva cerca de 15 minutos, e as 4 tasks devem terminar em verde. Na primeira
+   execução, os testes de variação de linhas só gravam a linha de base, porque ainda não há execução anterior para comparar.
+
+Cada notebook também roda sozinho, com **Run all**: com `gravar = nao` (o padrão dos widgets), ele lê e valida tudo sem gravar
+nada.
+
+### Usar a Gold real no portal
+
+1. Em **Catalog → v_energy → gold → Volumes → csv**, baixe os 12 arquivos `gold_*.csv`.
+2. Coloque os 12 em `data/gold/`, na raiz do repositório, no lugar dos arquivos da amostra. A pasta está no `.gitignore`: os
+   CSVs nunca vão para o Git ([DEC-004](docs/decisoes.md#dec-004--entrega-da-gold-em-datagold)).
+3. Com o portal no ar (passo 2 de [Como executar](#como-executar)), rode a carga:
+
+   ```bash
+   docker compose run --rm api python -m venergy_api.carga
+   ```
+
+   A carga confere os 12 arquivos contra o contrato antes de apagar a Gold anterior, grava em lotes e leva alguns minutos com
+   a Gold real ([DEC-038](docs/decisoes.md#dec-038--carga-da-gold-em-lotes-com-uma-rodada-de-conferência-antes-de-gravar)). As ordens de
+   inspeção e a auditoria do agente ficam no schema `app` e não são apagadas.
+4. Recarregue o portal. Para voltar à amostra, gere-a de novo (passo 3 de [Como executar](#como-executar)) e rode a carga.
+
 <details>
 <summary>Estratégia de agendamento</summary>
 
@@ -471,12 +548,33 @@ Detalhes e alternativas descartadas: [DEC-039](docs/decisoes.md#dec-039--workflo
 
 ## Suposições
 
-Toda suposição feita onde o case não é explícito está em [docs/decisoes.md](docs/decisoes.md), com data, motivo e autor.
+As principais suposições feitas onde o case não é explícito. A lista completa, com data, motivo e autor, está em
+[docs/decisoes.md](docs/decisoes.md).
+
+- **Faturamento fecha uma vez por mês, e o Job roda no dia 6 (D+5):** o case não diz quando o faturamento fecha
+  ([DEC-039](docs/decisoes.md#dec-039--workflow-do-databricks-e-agendamento-mensal)).
+- **DEC e FEC seguem a definição simplificada do case:** cada ocorrência é uma UC interrompida, e o denominador é o de UCs
+  faturadas do alimentador; os valores servem para comparar alimentadores e períodos, não com os limites da ANEEL
+  ([DEC-030](docs/decisoes.md#dec-030--regras-aplicadas-na-gold-ucs-ocorrências-gd-e-fila-de-suspeitas)). DEC e FEC de um período saem da
+  soma dos componentes ([DEC-033](docs/decisoes.md#dec-033--dec-e-fec-por-período-e-recorte-e-a-fila-de-suspeitas-paginada)).
+- **"Receita" sem qualificador é a receita faturada (com tributos)**
+  ([DEC-022](docs/decisoes.md#dec-022--regras-do-agente-sobre-a-gold-e-decisões-da-daily-de-2110)); a decomposição preço × volume × mix usa a
+  receita de energia, sem tributos ([DEC-073](docs/decisoes.md#dec-073--receita_energia-confirmada-como-base-do-pvm-e-da-tarifa-média)).
+- **A bandeira é um acréscimo fixo por kWh, igual em todas as classes**, como aparece no dado
+  ([DEC-029](docs/decisoes.md#dec-029--método-do-efeito-bandeira)).
+- **Períodos comparados são os mesmos meses em anos diferentes** (ex.: jul/2022 a jun/2023 contra jul/2025 a jun/2026)
+  ([DEC-028](docs/decisoes.md#dec-028--pares-de-períodos-da-decomposição-e-o-que-fica-para-o-backend)).
+- **As UCs com código de prefixo `TESTE` são cadastro de teste do sistema de origem**, e não receita a recuperar
+  ([DEC-067](docs/decisoes.md#dec-067--ucs-de-teste-do-cadastro-ficam-na-gold-documentadas)).
+- **Ordem de inspeção atrasada:** mais de 5 dias gerada ou mais de 10 em campo; os prazos são do time, não do case
+  ([DEC-064](docs/decisoes.md#dec-064--tempo-das-ordens-no-status-e-por-etapa)).
+- **Cinco perfis de acesso, um por liderança do case,** com a escrita nas ordens só para perdas
+  ([DEC-049](docs/decisoes.md#dec-049--login-com-cookie-httponly-e-perfis-por-cargo)).
 
 ## Time
 
 | Frente | Integrantes |
 |---|---|
-| Engenharia de Dados | Arthur Oliveira, Alisson, Gabriel |
+| Engenharia de Dados | Arthur Oliveira, Alisson Ramos, Gabriel Marinho |
 | Portal Web | Felipe Matias, João Euclides |
 | Inteligência Artificial | Luis Felipe Perylo, Lucas Mendes |
