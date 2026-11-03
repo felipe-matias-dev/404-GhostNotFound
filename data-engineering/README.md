@@ -42,7 +42,7 @@ e grava só em `v_energy.qualidade`. O que confere:
 
 | Seção | Teste | Tipo |
 |---|---|---|
-| 1 | CSV × Gold, para cada uma das 12 tabelas: contagem de linhas, colunas e ordem, soma das colunas numéricas (`money`, `energy_kwh` e `integer` do contrato) e encoding da UC-13 nas colunas de texto | crítico |
+| 1 | CSV × Gold, para cada uma das 12 tabelas: contagem de linhas, colunas e ordem, soma de colunas numéricas escolhidas em cada tabela (1 a 3 por tabela, listadas em `SOMAS_CSV` no notebook) e encoding da UC-13 nas colunas de texto | crítico |
 | 2 | Variação de linhas de cada tabela contra a execução anterior, com limite de 5% | alerta |
 | 3 | Reconciliações entre tabelas: `gold_kpis_mensais` = soma de `gold_kpis_segmento_mensal`; receita total = cadastro + órfãs; preço + volume + mix = variação da receita | crítico |
 | 4 | Premissa da DEC-067: nenhuma linha de UC de teste nas tabelas por UC | crítico |
