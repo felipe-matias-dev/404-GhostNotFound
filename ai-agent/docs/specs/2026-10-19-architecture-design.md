@@ -118,7 +118,7 @@ ai-agent/
 | `model` | `str` | Modelo que respondeu de fato (G1-06), com o nome que o provedor devolve, sem o prefixo da configuração (`gemini-3.1-flash-lite`, e não `google-gla:gemini-3.1-flash-lite`); quando a pergunta é barrada antes do LLM, é o modelo configurado no mesmo formato |
 | `prompt_version` | `str` | — |
 | `latency_ms` | `int` | `≥ 0` (G1-06) |
-| `input_tokens` | `int` | `≥ 0`, padrão `0`. Tokens de entrada das chamadas ao gerador de SQL neste pedido, somando todas as tentativas. A narrativa não entra: a porta `AnswerWriter` devolve só texto. O backend grava na auditoria (DEC-046) |
+| `input_tokens` | `int` | `≥ 0`, padrão `0`. Tokens de entrada de todas as chamadas do pedido: ao gerador de SQL (somando todas as tentativas), à narração e as chamadas que falharam. A narração entra, porque o total é somado no mesmo acumulador. O backend grava na auditoria (DEC-046) |
 | `output_tokens` | `int` | `≥ 0`, padrão `0`. Idem, tokens de saída |
 
 Invariantes:
