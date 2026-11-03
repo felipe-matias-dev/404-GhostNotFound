@@ -62,6 +62,7 @@ export function AgentePage() {
 		removerSessao,
 		enviarPergunta,
 		tentarNovamente,
+		historicoIndisponivel,
 	} = useAgente();
 	const [mostrarExemplos, setMostrarExemplos] = useState(true);
 	const [editandoTitulo, setEditandoTitulo] = useState(false);
@@ -356,6 +357,12 @@ export function AgentePage() {
 							<LogoMark className="size-3.5 text-accent-text" />
 							Conectado à camada Gold · 9 views auditáveis
 						</p>
+						{historicoIndisponivel && (
+							<output className="block text-center text-small text-text-muted">
+								Não foi possível carregar suas conversas anteriores. Você pode
+								perguntar normalmente.
+							</output>
+						)}
 						{mostrarExemplos && (
 							<section aria-label="Exemplos de perguntas" className="space-y-3">
 								<div className="flex items-center justify-between text-small text-text-muted">
