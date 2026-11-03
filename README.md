@@ -487,8 +487,10 @@ arquivos do dataset, entregues em `.zip` na plataforma do case. Os dados não es
 4. **Execução.** Clique em **Run now**. A execução leva cerca de 15 minutos, e as 4 tasks devem terminar em verde. Na primeira
    execução, os testes de variação de linhas só gravam a linha de base, porque ainda não há execução anterior para comparar.
 
-Cada notebook também roda sozinho, com **Run all**: com `gravar = nao` (o padrão dos widgets), ele lê e valida tudo sem gravar
-nada.
+Os três primeiros notebooks também rodam sozinhos, com **Run all**: com `gravar = nao` (o padrão dos widgets), eles leem e
+validam tudo sem gravar nada. O `Testes_Qualidade_Gold` não tem esse widget: só lê a Gold e os CSVs, mas toda execução grava o
+resultado em `v_energy.qualidade.resultados_testes` (criando o schema se faltar), e a contagem gravada passa a ser a base da
+variação de linhas na execução seguinte.
 
 ### Usar a Gold real no portal
 
@@ -504,7 +506,17 @@ nada.
    A carga confere os 12 arquivos contra o contrato antes de apagar a Gold anterior, grava em lotes e leva alguns minutos com
    a Gold real ([DEC-038](docs/decisoes.md#dec-038--carga-da-gold-em-lotes-com-uma-rodada-de-conferência-antes-de-gravar)). As ordens de
    inspeção e a auditoria do agente ficam no schema `app` e não são apagadas.
-4. Recarregue o portal. Para voltar à amostra, gere-a de novo (passo 3 de [Como executar](#como-executar)) e rode a carga.
+4. Recarregue o portal.
+
+Para voltar à amostra, gere-a por cima dos CSVs reais e rode a carga:
+
+```bash
+docker compose run --rm api python -m venergy_api.amostra --force
+docker compose run --rm api python -m venergy_api.carga
+```
+
+Sem o `--force`, o gerador para, porque a pasta já tem CSVs que podem ser a Gold real. Com ele, os CSVs reais de `data/gold/`
+são sobrescritos: para voltar à Gold real, é preciso baixá-los de novo do Volume.
 
 <details>
 <summary>Estratégia de agendamento</summary>
