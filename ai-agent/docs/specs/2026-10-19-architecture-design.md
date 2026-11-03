@@ -178,7 +178,7 @@ O caso de uso `application/ask.py` implementa `TextToSqlAgent` encadeando as por
    - Quando o resultado é pequeno (até 5 linhas e 4 colunas), o texto determinístico traz os valores em pt-BR (`Resultado: total = 3.`; nulo vira "sem valor"). Assim a resposta tem o número mesmo quando a narrativa cai na verificação (DEC-019). Resultado maior fica só em `rows`.
    - Item 8: o `AnswerWriter` substitui esse texto por uma narrativa. Se a verificação numérica falhar (§7.3 do guia), volta para o texto determinístico.
 8. **Mensagens de `unknown`, `refused` e `failed`:** textos fixos em português, sem LLM, em `refused_reason` e em `answer`. O modelo não escreve o motivo de não ter respondido.
-9. **Tokens.** `AgentAnswer.input_tokens` e `output_tokens` somam as `Generation` do pedido, também nos status sem SQL e na falha depois de uma tentativa. Pergunta barrada antes do modelo leva 0.
+9. **Tokens.** `AgentAnswer.input_tokens` e `output_tokens` somam as `Generation` do pedido, a narração e os tokens gastos em chamadas que falharam (gerador ou narração). Vale também nos status sem SQL e na falha depois de uma tentativa. Pergunta barrada antes do modelo leva 0.
 10. **Logs estruturados:** uma linha JSON por etapa (stdlib `logging`), com `request_id`, `session_id`, número da tentativa, etapa, status, SQL, motivo ou tipo de erro, número de linhas, latência da etapa, modelo, tokens e `prompt_version` (§12 do guia). Sem a amostra de linhas, para não levar dado pessoal aos logs. As etapas `orcamento` (tokens usados e orçamento) e `historico` (só a quantidade de turnos lidos) nunca registram o texto de perguntas anteriores.
 
 ### 5.2 Dados não são instruções
