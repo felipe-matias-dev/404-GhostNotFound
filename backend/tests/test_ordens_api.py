@@ -393,6 +393,8 @@ def test_order_copies_the_queue_context_and_keeps_it_when_the_unit_leaves_the_qu
         {"resultado": "IRREGULAR_CONFIRMADA", "tipo_irregularidade": "DESVIO"},
         {"resultado": "IRREGULAR_CONFIRMADA", "kwh_recuperado": 10},
         {"resultado": "IRREGULAR_CONFIRMADA", "tipo_irregularidade": "DESVIO", "kwh_recuperado": 0},
+        {"resultado": "IRREGULAR_CONFIRMADA", "tipo_irregularidade": "D", "kwh_recuperado": 0.0004},
+        {"resultado": "IRREGULAR_CONFIRMADA", "tipo_irregularidade": "D", "kwh_recuperado": 1e13},
         {"resultado": "REGULAR", "tipo_irregularidade": "DESVIO"},
         {"resultado": "REGULAR", "kwh_recuperado": 10},
         {"resultado": "NAO_REALIZADA", "kwh_recuperado": 10},

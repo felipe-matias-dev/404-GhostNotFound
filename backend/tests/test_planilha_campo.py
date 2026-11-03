@@ -138,6 +138,8 @@ def test_numeric_uc_cell_is_read_as_text() -> None:
             "Sem irregularidade com tipo",
         ),
         (["I", "0001", None, None, "CONFIRMADA", "BY-PASS", "muito"], "kWh recuperado inválido"),
+        (["I", "0001", None, None, "CONFIRMADA", "BY-PASS", "0,0004"], "até três casas"),
+        (["I", "0001", None, None, "CONFIRMADA", "BY-PASS", 1e13], "menos de 10 trilhões"),
         (["I", "0001", "ontem", None, "SEM IRREGULARIDADE", None, 0], "Data inválida"),
         (["I", None, None, None, "SEM IRREGULARIDADE", None, 0], "UC em branco"),
         (["I", "0001", None, None, None, None, 0], "Resultado em branco"),

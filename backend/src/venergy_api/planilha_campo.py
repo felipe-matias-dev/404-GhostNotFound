@@ -19,7 +19,7 @@ from openpyxl import Workbook, load_workbook
 from openpyxl.utils.exceptions import InvalidFileException
 from openpyxl.worksheet.datavalidation import DataValidation
 
-from venergy_api.ordens import ResultadoOrdem
+from venergy_api.ordens import ResultadoOrdem, kwh_cabe_na_coluna
 
 MAX_BYTES = 5 * 1024 * 1024
 # O arquivo do case tem cerca de 1.400 linhas no ano todo; o teto só barra arquivo errado.
@@ -176,6 +176,11 @@ def _ler_linha(aba: str, numero: int, cod_uc: str, celula: dict[str, object]) ->
         if kwh is None or kwh <= 0:
             raise _LinhaInvalida(
                 "Irregularidade confirmada precisa de kWh recuperado maior que zero"
+            )
+        if not kwh_cabe_na_coluna(kwh):
+            raise _LinhaInvalida(
+                "kWh recuperado precisa de até três casas decimais e menos de 10 trilhões: "
+                + _texto(celula.get("kwh_recuperado"))
             )
     else:
         if tipo is not None:

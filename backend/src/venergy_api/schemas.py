@@ -16,7 +16,7 @@ from pydantic import (
 )
 from venergy_agent.domain.answer import AnswerStatus, Confidence
 
-from venergy_api.ordens import ResultadoOrdem, StatusOrdem
+from venergy_api.ordens import KWH_CASAS, KWH_DIGITOS, ResultadoOrdem, StatusOrdem
 
 RequiredText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 
@@ -911,12 +911,14 @@ class AtualizarOrdemSchema(BaseModel):
         | None
     ) = None
     # O par da Gold (gold_inspecoes_uc): obrigatório ao confirmar irregularidade, proibido nos
-    # demais.
+    # demais. O kWh tem o mesmo limite da coluna (KWH_DIGITOS, KWH_CASAS).
     tipo_irregularidade: (
         Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
         | None
     ) = None
-    kwh_recuperado: Annotated[ExactNumber, Field(gt=0)] | None = None
+    kwh_recuperado: (
+        Annotated[ExactNumber, Field(gt=0, max_digits=KWH_DIGITOS, decimal_places=KWH_CASAS)] | None
+    ) = None
 
     @model_validator(mode="after")
     def resultado_so_ao_concluir(self) -> "AtualizarOrdemSchema":
@@ -925,7 +927,8 @@ class AtualizarOrdemSchema(BaseModel):
             raise ValueError("Informe o resultado da inspeção para concluir a ordem")
         if self.status != StatusOrdem.CONCLUIDA and self.resultado is not None:
             raise ValueError("O resultado só é registrado ao concluir a ordem")
-        # Mesma regra da planilha de campo (planilha_campo._ler_linha).
+        # Com irregularidade, a regra da planilha de campo (planilha_campo._ler_linha). Nos demais
+        # resultados o PATCH é mais estrito: a planilha aceita um kWh 0 e o grava vazio.
         if self.resultado == ResultadoOrdem.IRREGULAR_CONFIRMADA:
             if self.tipo_irregularidade is None or self.kwh_recuperado is None:
                 raise ValueError("Irregularidade confirmada precisa do tipo e do kWh recuperado")

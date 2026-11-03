@@ -5,6 +5,7 @@ consultada de um lugar só por qualquer endpoint que mude o status de uma OI.
 """
 
 from dataclasses import dataclass
+from decimal import Decimal
 from enum import StrEnum
 
 
@@ -37,6 +38,16 @@ TRANSICOES: dict[StatusOrdem, frozenset[StatusOrdem]] = {
 
 # Status em que a OI ainda ocupa a UC: enquanto houver uma assim, não se gera outra.
 STATUS_ATIVOS: frozenset[StatusOrdem] = frozenset({StatusOrdem.GERADA, StatusOrdem.EM_CAMPO})
+
+# O kWh recuperado vai para numeric(16, 3): até três casas e treze dígitos inteiros. Fora disso o
+# banco arredonda em silêncio (0,0004 vira 0) ou estoura a coluna, então o valor é recusado antes.
+KWH_DIGITOS = 16
+KWH_CASAS = 3
+
+
+def kwh_cabe_na_coluna(kwh: Decimal) -> bool:
+    """O kWh é gravado sem arredondar em numeric(KWH_DIGITOS, KWH_CASAS)."""
+    return abs(kwh) < Decimal(10) ** (KWH_DIGITOS - KWH_CASAS) and kwh == round(kwh, KWH_CASAS)
 
 
 class TransicaoInvalidaError(Exception):
