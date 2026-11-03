@@ -72,6 +72,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | 01/11/2026 | DEC-071: a tela de Rede ganha a faixa de indicadores do recorte (DEC, FEC, horas interrompidas, interrupções e UCs) contra o período base, colunas de horas e interrupções com busca e ordenação na tabela, trilha no Header, e o painel do alimentador mostra DEC e FEC juntos com a empresa como referência; o parâmetro `serie` sai da URL | A operação precisa ver quem piorou, quanto pesa cada alimentador e se ele está fora do padrão da empresa, com dados que a API já devolvia; nada é calculado na tela | João Euclides |
 | 01/11/2026 | DEC-072: a tela de Rede ganha variação contra a base em cada linha, ranking de alimentadores com recorte, ranking plano de bairros, série do alimentador dentro do recorte contra o recorte inteiro e a seção "Por que cai" (causa, tipo, UCs atingidas e reincidentes, duração), de `gold_interrupcoes_uc` | A operação precisa saber quem piorou, onde atacar e por que cai, com dados que já estão na Gold; toda conta fica no backend | João Euclides |
 | 01/11/2026 | DEC-073: `receita_energia` confirmada como base do PVM e da tarifa média, depois do teste declarado da DEC-023 | O teste da DEC-023 não distingue as definições (no dataset, os tributos são proporção fixa da fatura); a decisão segue o conceito: tributos não são receita da distribuidora | Arthur |
+| 03/11/2026 | DEC-074: task `testes_qualidade` no Workflow, depois do export, somente leitura: CSV × Gold, reconciliações entre tabelas e premissa da DEC-067 como críticos, variação de linhas como alerta, histórico em `v_energy.qualidade.resultados_testes` | O export é o único passo do pipeline sem trava, e é o que chega ao portal e ao agente | Arthur |
 | 01/11/2026 | DEC-067: as UCs de teste do cadastro (UC-12, prefixo `TESTE`) ficam na `gold_dim_uc` até depois da entrega, documentadas | Não afetam receita, energia, DEC/FEC, recortes nem fila; tirá-las exigiria regravar Silver e Gold perto do code freeze | Arthur |
 
 ## DEC-001 · Localização dos arquivos de origem (landing)
@@ -2087,3 +2088,20 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Motivo:** como o teste não distingue, a decisão se apoia no conceito: tributos não são receita da distribuidora. Sem eles, o efeito preço separa reajuste de tarifa e bandeira, e a variação dos impostos aparece à parte (como na conta da UC, DEC-057).
 - **Descartado:** `receita_faturada` como base do PVM. Daria a mesma variação percentual, mas misturaria a variação dos tributos com o efeito preço.
 - **Consequências:** saem as marcas de "provisória" do contrato, do dicionário e da DEC-057. O comentário de `backend/src/venergy_api/models.py` que cita a base provisória fica para um ajuste do Portal.
+
+## DEC-074 · Testes de qualidade do export e da Gold
+
+- **Data:** 03/11/2026 · **Área:** Dados · **Autor:** Arthur · **Atende:** D1-10 (issue #101)
+- **Contexto:** as travas dos notebooks (mais de 50 só no `Silver_to_Gold`: `aplicar_contrato`, `exigir_chave_unica`, `exigir_sem_orfaos`, `exigir_mesma_contagem`, `exigir_zero`) já barram o Job antes do export quando uma camada sai inconsistente. O export dos 12 CSVs é o único passo do pipeline sem trava, e é o que chega ao portal (pela carga) e ao agente.
+- **Decisão:** uma 4ª task no Workflow, `testes_qualidade`, depois de `silver_to_gold_export`, que roda o notebook [`Testes_Qualidade_Gold`](../data-engineering/notebooks/Testes_Qualidade_Gold.ipynb). É somente leitura: lê `v_energy.gold` e os CSVs do Volume e grava só em `v_energy.qualidade`.
+  - **Críticos** (uma falha deixa o Job vermelho): CSV × Gold em cada tabela (contagem de linhas, colunas e ordem, soma das colunas numéricas e encoding da UC-13); reconciliações entre tabelas (`gold_kpis_mensais` = soma de `gold_kpis_segmento_mensal`, receita total = cadastro + órfãs, preço + volume + mix = variação da receita); premissa da DEC-067 (nenhuma linha de UC de teste nas tabelas por UC).
+  - **Alerta** (só registrado): variação de linhas de cada tabela acima de 5% contra a execução anterior. Na primeira execução não há base, e o status é `LINHA_DE_BASE`.
+  - **Histórico:** uma linha por teste e execução em `v_energy.qualidade.resultados_testes` (append). Os valores medidos ficam só no Databricks; o print mostra teste, tabela, tipo e status (DEC-024).
+  - As sugestões do Alisson na issue #101 foram incorporadas.
+- **Execução:** validada isoladamente contra a Gold atual em 03/11/2026: 80 testes, 68 críticos OK e 12 de variação de linhas como linha de base, sem falha nem alerta. O Job completo não foi rodado antes do code freeze de 03/11, para não regravar Silver, Gold e CSVs. Como o Job lê os notebooks da `main`, a task entra no Job do Databricks depois do merge.
+- **Limitação:** os testes rodam depois do export, então detectam um CSV ruim, mas não impedem que ele seja gravado no Volume. Regra: com o Job vermelho, ninguém baixa os CSVs.
+- **Descartado:**
+  - Reescrever os 16 checks do contrato no notebook de testes: já são travas antes de gravar.
+  - Mover o export para depois dos testes: mexeria no `Silver_to_Gold` perto do code freeze.
+  - Lakeflow expectations e bibliotecas externas de qualidade: o notebook usa só PySpark, como os outros.
+- **Consequências:** o [`v_energy_workflow.yaml`](../data-engineering/workflow/v_energy_workflow.yaml) ganha a task `testes_qualidade`, e o Job passa a ter quatro tasks; a [DEC-039](#dec-039--workflow-do-databricks-e-agendamento-mensal) continua valendo para as três primeiras. Os notebooks existentes, a Gold, os CSVs e o contrato não mudam.
