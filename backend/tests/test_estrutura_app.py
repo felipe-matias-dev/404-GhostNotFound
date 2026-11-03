@@ -23,6 +23,13 @@ def banco_antigo(engine: Engine) -> Engine:
     with engine.begin() as connection:
         connection.execute(text("ALTER TABLE app.ordem_evento DROP COLUMN autor_login"))
         connection.execute(
+            text(
+                "ALTER TABLE app.ordem_inspecao DROP COLUMN fila_posicao, "
+                "DROP COLUMN fila_motivos, DROP COLUMN fila_kwh_recuperavel_est, "
+                "DROP COLUMN tipo_irregularidade, DROP COLUMN kwh_recuperado"
+            )
+        )
+        connection.execute(
             text("INSERT INTO app.ordem_inspecao (cod_uc, status) VALUES ('0001', 'GERADA')")
         )
         connection.execute(
@@ -49,6 +56,8 @@ def test_api_startup_adds_the_author_column_without_losing_events(
         pass
 
     assert autor_login_existe(banco_antigo)
+    colunas = {c["name"] for c in inspect(banco_antigo).get_columns("ordem_inspecao", schema="app")}
+    assert {"fila_posicao", "fila_motivos", "tipo_irregularidade", "kwh_recuperado"} <= colunas
     with Session(banco_antigo) as session:
         [evento] = session.scalars(select(OrdemEvento)).all()
         assert evento.autor_login is None

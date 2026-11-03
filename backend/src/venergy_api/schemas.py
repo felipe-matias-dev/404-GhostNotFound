@@ -840,6 +840,13 @@ class AtualizarOrdemSchema(BaseModel):
         Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=1000)]
         | None
     ) = None
+    # O par da Gold (gold_inspecoes_uc): obrigatório ao confirmar irregularidade, proibido nos
+    # demais.
+    tipo_irregularidade: (
+        Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
+        | None
+    ) = None
+    kwh_recuperado: Annotated[ExactNumber, Field(gt=0)] | None = None
 
     @model_validator(mode="after")
     def resultado_so_ao_concluir(self) -> "AtualizarOrdemSchema":
@@ -848,6 +855,14 @@ class AtualizarOrdemSchema(BaseModel):
             raise ValueError("Informe o resultado da inspeção para concluir a ordem")
         if self.status != StatusOrdem.CONCLUIDA and self.resultado is not None:
             raise ValueError("O resultado só é registrado ao concluir a ordem")
+        # Mesma regra da planilha de campo (planilha_campo._ler_linha).
+        if self.resultado == ResultadoOrdem.IRREGULAR_CONFIRMADA:
+            if self.tipo_irregularidade is None or self.kwh_recuperado is None:
+                raise ValueError("Irregularidade confirmada precisa do tipo e do kWh recuperado")
+        elif self.tipo_irregularidade is not None or self.kwh_recuperado is not None:
+            raise ValueError(
+                "Tipo de irregularidade e kWh recuperado só valem para irregularidade confirmada"
+            )
         return self
 
 
@@ -859,6 +874,13 @@ class OrdemSchema(BaseModel):
     status: StatusOrdem
     resultado: ResultadoOrdem | None
     observacao: str | None
+    # Resultado de campo estruturado, só em OI concluída como irregular.
+    tipo_irregularidade: str | None
+    kwh_recuperado: ExactNumber | None
+    # Contexto da fila na geração (cópia): vazio na OI gerada à mão, para UC fora da fila.
+    fila_posicao: int | None
+    fila_motivos: list[str] | None
+    fila_kwh_recuperavel_est: ExactNumber | None
     criada_em: datetime
     atualizada_em: datetime
     # Entrada no status atual (último evento) e há quantos segundos, pelo relógio do banco: a tela

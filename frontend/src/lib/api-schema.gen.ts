@@ -741,6 +741,10 @@ export interface components {
             resultado?: components["schemas"]["ResultadoOrdem"] | null;
             /** Observacao */
             observacao?: string | null;
+            /** Tipo Irregularidade */
+            tipo_irregularidade?: string | null;
+            /** Kwh Recuperado */
+            kwh_recuperado?: number | string | null;
         };
         /**
          * AuditoriaIaSchema
@@ -1402,6 +1406,16 @@ export interface components {
             resultado: components["schemas"]["ResultadoOrdem"] | null;
             /** Observacao */
             observacao: string | null;
+            /** Tipo Irregularidade */
+            tipo_irregularidade: string | null;
+            /** Kwh Recuperado */
+            kwh_recuperado: number | null;
+            /** Fila Posicao */
+            fila_posicao: number | null;
+            /** Fila Motivos */
+            fila_motivos: string[] | null;
+            /** Fila Kwh Recuperavel Est */
+            fila_kwh_recuperavel_est: number | null;
             /**
              * Criada Em
              * Format: date-time
@@ -1437,6 +1451,16 @@ export interface components {
             resultado: components["schemas"]["ResultadoOrdem"] | null;
             /** Observacao */
             observacao: string | null;
+            /** Tipo Irregularidade */
+            tipo_irregularidade: string | null;
+            /** Kwh Recuperado */
+            kwh_recuperado: number | null;
+            /** Fila Posicao */
+            fila_posicao: number | null;
+            /** Fila Motivos */
+            fila_motivos: string[] | null;
+            /** Fila Kwh Recuperavel Est */
+            fila_kwh_recuperavel_est: number | null;
             /**
              * Criada Em
              * Format: date-time

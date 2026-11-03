@@ -3484,6 +3484,34 @@
               }
             ],
             "title": "Observacao"
+          },
+          "tipo_irregularidade": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tipo Irregularidade"
+          },
+          "kwh_recuperado": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kwh Recuperado"
           }
         },
         "type": "object",
@@ -5506,6 +5534,64 @@
             ],
             "title": "Observacao"
           },
+          "tipo_irregularidade": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tipo Irregularidade"
+          },
+          "kwh_recuperado": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kwh Recuperado"
+          },
+          "fila_posicao": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fila Posicao"
+          },
+          "fila_motivos": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fila Motivos"
+          },
+          "fila_kwh_recuperavel_est": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fila Kwh Recuperavel Est"
+          },
           "criada_em": {
             "type": "string",
             "format": "date-time",
@@ -5546,6 +5632,11 @@
           "status",
           "resultado",
           "observacao",
+          "tipo_irregularidade",
+          "kwh_recuperado",
+          "fila_posicao",
+          "fila_motivos",
+          "fila_kwh_recuperavel_est",
           "criada_em",
           "atualizada_em",
           "no_status_desde",
@@ -5589,6 +5680,64 @@
             ],
             "title": "Observacao"
           },
+          "tipo_irregularidade": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tipo Irregularidade"
+          },
+          "kwh_recuperado": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kwh Recuperado"
+          },
+          "fila_posicao": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fila Posicao"
+          },
+          "fila_motivos": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fila Motivos"
+          },
+          "fila_kwh_recuperavel_est": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fila Kwh Recuperavel Est"
+          },
           "criada_em": {
             "type": "string",
             "format": "date-time",
@@ -5622,6 +5771,11 @@
           "status",
           "resultado",
           "observacao",
+          "tipo_irregularidade",
+          "kwh_recuperado",
+          "fila_posicao",
+          "fila_motivos",
+          "fila_kwh_recuperavel_est",
           "criada_em",
           "atualizada_em",
           "no_status_desde",

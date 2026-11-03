@@ -2,6 +2,7 @@
 
 from collections.abc import AsyncGenerator, AsyncIterator
 from contextlib import aclosing
+from decimal import Decimal
 from functools import partial
 from typing import Annotated, Any
 
@@ -29,7 +30,7 @@ from venergy_api.avisos_ordens import (
     loop_suporta_listen,
 )
 from venergy_api.database import SessionDep
-from venergy_api.models import DimUc, OrdemEvento, OrdemInspecao
+from venergy_api.models import DimUc, FilaSuspeita, OrdemEvento, OrdemInspecao
 from venergy_api.ordens import (
     STATUS_ATIVOS,
     LimitesDeAtraso,
@@ -144,9 +145,19 @@ def criar_ordens(
     if ja_ativas:
         raise _erro_ja_ativas(ja_ativas)
 
+    # O contexto da fila é copiado agora: a Gold recarrega a fila e a UC pode sair dela depois.
+    na_fila = {
+        suspeita.cod_uc: suspeita
+        for suspeita in session.scalars(
+            select(FilaSuspeita).where(FilaSuspeita.cod_uc.in_(pedido.cod_ucs))
+        )
+    }
     ordens = [
         OrdemInspecao(
             cod_uc=cod,
+            fila_posicao=na_fila[cod].score_suspeita if cod in na_fila else None,
+            fila_motivos=list(na_fila[cod].motivos) if cod in na_fila else None,
+            fila_kwh_recuperavel_est=na_fila[cod].kwh_recuperavel_est if cod in na_fila else None,
             eventos=[OrdemEvento(status_novo=StatusOrdem.GERADA, autor_login=usuario.login)],
         )
         for cod in pedido.cod_ucs
@@ -311,6 +322,8 @@ def _mudar_status(
     resultado: ResultadoOrdem | None,
     observacao: str | None,
     autor_login: str,
+    tipo_irregularidade: str | None = None,
+    kwh_recuperado: Decimal | None = None,
 ) -> None:
     """Valida a transição e registra a mudança. Quem chama trava a linha e faz o commit.
 
@@ -328,6 +341,8 @@ def _mudar_status(
     )
     ordem.status = novo
     ordem.resultado = resultado
+    ordem.tipo_irregularidade = tipo_irregularidade
+    ordem.kwh_recuperado = kwh_recuperado
     # A observação da OI é o que a equipe viu em campo ou o motivo do cancelamento. O motivo
     # de uma volta para GERADA fica só no evento, para não sobrescrevê-la.
     if observacao is not None and novo != StatusOrdem.GERADA:
@@ -394,7 +409,13 @@ def enviar_planilha(
             )
             continue
         _mudar_status(
-            ordem, StatusOrdem.CONCLUIDA, linha.resultado, linha.observacao, usuario.login
+            ordem,
+            StatusOrdem.CONCLUIDA,
+            linha.resultado,
+            linha.observacao,
+            usuario.login,
+            linha.tipo_irregularidade,
+            linha.kwh_recuperado,
         )
         concluidas.append(
             LinhaConcluidaSchema(
@@ -491,7 +512,15 @@ def atualizar_ordem(
     # simultâneas leriam o mesmo status atual e as duas passariam pela validação.
     ordem = _buscar_ordem(session, ordem_id, travar=True)
     try:
-        _mudar_status(ordem, mudanca.status, mudanca.resultado, mudanca.observacao, usuario.login)
+        _mudar_status(
+            ordem,
+            mudanca.status,
+            mudanca.resultado,
+            mudanca.observacao,
+            usuario.login,
+            mudanca.tipo_irregularidade,
+            mudanca.kwh_recuperado,
+        )
     except TransicaoInvalidaError as error:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(error)) from error
     avisar_mudanca_de_ordem(session, [ordem.id])

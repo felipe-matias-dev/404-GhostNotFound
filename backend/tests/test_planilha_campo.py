@@ -1,4 +1,5 @@
 from datetime import datetime
+from decimal import Decimal
 from io import BytesIO
 from zipfile import ZipFile
 
@@ -55,6 +56,7 @@ def test_confirmed_irregularity_becomes_a_concluded_order_with_the_field_details
     (linha,) = lida.validas
     assert (linha.aba, linha.linha, linha.cod_uc) == ("ago-set", 2, "0001")
     assert linha.resultado is ResultadoOrdem.IRREGULAR_CONFIRMADA
+    assert (linha.tipo_irregularidade, linha.kwh_recuperado) == ("DESVIO DIRETO", Decimal("120.5"))
     assert linha.observacao == (
         "Planilha de campo: desvio direto, 120,5 kWh recuperados, inspetor Fulano, "
         "12/08/2025 (inspeção INS-1)"
@@ -65,6 +67,7 @@ def test_no_irregularity_becomes_regular() -> None:
     (linha,) = ler_planilha(uma_aba(SEM_IRREGULARIDADE)).validas
 
     assert linha.resultado is ResultadoOrdem.REGULAR
+    assert (linha.tipo_irregularidade, linha.kwh_recuperado) == (None, None)
     assert linha.observacao == (
         "Planilha de campo: sem irregularidade, inspetor Ciclana, 13/08/2025 (inspeção INS-2)"
     )

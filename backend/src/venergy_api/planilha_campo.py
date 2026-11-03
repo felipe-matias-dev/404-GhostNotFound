@@ -63,6 +63,8 @@ class LinhaCampo:
     cod_uc: str
     resultado: ResultadoOrdem
     observacao: str
+    tipo_irregularidade: str | None
+    kwh_recuperado: Decimal | None
     # Só na planilha exportada pelo portal (OI-<id>): a linha vale para esta ordem, e não para
     # outra que a UC tenha hoje. O id_inspecao do formato do case não aponta para ordem nenhuma.
     ordem_id: int | None = None
@@ -198,6 +200,8 @@ def _ler_linha(aba: str, numero: int, cod_uc: str, celula: dict[str, object]) ->
         cod_uc,
         resultado,
         observacao[:MAX_OBSERVACAO],
+        tipo,
+        kwh if resultado is ResultadoOrdem.IRREGULAR_CONFIRMADA else None,
         int(exportada.group(1)) if exportada else None,
     )
 
