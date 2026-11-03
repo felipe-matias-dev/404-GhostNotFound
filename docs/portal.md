@@ -9,9 +9,9 @@ Logins de demonstração: [instalação](instalacao.md#logins-de-demonstração)
 |---|---|---|---|
 | **Henrique**, diretor comercial | Por que a receita não acompanhou a tarifa, e onde ela caiu? | [Visão geral e Receita](#visão-geral-e-receita-henrique) | Pronto |
 | **Rafael**, gerente de perdas | Quais unidades inspecionar primeiro, e em que pé está cada ordem? | [Perdas](#perdas-rafael) | Pronto |
-| **Camila**, atendimento | O que aconteceu com esta unidade consumidora, e por que a conta veio alta? | [Consulta de UC](#consulta-de-uc-camila) | API pronta, tela em construção |
+| **Camila**, atendimento | O que aconteceu com esta unidade consumidora, e por que a conta veio alta? | [Consulta de UC](#consulta-de-uc-camila) | Pronto |
 | **Beatriz**, operação | Quais alimentadores e regiões têm o pior DEC e FEC, quem piorou e por que a luz cai? | [Rede](#rede-beatriz) | Pronto |
-| **Patrícia**, diretora de TI | Os dados são confiáveis e seguros? Dá para perguntar em português? | [Agente de IA e auditoria](#agente-de-ia-e-auditoria-patrícia) | Pipeline e API prontos; chat no portal em construção |
+| **Patrícia**, diretora de TI | Os dados são confiáveis e seguros? Dá para perguntar em português? | [Agente de IA e auditoria](#agente-de-ia-e-auditoria-patrícia) | Pronto: tela do agente, chat flutuante e auditoria |
 
 ## Filtros compartilhados
 
