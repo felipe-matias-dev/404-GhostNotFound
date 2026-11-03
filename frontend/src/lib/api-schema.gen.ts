@@ -414,6 +414,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/fila-suspeitas/indicadores": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Indicadores
+         * @description Suspeitas, ordens e o acerto das inspeções (portal e Gold) no recorte pedido.
+         */
+        get: operations["get_indicadores_fila_suspeitas_indicadores_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/fila-suspeitas/recortes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Recortes
+         * @description Suspeitas por município ou bairro, para o mapa; o bairro leva o município junto.
+         */
+        get: operations["get_recortes_fila_suspeitas_recortes_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/fila-suspeitas/distribuicao-queda": {
         parameters: {
             query?: never;
@@ -688,6 +728,24 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         /**
+         * AcertoInspecoesSchema
+         * @description Inspeções de uma origem (portal ou Gold) e o quanto acertaram.
+         */
+        AcertoInspecoesSchema: {
+            /** Inspecoes */
+            inspecoes: number;
+            /** Irregulares */
+            irregulares: number;
+            /** Regulares */
+            regulares: number;
+            /** Nao Realizadas */
+            nao_realizadas: number;
+            /** Taxa Irregularidade */
+            taxa_irregularidade: number | null;
+            /** Kwh Recuperado */
+            kwh_recuperado: number;
+        };
+        /**
          * AlteracaoSessaoIaSchema
          * @description Novo título, estrela ou os dois. Nenhum deles pode vir nulo, e ao menos um é obrigatório.
          */
@@ -741,6 +799,10 @@ export interface components {
             resultado?: components["schemas"]["ResultadoOrdem"] | null;
             /** Observacao */
             observacao?: string | null;
+            /** Tipo Irregularidade */
+            tipo_irregularidade?: string | null;
+            /** Kwh Recuperado */
+            kwh_recuperado?: number | string | null;
         };
         /**
          * AuditoriaIaSchema
@@ -1086,6 +1148,7 @@ export interface components {
             ordem_ativa: components["schemas"]["OrdemAtivaSchema"] | null;
             /** Queda Percentual */
             queda_percentual: number | null;
+            ultima_inspecao: components["schemas"]["UltimaInspecaoSchema"] | null;
         };
         /**
          * FilaPaginaSchema
@@ -1161,6 +1224,24 @@ export interface components {
             n_chamados: number | null;
             /** Satisfacao Media */
             satisfacao_media: number | null;
+        };
+        /**
+         * IndicadoresPerdasSchema
+         * @description Os números do alto da tela de Perdas, no recorte pedido.
+         */
+        IndicadoresPerdasSchema: {
+            /** Suspeitas */
+            suspeitas: number;
+            /** Suspeitas Sem Ordem Ativa */
+            suspeitas_sem_ordem_ativa: number;
+            /** Kwh Recuperavel Est Sem Ordem */
+            kwh_recuperavel_est_sem_ordem: number | null;
+            /** Ordens Geradas */
+            ordens_geradas: number;
+            /** Ordens Em Campo */
+            ordens_em_campo: number;
+            portal: components["schemas"]["AcertoInspecoesSchema"];
+            gold: components["schemas"]["AcertoInspecoesSchema"];
         };
         /**
          * IndicadoresPeriodoSchema
@@ -1402,6 +1483,16 @@ export interface components {
             resultado: components["schemas"]["ResultadoOrdem"] | null;
             /** Observacao */
             observacao: string | null;
+            /** Tipo Irregularidade */
+            tipo_irregularidade: string | null;
+            /** Kwh Recuperado */
+            kwh_recuperado: number | null;
+            /** Fila Posicao */
+            fila_posicao: number | null;
+            /** Fila Motivos */
+            fila_motivos: string[] | null;
+            /** Fila Kwh Recuperavel Est */
+            fila_kwh_recuperavel_est: number | null;
             /**
              * Criada Em
              * Format: date-time
@@ -1437,6 +1528,16 @@ export interface components {
             resultado: components["schemas"]["ResultadoOrdem"] | null;
             /** Observacao */
             observacao: string | null;
+            /** Tipo Irregularidade */
+            tipo_irregularidade: string | null;
+            /** Kwh Recuperado */
+            kwh_recuperado: number | null;
+            /** Fila Posicao */
+            fila_posicao: number | null;
+            /** Fila Motivos */
+            fila_motivos: string[] | null;
+            /** Fila Kwh Recuperavel Est */
+            fila_kwh_recuperavel_est: number | null;
             /**
              * Criada Em
              * Format: date-time
@@ -1546,6 +1647,19 @@ export interface components {
             /** Municipio */
             municipio?: string | null;
         };
+        /** RecorteFilaSchema */
+        RecorteFilaSchema: {
+            /** Segmento */
+            segmento: string;
+            /** Municipio */
+            municipio?: string | null;
+            /** Suspeitas */
+            suspeitas: number;
+            /** Suspeitas Sem Ordem Ativa */
+            suspeitas_sem_ordem_ativa: number;
+            /** Kwh Recuperavel Est */
+            kwh_recuperavel_est: number | null;
+        };
         /**
          * RecortesContinuidadeSchema
          * @description DEC e FEC de um nível do recorte, do pior para o melhor.
@@ -1575,6 +1689,19 @@ export interface components {
             n_meses: number;
             /** Recortes */
             recortes: components["schemas"]["RecorteContinuidadeSchema"][];
+        };
+        /**
+         * RecortesFilaSchema
+         * @description Suspeitas por município ou bairro, das que mais valem inspecionar para as que menos.
+         */
+        RecortesFilaSchema: {
+            /**
+             * Nivel
+             * @enum {string}
+             */
+            nivel: "municipio" | "bairro";
+            /** Recortes */
+            recortes: components["schemas"]["RecorteFilaSchema"][];
         };
         /**
          * RespostaIaSchema
@@ -1773,6 +1900,27 @@ export interface components {
             total: number;
             /** Ucs */
             ucs: components["schemas"]["UcAtingidaSchema"][];
+        };
+        /**
+         * UltimaInspecaoSchema
+         * @description A inspeção de campo mais recente da UC, da Gold ou concluída no portal.
+         */
+        UltimaInspecaoSchema: {
+            /**
+             * Data
+             * Format: date
+             */
+            data: string;
+            /**
+             * Resultado
+             * @enum {string}
+             */
+            resultado: "irregularidade_confirmada" | "sem_irregularidade";
+            /**
+             * Origem
+             * @enum {string}
+             */
+            origem: "gold" | "portal";
         };
         /** UsuarioLogado */
         UsuarioLogado: {
@@ -2599,6 +2747,73 @@ export interface operations {
             };
         };
     };
+    get_indicadores_fila_suspeitas_indicadores_get: {
+        parameters: {
+            query?: {
+                municipio?: string | null;
+                bairro?: string | null;
+                classe?: ("B1" | "B2" | "B3" | "A4") | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IndicadoresPerdasSchema"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_recortes_fila_suspeitas_recortes_get: {
+        parameters: {
+            query?: {
+                municipio?: string | null;
+                bairro?: string | null;
+                classe?: ("B1" | "B2" | "B3" | "A4") | null;
+                nivel?: ("municipio" | "bairro") | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecortesFilaSchema"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_distribuicao_queda_fila_suspeitas_distribuicao_queda_get: {
         parameters: {
             query?: {
@@ -2648,6 +2863,7 @@ export interface operations {
                 medidor_eletromecanico?: boolean;
                 leituras_estimadas_min?: number | null;
                 leituras_estimadas_max?: number | null;
+                sem_inspecao_meses?: number | null;
             };
             header?: never;
             path?: never;

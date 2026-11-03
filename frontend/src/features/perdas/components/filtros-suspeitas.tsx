@@ -8,9 +8,14 @@ import {
 	PopoverContent,
 	PopoverTrigger,
 } from "#/components/ui/popover";
+import { SegmentedControl } from "#/components/ui/segmented-control";
 import type { Recorte } from "#/lib/filtros";
 import { distribuicaoQueda, distribuicaoQuedaKey } from "../api";
-import { FILTROS_FILA_INICIAIS, type FiltrosFila } from "../types";
+import {
+	FILTROS_FILA_INICIAIS,
+	type FiltrosFila,
+	MESES_SEM_INSPECAO,
+} from "../types";
 
 export function FiltrosSuspeitas({
 	value,
@@ -26,6 +31,7 @@ export function FiltrosSuspeitas({
 	const [aberto, setAberto] = useState(false);
 	const [rascunho, setRascunho] = useState(value);
 	const medidorId = useId();
+	const semOrdemId = useId();
 	const { data, isPending, isError, refetch } = useQuery({
 		queryKey: distribuicaoQuedaKey(recorte),
 		queryFn: () => distribuicaoQueda(recorte),
@@ -43,7 +49,9 @@ export function FiltrosSuspeitas({
 	const ativos =
 		Number(value.queda !== null) +
 		Number(value.medidorEletromecanico) +
-		Number(value.leiturasEstimadas !== null);
+		Number(value.leiturasEstimadas !== null) +
+		Number(value.semOrdemAtiva) +
+		Number(value.semInspecaoMeses !== null);
 	const [min, max] = rascunho.queda ?? [0, 100];
 
 	return (
@@ -123,6 +131,21 @@ export function FiltrosSuspeitas({
 							/>
 							Somente medidor eletromecânico
 						</label>
+						<label
+							htmlFor={semOrdemId}
+							className="flex min-h-8 cursor-pointer items-center gap-2 rounded-sm px-2 text-body hover:bg-hover"
+						>
+							<Checkbox
+								id={semOrdemId}
+								label="Somente UCs sem ordem ativa"
+								checked={rascunho.semOrdemAtiva}
+								disabled={disabled}
+								onChange={(semOrdemAtiva) =>
+									setRascunho({ ...rascunho, semOrdemAtiva })
+								}
+							/>
+							Somente UCs sem ordem ativa
+						</label>
 						<div className="grid gap-1">
 							<FaixaPercentual
 								label="Leituras estimadas"
@@ -139,6 +162,38 @@ export function FiltrosSuspeitas({
 									desse limite ou não informados ficam fora do filtro.
 								</p>
 							)}
+						</div>
+						<div className="grid gap-1 px-2 pb-1">
+							<span className="text-body">
+								Ocultar UCs inspecionadas nos últimos (meses)
+							</span>
+							<SegmentedControl
+								label="Ocultar UCs inspecionadas nos últimos meses"
+								value={
+									rascunho.semInspecaoMeses === null
+										? "nenhum"
+										: String(rascunho.semInspecaoMeses)
+								}
+								disabled={disabled}
+								options={[
+									{ value: "nenhum", label: "Nenhum" },
+									...MESES_SEM_INSPECAO.map((meses) => ({
+										value: String(meses),
+										label: String(meses),
+									})),
+								]}
+								onValueChange={(escolhido) =>
+									setRascunho({
+										...rascunho,
+										semInspecaoMeses:
+											escolhido === "nenhum" ? null : Number(escolhido),
+									})
+								}
+							/>
+							<p className="text-small text-text-muted">
+								Conta inspeções da Gold e ordens concluídas no portal (irregular
+								ou regular). Visita não realizada não conta.
+							</p>
 						</div>
 					</fieldset>
 					<div className="sticky bottom-0 flex items-center justify-between gap-2 border-t border-border bg-surface-2 p-2">

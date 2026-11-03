@@ -99,6 +99,7 @@ def test_concludes_the_order_that_is_in_the_field(client: TestClient) -> None:
     ordem = detalhe(client, ordem_id)
     assert (ordem["status"], ordem["resultado"]) == ("CONCLUIDA", "IRREGULAR_CONFIRMADA")
     assert ordem["observacao"].startswith("Planilha de campo: desvio direto, 120,5 kWh")
+    assert (ordem["tipo_irregularidade"], ordem["kwh_recuperado"]) == ("DESVIO DIRETO", 120.5)
 
 
 def test_the_history_records_who_uploaded_the_file(client: TestClient) -> None:

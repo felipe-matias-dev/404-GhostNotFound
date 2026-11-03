@@ -3,7 +3,7 @@
 // lado da logo com a navegação aberta e vai para o Header quando ela recolhe (no celular,
 // abre o Sheet). O MotionConfig casa as animações com o `duration-200 ease-linear` da
 // sidebar e respeita o "reduzir movimento" do sistema.
-import { Link } from "@tanstack/react-router";
+import { Link, useLocation } from "@tanstack/react-router";
 import { LayoutGroup, MotionConfig } from "motion/react";
 import { type ReactNode, useState } from "react";
 import {
@@ -18,6 +18,7 @@ import { SidebarInset, SidebarProvider } from "#/components/ui/sidebar";
 import { ThemeToggle } from "#/components/ui/theme-toggle";
 import { TooltipProvider } from "#/components/ui/tooltip";
 import type { DestinoPortal } from "#/lib/filtros";
+import { cn } from "#/lib/utils";
 
 export function AppShell({
 	children,
@@ -33,6 +34,12 @@ export function AppShell({
 	searchPara: (destino: DestinoPortal) => Record<string, unknown>;
 }) {
 	const atual = useItemAtivo(NAVEGACAO);
+	// O botão do agente (AgenteWidget) fica fixo no canto inferior direito, fora de /agente. O
+	// respiro no fim do conteúdo deixa a última linha de cada tela (paginação, rodapé de tabela)
+	// rolar para cima dele, em vez de ficar escondida embaixo.
+	const comBotaoDoAgente = useLocation({
+		select: (loc) => loc.pathname !== "/agente",
+	});
 	const [trilha, setTrilha] = useState<HTMLDivElement | null>(null);
 
 	return (
@@ -78,7 +85,10 @@ export function AppShell({
 									id="conteudo"
 									tabIndex={-1}
 									data-scroll-restoration-id="conteudo"
-									className="min-h-0 flex-1 overflow-y-auto outline-none"
+									className={cn(
+										"min-h-0 flex-1 overflow-y-auto outline-none",
+										comBotaoDoAgente && "pb-16",
+									)}
 								>
 									<HeaderTrilhaContext value={trilha}>
 										{children}

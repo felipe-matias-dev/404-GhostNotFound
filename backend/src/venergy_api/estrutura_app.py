@@ -25,6 +25,18 @@ def garantir_estrutura_do_app(connection: Connection) -> None:
     connection.execute(
         text("ALTER TABLE IF EXISTS app.ordem_evento ADD COLUMN IF NOT EXISTS autor_login text")
     )
+    # Contexto da fila e resultado de campo estruturado da OI: colunas nulas, sem efeito nas
+    # ordens que já existem.
+    for coluna in (
+        "fila_posicao integer",
+        "fila_motivos text[]",
+        "fila_kwh_recuperavel_est numeric(16, 3)",
+        "tipo_irregularidade text",
+        "kwh_recuperado numeric(16, 3)",
+    ):
+        connection.execute(
+            text(f"ALTER TABLE IF EXISTS app.ordem_inspecao ADD COLUMN IF NOT EXISTS {coluna}")
+        )
     # Tabela nova (DEC-065): quem atualiza o código sem rodar a carga precisa dela para o login.
     TentativaLogin.__table__.create(connection, checkfirst=True)
     # Auditoria do agente (DEC-046): tokens, usuário e os índices que o limite e o histórico usam.

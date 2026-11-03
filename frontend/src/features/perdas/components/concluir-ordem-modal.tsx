@@ -2,7 +2,12 @@ import { type FormEvent, useEffect, useId, useRef, useState } from "react";
 import { Button } from "#/components/ui/button";
 import { FloatingLabelTextarea } from "#/components/ui/floating-label";
 import { Modal } from "#/components/ui/modal";
-import { mensagemErroOrdem, RESULTADO_ORDEM_ROTULO } from "../conversions";
+import {
+	lerKwhRecuperado,
+	mensagemErroOrdem,
+	RESULTADO_ORDEM_ROTULO,
+	TIPOS_IRREGULARIDADE,
+} from "../conversions";
 import {
 	type AtualizarOrdem,
 	type Ordem,
@@ -25,7 +30,11 @@ export function ConcluirOrdemModal({
 }) {
 	const [resultado, setResultado] = useState<ResultadoOrdem | null>(null);
 	const [observacao, setObservacao] = useState("");
+	const [tipo, setTipo] = useState("");
+	const [kwh, setKwh] = useState("");
 	const [erroCampo, setErroCampo] = useState(false);
+	const [erroTipo, setErroTipo] = useState(false);
+	const [erroKwh, setErroKwh] = useState(false);
 	const [erroApi, setErroApi] = useState<string | null>(null);
 	const [enviando, setEnviando] = useState(false);
 	const primeiroRadio = useRef<HTMLInputElement>(null);
@@ -33,12 +42,22 @@ export function ConcluirOrdemModal({
 	const idFormulario = useId();
 	const idResultado = useId();
 	const idErroCampo = useId();
+	const idTipo = useId();
+	const idTipos = useId();
+	const idKwh = useId();
+	const idErroTipo = useId();
+	const idErroKwh = useId();
+	const irregular = resultado === "IRREGULAR_CONFIRMADA";
 
 	useEffect(() => {
 		if (!open) return;
 		setResultado(null);
 		setObservacao("");
+		setTipo("");
+		setKwh("");
 		setErroCampo(false);
+		setErroTipo(false);
+		setErroKwh(false);
 		setErroApi(null);
 		setEnviando(false);
 	}, [open]);
@@ -51,6 +70,14 @@ export function ConcluirOrdemModal({
 			primeiroRadio.current?.focus();
 			return;
 		}
+		const tipoLimpo = tipo.trim();
+		const kwhLido = irregular ? lerKwhRecuperado(kwh) : null;
+		if (irregular && (!tipoLimpo || kwhLido === null)) {
+			setErroTipo(!tipoLimpo);
+			setErroKwh(kwhLido === null);
+			setErroApi(null);
+			return;
+		}
 		setErroCampo(false);
 		setErroApi(null);
 		setEnviando(true);
@@ -59,6 +86,9 @@ export function ConcluirOrdemModal({
 				status: "CONCLUIDA",
 				resultado,
 				observacao: observacao.trim() || undefined,
+				...(irregular
+					? { tipo_irregularidade: tipoLimpo, kwh_recuperado: kwhLido }
+					: {}),
 			});
 			onConcluida(ordem);
 		} catch (error) {
@@ -126,6 +156,8 @@ export function ConcluirOrdemModal({
 								onChange={() => {
 									setResultado(valor);
 									setErroCampo(false);
+									setErroTipo(false);
+									setErroKwh(false);
 								}}
 								className="size-4 accent-accent"
 							/>
@@ -137,6 +169,63 @@ export function ConcluirOrdemModal({
 					<p id={idErroCampo} className="-mt-2 text-body text-danger">
 						Escolha o resultado da inspeção.
 					</p>
+				)}
+				{irregular && (
+					<div className="flex flex-col gap-4">
+						<div className="flex flex-col gap-1">
+							<label htmlFor={idTipo} className="text-small text-text-muted">
+								Tipo de irregularidade
+							</label>
+							<input
+								id={idTipo}
+								type="text"
+								list={idTipos}
+								value={tipo}
+								maxLength={100}
+								onChange={(event) => {
+									setTipo(event.target.value);
+									setErroTipo(false);
+								}}
+								aria-invalid={erroTipo || undefined}
+								aria-describedby={erroTipo ? idErroTipo : undefined}
+								className="h-10 w-full rounded-md border border-border bg-transparent px-3 text-body text-text outline-none focus-visible:ring-2 focus-visible:ring-focus-ring aria-invalid:border-danger"
+							/>
+							<datalist id={idTipos}>
+								{TIPOS_IRREGULARIDADE.map((opcao) => (
+									<option key={opcao} value={opcao} />
+								))}
+							</datalist>
+							{erroTipo && (
+								<p id={idErroTipo} className="text-body text-danger">
+									Informe o tipo de irregularidade.
+								</p>
+							)}
+						</div>
+						<div className="flex flex-col gap-1">
+							<label htmlFor={idKwh} className="text-small text-text-muted">
+								kWh recuperado
+							</label>
+							<input
+								id={idKwh}
+								type="text"
+								inputMode="decimal"
+								value={kwh}
+								onChange={(event) => {
+									setKwh(event.target.value);
+									setErroKwh(false);
+								}}
+								aria-invalid={erroKwh || undefined}
+								aria-describedby={erroKwh ? idErroKwh : undefined}
+								className="h-10 w-full rounded-md border border-border bg-transparent px-3 text-body text-text tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-focus-ring aria-invalid:border-danger"
+							/>
+							{erroKwh && (
+								<p id={idErroKwh} className="text-body text-danger">
+									Informe o kWh recuperado, maior que zero e com até três casas
+									decimais (ex.: 1.234,5).
+								</p>
+							)}
+						</div>
+					</div>
 				)}
 				<FloatingLabelTextarea
 					label="Observação (opcional)"

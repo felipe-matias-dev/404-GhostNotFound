@@ -6,6 +6,8 @@ import { useMediaQuery } from "#/lib/use-media-query";
 import { AcoesOrdemProvider, useAcoesOrdem } from "../components/acoes-ordem";
 import { FilaSuspeitas } from "../components/fila-suspeitas";
 import { GerarOrdens } from "../components/gerar-ordens";
+import { IndicadoresPerdas } from "../components/indicadores-perdas";
+import { MapaSuspeitas } from "../components/mapa-suspeitas";
 import { OrdensKanban } from "../components/ordens-kanban";
 import { OrdensTable } from "../components/ordens-table";
 import { PlanilhaCampo } from "../components/planilha-campo";
@@ -44,6 +46,18 @@ function OrdensSecao() {
 	const largo = useMediaQuery("(min-width: 48rem)");
 	const visaoEfetiva = largo && canEdit ? visao : "tabela";
 
+	// Sai da página atual: a fila do novo recorte começa na primeira.
+	const escolherRecorte = (proximo: Recorte) =>
+		navigate({
+			search: (prev) => ({
+				...prev,
+				municipio: proximo.municipio,
+				bairro: proximo.bairro,
+				pagina: undefined,
+			}),
+			resetScroll: false,
+		});
+
 	const filtrar = (next: StatusOrdem | undefined) =>
 		navigate({ search: (prev) => ({ ...prev, status: next }) });
 
@@ -73,7 +87,13 @@ function OrdensSecao() {
 					</button>
 				))}
 			</nav>
-			<div id="perdas-fila" hidden={secao !== "fila"}>
+			<IndicadoresPerdas recorte={recorte} />
+			<div
+				id="perdas-fila"
+				hidden={secao !== "fila"}
+				className={secao === "fila" ? "flex flex-col gap-5" : undefined}
+			>
+				<MapaSuspeitas recorte={recorte} onChange={escolherRecorte} />
 				<FilaSuspeitas onVerOrdens={() => setSecao("ordens")} />
 			</div>
 			<div

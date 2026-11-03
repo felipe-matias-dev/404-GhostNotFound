@@ -3,6 +3,7 @@ import type { SortState } from "#/components/ui/data-table";
 import { filtrosCompartilhadosShape, type Recorte } from "#/lib/filtros";
 import {
 	type FiltrosFila,
+	MESES_SEM_INSPECAO,
 	ORDENACAO_FILA,
 	type OrdenacaoFila,
 	STATUS_ORDEM,
@@ -16,6 +17,12 @@ const inteiro = (minimo: number, maximo = Number.MAX_SAFE_INTEGER) =>
 const booleano = z
 	.union([z.boolean(), z.literal("true"), z.literal("false")])
 	.transform((valor) => valor === true || valor === "true")
+	.optional()
+	.catch(undefined);
+
+const mesesSemInspecao = z.coerce
+	.number()
+	.refine((meses) => (MESES_SEM_INSPECAO as readonly number[]).includes(meses))
 	.optional()
 	.catch(undefined);
 
@@ -33,6 +40,8 @@ export const perdasSearchSchema = z.object({
 	medidor_eletromecanico: booleano,
 	leituras_estimadas_min: inteiro(25, 100),
 	leituras_estimadas_max: inteiro(25, 100),
+	sem_ordem_ativa: booleano,
+	sem_inspecao_meses: mesesSemInspecao,
 	pagina: inteiro(1),
 	ordenar_por: ordenarPorSchema,
 	direcao: direcaoSchema,
@@ -76,6 +85,8 @@ export function filtrosDaBusca(search: PerdasSearch): FiltrosFila {
 			search.leituras_estimadas_max,
 			25,
 		),
+		semOrdemAtiva: search.sem_ordem_ativa ?? false,
+		semInspecaoMeses: search.sem_inspecao_meses ?? null,
 	};
 }
 
@@ -104,6 +115,16 @@ const camposLocais: {
 		rotulo: "leituras estimadas",
 		schema: inteiro(25, 100),
 	},
+	{
+		campo: "sem_ordem_ativa",
+		rotulo: "sem ordem ativa",
+		schema: booleano,
+	},
+	{
+		campo: "sem_inspecao_meses",
+		rotulo: "sem inspeção recente",
+		schema: mesesSemInspecao,
+	},
 	{ campo: "pagina", rotulo: "página", schema: inteiro(1) },
 	{ campo: "ordenar_por", rotulo: "ordenação", schema: ordenarPorSchema },
 	{ campo: "direcao", rotulo: "ordenação", schema: direcaoSchema },
@@ -123,6 +144,8 @@ export function buscaCanonicaLocal(
 		medidor_eletromecanico: filtros.medidorEletromecanico ? true : undefined,
 		leituras_estimadas_min: filtros.leiturasEstimadas?.[0],
 		leituras_estimadas_max: filtros.leiturasEstimadas?.[1],
+		sem_ordem_ativa: filtros.semOrdemAtiva ? true : undefined,
+		sem_inspecao_meses: filtros.semInspecaoMeses ?? undefined,
 		pagina:
 			search.pagina !== undefined && search.pagina > 1
 				? search.pagina
@@ -210,6 +233,8 @@ export function patchDosFiltros(filtros: FiltrosFila): Partial<PerdasSearch> {
 		medidor_eletromecanico: filtros.medidorEletromecanico ? true : undefined,
 		leituras_estimadas_min: filtros.leiturasEstimadas?.[0],
 		leituras_estimadas_max: filtros.leiturasEstimadas?.[1],
+		sem_ordem_ativa: filtros.semOrdemAtiva ? true : undefined,
+		sem_inspecao_meses: filtros.semInspecaoMeses ?? undefined,
 		pagina: undefined,
 	};
 }

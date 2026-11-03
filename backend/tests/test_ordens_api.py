@@ -1,4 +1,5 @@
 from datetime import date
+from decimal import Decimal
 
 import pytest
 from fastapi.testclient import TestClient
@@ -8,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from venergy_api.auth import Perfil
 from venergy_api.database import Base
-from venergy_api.models import DimUc, OrdemEvento, OrdemInspecao, Usuario
+from venergy_api.models import DimUc, FilaSuspeita, OrdemEvento, OrdemInspecao, Usuario
 from venergy_api.ordens import StatusOrdem
 from venergy_api.schemas import MAX_ORDENS_POR_PEDIDO
 
@@ -162,7 +163,7 @@ def test_unknown_order_returns_404(client: TestClient) -> None:
     assert response.json() == {"detail": "Ordem de inspeção 999 não encontrada"}
 
 
-def change(client: TestClient, ordem_id: int, **mudanca: str) -> Response:
+def change(client: TestClient, ordem_id: int, **mudanca: str | float) -> Response:
     return client.patch(f"/ordens-inspecao/{ordem_id}", json=mudanca)
 
 
@@ -177,6 +178,8 @@ def test_full_flow_records_the_result_and_every_step_in_the_history(
         ordem["id"],
         status="CONCLUIDA",
         resultado="IRREGULAR_CONFIRMADA",
+        tipo_irregularidade="DESVIO DIRETO",
+        kwh_recuperado=850.5,
         observacao="Desvio antes do medidor",
     )
 
@@ -185,6 +188,10 @@ def test_full_flow_records_the_result_and_every_step_in_the_history(
     assert concluida["status"] == "CONCLUIDA"
     assert concluida["resultado"] == "IRREGULAR_CONFIRMADA"
     assert concluida["observacao"] == "Desvio antes do medidor"
+    assert (concluida["tipo_irregularidade"], concluida["kwh_recuperado"]) == (
+        "DESVIO DIRETO",
+        850.5,
+    )
     assert [(e["status_anterior"], e["status_novo"]) for e in concluida["eventos"]] == [
         (None, "GERADA"),
         ("GERADA", "EM_CAMPO"),
@@ -347,3 +354,66 @@ def test_author_no_longer_in_the_users_table_keeps_the_login_without_a_name(
     [evento] = client.get(f"/ordens-inspecao/{ordem['id']}").json()["eventos"]
 
     assert (evento["autor_login"], evento["autor_nome"]) == ("teste", None)
+
+
+def test_order_copies_the_queue_context_and_keeps_it_when_the_unit_leaves_the_queue(
+    client: TestClient, engine: Engine
+) -> None:
+    with Session(engine) as session, session.begin():
+        session.add(
+            FilaSuspeita(
+                cod_uc="0001",
+                score_suspeita=7,
+                motivos=["Medidor eletromecânico"],
+                kwh_recuperavel_est=Decimal("42.500"),
+            )
+        )
+
+    dentro, fora = create_orders(client, "0001", "0002")
+
+    assert (dentro["fila_posicao"], dentro["fila_motivos"], dentro["fila_kwh_recuperavel_est"]) == (
+        7,
+        ["Medidor eletromecânico"],
+        42.5,
+    )
+    assert (fora["fila_posicao"], fora["fila_motivos"], fora["fila_kwh_recuperavel_est"]) == (
+        None,
+        None,
+        None,
+    )
+    with Session(engine) as session, session.begin():
+        session.query(FilaSuspeita).delete()
+    assert client.get(f"/ordens-inspecao/{dentro['id']}").json()["fila_posicao"] == 7
+
+
+@pytest.mark.parametrize(
+    "campos",
+    [
+        {"resultado": "IRREGULAR_CONFIRMADA"},
+        {"resultado": "IRREGULAR_CONFIRMADA", "tipo_irregularidade": "DESVIO"},
+        {"resultado": "IRREGULAR_CONFIRMADA", "kwh_recuperado": 10},
+        {"resultado": "IRREGULAR_CONFIRMADA", "tipo_irregularidade": "DESVIO", "kwh_recuperado": 0},
+        {"resultado": "IRREGULAR_CONFIRMADA", "tipo_irregularidade": "D", "kwh_recuperado": 0.0004},
+        {"resultado": "IRREGULAR_CONFIRMADA", "tipo_irregularidade": "D", "kwh_recuperado": 1e13},
+        {"resultado": "REGULAR", "tipo_irregularidade": "DESVIO"},
+        {"resultado": "REGULAR", "kwh_recuperado": 10},
+        {"resultado": "NAO_REALIZADA", "kwh_recuperado": 10},
+    ],
+)
+def test_field_result_details_follow_the_result(client: TestClient, campos: dict) -> None:
+    [ordem] = create_orders(client, "0001")
+    change(client, ordem["id"], status="EM_CAMPO")
+
+    response = change(client, ordem["id"], status="CONCLUIDA", **campos)
+
+    assert response.status_code == 422
+    assert client.get(f"/ordens-inspecao/{ordem['id']}").json()["status"] == "EM_CAMPO"
+
+
+def test_a_regular_result_is_stored_without_field_details(client: TestClient) -> None:
+    [ordem] = create_orders(client, "0001")
+    change(client, ordem["id"], status="EM_CAMPO")
+
+    concluida = change(client, ordem["id"], status="CONCLUIDA", resultado="REGULAR").json()
+
+    assert (concluida["tipo_irregularidade"], concluida["kwh_recuperado"]) == (None, None)
