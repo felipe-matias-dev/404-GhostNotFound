@@ -20,6 +20,8 @@ Pipeline de dados, portal e agente de IA construídos para responder a essa perg
 
 Time 404-GhostNotFound · Rocket Lab 2026.2 · Visagio
 
+![Visão geral do portal VE-360: receita e energia faturada em 12 meses corridos, efeitos da variação da receita e indicadores de rede e atendimento](docs/img/portal-visao-geral.png)
+
 </div>
 
 ---
