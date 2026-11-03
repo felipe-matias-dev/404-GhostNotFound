@@ -68,7 +68,7 @@ Cada parte do sistema responde à pergunta de uma pessoa da V-Energy.
 
 A Rede também localiza a continuidade num mapa único da RMR: o mesmo seletor **DEC | FEC** da tabela troca a cor dos municípios e dos bairros. DEC mede horas sem energia por UC; FEC, interrupções por UC. A intensidade vai de zero ao maior índice das regiões da malha no período e classe escolhidos, sem classificar conformidade regulatória. Clicar filtra a tela; regiões sem correspondência geográfica continuam na tabela, com aviso no mapa.
 
-Na fila de perdas, **Filtros** combina queda de consumo, medidor eletromecânico, leituras estimadas, UCs sem ordem ativa e UCs sem inspeção nos últimos 6, 12, 24 ou 36 meses (Gold ou portal). A Gold só informa leituras estimadas a partir de 25%; o filtro aceita de 25% a 100% e não inclui percentuais inferiores ou desconhecidos. Os filtros atuam antes da paginação ([DEC-051](docs/decisoes.md#dec-051--filtro-de-queda-na-fila-de-suspeitas)). No topo, a tela mostra suspeitas, ordens e a taxa de irregularidade das vistorias do portal ao lado da histórica da Gold, e um mapa com as suspeitas e o kWh/mês estimado por município e bairro; cada ordem guarda a posição e os motivos da fila na geração e, quando irregular, o tipo e o kWh recuperado ([DEC-073](docs/decisoes.md#dec-073--ordem-de-inspeção-guarda-o-contexto-da-fila-e-o-resultado-de-campo), [DEC-074](docs/decisoes.md#dec-074--tela-de-perdas-indicadores-mapa-última-inspeção-e-filtros-novos-da-fila)).
+Na fila de perdas, **Filtros** combina queda de consumo, medidor eletromecânico, leituras estimadas, UCs sem ordem ativa e UCs sem inspeção nos últimos 6, 12, 24 ou 36 meses (Gold ou portal). A Gold só informa leituras estimadas a partir de 25%; o filtro aceita de 25% a 100% e não inclui percentuais inferiores ou desconhecidos. Os filtros atuam antes da paginação ([DEC-051](docs/decisoes.md#dec-051--filtro-de-queda-na-fila-de-suspeitas)). No topo, a tela mostra suspeitas, ordens e a taxa de irregularidade das vistorias do portal ao lado da histórica da Gold, e um mapa com as suspeitas e o kWh/mês estimado por município e bairro; cada ordem guarda a posição e os motivos da fila na geração e, quando irregular, o tipo e o kWh recuperado ([DEC-075](docs/decisoes.md#dec-075--ordem-de-inspeção-guarda-o-contexto-da-fila-e-o-resultado-de-campo), [DEC-076](docs/decisoes.md#dec-076--tela-de-perdas-indicadores-mapa-última-inspeção-e-filtros-novos-da-fila)).
 
 As telas de análise compartilham o recorte: a barra superior grava na URL município, bairro, classe e o par de períodos, de modo que Visão geral, Receita, Rede e Perdas descrevem o mesmo recorte e um link reproduz a análise; os filtros próprios de cada tela ficam só na sessão do navegador ([DEC-060](docs/decisoes.md#dec-060--filtros-compartilhados-entre-as-telas-do-portal)). Em Perdas o período é apenas contexto, porque a fila é um retrato da Gold e as ordens de inspeção são estado atual; e a consulta individual de UC mostra o histórico completo, sem o recorte da análise ([DEC-058](docs/decisoes.md#dec-058--período-é-contexto-em-perdas-e-a-consulta-de-uc-não-é-limitada-pelo-recorte)). A ordem de uma UC que saiu do cadastro da Gold continua na lista sem recorte e fica fora quando há recorte, já que a localização só existe no cadastro ([DEC-059](docs/decisoes.md#dec-059--ordem-de-uc-ausente-do-cadastro-da-gold-fica-fora-da-lista-quando-há-recorte)).
 
@@ -203,7 +203,7 @@ estimada ganha um aviso. Fórmula e limites em
 
 ## Decisões que defendemos
 
-O registro completo, com 62 decisões numeradas e as suposições, está em [`docs/decisoes.md`](docs/decisoes.md). Estas são as que mais mudam o produto.
+O registro completo, com todas as decisões numeradas e as suposições, está em [`docs/decisoes.md`](docs/decisoes.md). Estas são as que mais mudam o produto.
 
 **PostgreSQL com schemas `gold` e `app`** · [DEC-002](docs/decisoes.md#dec-002--banco-local-postgresql)
 - **Problema:** o agente precisa de um usuário que só lê, e a recarga da Gold não pode apagar o trabalho de campo.
@@ -408,12 +408,24 @@ pelo FastAPI. O frontend gera dele um client tipado: ver
 ## Workflow no Databricks
 
 O Job `v_energy_workflow` ([`data-engineering/workflow/v_energy_workflow.yaml`](data-engineering/workflow/v_energy_workflow.yaml))
-roda `Landing_to_Bronze` → `Bronze_to_Silver` → `Silver_to_Gold` direto da branch `main` do GitHub, em compute serverless.
-A última task grava a Gold e exporta os 12 CSVs para `/Volumes/v_energy/gold/csv`. O agendamento é mensal, no dia 6
+roda `Landing_to_Bronze` → `Bronze_to_Silver` → `Silver_to_Gold` → `Testes_Qualidade_Gold` direto da branch `main` do GitHub,
+em compute serverless.
+A terceira task grava a Gold e exporta os 12 CSVs para `/Volumes/v_energy/gold/csv`. A quarta, `testes_qualidade`
+([`Testes_Qualidade_Gold`](data-engineering/notebooks/Testes_Qualidade_Gold.ipynb)), confere os CSVs contra a Gold e as
+reconciliações entre tabelas, somente leitura; um teste crítico com falha deixa o Job vermelho
+([DEC-074](docs/decisoes.md#dec-074--testes-de-qualidade-do-export-e-da-gold), detalhes em
+[`data-engineering/README.md`](data-engineering/README.md#testes-de-qualidade)). O agendamento é mensal, no dia 6
 (D+5 do fechamento do faturamento), e fica pausado porque o dataset do case é uma extração única
 ([DEC-039](docs/decisoes.md#dec-039--workflow-do-databricks-e-agendamento-mensal)).
 
 ![Execução bem-sucedida do Workflow no Databricks](docs/img/workflow-databricks.png)
+
+A task de testes foi adicionada depois da última execução completa do Job e validada isoladamente contra a Gold atual; a próxima
+execução completa roda as quatro tasks.
+
+![Resumo por tabela da execução isolada dos testes de qualidade](docs/img/testes-qualidade.png)
+
+*Resumo por tabela da execução isolada dos testes: 80 testes, 68 críticos OK e 12 de variação de linhas gravados como linha de base. O resultado completo de cada execução fica em `v_energy.qualidade.resultados_testes`.*
 
 **Para reexecutar:** em **Jobs & Pipelines → v_energy_workflow**, clique em **Run now** uma vez.
 
@@ -465,6 +477,6 @@ Toda suposição feita onde o case não é explícito está em [docs/decisoes.md
 
 | Frente | Integrantes |
 |---|---|
-| Engenharia de Dados | Arthur Oliveira, Alysson, Gabriel |
+| Engenharia de Dados | Arthur Oliveira, Alisson, Gabriel |
 | Portal Web | Felipe Matias, João Euclides |
 | Inteligência Artificial | Luis Felipe Perylo, Lucas Mendes |

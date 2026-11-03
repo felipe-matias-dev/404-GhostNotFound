@@ -1,6 +1,12 @@
 import { API_URL, ApiError, api, unwrap } from "#/lib/api";
 import type { paths } from "#/lib/api-schema.gen";
-import type { AuditoriaIa, PerguntaIa, RespostaIa } from "./types";
+import type {
+	AlteracaoSessaoIa,
+	AuditoriaIa,
+	PerguntaIa,
+	RespostaIa,
+	SessaoIa,
+} from "./types";
 
 export const agenteKeys = {
 	all: ["agente"] as const,
@@ -81,6 +87,30 @@ export function buscarAuditoriaIa(
 		api.GET("/ai/audit/{audit_id}", {
 			params: { path: { audit_id: auditId } },
 			signal,
+		}),
+	);
+}
+
+export function buscarSessoesIa(signal?: AbortSignal): Promise<SessaoIa[]> {
+	return unwrap(api.GET("/ai/sessions", { signal }));
+}
+
+export function alterarSessaoIa(
+	sessionId: string,
+	alteracao: AlteracaoSessaoIa,
+): Promise<SessaoIa> {
+	return unwrap(
+		api.PATCH("/ai/sessions/{session_id}", {
+			params: { path: { session_id: sessionId } },
+			body: alteracao,
+		}),
+	);
+}
+
+export async function excluirSessaoIa(sessionId: string): Promise<void> {
+	await unwrap(
+		api.DELETE("/ai/sessions/{session_id}", {
+			params: { path: { session_id: sessionId } },
 		}),
 	);
 }
