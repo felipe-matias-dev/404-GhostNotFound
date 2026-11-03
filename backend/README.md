@@ -14,7 +14,7 @@ PostgreSQL local, que é carregado a partir de CSVs.
 ## Como rodar
 
 Só quer o portal no ar? `docker compose up` sobe banco, API e frontend juntos: ver o
-[README da raiz](../README.md#como-executar-localmente). Os passos abaixo rodam a API
+[README da raiz](../README.md#como-executar). Os passos abaixo rodam a API
 direto na máquina, que é o caminho para desenvolver e rodar os testes.
 
 Primeiro o banco, na **raiz do repositório**:
