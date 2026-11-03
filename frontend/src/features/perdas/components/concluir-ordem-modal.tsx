@@ -220,7 +220,8 @@ export function ConcluirOrdemModal({
 							/>
 							{erroKwh && (
 								<p id={idErroKwh} className="text-body text-danger">
-									Informe o kWh recuperado, maior que zero (ex.: 1.234,5).
+									Informe o kWh recuperado, maior que zero e com até três casas
+									decimais (ex.: 1.234,5).
 								</p>
 							)}
 						</div>

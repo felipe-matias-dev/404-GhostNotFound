@@ -116,6 +116,20 @@ describe("lerKwhRecuperado", () => {
 		expect(lerKwhRecuperado("1234")).toBe(1234);
 	});
 
+	it("lê o ponto sem vírgula como a planilha de campo: milhar em grupos de três", () => {
+		expect(lerKwhRecuperado("1.234")).toBe(1234);
+		expect(lerKwhRecuperado("12.345.678")).toBe(12345678);
+		expect(lerKwhRecuperado("1234.5")).toBe(1234.5);
+		expect(lerKwhRecuperado("1.23")).toBe(1.23);
+	});
+
+	it("recusa o que numeric(16,3) arredondaria ou não guarda", () => {
+		expect(lerKwhRecuperado("0,0004")).toBeNull();
+		expect(lerKwhRecuperado("1,2345")).toBeNull();
+		expect(lerKwhRecuperado("10000000000000")).toBeNull();
+		expect(lerKwhRecuperado("9999999999999,5")).toBe(9999999999999.5);
+	});
+
 	it("recusa texto, zero e negativo", () => {
 		expect(lerKwhRecuperado("")).toBeNull();
 		expect(lerKwhRecuperado("abc")).toBeNull();
