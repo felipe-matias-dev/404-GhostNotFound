@@ -408,12 +408,24 @@ pelo FastAPI. O frontend gera dele um client tipado: ver
 ## Workflow no Databricks
 
 O Job `v_energy_workflow` ([`data-engineering/workflow/v_energy_workflow.yaml`](data-engineering/workflow/v_energy_workflow.yaml))
-roda `Landing_to_Bronze` → `Bronze_to_Silver` → `Silver_to_Gold` direto da branch `main` do GitHub, em compute serverless.
-A última task grava a Gold e exporta os 12 CSVs para `/Volumes/v_energy/gold/csv`. O agendamento é mensal, no dia 6
+roda `Landing_to_Bronze` → `Bronze_to_Silver` → `Silver_to_Gold` → `Testes_Qualidade_Gold` direto da branch `main` do GitHub,
+em compute serverless.
+A terceira task grava a Gold e exporta os 12 CSVs para `/Volumes/v_energy/gold/csv`. A quarta, `testes_qualidade`
+([`Testes_Qualidade_Gold`](data-engineering/notebooks/Testes_Qualidade_Gold.ipynb)), confere os CSVs contra a Gold e as
+reconciliações entre tabelas, somente leitura; um teste crítico com falha deixa o Job vermelho
+([DEC-074](docs/decisoes.md#dec-074--testes-de-qualidade-do-export-e-da-gold), detalhes em
+[`data-engineering/README.md`](data-engineering/README.md#testes-de-qualidade)). O agendamento é mensal, no dia 6
 (D+5 do fechamento do faturamento), e fica pausado porque o dataset do case é uma extração única
 ([DEC-039](docs/decisoes.md#dec-039--workflow-do-databricks-e-agendamento-mensal)).
 
 ![Execução bem-sucedida do Workflow no Databricks](docs/img/workflow-databricks.png)
+
+A task de testes foi adicionada depois da última execução completa do Job e validada isoladamente contra a Gold atual; a próxima
+execução completa roda as quatro tasks.
+
+![Resumo por tabela da execução isolada dos testes de qualidade](docs/img/testes-qualidade.png)
+
+*Resumo por tabela da execução isolada dos testes: 80 testes, 68 críticos OK e 12 de variação de linhas gravados como linha de base. O resultado completo de cada execução fica em `v_energy.qualidade.resultados_testes`.*
 
 **Para reexecutar:** em **Jobs & Pipelines → v_energy_workflow**, clique em **Run now** uma vez.
 
