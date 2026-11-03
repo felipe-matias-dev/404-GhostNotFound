@@ -2,7 +2,7 @@ import { Badge } from "#/components/ui/badge";
 import { DataTable, type DataTableColumn } from "#/components/ui/data-table";
 import { useSession } from "#/features/auth";
 import type { Recorte } from "#/lib/filtros";
-import { formatDataHora } from "#/lib/format";
+import { formatDataHora, formatKWh } from "#/lib/format";
 import { RESULTADO_ORDEM_ROTULO, STATUS_ORDEM_VISUAL } from "../conversions";
 import { chaveDoRecorte, useOrdens } from "../hooks/use-ordens";
 import { type OrdemDaTela, STATUS_ORDEM, type StatusOrdem } from "../types";
@@ -44,6 +44,14 @@ const COLUNAS: DataTableColumn<OrdemDaTela>[] = [
 		id: "resultado",
 		header: "Resultado",
 		value: (o) => (o.resultado ? RESULTADO_ORDEM_ROTULO[o.resultado] : null),
+	},
+	{
+		id: "kwh_recuperado",
+		header: "kWh recuperado",
+		width: "152px",
+		numeric: true,
+		value: (o) => o.kwh_recuperado,
+		cell: (o) => (o.kwh_recuperado == null ? "" : formatKWh(o.kwh_recuperado)),
 	},
 	{
 		id: "no_status",

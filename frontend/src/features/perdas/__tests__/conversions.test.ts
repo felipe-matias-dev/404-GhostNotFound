@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { ApiError } from "#/lib/api";
 import {
 	acaoParaDestino,
+	lerKwhRecuperado,
 	mensagemErroOrdem,
 	paraOrdensDaTela,
 	segundosNoStatus,
@@ -105,5 +106,20 @@ describe("paraOrdensDaTela", () => {
 			{ ...ORDEM_DA_API, recebida_em: 42 },
 			{ ...outra, recebida_em: 42 },
 		]);
+	});
+});
+
+describe("lerKwhRecuperado", () => {
+	it("aceita vírgula decimal pt-BR, com ou sem separador de milhar", () => {
+		expect(lerKwhRecuperado("1.234,5")).toBe(1234.5);
+		expect(lerKwhRecuperado("350,25")).toBe(350.25);
+		expect(lerKwhRecuperado("1234")).toBe(1234);
+	});
+
+	it("recusa texto, zero e negativo", () => {
+		expect(lerKwhRecuperado("")).toBeNull();
+		expect(lerKwhRecuperado("abc")).toBeNull();
+		expect(lerKwhRecuperado("0")).toBeNull();
+		expect(lerKwhRecuperado("-5")).toBeNull();
 	});
 });

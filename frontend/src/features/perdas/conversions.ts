@@ -201,3 +201,25 @@ export function segundosNoStatus(ordem: OrdemDaTela, agora: number): number {
 	const decorrido = Math.max(0, agora - ordem.recebida_em);
 	return ordem.segundos_no_status + Math.floor(decorrido / 1000);
 }
+
+/** Tipos de irregularidade mais comuns da planilha de campo; o campo aceita qualquer outro texto. */
+export const TIPOS_IRREGULARIDADE = [
+	"DESVIO DIRETO",
+	"BY-PASS",
+	"MEDIDOR ADULTERADO",
+	"LIGAÇÃO CLANDESTINA",
+] as const;
+
+/**
+ * kWh digitado em pt-BR ("1.234,5" ou "1234,5") ou com ponto decimal ("1234.5"). Devolve `null`
+ * para texto que não é um número ou para valor que não é maior que zero, como o backend exige.
+ */
+export function lerKwhRecuperado(texto: string): number | null {
+	const limpo = texto.trim().replace(/\s/g, "");
+	const normalizado = limpo.includes(",")
+		? limpo.replace(/\./g, "").replace(",", ".")
+		: limpo;
+	if (!/^\d+(\.\d+)?$/.test(normalizado)) return null;
+	const valor = Number(normalizado);
+	return valor > 0 ? valor : null;
+}
