@@ -32,7 +32,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | 22/10/2026 | DEC-020: o `AgentAnswer` ganha `status` (`answered`, `unknown`, `clarify`, `refused`, `failed`), `truncated`, `refused_reason`, `model` e `latency_ms`, com invariantes por status | O portal distingue resposta, "não sei", esclarecimento e falha; a auditoria guarda modelo e latência | Lucas |
 | 22/10/2026 | DEC-021: com filtro de município, bairro ou classe, a receita e o kWh são somados no backend a partir da fato e do cadastro; DEC e FEC ficam no total da empresa e por alimentador | Receita e kWh se somam; somar DEC de alimentadores por bairro daria um número errado | Felipe |
 | 21/10/2026 | DEC-022: o agente só lê colunas não sensíveis das tabelas liberadas no contrato, e "receita" sem qualificador é a receita faturada | Dado pessoal e texto livre ficam fora do agente; uma definição única de receita evita respostas divergentes | Alisson |
-| 22/10/2026 | DEC-023: receita da Gold em três medidas (total, energia e tributos), com a energia como base provisória do PVM; consumo médio nulo sem leitura; `potencia_kwp`; reconciliação do faturamento e da energia | Nenhum valor descartado sem explicação; os números da diretoria podem ser conciliados com os da Gold | Alisson |
+| 22/10/2026 | DEC-023: receita da Gold em três medidas (total, energia e tributos), com a energia como base provisória do PVM (confirmada na DEC-073); consumo médio nulo sem leitura; `potencia_kwp`; reconciliação do faturamento e da energia | Nenhum valor descartado sem explicação; os números da diretoria podem ser conciliados com os da Gold | Alisson |
 | 22/10/2026 | DEC-024: resultados agregados necessários para sustentar uma hipótese podem ir ao repositório; identificação de pessoas e de UCs e dado de LGPD ficam mascarados; linha a linha, amostras e outputs nunca sobem | O diagnóstico precisa mostrar a evidência, mas o dataset é confidencial e há dado pessoal | Alisson |
 | 23/10/2026 | DEC-025 (proposta): mapa da RMR com a malha municipal 2025 e a malha de bairros do Censo 2022 do IBGE, os 15 municípios da LC estadual 382/2018, e município e bairro da Gold casados com os do mapa pelo nome normalizado | O mapa vira o seletor principal de município e bairro sem mudar o contrato da Gold; o que está na Gold é clicável, o resto aparece apagado | João Euclides |
 | 23/10/2026 | DEC-026: ações das OIs na tela de perdas (enviar a campo, concluir, cancelar, histórico, gerar) com Kanban das ativas e troca Kanban ⇄ tabela lembrada no navegador | O gerente acompanha e move as OIs sem sair da tela; o backend continua sendo o dono da máquina de estados | João Euclides |
@@ -71,6 +71,8 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | 02/11/2026 | DEC-070: a checagem da narrativa do agente aceita o valor da linha arredondado às casas escritas, os dois meses de um par `AAAA-MM/AAAA-MM`, o ano de um prefixo `AAAA-%` e o ano sozinho quando o filtro cobre anos inteiros; as suposições chegam ao redator sem nomes técnicos | Na Gold real, 9 de 10 respostas saíam no texto de reserva; a maior parte era narrativa correta descartada pela própria checagem | Luis Felipe |
 | 01/11/2026 | DEC-071: a tela de Rede ganha a faixa de indicadores do recorte (DEC, FEC, horas interrompidas, interrupções e UCs) contra o período base, colunas de horas e interrupções com busca e ordenação na tabela, trilha no Header, e o painel do alimentador mostra DEC e FEC juntos com a empresa como referência; o parâmetro `serie` sai da URL | A operação precisa ver quem piorou, quanto pesa cada alimentador e se ele está fora do padrão da empresa, com dados que a API já devolvia; nada é calculado na tela | João Euclides |
 | 01/11/2026 | DEC-072: a tela de Rede ganha variação contra a base em cada linha, ranking de alimentadores com recorte, ranking plano de bairros, série do alimentador dentro do recorte contra o recorte inteiro e a seção "Por que cai" (causa, tipo, UCs atingidas e reincidentes, duração), de `gold_interrupcoes_uc` | A operação precisa saber quem piorou, onde atacar e por que cai, com dados que já estão na Gold; toda conta fica no backend | João Euclides |
+| 01/11/2026 | DEC-073: `receita_energia` confirmada como base do PVM e da tarifa média, depois do teste declarado da DEC-023 | O teste da DEC-023 não distingue as definições (no dataset, os tributos são proporção fixa da fatura); a decisão segue o conceito: tributos não são receita da distribuidora | Arthur |
+| 01/11/2026 | DEC-067: as UCs de teste do cadastro (UC-12, prefixo `TESTE`) ficam na `gold_dim_uc` até depois da entrega, documentadas | Não afetam receita, energia, DEC/FEC, recortes nem fila; tirá-las exigiria regravar Silver e Gold perto do code freeze | Arthur |
 
 ## DEC-001 · Localização dos arquivos de origem (landing)
 
@@ -642,7 +644,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 
 - **Data:** 22/10/2026 · **Área:** Dados · **Autor:** Alisson
 - **Status:** decidido no time de Dados; a base oficial da receita do PVM só é confirmada depois da
-  reconciliação.
+  reconciliação. **Atualização (01/11/2026):** confirmada na [DEC-073](#dec-073--receita_energia-confirmada-como-base-do-pvm-e-da-tarifa-média).
 - **Contexto:** a Silver de faturas traz o valor da energia, os tributos e o valor total da fatura
   (total = energia + tributos), e o glossário do projeto define a receita faturada como o valor
   emitido na fatura. Faltava dizer qual valor sustenta o PVM e a tarifa média, e como tratar as
@@ -1736,7 +1738,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
     esse JSON depois.
 - **Limitações conhecidas:**
   - A parte "tributos" é a variação total dos impostos, sem separar alíquota de base de cálculo.
-  - `receita_energia` ainda é a base provisória da DEC-023: se a reconciliação mudar a definição, a fórmula acompanha sem mudar o
+  - `receita_energia`, base das partes consumo, bandeira e tarifa, foi confirmada na DEC-073: se a definição mudar um dia, a fórmula acompanha sem mudar o
     contrato da rota.
   - O consumo mistura gastar mais por dia e a conta cobrir mais dias: com o dado atual não há como separar os dois sem inventar
     uma proporção. Os dias na tela deixam a atendente ver quando a diferença de dias é grande.
@@ -1949,6 +1951,22 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Decisão:** o prompt `insight/v3` passa a ser o padrão: no máximo duas frases, sem repetir a variação nem os efeitos, com a leitura que a tela não resume. O backend acrescenta ao JSON `fatores_a_favor`, `fatores_contra`, `maior_fator`, `n_segmentos_em_queda`, `maior_queda_participacao_pct`, `n_segmentos_quantidade_em_queda`, `n_segmentos_alta_so_por_preco` e `bandeira_no_preco_pct`. O cálculo fica no backend e o LLM continua só narrando, com todo número conferido contra o JSON (DEC-019). O backend escolhe a leitura mais forte por regra (`leitura_principal`), inclusive a comparação com o recorte de cima para recortes pequenos, e escreve o texto dela (`leitura_texto`). O modelo só redige: se ele falhar, ou se o texto trouxer outros números, jargão, outros sentidos ou uma conclusão a mais, a tela mostra o texto da regra, com `origem: regra`, fora do cache. Não há nova tentativa na hora, porque com temperatura 0 o modelo repetiria o texto. Com a IA desligada, vale o mesmo. O texto do modelo também precisa manter a sequência de altas e quedas da leitura. Percentuais dos efeitos sobre a base foram testados e retirados: levaram o texto a escrever "o preço subiu 12,3%".
 - **Medição:** 11 recortes da Gold real, pela função da rota `GET /receita/insight`, sem login, com leitura de cada texto. A rodada fixa é `make eval-insights`, com dois casos sintéticos para o que a base não tem (perfil de consumo como maior fator e recorte sem receita base).
 
+## DEC-067 · UCs de teste do cadastro ficam na Gold, documentadas
+
+- **Data:** 01/11/2026 · **Área:** Dados · **Autor:** Arthur · **Complementa:** UC-12 ([`qualidade-dados.md`](qualidade-dados.md)) e DEC-030
+- **Contexto:** no QA da Gold oficial (27/10), as UCs da UC-12 (documento de preenchimento repetido, sem medidor) se revelaram cadastro de teste do sistema de origem: o `cod_uc` tem prefixo `TESTE`. Conferido na Gold: são exatamente as UCs da UC-12 e não têm fatura, medidor, ocorrência, chamado nem inspeção, nem entram na fila de suspeitas.
+- **Decisão:** as UCs continuam na `gold_dim_uc` até depois da entrega, com o caso documentado no contrato, no dicionário, na UC-12 e no diagnóstico (H6 e Recomendação 3 deixam de tratá-las como receita a recuperar). A Silver também as mantém, marcadas por `flag_documento_repetido`.
+- **Motivo:** tirá-las exige mudar a Silver e a Gold e rodar o Workflow de novo perto do code freeze (03/11). O ganho não paga o risco agora.
+- **Consequências:**
+  - receita, energia, `n_uc` (UCs faturadas, DEC-030), DEC/FEC, recortes, decomposição e fila não mudam, porque essas UCs não têm fatura nem ocorrência;
+  - contagens feitas direto na `gold_dim_uc` (ex.: quantas UCs há num bairro) incluem essas UCs, no agente e no portal. Ex.: o G001 do golden set ("Quantas UCs existem na base?") conta o cadastro de teste, enquanto o diagnóstico fala nas UCs válidas;
+  - o diagnóstico da receita não trata mais essas UCs como vazamento: a H6 passa a parcialmente confirmada (só as faturas órfãs, `FAT-05`) e a Recomendação 3 deixa de estimar energia e receita recuperáveis nelas;
+  - a consulta de UC consegue abrir uma delas, que aparece sem consumo, faturas, medidor ou chamados.
+- **Descartado:**
+  - **excluir agora da Gold:** pelo motivo acima;
+  - **apagar na Silver:** a Silver não descarta cadastro (UC-12).
+- **Evolução:** `flag_uc_teste` na Silver e exclusão na `gold_dim_uc`, com trava "nenhuma UC de teste na Gold"; ou filtro na view `sem_uc` (camada semântica do GenAI), que corrige as contagens do agente sem rodar o Workflow de novo.
+
 ## DEC-068 · Rastreamento das requisições com OpenTelemetry
 
 - **Data:** 01/11/2026 · **Área:** Backend e infraestrutura · **Autor:** Felipe
@@ -2059,3 +2077,13 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   - Ligar as interrupções à perda de receita: a hipótese H7 foi refutada.
   - Limites da ANEEL (DIC, FIC, DMIC) para reincidência e duração: o DEC/FEC do case é simplificado (`docs/dicionario-de-dados.md`).
 - **Consequências:** `gold_interrupcoes_uc` passa a ter a tela DEC/FEC em `consumers` (DEC-014). No frontend saem `useSerieAlimentador`, `buscarSerieAlimentador`, o tipo `ReferenciaMensal`, o uso de `/indicadores/mensal` no painel, a opção desligada e a mensagem "Limpe o recorte…". `visao` aceita `alimentadores`, `bairros` e `localidades`, e a memória da Rede (DEC-060) guarda `criterio`, `visao`, `alimentador` e `painel`; mudar o recorte ou o período fecha o painel e esquece o tamanho. A `DataTable` ganha o ponto `xl` (36rem) para virar tabela em containers estreitos e alinha à esquerda o cabeçalho das colunas que não ordenam. A faixa de indicadores da DEC-071 não muda.
+
+## DEC-073 · `receita_energia` confirmada como base do PVM e da tarifa média
+
+- **Data:** 01/11/2026 · **Área:** Dados · **Autor:** Arthur · **Revisa:** DEC-023 (base provisória) · **Número:** revisada no #126 como DEC-066 e renumerada, porque a DEC-066 ficou com o insight da Receita
+- **Contexto:** a DEC-023 deixou `receita_energia` (sem tributos) como base provisória do PVM e da `tarifa_media`, até um teste declarado: medir qual definição, com ou sem tributos, reproduz a variação citada pela diretoria, sem ajustar números.
+- **Resultado do teste:** feito no diagnóstico ([`diagnostico-receita.md`](diagnostico-receita.md), seções 2 e 4). Entre o período base e o atual, a receita varia +8,00% tanto em `receita_energia` quanto em `receita_faturada` (com tributos): as duas definições reproduzem a variação da diretoria, e a diferença fica só nos valores absolutos. **O teste não distingue as duas:** no dataset, os tributos são uma proporção fixa da fatura em todos os meses, então qualquer variação percentual sai igual com e sem eles. A decomposição do período base para o atual fecha exatamente com a variação da `receita_energia`.
+- **Decisão:** `receita_energia` passa a ser a base oficial de `receita_base`, `receita_atual`, `tarifa_media` e `receita_energia_cadastro`. Nenhum número, coluna ou fórmula muda. "Receita" sem qualificador continua sendo `receita_faturada` (DEC-022).
+- **Motivo:** como o teste não distingue, a decisão se apoia no conceito: tributos não são receita da distribuidora. Sem eles, o efeito preço separa reajuste de tarifa e bandeira, e a variação dos impostos aparece à parte (como na conta da UC, DEC-057).
+- **Descartado:** `receita_faturada` como base do PVM. Daria a mesma variação percentual, mas misturaria a variação dos tributos com o efeito preço.
+- **Consequências:** saem as marcas de "provisória" do contrato, do dicionário e da DEC-057. O comentário de `backend/src/venergy_api/models.py` que cita a base provisória fica para um ajuste do Portal.
