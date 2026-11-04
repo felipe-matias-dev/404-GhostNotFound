@@ -204,13 +204,19 @@ export function UnidadeConsumidoraPage() {
 											: "Tente novamente para consultar o histórico."}
 								</p>
 							</div>
-							<Button
-								variant="outline"
-								disabled={query.isFetching}
-								onClick={() => void query.refetch()}
-							>
-								Tentar de novo
-							</Button>
+							{naoEncontrada && !data ? (
+								<Button variant="outline" onClick={abrir}>
+									Buscar outra UC
+								</Button>
+							) : (
+								<Button
+									variant="outline"
+									disabled={query.isFetching}
+									onClick={() => void query.refetch()}
+								>
+									Tentar de novo
+								</Button>
+							)}
 						</div>
 					)}
 					{data ? (
