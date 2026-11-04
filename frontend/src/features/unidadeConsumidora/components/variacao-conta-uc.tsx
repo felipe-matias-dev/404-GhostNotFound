@@ -29,7 +29,7 @@ function tom(valor: number) {
 export function VariacaoContaUc({ data }: { data: Uc360 }) {
 	const variacao = data.variacao_conta;
 	// O insight responde ao "a conta veio alta": se o consumo subiu mesmo, e se é de um mês só.
-	const insight = useInsightUc(data.cadastro.cod_uc);
+	const insight = useInsightUc(data);
 
 	return (
 		<section

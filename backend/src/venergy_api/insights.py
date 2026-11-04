@@ -61,6 +61,16 @@ def _decimal(numero: str) -> Decimal:
     return Decimal(numero.replace(".", "").replace(",", "."))
 
 
+def _variacoes(texto: str) -> set[Decimal]:
+    """Os percentuais e os valores em R$ do texto."""
+    return {
+        _decimal(v["numero"])
+        for frase in _FIM_DA_FRASE.split(texto)
+        for v in _VARIACAO.finditer(frase)
+        if v["reais"] or v["pct"]
+    }
+
+
 def _sentidos(texto: str) -> set[tuple[Decimal, str]]:
     """Cada variação com o sentido da última alta ou queda dita antes dela, na mesma frase."""
     pares: set[tuple[Decimal, str]] = set()
@@ -98,6 +108,21 @@ def com_candidatas(
         "leitura_principal": candidatas[0][0],
         "leitura_texto": candidatas[0][1],
     }
+
+
+def _numeros_exigidos(
+    metricas: dict[str, object], escolhidas: Sequence[str], leitura: str
+) -> set[Decimal]:
+    """Os números de cada leitura escolhida, sem as contagens das que exigem nomes."""
+    candidatas = {c["id"]: c for c in metricas.get("candidatas", [])}
+    chaves = escolhidas or str(metricas.get("leitura_principal", "")).split("+")
+    if not candidatas or not all(chave in candidatas for chave in chaves):
+        return _numeros(leitura)
+    exigidos: set[Decimal] = set()
+    for chave in chaves:
+        texto = str(candidatas[chave]["texto"])
+        exigidos |= _variacoes(texto) if candidatas[chave].get("nomes") else _numeros(texto)
+    return exigidos
 
 
 def _nomes_exigidos(metricas: dict[str, object], escolhidas: Sequence[str]) -> list[str]:
@@ -146,10 +171,17 @@ def motivo_da_recusa(
             f"Escreva no máximo {limite} caracteres e diga só o que as leituras escolhidas "
             "dizem, sem outra conclusão."
         )
-    if _numeros(texto) != _numeros(leitura):
+    # Nenhum número fora das leituras: é o que impede a invenção. Os números das leituras
+    # também não podem faltar, exceto as contagens de uma leitura que cita nomes: citados os 3
+    # nomes, "os 3 … de 13" fica redundante, e exigi-las fazia a IA trocar os nomes pelos
+    # números. Em "73 dos 86 bairros", sem nomes, o 86 é o fato e continua exigido.
+    inventados = _numeros(texto) - _numeros(leitura)
+    faltando = _numeros_exigidos(metricas, escolhidas, leitura) - _numeros(texto)
+    if inventados or faltando:
         esperados = ", ".join(dict.fromkeys(_NUMERO.findall(leitura)))
         motivos.append(
-            f"Use estes números, escritos exatamente assim, e nenhum outro: {esperados}."
+            f"Use só estes números, escritos exatamente assim, sem deixar nenhum de fora: "
+            f"{esperados}."
             if esperados
             else "Não use números: as leituras escolhidas não têm nenhum."
         )

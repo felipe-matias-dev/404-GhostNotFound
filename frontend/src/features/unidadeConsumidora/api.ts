@@ -4,7 +4,10 @@ import type { Uc360 } from "./types";
 export const unidadeConsumidoraKeys = {
 	visao360: (codUc: string | undefined) =>
 		["unidadeConsumidora", "visao360", codUc] as const,
-	insight: (codUc: string) => ["unidadeConsumidora", "insight", codUc] as const,
+	// Com a versão dos dados da UC: depois de uma recarga da Gold, a visão 360 muda e o insight
+	// antigo não reaparece ao lado dos números novos.
+	insight: (codUc: string, versao: unknown) =>
+		["unidadeConsumidora", "insight", codUc, versao] as const,
 };
 
 export function buscarVisao360(

@@ -82,7 +82,9 @@ def test_a_gain_counts_as_a_rise() -> None:
 def test_the_reason_tells_the_ai_which_numbers_to_use() -> None:
     motivo = motivo_da_recusa("A receita cresceu 8,5%.", METRICAS, ("receita",), NADA)
 
-    assert motivo == "Use estes números, escritos exatamente assim, e nenhum outro: 8,0."
+    assert motivo == (
+        "Use só estes números, escritos exatamente assim, sem deixar nenhum de fora: 8,0."
+    )
 
 
 def test_the_reason_names_the_forbidden_term_and_the_size_limit() -> None:
@@ -144,7 +146,7 @@ def test_every_reason_goes_back_at_once() -> None:
     assert motivo_da_recusa(
         "Os municípios concentram 71,0%.", metricas, ("concentracao",), NADA
     ) == (
-        "Use estes números, escritos exatamente assim, e nenhum outro: 2, 70,0. "
+        "Use só estes números, escritos exatamente assim, sem deixar nenhum de fora: 2, 70,0. "
         "Cite estes nomes como estão: Olinda, Recife."
     )
 
@@ -155,3 +157,39 @@ def test_a_reading_without_numbers_asks_for_none() -> None:
     assert motivo_da_recusa("O preço pesou 5,0%.", metricas, ("fator",), NADA) == (
         "Não use números: as leituras escolhidas não têm nenhum."
     )
+
+
+def test_counts_may_be_left_out_when_the_text_names_the_places() -> None:
+    metricas = com_candidatas(
+        [("concentracao", "Os 3 municípios, de 13, concentram 73,0%: Olinda, Recife e Paulista.")],
+        {},
+        {"concentracao": ["Olinda", "Recife", "Paulista"]},
+    )
+
+    assert texto_aceito(
+        "Olinda, Recife e Paulista concentram 73,0% da energia.", metricas, ("concentracao",), NADA
+    )
+
+
+def test_a_percentage_cannot_be_left_out_even_when_names_are_cited() -> None:
+    metricas = com_candidatas(
+        [("concentracao", "Os 2 municípios concentram 73,0%: Olinda e Recife.")],
+        {},
+        {"concentracao": ["Olinda", "Recife"]},
+    )
+
+    assert not texto_aceito(
+        "Olinda e Recife concentram a maior parte.", metricas, ("concentracao",), NADA
+    )
+
+
+def test_counts_of_a_reading_without_names_cannot_be_left_out() -> None:
+    metricas = com_candidatas([("preco", "Em 73 dos 86 bairros, a receita subiu 5,0%.")], {})
+
+    assert not texto_aceito("Em 73 bairros, a receita subiu 5,0%.", metricas, ("preco",), NADA)
+
+
+def test_a_number_outside_the_readings_is_never_accepted() -> None:
+    metricas = com_candidatas([("concentracao", "Os 3 municípios concentram 73,0%.")], {})
+
+    assert not texto_aceito("Os 4 municípios concentram 73,0%.", metricas, ("concentracao",), NADA)
