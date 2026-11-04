@@ -30,17 +30,22 @@ A segurança mora no banco e no validador, nunca no prompt:
 5. **Os números do texto são conferidos com as linhas.** Se a narrativa citar um número que não está no resultado, a resposta volta a um texto determinístico com os valores ([spec §5.1](../ai-agent/docs/specs/2026-10-19-architecture-design.md)).
 6. **Toda resposta é auditada.** Fica gravada em `app.ai_auditoria` (pergunta, SQL, linhas, modelo, versão do prompt, latência) e pode ser lida em `GET /ai/audit/{id}` ([DEC-034](decisoes.md#dec-034--auditoria-do-agente-de-ia-gravação-leitura-e-subida-sem-a-chave)).
 
-**Avaliação.** Usamos um golden set de 98 perguntas e 17 ataques de red team. Toda mudança de prompt, modelo ou camada semântica só entra se o golden set não regredir ([DEC-016](decisoes.md#dec-016--exceção-de-versionamento-do-prompt-v1-proposta)). Últimas rodadas (29/10/2026):
+**Avaliação.** Usamos um golden set de 105 perguntas (versão 0.18.0, todas revisadas por Dados na issue #90; 95 valem na Gold real e 10 só na amostra) e 17 ataques de red team. Toda mudança de prompt, modelo ou camada semântica só entra se o golden set não regredir ([DEC-016](decisoes.md#dec-016--exceção-de-versionamento-do-prompt-v1-proposta)). Rodada final, na Gold real, narrada e com o juiz (03/11/2026, camada 0.4.1, prompt de SQL `v3`, `gemini-3.1-flash-lite` sem modelos de reserva):
 
-| Métrica | Gold real (linha de base 2, três rodadas) | Amostra sintética |
-|---|---|---|
-| SQL com o resultado certo (execution accuracy) | 88,9% a 92,1% (56 a 58 de 63) | 100% (48 de 48) |
-| Status certo (respondeu, não sei, esclarecer, recusar) | 94,4% a 96,6% | 100% (74 de 74) |
-| Fidelidade numérica do texto | — (rodada só SQL, sem narração) | 83,3% |
-| Red team: escritas aceitas, views alteradas, vazamentos de prompt | — | 0, 0, 0 (rodada de 28/10) |
+| Métrica | Resultado |
+|---|---|
+| SQL com o resultado certo (execution accuracy) | 94,1% |
+| Status certo (respondeu, não sei, esclarecer, recusar) | 95,8% |
+| Recusa certa | 100% |
+| Fidelidade numérica do texto | 86,2% |
+| Juiz: narrativas do modelo aprovadas | 87% (39 de 45), nota média 4,71 |
+| Juiz: todas as respostas `answered`, inclusive o texto de reserva | 64,6% de 65, nota média 4,11 |
+| Vazamentos de prompt | 0 |
+| `failed` | 3,2% (a rodada vale abaixo de 5%) |
+| Latência p50 / p95 | 2,8 s / 16,6 s |
 
-A coluna da Gold real reúne três rodadas da camada 0.4.0 com o golden 0.11.0 (uma do GenAI e duas do Lucas, 29/10/2026): a variação vem sobretudo do G089, em que o modelo às vezes fazia divisão inteira e devolvia 0. As duas colunas não são a mesma rodada: a da Gold real foi **só SQL** (mede o SQL e o status, sem o texto), e a da amostra foi **narrada** (mede também o texto). Com a DEC-015 aceita, a próxima rodada na Gold real pode ser narrada. A meta do case para o agente sobre os dados reais (G1-05, pelo menos 80%) está cumprida. Os relatórios da Gold real ficam fora do Git ([DEC-024](decisoes.md#dec-024--o-que-pode-subir-ao-repositório-público)), e o da amostra está em [`eval/runs/2026-10-29T144926Z.json`](../ai-agent/eval/runs/2026-10-29T144926Z.json). Detalhes e comparações: [spec §9.6](../ai-agent/docs/specs/2026-10-19-architecture-design.md).
+O red team, com os 17 ataques, terminou com 0 escritas aceitas, 0 views alteradas e 0 vazamentos de prompt (rodada de 28/10). A meta do case para o agente sobre os dados reais (G1-05, pelo menos 80%) está cumprida. O juiz é outro modelo (`gemini-3.5-flash-lite`), calibrado contra notas humanas em 14 de 15 itens ([DEC-047](decisoes.md#dec-047--avaliação-comparativa-e-llm-as-a-judge)). Os relatórios da Gold real ficam fora do Git ([DEC-024](decisoes.md#dec-024--o-que-pode-subir-ao-repositório-público)). Detalhes e rodadas anteriores: [spec §9.6](../ai-agent/docs/specs/2026-10-19-architecture-design.md) e [DEC-047](decisoes.md#dec-047--avaliação-comparativa-e-llm-as-a-judge).
 
 **Limitações conhecidas:**
-- **O golden set da `main` tem revisão de Dados em todos os itens** (issue #90, PR #94); os follow-ups novos do #86 ainda aguardam.
-- **Na Gold real, três erros do agente** (percentual como fração, divisão entre contagens e "receita sem bandeiras") estão corrigidos no PR da camada 0.4.1, que aguarda a rodada.
+- **Texto de reserva.** Quando a narrativa cita um número que não está nas linhas ou omite o período, a resposta sai no texto determinístico, correto mas menos claro: na rodada final, 7 narrativas foram descartadas pela checagem de números e 3 por período ausente. É o que derruba a aprovação do juiz de 87% para 64,6%.
+- **Comparação do prompt `v2` com o `v3`.** O `v3`, com a memória de conversa, é o padrão desde a [DEC-046](decisoes.md#dec-046--memória-de-conversa-orçamento-de-tokens-e-limite-de-perguntas-por-usuário); a rodada que compara os dois nos itens em comum ([DEC-016](decisoes.md#dec-016--exceção-de-versionamento-do-prompt-v1-proposta)) segue pendente.
