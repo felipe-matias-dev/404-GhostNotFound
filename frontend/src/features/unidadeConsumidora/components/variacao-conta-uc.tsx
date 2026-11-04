@@ -54,19 +54,6 @@ export function VariacaoContaUc({ data }: { data: Uc360 }) {
 							<AjudaDasPartes />
 						</PopoverContent>
 					</Popover>
-					<InsightIa
-						className="ml-auto"
-						texto={insight.data?.texto}
-						origem={insight.data?.origem}
-						carregando={insight.isFetching}
-						indisponivel={
-							insight.isError ||
-							(insight.data !== undefined && !insight.data.texto)
-						}
-						onGerar={() => {
-							void insight.refetch();
-						}}
-					/>
 				</div>
 				{variacao && (
 					<p className="mt-1 text-small text-text-muted">
@@ -74,6 +61,21 @@ export function VariacaoContaUc({ data }: { data: Uc360 }) {
 						{formatCompetencia(variacao.competencia_comparada)}
 					</p>
 				)}
+				{/* Numa linha própria: ao lado do título, espremia o texto na coluna estreita. Vale
+				    também sem a conta para comparar: o consumo dos 12 meses ainda tem leitura. */}
+				<InsightIa
+					className="mt-2"
+					texto={insight.data?.texto}
+					origem={insight.data?.origem}
+					carregando={insight.isFetching}
+					indisponivel={
+						insight.isError ||
+						(insight.data !== undefined && !insight.data.texto)
+					}
+					onGerar={() => {
+						void insight.refetch();
+					}}
+				/>
 			</header>
 			{variacao ? (
 				<CorpoVariacao variacao={variacao} />

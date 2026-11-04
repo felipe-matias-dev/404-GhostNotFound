@@ -29,6 +29,9 @@ _SENTIDO = re.compile(
     re.IGNORECASE,
 )
 _NUMERO = re.compile(r"\d+(?:\.\d{3})*(?:,\d+)?")
+# Variações: um percentual ou um valor em R$. São os números que sobem ou caem.
+_VARIACAO = re.compile(r"(?P<reais>R\$\s*)?(?P<numero>\d+(?:\.\d{3})*(?:,\d+)?)(?P<pct>\s*%)?")
+_FIM_DA_FRASE = re.compile(r"[.:;!?](?=\s|$)")
 
 
 def numero_br(valor: object, casas: int = 1) -> str:
@@ -42,11 +45,24 @@ def variou(pct: float) -> str:
 
 
 def _numeros(texto: str) -> set[Decimal]:
-    return {Decimal(numero.replace(".", "").replace(",", ".")) for numero in _NUMERO.findall(texto)}
+    return {_decimal(numero) for numero in _NUMERO.findall(texto)}
 
 
-def _sentidos(texto: str) -> list[str | None]:
-    return [encontrado.lastgroup for encontrado in _SENTIDO.finditer(texto)]
+def _decimal(numero: str) -> Decimal:
+    return Decimal(numero.replace(".", "").replace(",", "."))
+
+
+def _sentidos(texto: str) -> set[tuple[Decimal, str]]:
+    """Cada variação com o sentido da última alta ou queda dita antes dela, na mesma frase."""
+    pares: set[tuple[Decimal, str]] = set()
+    for frase in _FIM_DA_FRASE.split(texto):
+        for variacao in _VARIACAO.finditer(frase):
+            if not (variacao["reais"] or variacao["pct"]):
+                continue
+            antes = list(_SENTIDO.finditer(frase, 0, variacao.start()))
+            if antes:
+                pares.add((_decimal(variacao["numero"]), str(antes[-1].lastgroup)))
+    return pares
 
 
 def com_candidatas(
@@ -78,12 +94,13 @@ def leitura_escolhida(metricas: dict[str, object], escolhidas: Sequence[str]) ->
 def texto_fiel(texto: str, leitura: str, proibidos: re.Pattern[str]) -> bool:
     """Se o texto do modelo diz a leitura: mesmos números e sentidos, sem os termos proibidos.
 
-    Sinônimo em outra ordem também é recusado: o custo é mostrar o texto da regra, que diz o
-    mesmo, e nunca uma alta trocada por uma queda.
+    Cada variação que a leitura diz que subiu ou caiu precisa subir ou cair no texto também,
+    em qualquer ordem: juntar duas leituras que repetem um número continua valendo, e trocar
+    uma alta por uma queda nunca vale. Na dúvida, o custo é mostrar o texto da regra.
     """
     if proibidos.search(texto) or len(texto) > len(leitura) + FOLGA_DO_TEXTO:
         return False
-    return _numeros(texto) == _numeros(leitura) and _sentidos(texto) == _sentidos(leitura)
+    return _numeros(texto) == _numeros(leitura) and _sentidos(leitura) <= _sentidos(texto)
 
 
 def texto_aceito(

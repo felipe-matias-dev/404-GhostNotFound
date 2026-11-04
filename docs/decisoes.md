@@ -2149,7 +2149,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
     - Unidade consumidora (atendimento), `GET /unidades-consumidoras/{cod_uc}/insight`.
   - O botão "Gerar insight" (DEC-069) fica ao lado da leitura que o insight aprofunda: o título da Visão Geral, a legenda do ranking de alimentadores e o cartão "Por que a conta mudou".
   - **Leituras candidatas.** Em toda tela, o backend calcula as leituras do recorte, cada uma com um `id` e um texto com os números já calculados (`candidatas` no JSON). A IA escolhe uma ou duas, as que mais importam para quem usa a tela, e escreve o insight com as próprias palavras. Ela devolve o texto e os `id` escolhidos (`InsightDraft`, saída estruturada do `PydanticAiInsightWriter`). O prompt `insight/v4` diz quem usa cada tela e o que a tela já mostra, para a IA preferir o que ela não mostra.
-  - **Conferência.** O backend aceita o texto se a escolha vale (até duas leituras, sem repetir, todas entre as candidatas) e se o texto diz o que elas dizem. Os números são os mesmos, as altas e quedas vêm na mesma ordem e não há nome de chave nem termo proibido (`texto_aceito` em `insights.py`). Continua valendo a checagem do agente: todo número do texto existe no JSON (DEC-019). Se o texto falhar, a tela mostra a reserva (`leitura_texto`), com `origem: regra`, como na DEC-066.
+  - **Conferência.** O backend aceita o texto se a escolha vale (até duas leituras, sem repetir, todas entre as candidatas) e se o texto diz o que elas dizem. Os números são os mesmos, cada percentual ou valor em R$ sobe ou cai como na leitura, em qualquer ordem, e não há nome de chave nem termo proibido (`texto_aceito` em `insights.py`). Continua valendo a checagem do agente: todo número do texto existe no JSON (DEC-019). Se o texto falhar, a tela mostra a reserva (`leitura_texto`), com `origem: regra`, como na DEC-066.
   - **O que cada tela traz que a tela não diz:**
 
     | Tela | Leituras candidatas |
@@ -2161,7 +2161,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 
   - Nenhum dado do titular vai ao modelo: o insight da UC leva só variações da conta e do consumo, sem o código da UC.
 - **Motivo:** a interpretação passa a ser da IA, como o case pede, sem abrir mão de "dado inventado é pior que nenhum dado". As regras não dependem da Gold de hoje: comparam sinais e proporções do recorte pedido. O cache usa o conteúdo das métricas como chave, então uma Gold recarregada gera um insight novo.
-- **Medição:** chamada às quatro rotas com o modelo padrão na Gold real, em 03/11. A IA escolheu duas leituras e o texto passou na conferência nas quatro: na Receita, na Visão Geral, na Rede e numa UC com conta maior.
+- **Medição:** chamada às quatro rotas com o modelo padrão na Gold real, em 03/11, e conferência das telas no portal. Na UC, a IA juntou duas leituras que repetiam o mesmo percentual e citou o número uma vez; a primeira versão da conferência, que exigia as altas e quedas na mesma sequência, recusou o texto. Por isso a conferência passou a olhar o sentido de cada variação, e não a sequência.
 - **Alternativas descartadas:**
   - **a IA escolher livremente sobre as métricas:** foi o que fez o insight repetir a tela e afirmar o que os números não sustentam (DEC-066);
   - **a regra escolher a leitura:** a IA só redigia e a interpretação ficava presa ao que a regra conhece.

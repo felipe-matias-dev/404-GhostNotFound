@@ -42,3 +42,32 @@ def test_a_text_with_numbers_of_a_reading_it_did_not_choose_is_refused() -> None
     assert not texto_aceito(
         "Os chamados subiram 12,3%, e a receita cresceu 8,0%.", METRICAS, ("chamados",), NADA
     )
+
+
+def test_two_readings_repeating_a_number_can_be_merged_by_the_ai() -> None:
+    metricas = com_candidatas(
+        [
+            ("conta", "A conta subiu R$ 7,26, e o consumo do mês cresceu 11,7%."),
+            ("tendencia", "O consumo cresceu 11,7% no mês e cresceu 9,6% nos 12 meses."),
+        ],
+        {},
+    )
+
+    assert texto_aceito(
+        "A conta subiu R$ 7,26 e o consumo do mês cresceu 11,7%. "
+        "Nos 12 meses, o consumo também cresceu 9,6%.",
+        metricas,
+        ("conta", "tendencia"),
+        NADA,
+    )
+
+
+def test_a_variation_with_its_direction_flipped_is_refused_in_any_order() -> None:
+    metricas = com_candidatas([("receita", "A receita cresceu 8,0% e a energia recuou 4,0%.")], {})
+
+    assert not texto_aceito(
+        "A energia cresceu 4,0%, e a receita recuou 8,0%.", metricas, ("receita",), NADA
+    )
+    assert texto_aceito(
+        "A energia recuou 4,0%, e a receita cresceu 8,0%.", metricas, ("receita",), NADA
+    )
