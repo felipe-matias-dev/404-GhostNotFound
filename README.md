@@ -168,8 +168,9 @@ A coluna da Gold real reúne três rodadas da camada 0.4.0 com o golden 0.11.0 (
 
 ### Atendimento: visão 360 da UC
 
-Use **Consulta de UC** na sidebar ou Ctrl/Cmd + K para abrir a palette. Busque pelo código
-exatamente como aparece na conta, preservando zeros iniciais, ou selecione uma consulta recente.
+Use **Consulta de UC** na sidebar ou Ctrl/Cmd + K para abrir a palette. Digite o código com ou
+sem o prefixo (`UC144997`, `uc 144997` ou `144997`): as opções vêm do cadastro, com município e
+bairro, e as consultas recentes aparecem logo abaixo (DEC-078).
 A sidebar destaca as telas do cargo em **Minha área** e mantém as demais em **Outras consultas**, sem duplicações (DEC-049).
 Somente os cinco códigos consultados com sucesso mais recentemente ficam salvos neste navegador,
 sem titular ou valores; a ação **Limpar recentes** remove a lista.
