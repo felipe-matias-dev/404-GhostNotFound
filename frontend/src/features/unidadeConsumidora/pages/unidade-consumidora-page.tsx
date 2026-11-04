@@ -230,7 +230,9 @@ export function UnidadeConsumidoraPage() {
 									)}
 								>
 									<h2 id="uc-identificacao" className="font-mono text-heading">
-										UC {data.cadastro.cod_uc}
+										{/^uc/i.test(data.cadastro.cod_uc)
+											? data.cadastro.cod_uc
+											: `UC ${data.cadastro.cod_uc}`}
 									</h2>
 									<p className="mt-1 text-body">
 										{data.cadastro.titular_mascarado ?? "Titular não informado"}
