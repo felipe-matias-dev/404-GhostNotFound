@@ -4,9 +4,11 @@ import {
 	PopoverContent,
 	PopoverTrigger,
 } from "#/components/ui/popover";
+import { InsightIa } from "#/features/agente";
 import { formatBRL, formatCompetencia } from "#/lib/format";
 import { cn } from "#/lib/utils";
 import { maiorParte, partesDaConta, textoDosDias } from "../conversions";
+import { useInsightUc } from "../hooks/use-insight-uc";
 import type { Uc360 } from "../types";
 
 // Uma grade para todas as linhas: rótulo e valor na largura do maior, e a barra fica com o resto.
@@ -26,6 +28,8 @@ function tom(valor: number) {
  */
 export function VariacaoContaUc({ data }: { data: Uc360 }) {
 	const variacao = data.variacao_conta;
+	// O insight responde ao "a conta veio alta": se o consumo subiu mesmo, e se é de um mês só.
+	const insight = useInsightUc(data.cadastro.cod_uc);
 
 	return (
 		<section
@@ -50,6 +54,19 @@ export function VariacaoContaUc({ data }: { data: Uc360 }) {
 							<AjudaDasPartes />
 						</PopoverContent>
 					</Popover>
+					<InsightIa
+						className="ml-auto"
+						texto={insight.data?.texto}
+						origem={insight.data?.origem}
+						carregando={insight.isFetching}
+						indisponivel={
+							insight.isError ||
+							(insight.data !== undefined && !insight.data.texto)
+						}
+						onGerar={() => {
+							void insight.refetch();
+						}}
+					/>
 				</div>
 				{variacao && (
 					<p className="mt-1 text-small text-text-muted">

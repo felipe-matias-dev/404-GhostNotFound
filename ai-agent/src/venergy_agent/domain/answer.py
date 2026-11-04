@@ -77,8 +77,16 @@ class AgentAnswer(BaseModel):
         return self
 
 
+class InsightDraft(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    text: str
+    readings: tuple[str, ...] = ()
+
+
 class Insight(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     text: str
     metrics_used: tuple[str, ...]
+    readings: tuple[str, ...] = ()

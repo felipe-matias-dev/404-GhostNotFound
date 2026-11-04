@@ -19,6 +19,7 @@ import {
 	SegmentedControl,
 	type SegmentedOption,
 } from "#/components/ui/segmented-control";
+import { InsightIa } from "#/features/agente";
 import { CLASSE_ROTULO, useFiltrosPortal } from "#/features/filtros";
 import { cn } from "#/lib/utils";
 import {
@@ -31,6 +32,7 @@ import { MapaContinuidade } from "../components/mapa-continuidade";
 import { linhasDoRanking } from "../conversions";
 import {
 	useContinuidadeMensal,
+	useInsightContinuidade,
 	useRankingContinuidade,
 	useRecortesContinuidade,
 } from "../hooks/use-continuidade";
@@ -131,6 +133,9 @@ export function RedePage() {
 		undefined,
 		Boolean(alimentador),
 	);
+
+	// O insight narra o ranking de alimentadores: só existe nessa visão.
+	const insight = useInsightContinuidade(periodo, criterio, recorte, base);
 
 	const ativa = visao === "alimentadores" ? ranking : recortes;
 	const rows: LinhaContinuidade[] | undefined =
@@ -483,7 +488,23 @@ export function RedePage() {
 								>
 									{titulo}
 								</h2>
-								<p className="text-small text-text-muted">{legenda}</p>
+								<div className="flex flex-wrap items-center gap-2">
+									<p className="text-small text-text-muted">{legenda}</p>
+									{visao === "alimentadores" && periodo && (
+										<InsightIa
+											texto={insight.data?.texto}
+											origem={insight.data?.origem}
+											carregando={insight.isFetching}
+											indisponivel={
+												insight.isError ||
+												(insight.data !== undefined && !insight.data.texto)
+											}
+											onGerar={() => {
+												void insight.refetch();
+											}}
+										/>
+									)}
+								</div>
 							</div>
 							<div className="flex flex-wrap items-center gap-2">
 								<SegmentedControl

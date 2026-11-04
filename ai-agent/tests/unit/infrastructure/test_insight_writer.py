@@ -2,7 +2,7 @@ import json
 import logging
 from pathlib import Path
 
-from pydantic_ai.messages import ModelResponse, SystemPromptPart, TextPart
+from pydantic_ai.messages import ModelResponse, SystemPromptPart, ToolCallPart
 from pydantic_ai.models.function import FunctionModel
 
 from venergy_agent.infrastructure.insight_writer import PydanticAiInsightWriter
@@ -12,12 +12,13 @@ NONCE = "n0nce42"
 METRICS = {"receita_faturada": 1234.5, "variacao_percentual": -4.0}
 
 
-def narrating_model(text):
+def narrating_model(text, readings=()):
     calls = []
 
     def respond(messages, info):
         calls.append(messages)
-        return ModelResponse(parts=[TextPart(content=text)])
+        args = {"text": text, "readings": list(readings)}
+        return ModelResponse(parts=[ToolCallPart(tool_name=info.output_tools[0].name, args=args)])
 
     return FunctionModel(respond), calls
 
@@ -164,3 +165,18 @@ async def test_a_negative_metric_written_as_a_reduction_keeps_the_insight():
     insight = await writer(model).narrate("Receita", {"efeito_volume": -883.87})
 
     assert insight is not None
+
+
+async def test_the_readings_the_model_chose_come_with_the_insight():
+    model, _ = narrating_model("A receita caiu 4,0%.", ("queda_geral", "maior_queda"))
+
+    insight = await writer(model).narrate("Receita", METRICS)
+
+    assert insight is not None
+    assert insight.readings == ("queda_geral", "maior_queda")
+
+
+async def test_shipped_v4_prompt_asks_the_model_to_choose_among_the_candidates():
+    template = (SHIPPED_PROMPTS / "v4" / "insight.md").read_text(encoding="utf-8")
+
+    assert "candidatas" in template and "readings" in template

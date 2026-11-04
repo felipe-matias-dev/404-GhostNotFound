@@ -10,6 +10,8 @@ import re
 from collections.abc import Sequence
 from decimal import ROUND_HALF_UP, Decimal
 
+from venergy_api.insights import com_candidatas, numero_br, variou
+from venergy_api.insights import texto_aceito as conferir
 from venergy_api.schemas import DecomposicaoFiltroSchema, DecomposicaoLinhaSchema
 from venergy_api.variacao import variacao_pct
 
@@ -23,15 +25,6 @@ _TERMOS_PROIBIDOS = re.compile(
     r"\b(faturamento|simultaneamente|desempenho|segmentos?|efeitos?|mix|volume|recorte)\b|·",
     re.IGNORECASE,
 )
-# Folga para o modelo reescrever a leitura, sem espaço para ele acrescentar outra conclusão.
-_FOLGA_DO_TEXTO = 40
-# Sentido de cada afirmação, na ordem do texto. "Ganho" fica de fora: é o nome do efeito do preço.
-_SENTIDO = re.compile(
-    r"\b(?:(?P<alta>cresc\w*|sub\w*|alta|aument\w*)"
-    r"|(?P<queda>recu\w*|ca[ií]\w*|qued\w*|perd\w*|redu\w*|derrub\w*))\b",
-    re.IGNORECASE,
-)
-_NUMERO = re.compile(r"\d+(?:\.\d{3})*(?:,\d+)?")
 
 _CENTAVOS = Decimal("0.01")
 
@@ -88,24 +81,15 @@ def _nome_acima(filtro: DecomposicaoFiltroSchema) -> tuple[str, str]:
     return nome, lugar
 
 
-def _numero_br(valor: object, casas: int = 1) -> str:
-    return f"{valor:,.{casas}f}".replace(",", "#").replace(".", ",").replace("#", ".")
-
-
-def _variou(pct: float) -> str:
-    if pct == 0:
-        return "ficou estável"
-    return f"{'cresceu' if pct > 0 else 'recuou'} {_numero_br(abs(pct))}%"
-
-
-def _leitura_principal(
+def _leituras(
     metricas: dict[str, object], filtro: DecomposicaoFiltroSchema
-) -> tuple[str, str]:
-    """A leitura mais forte do recorte e o texto dela, que a tela não resume (DEC-066).
+) -> list[tuple[str, str]]:
+    """As leituras do recorte que a tela não resume, da mais forte para a mais fraca.
 
-    A regra é daqui, e não do LLM: ele só redige. Se o texto dele não servir, este é o que a
-    tela mostra.
+    São as candidatas da IA, que escolhe entre elas (DEC-077). A primeira é a reserva: o texto
+    que a tela mostra se o da IA não servir (DEC-066).
     """
+    leituras: list[tuple[str, str]] = []
     n = metricas["n_segmentos"]
     plural = _PLURAL_DO_NIVEL[metricas["nivel_das_linhas"]]
     todos, dos, artigo = (
@@ -122,60 +106,75 @@ def _leitura_principal(
     if metricas.get("unico_em_queda") and pct is not None and pct_acima is not None:
         nome = filtro.bairro or filtro.municipio
         tipo_do_nome = "bairro" if filtro.bairro else "município"
-        return "unico_em_queda", (
-            f"{nome} foi o único {tipo_do_nome} a perder receita {lugar_acima}: "
-            f"{_variou(pct)}, enquanto {nome_acima} {_variou(pct_acima)}."
+        leituras.append(
+            (
+                "unico_em_queda",
+                (
+                    f"{nome} foi o único {tipo_do_nome} a perder receita {lugar_acima}: "
+                    f"{variou(pct)}, enquanto {nome_acima} {variou(pct_acima)}."
+                ),
+            )
         )
     if contar and metricas["variacao_receita"] > 0 and so_preco * 2 >= n:
         quantos = f"{todos} {n}" if so_preco == n else f"{so_preco} {dos} {n}"
-        return "alta_depende_do_preco", (
-            f"Em {quantos} {plural}, a receita só subiu por causa do preço: sem ele, a quantidade "
-            "vendida e o perfil de consumo somados a teriam derrubado."
+        leituras.append(
+            (
+                "alta_depende_do_preco",
+                (
+                    f"Em {quantos} {plural}, a receita só subiu por causa do preço: sem ele, "
+                    "a quantidade vendida e o perfil de consumo somados a teriam derrubado."
+                ),
+            )
         )
     if bandeira is not None and bandeira >= 50:
-        return "bandeira_pesa", (
-            f"{_numero_br(bandeira)}% do ganho de preço veio da bandeira, não da tarifa."
+        leituras.append(
+            (
+                "bandeira_pesa",
+                (f"{numero_br(bandeira)}% do ganho de preço veio da bandeira, não da tarifa."),
+            )
         )
     if contar and quantidade == n:
-        return "quantidade_geral", (
-            f"A quantidade vendida caiu em {todos} {n} {plural}: a queda é geral, não localizada."
+        leituras.append(
+            (
+                "quantidade_geral",
+                (
+                    f"A quantidade vendida caiu em {todos} {n} {plural}: "
+                    "a queda é geral, não localizada."
+                ),
+            )
         )
     participacao = metricas.get("maior_queda_participacao_pct")
     if metricas["n_segmentos_em_queda"] >= 2 and participacao >= 50:
-        return "quedas_concentradas", (
-            f"{metricas['maiores_quedas'][0]['segmento']} responde por "
-            f"{_numero_br(participacao)}% da soma das quedas de receita entre {artigo} {plural}."
+        leituras.append(
+            (
+                "quedas_concentradas",
+                (
+                    f"{metricas['maiores_quedas'][0]['segmento']} responde por "
+                    f"{numero_br(participacao)}% da soma das quedas de receita "
+                    f"entre {artigo} {plural}."
+                ),
+            )
         )
     if pct is not None and pct_acima is not None:
         nome = filtro.bairro or filtro.municipio
         lugar = f"Em {nome}" if nome else f"Na classe {filtro.classe}"
-        return "comparacao_acima", (
-            f"{lugar}, a receita {_variou(pct)}, enquanto {nome_acima} {_variou(pct_acima)}."
+        leituras.append(
+            (
+                "comparacao_acima",
+                (f"{lugar}, a receita {variou(pct)}, enquanto {nome_acima} {variou(pct_acima)}."),
+            )
         )
     if metricas["fatores_a_favor"] or metricas["fatores_contra"]:
         artigo_do_fator = "a" if metricas["maior_fator"] == "quantidade vendida" else "o"
-        return "maior_fator", f"O que mais pesou foi {artigo_do_fator} {metricas['maior_fator']}."
-    return "sem_variacao", "A receita não variou entre os dois períodos."
+        leituras.append(
+            ("maior_fator", f"O que mais pesou foi {artigo_do_fator} {metricas['maior_fator']}.")
+        )
+    return leituras or [("sem_variacao", "A receita não variou entre os dois períodos.")]
 
 
-def _numeros(texto: str) -> set[Decimal]:
-    return {Decimal(numero.replace(".", "").replace(",", ".")) for numero in _NUMERO.findall(texto)}
-
-
-def _sentidos(texto: str) -> list[str | None]:
-    return [encontrado.lastgroup for encontrado in _SENTIDO.finditer(texto)]
-
-
-def texto_aceito(texto: str, metricas: dict[str, object]) -> bool:
-    """Se o texto do modelo diz a leitura escolhida: mesmos números e sentidos, sem jargão.
-
-    Sinônimo em outra ordem também é recusado: o custo é mostrar o texto da regra, que diz o
-    mesmo, e nunca uma alta trocada por uma queda.
-    """
-    leitura = str(metricas["leitura_texto"])
-    if _TERMOS_PROIBIDOS.search(texto) or len(texto) > len(leitura) + _FOLGA_DO_TEXTO:
-        return False
-    return _numeros(texto) == _numeros(leitura) and _sentidos(texto) == _sentidos(leitura)
+def texto_aceito(texto: str, metricas: dict[str, object], escolhidas: Sequence[str] = ()) -> bool:
+    """Se o texto da IA diz as leituras que ela escolheu, sem o jargão da ponte."""
+    return conferir(texto, metricas, escolhidas, _TERMOS_PROIBIDOS)
 
 
 def metricas_da_receita(
@@ -277,5 +276,4 @@ def metricas_da_receita(
             linhas_acima
         ) >= MIN_SEGMENTOS_PARA_CONTAR and vizinhos_em_queda == [nome]
 
-    metricas["leitura_principal"], metricas["leitura_texto"] = _leitura_principal(metricas, filtro)
-    return metricas
+    return com_candidatas(_leituras(metricas, filtro), metricas)

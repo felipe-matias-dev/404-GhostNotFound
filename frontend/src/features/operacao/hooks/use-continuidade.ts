@@ -1,6 +1,7 @@
 import { skipToken, useQuery } from "@tanstack/react-query";
 import {
 	buscarContinuidadeMensal,
+	buscarInsightContinuidade,
 	buscarRankingContinuidade,
 	buscarRecortesContinuidade,
 	buscarResumoOcorrencias,
@@ -111,5 +112,22 @@ export function useUcsAtingidas(
 			JSON.stringify(consultaAnterior.queryKey.slice(0, -1)) === conjunto
 				? anterior
 				: undefined,
+	});
+}
+
+/** O insight de IA do ranking; só busca quando o usuário pede (`refetch`), como na Receita. */
+export function useInsightContinuidade(
+	periodo: Periodo | undefined,
+	criterio: Criterio,
+	recorte: Recorte,
+	base: Periodo | undefined,
+) {
+	return useQuery({
+		queryKey: continuidadeKeys.insight(periodo, criterio, recorte, base),
+		queryFn: periodo
+			? () => buscarInsightContinuidade(periodo, criterio, recorte, base)
+			: skipToken,
+		enabled: false,
+		retry: false,
 	});
 }

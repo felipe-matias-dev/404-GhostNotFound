@@ -1,13 +1,100 @@
-"""Cache dos insights de IA: o mesmo recorte não paga o modelo duas vezes."""
+"""Insights de IA das telas: o cache, a conferência do texto e a narração com reserva da regra.
+
+Em toda tela, o backend calcula as leituras candidatas do recorte, cada uma com os seus números,
+e a IA escolhe as que mais importam e escreve o insight (DEC-077). O texto só vale se disser o
+que as leituras escolhidas dizem; senão, a tela mostra `leitura_texto`, a reserva da regra.
+"""
 
 import json
+import re
 from collections import OrderedDict
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping, Sequence
+from decimal import Decimal
 from typing import Annotated
 
 from fastapi import Depends, Request
+from venergy_agent.application.ports import InsightWriter
+
+from venergy_api.schemas import InsightSchema
 
 CAPACIDADE_PADRAO = 256
+# Uma ou duas leituras: mais que isso vira a lista que a tela já mostra.
+MAX_ESCOLHIDAS = 2
+# Folga para o modelo reescrever a leitura, sem espaço para ele acrescentar outra conclusão.
+FOLGA_DO_TEXTO = 40
+# Sentido de cada afirmação, na ordem do texto. "Ganho" fica de fora: é o nome do efeito do preço.
+_SENTIDO = re.compile(
+    r"\b(?:(?P<alta>cresc\w*|sub\w*|alta|aument\w*)"
+    r"|(?P<queda>recu\w*|ca[ií]\w*|qued\w*|perd\w*|redu\w*|derrub\w*))\b",
+    re.IGNORECASE,
+)
+_NUMERO = re.compile(r"\d+(?:\.\d{3})*(?:,\d+)?")
+
+
+def numero_br(valor: object, casas: int = 1) -> str:
+    return f"{valor:,.{casas}f}".replace(",", "#").replace(".", ",").replace("#", ".")
+
+
+def variou(pct: float) -> str:
+    if pct == 0:
+        return "ficou estável"
+    return f"{'cresceu' if pct > 0 else 'recuou'} {numero_br(abs(pct))}%"
+
+
+def _numeros(texto: str) -> set[Decimal]:
+    return {Decimal(numero.replace(".", "").replace(",", ".")) for numero in _NUMERO.findall(texto)}
+
+
+def _sentidos(texto: str) -> list[str | None]:
+    return [encontrado.lastgroup for encontrado in _SENTIDO.finditer(texto)]
+
+
+def com_candidatas(
+    candidatas: list[tuple[str, str]], metricas: dict[str, object]
+) -> dict[str, object]:
+    """As métricas com as leituras candidatas e a reserva: a primeira, na ordem da regra."""
+    return {
+        **metricas,
+        "candidatas": [{"id": chave, "texto": texto} for chave, texto in candidatas],
+        "leitura_principal": candidatas[0][0],
+        "leitura_texto": candidatas[0][1],
+    }
+
+
+def leitura_escolhida(metricas: dict[str, object], escolhidas: Sequence[str]) -> str | None:
+    """O texto das leituras que a IA escolheu, na ordem dela, ou None se a escolha não vale.
+
+    Sem escolha (prompt anterior ao v4), a comparação é com a reserva, como antes.
+    """
+    if not escolhidas:
+        return str(metricas["leitura_texto"])
+    textos = {candidata["id"]: candidata["texto"] for candidata in metricas["candidatas"]}
+    repetida = len(set(escolhidas)) < len(escolhidas)
+    if len(escolhidas) > MAX_ESCOLHIDAS or repetida or not set(escolhidas) <= textos.keys():
+        return None
+    return " ".join(textos[chave] for chave in escolhidas)
+
+
+def texto_fiel(texto: str, leitura: str, proibidos: re.Pattern[str]) -> bool:
+    """Se o texto do modelo diz a leitura: mesmos números e sentidos, sem os termos proibidos.
+
+    Sinônimo em outra ordem também é recusado: o custo é mostrar o texto da regra, que diz o
+    mesmo, e nunca uma alta trocada por uma queda.
+    """
+    if proibidos.search(texto) or len(texto) > len(leitura) + FOLGA_DO_TEXTO:
+        return False
+    return _numeros(texto) == _numeros(leitura) and _sentidos(texto) == _sentidos(leitura)
+
+
+def texto_aceito(
+    texto: str,
+    metricas: dict[str, object],
+    escolhidas: Sequence[str],
+    proibidos: re.Pattern[str],
+) -> bool:
+    """Se a escolha da IA vale e o texto diz o que as leituras escolhidas dizem."""
+    leitura = leitura_escolhida(metricas, escolhidas)
+    return leitura is not None and texto_fiel(texto, leitura, proibidos)
 
 
 def chave_do_cache(tela: str, metricas: Mapping[str, object]) -> str:
@@ -47,3 +134,26 @@ def get_cache_insights(request: Request) -> CacheInsights:
 
 
 CacheInsightsDep = Annotated[CacheInsights, Depends(get_cache_insights)]
+
+
+async def narrar(
+    tela: str,
+    metricas: dict[str, object],
+    redator: InsightWriter | None,
+    cache: CacheInsights,
+    aceito: Callable[[str, tuple[str, ...]], bool],
+) -> InsightSchema:
+    """O texto da IA, se `aceito` o confirma com as leituras dela, ou a reserva da regra."""
+    chave = chave_do_cache(tela, metricas)
+    texto = cache.obter(chave)
+    if texto is None:
+        insight = await redator.narrate(tela, metricas) if redator else None
+        if insight is None or not aceito(insight.text, insight.readings):
+            # IA desligada, provedor fora ou texto recusado: a tela mostra a leitura da regra.
+            # Ela não entra no cache, e o próximo pedido tenta o modelo de novo. Repetir agora
+            # não adianta: com temperatura 0, o modelo escreveria o mesmo texto.
+            leitura = str(metricas["leitura_texto"])
+            return InsightSchema(texto=leitura, origem="regra", metricas=metricas)
+        texto = insight.text
+        cache.guardar(chave, texto)
+    return InsightSchema(texto=texto, origem="ia", metricas=metricas)

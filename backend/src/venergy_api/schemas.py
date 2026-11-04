@@ -275,11 +275,11 @@ class DecomposicaoLinhaSchema(BaseModel):
     efeito_mix: ExactNumber
 
 
-class InsightReceitaSchema(BaseModel):
-    """O insight de IA da tela de Receita e as métricas que sustentam cada número do texto."""
+class InsightSchema(BaseModel):
+    """O insight de IA de uma tela e as métricas que sustentam cada número do texto."""
 
     # Se o redator falha ou o texto dele não serve, vem a leitura escrita pela regra do backend,
-    # e `origem` diz qual dos dois é. Vazio só se o recorte não tem segmentos, sem chamar o modelo.
+    # e `origem` diz qual dos dois é. Vazio só se não há o que narrar, sem chamar o modelo.
     texto: str | None
     origem: Literal["ia", "regra"] | None = None
     metricas: dict[str, Any] | None

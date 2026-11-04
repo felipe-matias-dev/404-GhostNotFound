@@ -121,7 +121,7 @@ def _candidatos(session: Session, base: str, atual: str) -> list[Candidato]:
 
 async def _narrar(redator, caso: str, recorte: str, metricas: Metricas) -> dict[str, object]:
     insight = await redator.narrate("receita", metricas)
-    aceito = insight is not None and texto_aceito(insight.text, metricas)
+    aceito = insight is not None and texto_aceito(insight.text, metricas, insight.readings)
     return {
         "caso": caso,
         "recorte": recorte,

@@ -7,7 +7,7 @@ from pathlib import Path
 from pydantic_ai import Agent
 from pydantic_ai.models import Model
 
-from venergy_agent.domain.answer import Insight
+from venergy_agent.domain.answer import Insight, InsightDraft
 from venergy_agent.domain.numbers import unsupported_numbers
 from venergy_agent.infrastructure.prompt_renderer import render_insight_system, render_insight_user
 
@@ -31,7 +31,7 @@ class PydanticAiInsightWriter:
 
     async def narrate(self, screen: str, metrics: Mapping[str, object]) -> Insight | None:
         try:
-            agent = Agent(self._model, output_type=str, system_prompt=self._system)
+            agent = Agent(self._model, output_type=InsightDraft, system_prompt=self._system)
             run = await agent.run(
                 render_insight_user(screen, metrics, self._nonce),
                 model_settings={"temperature": self._temperature},
@@ -39,7 +39,7 @@ class PydanticAiInsightWriter:
         except Exception as error:
             _log(screen, "erro_do_modelo", error=type(error).__name__)
             return None
-        text = run.output.strip()
+        text = run.output.text.strip()
         if not text:
             _log(screen, "texto_vazio")
             return None
@@ -48,7 +48,7 @@ class PydanticAiInsightWriter:
             _log(screen, "numeros_sem_suporte", numbers=list(unsupported))
             return None
         _log(screen, "aceito")
-        return Insight(text=text, metrics_used=tuple(metrics.keys()))
+        return Insight(text=text, metrics_used=tuple(metrics.keys()), readings=run.output.readings)
 
 
 def _metric_values(value: object) -> Iterator[object]:

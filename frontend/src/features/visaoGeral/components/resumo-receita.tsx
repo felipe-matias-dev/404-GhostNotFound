@@ -8,6 +8,7 @@ import type { ReactNode } from "react";
 import { Button, buttonVariants } from "#/components/ui/button";
 import { KpiDelta, KpiValue } from "#/components/ui/kpi-card";
 import { TrendChart } from "#/components/ui/trend-chart";
+import { InsightIa } from "#/features/agente";
 import { useFiltrosPortal } from "#/features/filtros";
 import {
 	DEFINICOES,
@@ -24,6 +25,7 @@ import {
 import { cn } from "#/lib/utils";
 import { leitura, MESES_MAX_JANELA, mesesDoPeriodo } from "../conversions";
 import { useTesoura } from "../hooks/use-indicadores";
+import { useInsightVisaoGeral } from "../hooks/use-insight-visao-geral";
 
 const receita = (valor: number) => formatBRL(valor, { compacto: true });
 const energia = (valor: number) => formatKWh(valor, { compacto: true });
@@ -89,6 +91,7 @@ export function ResumoReceita({
 	const { searchPara } = useFiltrosPortal();
 	const comparacao = useComparacaoIndicadores(par, recorte);
 	const serie = useTesoura(par, recorte);
+	const insight = useInsightVisaoGeral(par, recorte);
 	const meses = par ? mesesDoPeriodo(par.periodo_atual) : undefined;
 	const janela = meses === 1 ? "mês" : "meses";
 	const corridos = meses === 1 ? "mês corrido" : "meses corridos";
@@ -160,10 +163,25 @@ export function ResumoReceita({
 					{frase ?? "Receita e energia faturadas"}
 				</h2>
 				{par ? (
-					<p className="text-pretty text-body text-text-muted">
-						{formatPeriodoCurto(par.periodo_atual)} vs{" "}
-						{formatPeriodoCurto(par.periodo_base)}.
-					</p>
+					<div className="flex flex-wrap items-center justify-between gap-2">
+						<p className="text-pretty text-body text-text-muted">
+							{formatPeriodoCurto(par.periodo_atual)} vs{" "}
+							{formatPeriodoCurto(par.periodo_base)}.
+						</p>
+						{/* O insight aprofunda a frase do título: o porquê da receita e da rede. */}
+						<InsightIa
+							texto={insight.data?.texto}
+							origem={insight.data?.origem}
+							carregando={insight.isFetching}
+							indisponivel={
+								insight.isError ||
+								(insight.data !== undefined && !insight.data.texto)
+							}
+							onGerar={() => {
+								void insight.refetch();
+							}}
+						/>
+					</div>
 				) : null}
 			</header>
 			<div className="grid gap-6 lg:grid-cols-[minmax(13rem,16rem)_minmax(0,1fr)]">

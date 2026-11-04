@@ -3,36 +3,16 @@ from decimal import Decimal
 
 import pytest
 from fastapi.testclient import TestClient
+from redator_falso import ECO, Escolha
 from sqlalchemy import Engine
 from sqlalchemy.orm import Session
-from venergy_agent.domain.answer import Insight
 
-from venergy_api.agente import get_redator_insights
 from venergy_api.database import Base
 from venergy_api.models import ReceitaDecomposicao
 
 BASE = "2024-01/2024-12"
 ATUAL = "2025-01/2025-12"
 FILTRO = {"periodo_base": BASE, "periodo_atual": ATUAL}
-ECO = object()
-
-
-class RedatorFalso:
-    """Devolve os textos combinados, em ordem, sem chamar o Gemini, e guarda o que recebeu.
-
-    `ECO` repete a leitura das métricas: um texto que o backend aceita.
-    """
-
-    def __init__(self, *textos: object) -> None:
-        self.textos = list(textos) or [ECO]
-        self.chamadas: list[tuple[str, dict]] = []
-
-    async def narrate(self, screen: str, metrics: dict) -> Insight | None:
-        self.chamadas.append((screen, metrics))
-        texto = self.textos[min(len(self.chamadas), len(self.textos)) - 1]
-        if texto is ECO:
-            texto = metrics["leitura_texto"]
-        return None if texto is None else Insight(text=texto, metrics_used=tuple(metrics))
 
 
 def decomposition_line(
@@ -73,19 +53,6 @@ def bridge(add_lines: Callable[..., None]) -> None:
         decomposition_line("Recife", "Casa Forte", "B1", "50", "55", "5"),
         decomposition_line("Olinda", "Carmo", "B1", "80", "60", "-20"),
     )
-
-
-@pytest.fixture
-def client_with_writer(
-    engine: Engine, client_for: Callable[[Engine], TestClient]
-) -> Callable[..., tuple[TestClient, RedatorFalso]]:
-    def build(*textos: object) -> tuple[TestClient, RedatorFalso]:
-        client = client_for(engine)
-        redator = RedatorFalso(*textos)
-        client.app.dependency_overrides[get_redator_insights] = lambda: redator
-        return client, redator
-
-    return build
 
 
 @pytest.mark.usefixtures("bridge")
@@ -239,3 +206,17 @@ def test_the_whole_company_has_nothing_above(client_with_writer) -> None:
 
     assert "variacao_acima_pct" not in metricas
     assert "n_vizinhos" not in metricas
+
+
+@pytest.mark.usefixtures("bridge")
+def test_the_ai_can_choose_a_reading_other_than_the_rule_one(client_with_writer) -> None:
+    client, _ = client_with_writer()
+    metricas = client.get("/receita/insight", params=FILTRO).json()["metricas"]
+    outra = metricas["candidatas"][-1]["id"]
+    assert outra != metricas["leitura_principal"]
+    client, _ = client_with_writer(Escolha(outra))
+
+    corpo = client.get("/receita/insight", params=FILTRO).json()
+
+    assert corpo["origem"] == "ia"
+    assert corpo["texto"] == corpo["metricas"]["candidatas"][-1]["texto"]

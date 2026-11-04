@@ -76,6 +76,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | 03/11/2026 | DEC-074: task `testes_qualidade` no Workflow, depois do export, somente leitura: CSV × Gold, reconciliações entre tabelas e premissa da DEC-067 como críticos, variação de linhas como alerta, histórico em `v_energy.qualidade.resultados_testes` | O export é o único passo do pipeline sem trava, e é o que chega ao portal e ao agente | Arthur |
 | 02/11/2026 | DEC-075: a ordem de inspeção guarda, na geração, a posição, os motivos e o kWh/mês estimado da UC na fila, e, na conclusão como irregular, o tipo de irregularidade e o kWh recuperado em colunas próprias (PATCH e planilha de campo, com o kWh de 0,001 ao teto de `numeric(16,3)`) | A fila é recriada a cada carga: sem a cópia, não se sabe por que a ordem foi gerada; sem o resultado estruturado, o portal não mede quanto as ordens recuperaram | João Euclides |
 | 02/11/2026 | DEC-076: a tela de Perdas ganha faixa de indicadores (suspeitas, ordens e acerto das inspeções do portal contra a Gold), mapa e ranking de suspeitas por município e bairro, última inspeção de cada UC da fila com filtro por meses, filtro "sem ordem ativa" e total de kWh da seleção | O gerente via a lista de trabalho, mas não se ela acerta, onde a perda se concentra nem quais UCs já foram vistoriadas; toda conta fica no backend, exceto a soma das linhas que o usuário selecionou na página, que é apresentação | João Euclides |
+| 03/11/2026 | DEC-077: insights de IA também na Visão Geral, na Rede e na Unidade consumidora; em todas as telas a IA escolhe entre as leituras candidatas que o backend calcula e escreve o insight, e o backend confere o texto contra as leituras escolhidas (prompt `insight/v4`) | O case pede insights "nas telas que uso no dia a dia", e não numa tela só; com a regra escolhendo a leitura, a IA só redigia e a interpretação ficava fixa | Luis Felipe |
 
 ## DEC-001 · Localização dos arquivos de origem (landing)
 
@@ -2136,3 +2137,34 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Suposições:** a taxa da Gold é a régua histórica das vistorias de antes do portal, e não da fila atual; as duas taxas aparecem lado a lado, sem conclusão automática. Ordens de UC fora do cadastro saem das contagens com recorte (DEC-059).
 - **Alternativas descartadas:** calcular taxas e somas do recorte na tela, contra a regra de cálculo no backend; uma rota que soma o kWh da seleção; contar a janela de meses a partir da última carga da Gold, que muda a cada carga sem o usuário ver.
 - **Consequências:** `sem_ordem_ativa` e `sem_inspecao_meses` entram na memória de filtros locais de Perdas (DEC-060). Os indicadores e o mapa são invalidados junto com as ordens.
+
+## DEC-077 · Insights de IA nas telas do dia a dia, com a IA escolhendo a leitura
+
+- **Data:** 03/11/2026 · **Área:** GenAI e backend · **Autor:** Luis Felipe · **Revisa:** DEC-066 (a regra deixa de escolher a leitura e passa a calcular as candidatas e a reserva)
+- **Contexto:** o case pede, no Módulo 3, insight "em pelo menos uma das telas", mas a user story da seção 5.3 pede insights "nas telas que uso no dia a dia". Só a Receita tinha. E nela a regra do backend escolhia a conclusão (DEC-066): a IA só reescrevia um texto pronto, e um padrão novo nos dados não aparecia, porque a regra só conhece as leituras que alguém escreveu.
+- **Decisão:**
+  - **Três telas novas**, cada uma com a pessoa que a usa no case:
+    - Visão Geral (diretoria), `GET /indicadores/insight`;
+    - Rede (operação), `GET /continuidade/insight`;
+    - Unidade consumidora (atendimento), `GET /unidades-consumidoras/{cod_uc}/insight`.
+  - O botão "Gerar insight" (DEC-069) fica ao lado da leitura que o insight aprofunda: o título da Visão Geral, a legenda do ranking de alimentadores e o cartão "Por que a conta mudou".
+  - **Leituras candidatas.** Em toda tela, o backend calcula as leituras do recorte, cada uma com um `id` e um texto com os números já calculados (`candidatas` no JSON). A IA escolhe uma ou duas, as que mais importam para quem usa a tela, e escreve o insight com as próprias palavras. Ela devolve o texto e os `id` escolhidos (`InsightDraft`, saída estruturada do `PydanticAiInsightWriter`). O prompt `insight/v4` diz quem usa cada tela e o que a tela já mostra, para a IA preferir o que ela não mostra.
+  - **Conferência.** O backend aceita o texto se a escolha vale (até duas leituras, sem repetir, todas entre as candidatas) e se o texto diz o que elas dizem. Os números são os mesmos, as altas e quedas vêm na mesma ordem e não há nome de chave nem termo proibido (`texto_aceito` em `insights.py`). Continua valendo a checagem do agente: todo número do texto existe no JSON (DEC-019). Se o texto falhar, a tela mostra a reserva (`leitura_texto`), com `origem: regra`, como na DEC-066.
+  - **O que cada tela traz que a tela não diz:**
+
+    | Tela | Leituras candidatas |
+    |---|---|
+    | Visão Geral | a base de unidades crescendo com menos energia (a pergunta do diretor no case); a receita contra a energia e o ganho que veio do preço; o indicador de rede e atendimento que mais piorou |
+    | Rede | quanto das horas de interrupção (DEC) ou das interrupções (FEC) se concentra no décimo pior dos alimentadores; quantas vezes o pior passa do índice do conjunto; com período base, em quantos o índice subiu e onde subiu mais |
+    | Unidade consumidora | a conta subiu sem o cliente gastar mais energia; o mês fora do padrão contra a tendência dos 12 meses; leitura estimada |
+    | Receita | as leituras da DEC-066, agora todas como candidatas |
+
+  - Nenhum dado do titular vai ao modelo: o insight da UC leva só variações da conta e do consumo, sem o código da UC.
+- **Motivo:** a interpretação passa a ser da IA, como o case pede, sem abrir mão de "dado inventado é pior que nenhum dado". As regras não dependem da Gold de hoje: comparam sinais e proporções do recorte pedido. O cache usa o conteúdo das métricas como chave, então uma Gold recarregada gera um insight novo.
+- **Medição:** chamada às quatro rotas com o modelo padrão na Gold real, em 03/11. A IA escolheu duas leituras e o texto passou na conferência nas quatro: na Receita, na Visão Geral, na Rede e numa UC com conta maior.
+- **Alternativas descartadas:**
+  - **a IA escolher livremente sobre as métricas:** foi o que fez o insight repetir a tela e afirmar o que os números não sustentam (DEC-066);
+  - **a regra escolher a leitura:** a IA só redigia e a interpretação ficava presa ao que a regra conhece.
+- **Consequências:**
+  - a avaliação da Receita (`make eval-insights`) confere o texto contra as leituras que a IA escolheu;
+  - o prompt `insight/v3` continua no repositório. Sem `readings`, a conferência volta a comparar o texto com a reserva.

@@ -7,10 +7,12 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
+from redator_falso import RedatorFalso
 from sqlalchemy import Engine, text
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
+from venergy_api.agente import get_redator_insights
 from venergy_api.auth import Perfil, UsuarioLogado
 from venergy_api.carga import drop_agent_views
 from venergy_api.config import Settings
@@ -113,3 +115,16 @@ def client_for(tmp_path: Path, perfil: Perfil) -> Callable[..., TestClient]:
 @pytest.fixture
 def client(engine: Engine, client_for: Callable[..., TestClient]) -> TestClient:
     return client_for(engine)
+
+
+@pytest.fixture
+def client_with_writer(
+    engine: Engine, client_for: Callable[[Engine], TestClient]
+) -> Callable[..., tuple[TestClient, RedatorFalso]]:
+    def build(*textos: object) -> tuple[TestClient, RedatorFalso]:
+        client = client_for(engine)
+        redator = RedatorFalso(*textos)
+        client.app.dependency_overrides[get_redator_insights] = lambda: redator
+        return client, redator
+
+    return build
