@@ -22,7 +22,7 @@ O agente transforma uma pergunta em português numa consulta SQL somente leitura
 - narração com verificação numérica, texto determinístico com valores e `prompts/v2` (PR #36, item 8, DEC-019);
 - `InsightWriter` (PRs #37 e #40, item 9).
 
-**Na `main` (G1-10, DEC-046, aceita em 30/10/2026):** follow-up com memória, orçamento de tokens por sessão e `prompts/v3`, que é o padrão. A rodada do golden set que compara v2 e v3 segue como pendência registrada (§11).
+**Na `main` (G1-10, DEC-046, aceita em 30/10/2026):** follow-up com memória, orçamento de tokens por sessão e `prompts/v3`, que é o padrão. A rodada do golden set que compara v2 e v3 (§9.5, §11) foi feita em 04/11/2026: v3 com 95 de 95 itens e 6 de 6 follow-ups, sem nenhuma piora contra a v2 (DEC-046).
 
 **Também na `main`:** red team, runner de métricas e linha de base (item 7, PR #41, §9.6); avaliação comparativa e juiz (PR #85, §9.4 e §9.5, DEC-047), com a calibração e a rodada final na Gold real em 03/11/2026 (PR #135, issue #116).
 
@@ -228,7 +228,7 @@ O validador é a primeira trava. A segunda é o banco: role somente leitura, com
 | `max_rows` | `200` | `> 0`; teto do `LIMIT` |
 | `query_timeout_seconds` | `10` | `> 0` |
 | `max_correction_attempts` | `3` | `1 ≤ n ≤ 3` |
-| `prompt_version` | `v3` | Pasta em `prompts/`. A v3 (DEC-046) é a v2 mais o histórico da conversa; a v2 (23/10/2026) pede só as suposições que mudam o número da resposta; a v1 fica como registro. A troca do padrão só entra na `main` depois da rodada da regra de merge (§9.5, §11) |
+| `prompt_version` | `v3` | Pasta em `prompts/`. A v3 (DEC-046) é a v2 mais o histórico da conversa; a v2 (23/10/2026) pede só as suposições que mudam o número da resposta; a v1 fica como registro. A troca do padrão foi confirmada pela rodada da regra de merge em 04/11/2026 (§9.5, §11, DEC-046) |
 | `judge_model` | `google-gla:gemini-3.5-flash-lite` | Provedor e nome conferidos ao montar o juiz (`--judge`), não ao carregar as settings; precisa ser diferente do `llm_model` e do `fallback_model` (nome sem provedor e sem organização). A chave do provedor do juiz só é conferida ao montar o juiz (`--judge`) |
 | `judge_prompt_version` | `v1` | Pasta em `prompts/judge/` |
 | `answer_sample_rows` | `20` | **Item 6.** `> 0`; linhas em `AgentAnswer.rows` e no `AnswerWriter` |
