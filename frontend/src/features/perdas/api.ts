@@ -45,6 +45,13 @@ export const recortesFilaKey = (
 	nivel: "municipio" | "bairro",
 ) => [...filaKey, "recortes", nivel, recorte] as const;
 
+/** O insight de IA da tela: só totais da fila e das vistorias, nunca uma UC (DEC-022). */
+export function insightPerdas(recorte: Recorte) {
+	return unwrap(
+		api.GET("/fila-suspeitas/insight", { params: { query: recorte } }),
+	);
+}
+
 export function indicadoresPerdas(recorte: Recorte) {
 	return unwrap(
 		api.GET("/fila-suspeitas/indicadores", { params: { query: recorte } }),

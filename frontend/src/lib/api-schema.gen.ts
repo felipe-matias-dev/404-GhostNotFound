@@ -132,6 +132,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/unidades-consumidoras/{cod_uc}/insight": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Insight
+         * @description Um insight de IA para o atendente: se o consumo da UC subiu mesmo, e se é de um mês só.
+         */
+        get: operations["get_insight_unidades_consumidoras__cod_uc__insight_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/receita/mensal": {
         parameters: {
             query?: never;
@@ -274,6 +294,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/continuidade/insight": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Insight
+         * @description Um insight de IA sobre o ranking de alimentadores que a tela de Rede mostra.
+         */
+        get: operations["get_insight_continuidade_insight_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/continuidade/recortes": {
         parameters: {
             query?: never;
@@ -394,6 +434,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/indicadores/insight": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Insight
+         * @description Um insight de IA sobre a comparação de indicadores que a Visão Geral mostra.
+         */
+        get: operations["get_insight_indicadores_insight_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/indicadores/janelas": {
         parameters: {
             query?: never;
@@ -446,6 +506,26 @@ export interface paths {
          * @description Suspeitas por município ou bairro, para o mapa; o bairro leva o município junto.
          */
         get: operations["get_recortes_fila_suspeitas_recortes_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/fila-suspeitas/insight": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Insight
+         * @description Um insight de IA sobre os indicadores e o mapa da tela de Perdas, só com totais.
+         */
+        get: operations["get_insight_fila_suspeitas_insight_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1302,10 +1382,10 @@ export interface components {
             n_uc_medio: number | null;
         };
         /**
-         * InsightReceitaSchema
-         * @description O insight de IA da tela de Receita e as métricas que sustentam cada número do texto.
+         * InsightSchema
+         * @description O insight de IA de uma tela e as métricas que sustentam cada número do texto.
          */
-        InsightReceitaSchema: {
+        InsightSchema: {
             /** Texto */
             texto: string | null;
             /** Origem */
@@ -2260,6 +2340,46 @@ export interface operations {
             };
         };
     };
+    get_insight_unidades_consumidoras__cod_uc__insight_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cod_uc: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InsightSchema"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErroSchema"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_receita_mensal_receita_mensal_get: {
         parameters: {
             query?: {
@@ -2405,7 +2525,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["InsightReceitaSchema"];
+                    "application/json": components["schemas"]["InsightSchema"];
                 };
             };
             /** @description Validation Error */
@@ -2477,6 +2597,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RankingContinuidadeSchema"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_insight_continuidade_insight_get: {
+        parameters: {
+            query: {
+                inicio: string;
+                fim: string;
+                municipio?: string | null;
+                bairro?: string | null;
+                classe?: ("B1" | "B2" | "B3" | "A4") | null;
+                criterio?: "dec" | "fec";
+                base_inicio?: string | null;
+                base_fim?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InsightSchema"];
                 };
             };
             /** @description Validation Error */
@@ -2713,6 +2871,43 @@ export interface operations {
             };
         };
     };
+    get_insight_indicadores_insight_get: {
+        parameters: {
+            query: {
+                base_inicio: string;
+                base_fim: string;
+                atual_inicio: string;
+                atual_fim: string;
+                municipio?: string | null;
+                bairro?: string | null;
+                classe?: ("B1" | "B2" | "B3" | "A4") | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InsightSchema"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_janelas_indicadores_janelas_get: {
         parameters: {
             query?: {
@@ -2801,6 +2996,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RecortesFilaSchema"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_insight_fila_suspeitas_insight_get: {
+        parameters: {
+            query?: {
+                municipio?: string | null;
+                bairro?: string | null;
+                classe?: ("B1" | "B2" | "B3" | "A4") | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InsightSchema"];
                 };
             };
             /** @description Validation Error */

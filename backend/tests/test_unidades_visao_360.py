@@ -572,3 +572,52 @@ def test_bill_variation_is_empty_without_the_bill_of_the_previous_year(
     body = client.get(URL.format(cod_uc="0001")).json()
 
     assert body["variacao_conta"] is None
+
+
+INSIGHT = "/unidades-consumidoras/{cod_uc}/insight"
+
+
+def test_insight_answers_if_the_customer_used_more_energy(client_with_writer, seed) -> None:
+    seed(
+        make_uc("0001"),
+        make_invoice("0001", "2024-12", kwh_faturado=Decimal("100")),
+        make_invoice(
+            "0001", "2025-12", kwh_faturado=Decimal("98"), receita_faturada=Decimal("120.00")
+        ),
+    )
+    client, redator = client_with_writer()
+
+    corpo = client.get(INSIGHT.format(cod_uc="0001")).json()
+
+    assert corpo["origem"] == "ia"
+    assert corpo["metricas"]["leitura_principal"] == "conta_sem_consumo"
+    assert corpo["metricas"]["diferenca_conta"] == 30.0
+    assert redator.chamadas == [("unidade_consumidora", corpo["metricas"])]
+
+
+def test_insight_never_sends_the_holder_to_the_model(client_with_writer, seed) -> None:
+    seed(
+        make_uc("0001"),
+        make_invoice("0001", "2024-12"),
+        make_invoice("0001", "2025-12", receita_faturada=Decimal("95.00")),
+    )
+    client, redator = client_with_writer()
+
+    client.get(INSIGHT.format(cod_uc="0001"))
+
+    enviado = str(redator.chamadas)
+    assert "M. S." not in enviado and "1-23" not in enviado and "0001" not in enviado
+
+
+def test_insight_of_an_unknown_unit_is_404(client: TestClient, seed) -> None:
+    assert client.get(INSIGHT.format(cod_uc="9999")).status_code == 404
+
+
+def test_insight_without_comparison_is_empty(client: TestClient, seed) -> None:
+    seed(make_uc("0001"), make_invoice("0001", "2025-12"))
+
+    assert client.get(INSIGHT.format(cod_uc="0001")).json() == {
+        "texto": None,
+        "origem": None,
+        "metricas": None,
+    }

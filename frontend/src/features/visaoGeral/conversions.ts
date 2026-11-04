@@ -2,6 +2,7 @@ import type { TrendCategory, TrendSeries } from "#/components/ui/trend-chart";
 import type { WaterfallStep } from "#/components/ui/waterfall-chart";
 import { trechoDe } from "#/features/filtros";
 import type { Intervalo } from "#/features/indicadores";
+import type { ParPeriodos } from "#/lib/filtros";
 import { formatCompetencia, formatCompetenciaCurta } from "#/lib/format";
 import type { JanelaIndicadores } from "./types";
 
@@ -130,4 +131,14 @@ export function efeitosDaReceita(passos: WaterfallStep[]): EfeitoDaReceita[] {
 			rotulo: p.label,
 			pct: base > 0 ? p.value / base : null,
 		}));
+}
+
+/** Os quatro limites do par de períodos, na forma que `/indicadores/insight` recebe. */
+export function periodosDoInsight({
+	periodo_base,
+	periodo_atual,
+}: ParPeriodos) {
+	const [base_inicio = "", base_fim = ""] = periodo_base.split("/");
+	const [atual_inicio = "", atual_fim = ""] = periodo_atual.split("/");
+	return { base_inicio, base_fim, atual_inicio, atual_fim };
 }

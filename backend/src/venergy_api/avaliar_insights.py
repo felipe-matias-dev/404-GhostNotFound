@@ -1,9 +1,10 @@
-"""Rodada fixa dos insights da Receita: `make eval-insights` (DEC-066).
+"""Rodada fixa dos insights das cinco telas: `make eval-insights` (DEC-066, DEC-077).
 
-Escolhe na Gold carregada um recorte para cada caso que a regra de leitura distingue, soma dois
-casos sintéticos que a base pode não ter e chama o modelo em todos. O relatório vai para
-`ai-agent/eval/runs_gold/`, fora do Git, porque traz números da Gold. Termina com erro se algum
-caso esperado não sair com texto do modelo.
+Para cada tela, escolhe na Gold carregada um recorte para cada caso que as leituras distinguem
+e chama o modelo em todos; na Receita, soma dois casos sintéticos que a base pode não ter. Cada
+texto passa pela mesma conferência da rota. `make eval-insights TELAS=rede,receita` roda só
+essas telas. O relatório vai para `ai-agent/eval/runs_gold/`, fora do Git, porque traz números
+da Gold. Termina com erro se algum caso não sair com texto do modelo.
 """
 
 import asyncio
@@ -14,20 +15,56 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from venergy_agent.bootstrap import build_insight_writer
 from venergy_agent.config import AgentSettings
 
+from venergy_api import (
+    insight_continuidade,
+    insight_indicadores,
+    insight_perdas,
+    insight_receita,
+    insight_uc,
+)
+from venergy_api.agente import configurar_logs_do_agente
 from venergy_api.config import get_settings
 from venergy_api.database import create_db_engine
-from venergy_api.insight_receita import filtro_acima, metricas_da_receita, texto_aceito
-from venergy_api.models import ReceitaDecomposicao
+from venergy_api.insight_receita import filtro_acima, metricas_da_receita
+from venergy_api.insights import redigir
+from venergy_api.models import DimUc, FatoFaturamentoMensal, ReceitaDecomposicao
+from venergy_api.routers.continuidade import get_ranking_alimentadores
+from venergy_api.routers.fila import get_indicadores, get_recortes
+from venergy_api.routers.indicadores import get_comparacao
 from venergy_api.routers.receita import consultar_decomposicao
-from venergy_api.schemas import DecomposicaoFiltroSchema, DecomposicaoLinhaSchema
+from venergy_api.routers.unidades import consultar_metricas_da_uc
+from venergy_api.schemas import (
+    DecomposicaoFiltroSchema,
+    DecomposicaoLinhaSchema,
+    IndicadoresComparacaoFiltroSchema,
+    RankingFiltroSchema,
+    RecorteFiltroSchema,
+    RecortesFilaFiltroSchema,
+)
 
 Metricas = dict[str, object]
 Candidato = tuple[DecomposicaoFiltroSchema, Metricas]
+# Um caso de uma tela: o nome, o recorte em palavras e as métricas que vão ao modelo.
+Caso = tuple[str, str, Metricas]
+Motivo = Callable[[str, Metricas, Sequence[str]], str | None]
+
+MOTIVOS: dict[str, Motivo] = {
+    "receita": insight_receita.motivo_da_recusa,
+    "visao_geral": insight_indicadores.motivo_da_recusa,
+    "rede": insight_continuidade.motivo_da_recusa,
+    "unidade_consumidora": insight_uc.motivo_da_recusa,
+    "perdas": insight_perdas.motivo_da_recusa,
+}
+# UCs lidas para achar um caso de cada leitura: o bastante para a base real, sem ler todas.
+AMOSTRA_DE_UCS = 400
+# Pausa entre os casos: em sequência, a rodada passava do limite por minuto do plano gratuito do
+# Gemini, e a falha do provedor aparecia como insight recusado.
+PAUSA_ENTRE_CASOS = 4.0
 
 RELATORIOS = Path(__file__).parents[3] / "ai-agent" / "eval" / "runs_gold"
 
@@ -92,6 +129,138 @@ def escolher_recortes(candidatos: Sequence[Candidato]) -> dict[str, Candidato | 
     }
 
 
+def ids_das_candidatas(metricas: Metricas) -> set[str]:
+    return {str(candidata["id"]) for candidata in metricas["candidatas"]}
+
+
+def casos_por_leitura(
+    recortes: Sequence[tuple[str, Metricas]], leituras: Sequence[str]
+) -> list[Caso]:
+    """Para cada leitura, o primeiro recorte que a tem entre as candidatas, se houver.
+
+    Com as candidatas (DEC-077), o caso garante que a IA tenha a leitura para escolher.
+    """
+    casos = []
+    for leitura in leituras:
+        achado = next((r for r in recortes if leitura in ids_das_candidatas(r[1])), None)
+        if achado:
+            casos.append((leitura, *achado))
+    return casos
+
+
+def _pares(par: tuple[str, str]) -> tuple[list[str], list[str]]:
+    return par[0].split("/"), par[1].split("/")
+
+
+def _municipios(session: Session) -> list[str]:
+    return sorted(session.scalars(select(DimUc.municipio).distinct()).all())
+
+
+def casos_da_visao_geral(session: Session, par: tuple[str, str]) -> list[Caso]:
+    (base_inicio, base_fim), (atual_inicio, atual_fim) = _pares(par)
+    recortes: list[dict[str, str]] = [{}, {"classe": "B1"}, {"classe": "B3"}]
+    recortes += [{"municipio": municipio} for municipio in _municipios(session)]
+    lidos = []
+    for recorte in recortes:
+        filtro = IndicadoresComparacaoFiltroSchema(
+            base_inicio=base_inicio,
+            base_fim=base_fim,
+            atual_inicio=atual_inicio,
+            atual_fim=atual_fim,
+            **recorte,
+        )
+        metricas = insight_indicadores.metricas_dos_indicadores(
+            filtro, get_comparacao(filtro, session)
+        )
+        if metricas:
+            lidos.append((str(metricas["recorte"]), metricas))
+    leituras = (
+        "base_cresce_consumo_cai",
+        "receita_sem_consumo",
+        "preco_acima_do_consumo",
+        "receita_e_energia",
+        "maior_piora",
+        "sem_piora",
+    )
+    return [("empresa", *lidos[0]), *casos_por_leitura(lidos[1:], leituras)] if lidos else []
+
+
+def casos_da_rede(session: Session, par: tuple[str, str]) -> list[Caso]:
+    (base_inicio, base_fim), (inicio, fim) = _pares(par)
+    base = {"base_inicio": base_inicio, "base_fim": base_fim}
+    recortes: list[tuple[str, dict[str, str]]] = [
+        ("empresa_dec", {"criterio": "dec", **base}),
+        ("empresa_fec", {"criterio": "fec", **base}),
+        ("empresa_sem_base", {"criterio": "dec"}),
+    ]
+    recortes += [
+        (municipio, {"municipio": municipio, **base}) for municipio in _municipios(session)
+    ]
+    lidos = []
+    for nome, recorte in recortes:
+        filtro = RankingFiltroSchema(inicio=inicio, fim=fim, **recorte)
+        metricas = insight_continuidade.metricas_da_continuidade(
+            filtro, get_ranking_alimentadores(filtro, session)
+        )
+        if metricas:
+            lidos.append((nome, metricas))
+    fixos = [(nome, nome, metricas) for nome, metricas in lidos[:3]]
+    leituras = ("concentracao", "pior_alimentador", "alimentadores_em_alta", "maior_alta")
+    return fixos + casos_por_leitura(lidos[3:], leituras)
+
+
+def casos_da_uc(session: Session) -> list[Caso]:
+    """Uma UC de cada leitura, entre as que faturaram no último mês da Gold."""
+    fato = FatoFaturamentoMensal
+    referencia = session.scalar(select(func.max(fato.competencia)))
+    ucs = session.scalars(
+        select(fato.cod_uc)
+        .where(fato.competencia == referencia)
+        .order_by(fato.cod_uc)
+        .limit(AMOSTRA_DE_UCS)
+    ).all()
+    lidos = [(cod_uc, m) for cod_uc in ucs if (m := consultar_metricas_da_uc(session, cod_uc))]
+    leituras = (
+        "conta_sem_consumo",
+        "conta_com_consumo",
+        "mes_fora_do_padrao",
+        "tendencia",
+        "consumo_do_mes_e_do_ano",
+        "consumo_do_ano",
+        "leitura_estimada",
+    )
+    # O relatório não leva o código da UC: só o caso e as métricas, como o modelo recebe.
+    return [(caso, "uma UC", metricas) for caso, _, metricas in casos_por_leitura(lidos, leituras)]
+
+
+def casos_de_perdas(session: Session) -> list[Caso]:
+    """A empresa e um município para cada leitura; só totais, como a rota manda ao modelo."""
+    recortes = [{}] + [{"municipio": municipio} for municipio in _municipios(session)]
+    lidos = []
+    for recorte in recortes:
+        filtro = RecorteFiltroSchema(**recorte)
+        metricas = insight_perdas.metricas_de_perdas(
+            filtro,
+            get_indicadores(filtro, session),
+            get_recortes(RecortesFilaFiltroSchema(**recorte), session),
+        )
+        if metricas:
+            lidos.append((str(metricas["recorte"]), metricas))
+    leituras = ("concentracao", "acerto_das_inspecoes", "fila_parada")
+    return [("empresa", *lidos[0]), *casos_por_leitura(lidos[1:], leituras)] if lidos else []
+
+
+def casos_da_receita(session: Session, par: tuple[str, str]) -> tuple[list[Caso], list[str]]:
+    escolhidos = escolher_recortes(_candidatos(session, *par))
+    casos = [
+        (caso, str(candidato[1]["recorte"]), candidato[1])
+        for caso, candidato in escolhidos.items()
+        if candidato is not None
+    ]
+    casos += [(caso, "sintético", m) for caso, m in casos_sinteticos().items()]
+    return casos, [caso for caso, candidato in escolhidos.items() if candidato is None]
+
+
 def _candidatos(session: Session, base: str, atual: str) -> list[Candidato]:
     decomposicao = ReceitaDecomposicao
     pares = session.execute(
@@ -119,23 +288,34 @@ def _candidatos(session: Session, base: str, atual: str) -> list[Candidato]:
     return candidatos
 
 
-async def _narrar(redator, caso: str, recorte: str, metricas: Metricas) -> dict[str, object]:
-    insight = await redator.narrate("receita", metricas)
-    aceito = insight is not None and texto_aceito(insight.text, metricas)
+async def _narrar(redator, tela: str, caso: Caso) -> dict[str, object]:
+    nome, recorte, metricas = caso
+    # O mesmo caminho da rota, com a nova tentativa quando a conferência recusa.
+    insight = await redigir(
+        tela,
+        metricas,
+        redator,
+        lambda texto, escolhidas: MOTIVOS[tela](texto, metricas, escolhidas),
+    )
+    aceito = insight is not None
     return {
-        "caso": caso,
+        "tela": tela,
+        "caso": nome,
         "recorte": recorte,
-        "leitura": metricas["leitura_principal"],
+        "candidatas": sorted(ids_das_candidatas(metricas)),
+        "escolhidas": list(insight.readings) if insight else [],
         "origem": "ia" if aceito else "regra",
         "regra": metricas["leitura_texto"],
         "texto": insight.text if insight else None,
     }
 
 
-async def rodar() -> int:
+async def rodar(telas: Sequence[str]) -> int:
+    # O motivo de cada texto descartado pelo agente (erro do provedor, número sem suporte) é log.
+    configurar_logs_do_agente()
     engine = create_db_engine(get_settings().database_url)
     redator = build_insight_writer(AgentSettings())
-    resultados: list[dict[str, object]] = []
+    casos: dict[str, list[Caso]] = {}
     sem_recorte: list[str] = []
     with Session(engine) as session:
         par = session.execute(
@@ -146,29 +326,49 @@ async def rodar() -> int:
         if par is None:
             print("A Gold não tem decomposição de receita.")
             return 1
-        escolhidos = escolher_recortes(_candidatos(session, par[0], par[1]))
-    for caso, candidato in escolhidos.items():
-        if candidato is None:
-            sem_recorte.append(caso)
-            continue
-        resultados.append(await _narrar(redator, caso, str(candidato[1]["recorte"]), candidato[1]))
-    for caso, metricas in casos_sinteticos().items():
-        resultados.append(await _narrar(redator, caso, "sintético", metricas))
+        par = (par[0], par[1])
+        if "receita" in telas:
+            casos["receita"], sem_recorte = casos_da_receita(session, par)
+        if "visao_geral" in telas:
+            casos["visao_geral"] = casos_da_visao_geral(session, par)
+        if "rede" in telas:
+            casos["rede"] = casos_da_rede(session, par)
+        if "unidade_consumidora" in telas:
+            casos["unidade_consumidora"] = casos_da_uc(session)
+        if "perdas" in telas:
+            casos["perdas"] = casos_de_perdas(session)
 
+    resultados = []
+    for tela, da_tela in casos.items():
+        for caso in da_tela:
+            if resultados:
+                await asyncio.sleep(PAUSA_ENTRE_CASOS)
+            resultados.append(await _narrar(redator, tela, caso))
     RELATORIOS.mkdir(parents=True, exist_ok=True)
     instante = datetime.now(UTC).strftime("%Y-%m-%dT%H%M%SZ")
     relatorio = RELATORIOS / f"insights-{instante}.json"
-    conteudo = {"resultados": resultados, "sem_recorte": sem_recorte}
+    conteudo = {"par": par, "resultados": resultados, "sem_recorte_receita": sem_recorte}
     relatorio.write_text(json.dumps(conteudo, ensure_ascii=False, indent=1), encoding="utf-8")
 
-    recusados = [item for item in resultados if item["origem"] != "ia"]
     for item in resultados:
-        print(f"[{item['origem']}] {item['caso']} · {item['recorte']}\n  {item['texto']}")
-    print(f"\n{len(resultados) - len(recusados)} de {len(resultados)} com texto do modelo.")
-    print(f"Sem recorte na base: {', '.join(sem_recorte) or 'nenhum'}.")
+        escolhidas = ", ".join(item["escolhidas"]) or "nenhuma"
+        print(f"[{item['origem']}] {item['tela']} · {item['caso']} · {item['recorte']}")
+        print(f"  escolhidas: {escolhidas}\n  {item['texto']}")
+    print()
+    for tela in casos:
+        da_tela = [item for item in resultados if item["tela"] == tela]
+        aceitos = sum(1 for item in da_tela if item["origem"] == "ia")
+        print(f"{tela}: {aceitos} de {len(da_tela)} com texto do modelo.")
+    print(f"Sem recorte na base (Receita): {', '.join(sem_recorte) or 'nenhum'}.")
     print(f"Relatório: {relatorio}")
-    return 1 if recusados else 0
+    return 1 if any(item["origem"] != "ia" for item in resultados) else 0
 
 
 if __name__ == "__main__":
-    sys.exit(asyncio.run(rodar()))
+    pedidas = sys.argv[1].split(",") if len(sys.argv) > 1 and sys.argv[1] else list(MOTIVOS)
+    desconhecidas = set(pedidas) - set(MOTIVOS)
+    if desconhecidas:
+        sys.exit(
+            f"Telas desconhecidas: {', '.join(sorted(desconhecidas))}. Use {', '.join(MOTIVOS)}."
+        )
+    sys.exit(asyncio.run(rodar(pedidas)))

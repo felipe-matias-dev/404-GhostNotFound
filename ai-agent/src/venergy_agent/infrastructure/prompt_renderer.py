@@ -166,12 +166,15 @@ def render_insight_system(template: str, nonce: str) -> str:
     return _fill(template, nonce=nonce)
 
 
-def render_insight_user(screen: str, metrics: Mapping[str, object], nonce: str) -> str:
+def render_insight_user(
+    screen: str, metrics: Mapping[str, object], nonce: str, feedback: str | None = None
+) -> str:
     _require(nonce)
     data = json.dumps(metrics, ensure_ascii=False, default=str, sort_keys=True)
-    return "\n\n".join(
-        [delimited("pergunta", f"tela: {screen}", nonce), delimited("dados", data, nonce)]
-    )
+    parts = [delimited("pergunta", f"tela: {screen}", nonce), delimited("dados", data, nonce)]
+    if feedback:
+        parts.append(f"Seu texto anterior foi recusado na conferência. {feedback} Escreva de novo.")
+    return "\n\n".join(parts)
 
 
 def render_judge_system(template: str, nonce: str) -> str:

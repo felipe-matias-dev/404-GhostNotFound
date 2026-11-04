@@ -7,7 +7,7 @@ from pathlib import Path
 from pydantic_ai import Agent
 from pydantic_ai.models import Model
 
-from venergy_agent.domain.answer import Insight
+from venergy_agent.domain.answer import Insight, InsightDraft
 from venergy_agent.domain.numbers import unsupported_numbers
 from venergy_agent.infrastructure.prompt_renderer import render_insight_system, render_insight_user
 
@@ -29,26 +29,44 @@ class PydanticAiInsightWriter:
         self._system = render_insight_system(template, self._nonce)
         self._temperature = temperature
 
-    async def narrate(self, screen: str, metrics: Mapping[str, object]) -> Insight | None:
+    async def narrate(
+        self, screen: str, metrics: Mapping[str, object], feedback: str | None = None
+    ) -> Insight | None:
+        insight, unsupported = await self._write(screen, metrics, feedback)
+        if unsupported and feedback is None:
+            numbers = ", ".join(unsupported)
+            retry = (
+                f"Os números {numbers} não estão nas métricas. Use só os números das leituras, "
+                "no formato brasileiro (3,9 e não 3.9)."
+            )
+            insight, _ = await self._write(screen, metrics, retry)
+        return insight
+
+    async def _write(
+        self, screen: str, metrics: Mapping[str, object], feedback: str | None
+    ) -> tuple[Insight | None, tuple[str, ...]]:
         try:
-            agent = Agent(self._model, output_type=str, system_prompt=self._system)
+            agent = Agent(self._model, output_type=InsightDraft, system_prompt=self._system)
             run = await agent.run(
-                render_insight_user(screen, metrics, self._nonce),
+                render_insight_user(screen, metrics, self._nonce, feedback),
                 model_settings={"temperature": self._temperature},
             )
         except Exception as error:
             _log(screen, "erro_do_modelo", error=type(error).__name__)
-            return None
-        text = run.output.strip()
+            return None, ()
+        text = run.output.text.strip()
         if not text:
             _log(screen, "texto_vazio")
-            return None
+            return None, ()
         unsupported = unsupported_numbers(text, list(_metric_values(metrics)))
         if unsupported:
             _log(screen, "numeros_sem_suporte", numbers=list(unsupported))
-            return None
+            return None, unsupported
         _log(screen, "aceito")
-        return Insight(text=text, metrics_used=tuple(metrics.keys()))
+        insight = Insight(
+            text=text, metrics_used=tuple(metrics.keys()), readings=run.output.readings
+        )
+        return insight, ()
 
 
 def _metric_values(value: object) -> Iterator[object]:

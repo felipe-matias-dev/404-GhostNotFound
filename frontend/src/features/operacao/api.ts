@@ -57,6 +57,20 @@ export const continuidadeKeys = {
 		alimentador: string | undefined,
 	) =>
 		[...continuidadeKeys.all, "resumo", periodo, recorte, alimentador] as const,
+	insight: (
+		periodo: Periodo | undefined,
+		criterio: Criterio,
+		recorte: Recorte,
+		base: Periodo | undefined,
+	) =>
+		[
+			...continuidadeKeys.all,
+			"insight",
+			periodo,
+			criterio,
+			recorte,
+			base,
+		] as const,
 	ucs: (
 		periodo: Periodo | undefined,
 		recorte: Recorte,
@@ -96,6 +110,28 @@ export function buscarRankingContinuidade(
 				},
 			},
 			signal,
+		}),
+	);
+}
+
+/** O insight de IA do ranking de alimentadores, com os mesmos filtros da tabela. */
+export function buscarInsightContinuidade(
+	periodo: Periodo,
+	criterio: Criterio,
+	recorte: Recorte,
+	base: Periodo | undefined,
+) {
+	return unwrap(
+		api.GET("/continuidade/insight", {
+			params: {
+				query: {
+					inicio: periodo.inicio,
+					fim: periodo.fim,
+					criterio,
+					...recorte,
+					...doPeriodoBase(base),
+				},
+			},
 		}),
 	);
 }
