@@ -7,6 +7,9 @@ que o backend calcula ([DEC-077](decisoes.md#dec-077--insights-de-ia-nas-telas-d
 É chamado pelo backend em `POST /ai/ask`; para ligá-lo, basta a `GOOGLE_API_KEY` no `.env`
 ([instalação](instalacao.md#agente-de-ia)).
 
+O passo a passo da pergunta e do insight, com os diagramas, os motivos de cada escolha e as
+alternativas descartadas, está no [README do agente](../ai-agent/README.md#como-o-agente-responde-uma-pergunta).
+
 Documentação técnica do módulo: [`ai-agent/README.md`](../ai-agent/README.md),
 [mapa do estado atual](../ai-agent/docs/architecture.md) e a
 [spec](../ai-agent/docs/specs/2026-10-19-architecture-design.md), que é a fonte da verdade.

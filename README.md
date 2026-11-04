@@ -104,7 +104,9 @@ Hipóteses, método e recomendações: [diagnóstico da receita](docs/diagnostic
 - **Insights de IA nas cinco telas,** gerados sob pedido: a IA escolhe entre leituras que o
   backend calcula, e o texto é descartado se citar um número fora delas.
 - **Agente Text-to-SQL** em português: um `SELECT` validado por parser, executado
-  somente leitura, com auditoria de cada resposta.
+  somente leitura, com auditoria de cada resposta. Como o agente e os insights
+  funcionam, por que foram desenhados assim e o que descartamos:
+  [README do agente de IA](ai-agent/README.md).
 - **Pipeline Medalhão no Databricks** com travas entre as camadas: uma falha para o Job
   antes de publicar dado errado. 47 problemas do dataset catalogados, cada um com a
   sua regra.
@@ -226,7 +228,7 @@ motivo e autor, está nas [decisões](docs/decisoes.md).
 | Entender a resposta ao case | [Diagnóstico da receita](docs/diagnostico-receita.md) |
 | Instalar e operar o ambiente | [Instalação](docs/instalacao.md) · [Dos arquivos brutos ao portal](docs/dados-brutos.md) |
 | Usar o portal | [Guia do portal](docs/portal.md) |
-| Usar e avaliar o agente | [Agente de IA](docs/agente-ia.md) |
+| Usar e avaliar o agente | [Agente de IA](docs/agente-ia.md) · [Como o agente e os insights funcionam](ai-agent/README.md) |
 | Saber por que confiar | [Confiabilidade e decisões em destaque](docs/confiabilidade.md) |
 | Ir a fundo | [Arquitetura](docs/arquitetura.md) · [Dicionário de dados](docs/dicionario-de-dados.md) · [Qualidade dos dados](docs/qualidade-dados.md) · [Decisões](docs/decisoes.md) |
 | Contribuir | [Contribuindo](docs/contribuindo.md) |
