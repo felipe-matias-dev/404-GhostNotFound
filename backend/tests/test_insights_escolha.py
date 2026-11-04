@@ -147,3 +147,11 @@ def test_every_reason_goes_back_at_once() -> None:
         "Use estes números, escritos exatamente assim, e nenhum outro: 2, 70,0. "
         "Cite estes nomes como estão: Olinda, Recife."
     )
+
+
+def test_a_reading_without_numbers_asks_for_none() -> None:
+    metricas = com_candidatas([("fator", "O que mais pesou foi o preço.")], {})
+
+    assert motivo_da_recusa("O preço pesou 5,0%.", metricas, ("fator",), NADA) == (
+        "Não use números: as leituras escolhidas não têm nenhum."
+    )

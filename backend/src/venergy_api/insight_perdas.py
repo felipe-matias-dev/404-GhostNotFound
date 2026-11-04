@@ -84,12 +84,13 @@ def metricas_de_perdas(
             "participacao_dos_maiores_pct": participacao,
         }
         nomes["concentracao"] = [r.segmento for r in maiores]
+        # Sem "os 3 … de 13": os nomes já dizem quais e quantos são, e a IA tirava as contagens
+        # ao citá-los, o que a conferência recusava.
         leituras.append(
             (
                 "concentracao",
-                f"Os {len(maiores)} {plural} com mais energia a recuperar, de {len(lugares)}, "
-                f"concentram {numero_br(participacao)}% do kWh estimado da fila: "
-                f"{_lista([r.segmento for r in maiores])}.",
+                f"{_lista([r.segmento for r in maiores])}, os {plural} com mais energia a "
+                f"recuperar, concentram {numero_br(participacao)}% do kWh estimado da fila.",
             )
         )
 

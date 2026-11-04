@@ -72,8 +72,8 @@ def test_concentration_names_the_places_with_most_energy_to_recover() -> None:
 
     assert metricas["leitura_principal"] == "concentracao"
     assert metricas["leitura_texto"] == (
-        "Os 3 municípios com mais energia a recuperar, de 5, concentram 90,0% do kWh estimado "
-        "da fila: Lugar A, Lugar B e Lugar C."
+        "Lugar A, Lugar B e Lugar C, os municípios com mais energia a recuperar, concentram "
+        "90,0% do kWh estimado da fila."
     )
 
 

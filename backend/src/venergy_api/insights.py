@@ -150,6 +150,8 @@ def motivo_da_recusa(
         esperados = ", ".join(dict.fromkeys(_NUMERO.findall(leitura)))
         motivos.append(
             f"Use estes números, escritos exatamente assim, e nenhum outro: {esperados}."
+            if esperados
+            else "Não use números: as leituras escolhidas não têm nenhum."
         )
     elif not _sentidos(leitura) <= _sentidos(texto):
         motivos.append("Mantenha o sentido de cada número: o que sobe nas leituras sobe no texto.")
