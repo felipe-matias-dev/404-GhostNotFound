@@ -118,8 +118,8 @@ gantt
 | Gold v1 completa, export CSV e loader idempotente | O reload não altera o schema `app` | Feito (#49, #60): carga em lotes, tudo ou nada, sem tocar no `app` ([DEC-038](decisoes.md#dec-038--carga-da-gold-em-lotes-com-uma-rodada-de-conferência-antes-de-gravar), [DEC-050](decisoes.md#dec-050--autoria-nos-eventos-das-ordens-de-inspeção)) |
 | DEC/FEC por alimentador ao longo do tempo | Fórmula documentada no dicionário | Feito (#45, [DEC-033](decisoes.md#dec-033--dec-e-fec-por-período-e-recorte-e-a-fila-de-suspeitas-paginada)) |
 | Telas: KPIs, Receita (PVM + drill-down), UC 360, DEC/FEC, fila de Perdas | Cada tela atende à necessidade de uma das lideranças do case | Feito: Visão geral (#59, #68), Receita (#27, #51), UC 360 (#55, #81), Rede (#82, #131) e Perdas (#27, #96). Tour no [guia do portal](portal.md) |
-| Agente sobre dados reais, com trilha de auditoria e acesso somente leitura | Mostra o SQL e as linhas usadas; recusa DML/DDL | Feito (#52, #65): 88,9% a 92,1% de SQL certo na Gold real, contra a meta de 80% ([agente de IA](agente-ia.md)) |
-| Insight de IA embutido em pelo menos uma tela | Gerado apenas a partir de números já calculados | Feito na Receita (#58), gerado sob pedido (#128) |
+| Agente sobre dados reais, com trilha de auditoria e acesso somente leitura | Mostra o SQL e as linhas usadas; recusa DML/DDL | Feito (#52, #65): na rodada final na Gold real (03/11, #135), 94,1% de SQL certo, contra a meta de 80% ([agente de IA](agente-ia.md)) |
+| Insight de IA embutido em pelo menos uma tela | Gerado apenas a partir de números já calculados | Feito na Receita (#58), gerado sob pedido (#128), e estendido à Visão geral, à Rede, a Perdas e à UC, com a IA escolhendo entre as leituras do backend (#141, [DEC-077](decisoes.md#dec-077--insights-de-ia-nas-telas-do-dia-a-dia-com-a-ia-escolhendo-a-leitura)) |
 | Status report (data a confirmar com a Visagio) | 3 a 5 hipóteses com evidência e próximos passos | Sem registro no repositório |
 
 ### 2.4 Sprint 3 — Estabilização e entrega (03/11 a 04/11)
@@ -133,8 +133,8 @@ Sprint curta por causa do feriado de 02/11. **Objetivo:** nenhuma funcionalidade
 | Workflow reexecutável no Databricks e print no README | Execução ponta a ponta sem intervenção manual | Feito (#61, #72), com a task de testes de qualidade (#134). Prints em [dos arquivos brutos ao portal](dados-brutos.md) |
 | [Dicionário de dados](dicionario-de-dados.md) da Gold | Toda métrica com definição e as decisões de limpeza que a afetam | Feito (#23, #126) |
 | [Diagnóstico da receita](diagnostico-receita.md) | Causas com evidência, recomendações e ordem de grandeza do impacto em R$ | Feito (#19, #80) |
-| README completo | Uma pessoa de fora consegue executar tudo seguindo o passo a passo | Feito (#78); reorganizado com os guias em [`docs/`](README.md) na branch `chore/novos-docs` |
-| **Code freeze em 03/11, 20h** | Em 04/11 entram apenas correções de bug e documentação | Hoje: faltam os PRs #136 e #137 e a branch `chore/novos-docs` |
+| README completo | Uma pessoa de fora consegue executar tudo seguindo o passo a passo | Feito (#78, #137); reorganizado com os guias em [`docs/`](README.md) no #139 |
+| **Code freeze em 03/11, 20h** | Em 04/11 entram apenas correções de bug e documentação | O #136 e o #137 entraram antes do freeze; o #138 (documentação do agente) e o #141 (insights nas telas) entraram na noite de 03/11. Em revisão: o #139 (documentação) e as correções #140 (planilha de campo) e #142 (busca de UC e mapa de Perdas) |
 
 ### 2.5 Após a entrega (05/11 a 10/11)
 
@@ -263,7 +263,7 @@ Nenhum item Should começa antes de todos os Must da mesma frente estarem em `Do
 | Risco | Probabilidade | Impacto | Mitigação | Responsável | Desfecho |
 |---|---|---|---|---|---|
 | Atraso da Gold bloqueia Portal e IA | Alta | Alto | Contrato e mock no primeiro dia; Gold publicada tabela a tabela | D3 | Mitigado: portal e agente rodaram na amostra até a Gold oficial (#49, 27/10) |
-| Feriado de 02/11 encurta a última sprint | Certa | Médio | Sprint 2 termina com todas as funcionalidades; Sprint 3 só estabiliza | Scrum Master | Ocorreu: diferenciais seguiram até 03/11 (#131, #134), e o freeze ficou para 03/11 |
+| Feriado de 02/11 encurta a última sprint | Certa | Médio | Sprint 2 termina com todas as funcionalidades; Sprint 3 só estabiliza | Scrum Master | Ocorreu: diferenciais seguiram até 03/11 (#131, #134, #136, #141), e o freeze ficou para 03/11 |
 | Limites do workspace Databricks | Média | Alto | Testar o Job inteiro na S1 com amostra; leituras particionadas por ano | D1 | Não ocorreu: Job serverless completo em ~15 min |
 | Agente alucina ou é manipulado | Média | Crítico | ADR-03, golden set com perguntas sem resposta e de injection, role somente leitura | G1 | Mitigado: red team com 0 escritas aceitas e 0 vazamentos de prompt; números da resposta conferidos com as linhas ([DEC-019](decisoes.md#dec-019--verificação-numérica-da-narrativa)) |
 | Frontend com uma pessoa vira gargalo (5 telas) | Alta | Alto | Componentes reutilizáveis; V1 assume as telas de Perdas e das OIs e o export da fila; G2 faz o widget de chat | V2 | Mitigado com outra divisão: V2 fez as telas, inclusive a fila de Perdas (#96) e o chat (#99); V1 ficou com o backend das ordens |
