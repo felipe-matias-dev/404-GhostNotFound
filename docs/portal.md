@@ -79,7 +79,8 @@ Kanban ou tabela, com enviar a campo, concluir, cancelar, tempo por etapa e plan
   `perdas` altera ordens.
 - **Contexto e resultado:** cada ordem guarda a posição, os motivos e o kWh/mês estimado da UC
   na fila no momento da geração. Concluir como irregularidade confirmada exige o tipo e o kWh
-  recuperado, pela tela ou pela planilha
+  recuperado, pela tela ou pela planilha: de 0,001 a 9.999.999.999.999,999, com até três casas.
+  No modal e na planilha, a vírgula é a decimal e `1.234` é milhar
   ([DEC-075](decisoes.md#dec-075--ordem-de-inspeção-guarda-o-contexto-da-fila-e-o-resultado-de-campo)).
 - **Filtros da fila:** combinam queda de consumo, medidor eletromecânico, leituras estimadas,
   **Somente UCs sem ordem ativa** e **Ocultar UCs inspecionadas nos últimos** 6, 12, 24 ou 36
@@ -88,7 +89,8 @@ Kanban ou tabela, com enviar a campo, concluir, cancelar, tempo por etapa e plan
   filtros atuam antes da paginação
   ([DEC-051](decisoes.md#dec-051--filtro-de-queda-na-fila-de-suspeitas)). A coluna
   **Última inspeção** mostra data, resultado e origem, e a barra soma o kWh/mês estimado das
-  UCs selecionadas.
+  UCs selecionadas, a única soma feita na tela
+  ([DEC-076](decisoes.md#dec-076--tela-de-perdas-indicadores-mapa-última-inspeção-e-filtros-novos-da-fila)).
 - **Planilha de campo:** o botão de baixar exporta as ordens em campo no formato de
   `inspecoes.xlsx`, com seleção em resultado, data e kWh. O de enviar liga cada linha
   à ordem em campo da UC, conclui as válidas e mostra a tabela das rejeitadas com o motivo.
