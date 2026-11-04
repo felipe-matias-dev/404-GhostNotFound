@@ -188,6 +188,22 @@ def test_lists_only_the_history_of_the_requested_unit(client: TestClient, seed) 
     assert [item["cod_inspecao"] for item in body["inspecoes"]] == ["IN-1"]
 
 
+def test_typed_number_brings_the_history_of_the_resolved_unit(client: TestClient, seed) -> None:
+    seed(
+        make_uc("UC144997"),
+        make_meter("UC144997"),
+        make_outage("OC-1", "UC144997", datetime(2025, 3, 5, 10)),
+        make_ticket("AT-1", "UC144997", datetime(2025, 4, 2, 9)),
+    )
+
+    body = client.get(URL.format(cod_uc="144997")).json()
+
+    assert body["cadastro"]["cod_uc"] == "UC144997"
+    assert body["medidor"]["cod_medidor"] == "MED-UC144997"
+    assert [item["cod_ocorrencia"] for item in body["interrupcoes"]] == ["OC-1"]
+    assert [item["protocolo"] for item in body["atendimentos"]] == ["AT-1"]
+
+
 def test_history_comes_newest_first(client: TestClient, seed) -> None:
     seed(
         make_uc("0001"),

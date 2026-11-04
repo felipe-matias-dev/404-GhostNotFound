@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "V-Energy Grid 360 API",
-    "version": "0.13.0"
+    "version": "0.14.0"
   },
   "paths": {
     "/health": {
@@ -179,6 +179,71 @@
             "APIKeyCookie": []
           }
         ]
+      }
+    },
+    "/unidades-consumidoras/busca": {
+      "get": {
+        "tags": [
+          "unidades consumidoras"
+        ],
+        "summary": "Buscar Unidades",
+        "description": "UCs cujo código contém o texto digitado: o código exato primeiro, depois o prefixo.",
+        "operationId": "buscar_unidades_unidades_consumidoras_busca_get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 64,
+              "title": "Q"
+            }
+          },
+          {
+            "name": "limite",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 20,
+              "minimum": 1,
+              "default": 8,
+              "title": "Limite"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UcEncontradaSchema"
+                  },
+                  "title": "Response Buscar Unidades Unidades Consumidoras Busca Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/unidades-consumidoras/{cod_uc}": {
@@ -7543,6 +7608,35 @@
         ],
         "title": "UcAtingidaSchema",
         "description": "Uma UC atingida no período, sem titular nem documento."
+      },
+      "UcEncontradaSchema": {
+        "properties": {
+          "cod_uc": {
+            "type": "string",
+            "title": "Cod Uc"
+          },
+          "municipio": {
+            "type": "string",
+            "title": "Municipio"
+          },
+          "bairro": {
+            "type": "string",
+            "title": "Bairro"
+          },
+          "classe_cadastro": {
+            "type": "string",
+            "title": "Classe Cadastro"
+          }
+        },
+        "type": "object",
+        "required": [
+          "cod_uc",
+          "municipio",
+          "bairro",
+          "classe_cadastro"
+        ],
+        "title": "UcEncontradaSchema",
+        "description": "Opção do autocomplete da busca de UC: o código e onde a UC fica."
       },
       "UcsAtingidasSchema": {
         "properties": {

@@ -1,11 +1,13 @@
 """Rotas de unidades consumidoras: a busca que o atendente faz com o número da conta."""
 
+import re
 from collections.abc import Sequence
 from decimal import Decimal
+from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Query, status
 from fastapi.concurrency import run_in_threadpool
-from sqlalchemy import func, select
+from sqlalchemy import case, func, or_, select
 from sqlalchemy.orm import Session
 
 from venergy_api.agente import RedatorInsightsDep
@@ -34,15 +36,38 @@ from venergy_api.schemas import (
     LocalidadeSchema,
     MedidorUcSchema,
     Uc360Schema,
+    UcEncontradaSchema,
 )
 
 router = APIRouter(prefix="/unidades-consumidoras", tags=["unidades consumidoras"])
+
+
+# O atendente digita o código como o cliente fala: "144997", "uc 144997", "UC-144997". A busca
+# compara só letras e dígitos, sem caixa, e aceita o número sem o prefixo de letras do código.
+_CHAVE = func.regexp_replace(func.upper(DimUc.cod_uc), "[^A-Z0-9]", "", "g")
+_NUMERO = func.regexp_replace(_CHAVE, "^[A-Z]+", "")
+
+
+def _normalizar(texto: str) -> str:
+    return re.sub(r"[^0-9A-Z]", "", texto.upper())
 
 
 def _buscar_uc(session: Session, cod_uc: str) -> DimUc:
     # Busca pela chave primária: o SQLAlchemy monta a consulta com parâmetro, sem
     # concatenar o texto digitado no SQL.
     uc = session.get(DimUc, cod_uc)
+    chave = _normalizar(cod_uc)
+    if uc is None and chave:
+        # Sem o código exato, vale a UC cujo código normalizado é o digitado. Só o número
+        # resolve quando uma única UC tem esse número, para não escolher entre duas UCs.
+        candidatas = session.scalars(
+            select(DimUc)
+            .where(or_(chave == _CHAVE, chave == _NUMERO))
+            .order_by(case((chave == _CHAVE, 0), else_=1))
+            .limit(2)
+        ).all()
+        if candidatas and (len(candidatas) == 1 or _normalizar(candidatas[0].cod_uc) == chave):
+            uc = candidatas[0]
     if uc is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -80,6 +105,27 @@ def get_localidades(session: SessionDep) -> list[LocalidadeSchema]:
     ]
 
 
+@router.get("/busca")
+def buscar_unidades(
+    session: SessionDep,
+    q: Annotated[str, Query(max_length=64)],
+    limite: Annotated[int, Query(ge=1, le=20)] = 8,
+) -> list[UcEncontradaSchema]:
+    """UCs cujo código contém o texto digitado: o código exato primeiro, depois o prefixo."""
+    chave = _normalizar(q)
+    if not chave:
+        return []
+    ordem = case(
+        (or_(chave == _CHAVE, chave == _NUMERO), 0),
+        (or_(_CHAVE.startswith(chave), _NUMERO.startswith(chave)), 1),
+        else_=2,
+    )
+    ucs = session.scalars(
+        select(DimUc).where(_CHAVE.contains(chave)).order_by(ordem, DimUc.cod_uc).limit(limite)
+    )
+    return [UcEncontradaSchema.model_validate(uc, from_attributes=True) for uc in ucs]
+
+
 @router.get(
     "/{cod_uc}",
     # Declarado para o client gerado do OpenAPI tipar o erro, e não só o sucesso.
@@ -96,6 +142,7 @@ def get_unidade_consumidora(cod_uc: str, session: SessionDep) -> DimUcSchema:
 def get_visao_360(cod_uc: str, session: SessionDep) -> Uc360Schema:
     """Cadastro, medidor e histórico da UC: o que o atendente precisa com o cliente na linha."""
     uc = _buscar_uc(session, cod_uc)
+    cod_uc = uc.cod_uc
     medidor = session.get(MedidorUc, cod_uc)
     fato = FatoFaturamentoMensal
     referencia, faturas = _faturas_da_janela(session, cod_uc)
@@ -144,8 +191,7 @@ def get_visao_360(cod_uc: str, session: SessionDep) -> Uc360Schema:
 
 
 def consultar_metricas_da_uc(session: Session, cod_uc: str) -> dict[str, object] | None:
-    _buscar_uc(session, cod_uc)
-    referencia, faturas = _faturas_da_janela(session, cod_uc)
+    referencia, faturas = _faturas_da_janela(session, _buscar_uc(session, cod_uc).cod_uc)
     return metricas_da_uc(
         montar_consumo(referencia, faturas), montar_variacao_conta(referencia, faturas)
     )

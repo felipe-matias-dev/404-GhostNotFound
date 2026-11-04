@@ -4,12 +4,12 @@ Organização do time, cronograma, processo de trabalho e riscos do V-Energy Gri
 
 **Janela do projeto:** 19/10/2026 a 04/11/2026 (entrega do repositório). Prévia em 05/11 e banca em 10/11 (tarde).
 
-## Estado em 03/11/2026
+## Estado em 04/11/2026
 
-Dia do code freeze. Todas as entregas obrigatórias das três sprints estão na `main`, em 116 PRs mergeados desde 19/10. Cada tabela abaixo ganhou a coluna **Estado**, com os PRs que entregaram o item.
+Dia da entrega. Todas as entregas obrigatórias das três sprints estão na `main`, em 122 PRs mergeados desde 19/10. Cada tabela abaixo ganhou a coluna **Estado**, com os PRs que entregaram o item.
 
 - **Feito além do plano:** ordens de inspeção em tempo real ([DEC-063](decisoes.md#dec-063--ordens-de-inspeção-em-tempo-real-aviso-no-commit-e-sse)), rastreamento com OpenTelemetry ([DEC-068](decisoes.md#dec-068--rastreamento-das-requisições-com-opentelemetry)), etapas do agente por SSE ([DEC-055](decisoes.md#dec-055--etapas-do-agente-por-sse-em-post-aiaskstream)), conversas do agente salvas no banco ([DEC-053](decisoes.md#dec-053--conversas-do-agente-por-usuário-no-banco)) e limite de tentativas de login ([DEC-065](decisoes.md#dec-065--limite-de-tentativas-de-login-por-login-e-endereço)).
-- **Em aberto para a entrega (04/11):** mergear os PRs #136 (indicadores e mapa de Perdas) e #137 (pipeline do Databricks do zero) e a branch `chore/novos-docs` (README e documentação reorganizados); as issues #133 (DEC/FEC inflado em alimentador com mês faltando) e #100 (percentuais numéricos na fila); a tag `v1.0-entrega`, ainda não criada.
+- **Em aberto para a entrega (04/11):** mergear o PR #139 (README e documentação reorganizados); as issues #133 (DEC/FEC inflado em alimentador com mês faltando) e #100 (percentuais numéricos na fila); a tag `v1.0-entrega`, ainda não criada. Os PRs #136 (indicadores e mapa de Perdas) e #137 (pipeline do Databricks do zero) entraram antes do freeze, e as correções #140 (planilha de campo) e #142 (busca de UC e mapa de Perdas) em 04/11.
 - **Processo:** a daily aconteceu em todos os dias úteis desde 19/10, às 19h. Todas as conversas do time, técnicas inclusive, ficaram no grupo e na daily, e os pedidos de revisão de PR saíam no grupo ([§4.1](#41-cerimônias)).
 - **Fora do repositório:** status report, slides e ensaios não têm registro aqui; o estado deles está com o time.
 
@@ -130,11 +130,11 @@ Sprint curta por causa do feriado de 02/11. **Objetivo:** nenhuma funcionalidade
 |---|---|---|
 | Ciclo completo das OIs (gerar, mudar status, registrar resultado, cancelar) | Fluxo executado ao vivo em menos de 1 min | Feito (#9, #34, #79, #96, #115, #122) |
 | Filtros globais (período, município, bairro, classe) | Funcionam em todas as telas analíticas | Feito (#107, [DEC-060](decisoes.md#dec-060--filtros-compartilhados-entre-as-telas-do-portal)) |
-| Workflow reexecutável no Databricks e print no README | Execução ponta a ponta sem intervenção manual | Feito (#61, #72), com a task de testes de qualidade (#134). Prints em [dos arquivos brutos ao portal](dados-brutos.md) |
+| Workflow reexecutável no Databricks e print no README | Execução ponta a ponta sem intervenção manual | Feito (#61, #72), com a task de testes de qualidade (#134). Print no [README](../README.md#trazendo-os-arquivos-brutos) e em [dos arquivos brutos ao portal](dados-brutos.md) |
 | [Dicionário de dados](dicionario-de-dados.md) da Gold | Toda métrica com definição e as decisões de limpeza que a afetam | Feito (#23, #126) |
 | [Diagnóstico da receita](diagnostico-receita.md) | Causas com evidência, recomendações e ordem de grandeza do impacto em R$ | Feito (#19, #80) |
 | README completo | Uma pessoa de fora consegue executar tudo seguindo o passo a passo | Feito (#78, #137); reorganizado com os guias em [`docs/`](README.md) no #139 |
-| **Code freeze em 03/11, 20h** | Em 04/11 entram apenas correções de bug e documentação | O #136 e o #137 entraram antes do freeze; o #138 (documentação do agente) e o #141 (insights nas telas) entraram na noite de 03/11. Em revisão: o #139 (documentação) e as correções #140 (planilha de campo) e #142 (busca de UC e mapa de Perdas) |
+| **Code freeze em 03/11, 20h** | Em 04/11 entram apenas correções de bug e documentação | O #136 e o #137 entraram antes do freeze; o #138 (documentação do agente) e o #141 (insights nas telas) entraram na noite de 03/11; as correções #140 (planilha de campo) e #142 (busca de UC e mapa de Perdas) em 04/11. Em revisão: o #139 (documentação) |
 
 ### 2.5 Após a entrega (05/11 a 10/11)
 

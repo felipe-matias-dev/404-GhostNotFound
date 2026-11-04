@@ -95,6 +95,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/unidades-consumidoras/busca": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Buscar Unidades
+         * @description UCs cujo código contém o texto digitado: o código exato primeiro, depois o prefixo.
+         */
+        get: operations["buscar_unidades_unidades_consumidoras_busca_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/unidades-consumidoras/{cod_uc}": {
         parameters: {
             query?: never;
@@ -1968,6 +1988,20 @@ export interface components {
             maior_duracao_h: number;
         };
         /**
+         * UcEncontradaSchema
+         * @description Opção do autocomplete da busca de UC: o código e onde a UC fica.
+         */
+        UcEncontradaSchema: {
+            /** Cod Uc */
+            cod_uc: string;
+            /** Municipio */
+            municipio: string;
+            /** Bairro */
+            bairro: string;
+            /** Classe Cadastro */
+            classe_cadastro: string;
+        };
+        /**
          * UcsAtingidasSchema
          * @description Página das UCs mais atingidas, por horas interrompidas.
          */
@@ -2256,6 +2290,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LocalidadeSchema"][];
+                };
+            };
+        };
+    };
+    buscar_unidades_unidades_consumidoras_busca_get: {
+        parameters: {
+            query: {
+                q: string;
+                limite?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UcEncontradaSchema"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

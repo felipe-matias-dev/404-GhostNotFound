@@ -204,13 +204,19 @@ export function UnidadeConsumidoraPage() {
 											: "Tente novamente para consultar o histórico."}
 								</p>
 							</div>
-							<Button
-								variant="outline"
-								disabled={query.isFetching}
-								onClick={() => void query.refetch()}
-							>
-								Tentar de novo
-							</Button>
+							{naoEncontrada && !data ? (
+								<Button variant="outline" onClick={abrir}>
+									Buscar outra UC
+								</Button>
+							) : (
+								<Button
+									variant="outline"
+									disabled={query.isFetching}
+									onClick={() => void query.refetch()}
+								>
+									Tentar de novo
+								</Button>
+							)}
 						</div>
 					)}
 					{data ? (
@@ -224,7 +230,9 @@ export function UnidadeConsumidoraPage() {
 									)}
 								>
 									<h2 id="uc-identificacao" className="font-mono text-heading">
-										UC {data.cadastro.cod_uc}
+										{/^uc/i.test(data.cadastro.cod_uc)
+											? data.cadastro.cod_uc
+											: `UC ${data.cadastro.cod_uc}`}
 									</h2>
 									<p className="mt-1 text-body">
 										{data.cadastro.titular_mascarado ?? "Titular não informado"}

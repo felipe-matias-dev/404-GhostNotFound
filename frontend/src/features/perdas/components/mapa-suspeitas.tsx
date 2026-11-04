@@ -119,76 +119,73 @@ export function MapaSuspeitas({
 			aria-labelledby="perdas-mapa-titulo"
 			className="flex min-w-0 flex-col gap-3 rounded-md border border-border bg-surface-1 p-5 shadow-edge"
 		>
-			<div className="flex flex-col gap-1">
-				<h2 id="perdas-mapa-titulo" className="text-heading">
-					Onde estão as suspeitas
-				</h2>
-				<p className="text-small text-text-muted">
-					Cor pela energia estimada a recuperar por mês, nas suspeitas de cada{" "}
-					{noNivelBairro ? "bairro" : "município"}. Selecione uma região para
-					filtrar a fila.
-				</p>
-			</div>
-			<div className="grid gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] lg:items-start">
+			<h2 id="perdas-mapa-titulo" className="text-heading">
+				Onde estão as suspeitas
+			</h2>
+			<div className="grid gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
 				<div className="flex min-w-0 flex-col gap-2">
-					<RegionMap
-						label="Mapa de suspeitas da Região Metropolitana do Recife"
-						viewBox={RMR_VIEWBOX}
-						shapes={formas}
-						context={RMR_CONTEXTO}
-						enabledIds={habilitados}
-						containerIds={
-							municipio && formasBairro.length > 0
-								? new Set([municipio.id])
-								: undefined
-						}
-						focusIds={foco}
-						selectedId={bairro?.id ?? municipio?.id ?? null}
-						colorScale="sequential"
-						getIntensity={(forma) =>
-							maximo > 0
-								? (linhaDe(forma)?.kwh_recuperavel_est ?? 0) / maximo
-								: 0
-						}
-						legend={{
-							title: "Energia a recuperar (kWh/mês)",
-							ticks: temDados
-								? [
-										formatKWh(0),
-										formatKWh(maximo / 2, { compacto: true }),
-										formatKWh(maximo, { compacto: true }),
-									]
-								: [formatKWh(null), formatKWh(null), formatKWh(null)],
-							description: `De zero à maior estimativa entre os ${formasBairro.length > 0 ? "bairros do município" : "municípios"} com suspeitas na malha. Quanto maior, mais intensa a cor.`,
-						}}
-						getHref={(forma) =>
-							router.buildLocation({
-								to: "/perdas",
-								search: searchPara("/perdas", {
-									...recorteDe(forma),
-									pagina: undefined,
-								}) as never,
-							}).href
-						}
-						onSelect={(forma) => onChange(recorteDe(forma))}
-						onClear={() =>
-							onChange(
+					{/* Em tela larga, a altura da linha vem do ranking: o mapa, fora do fluxo, ocupa
+					    o que sobra, sem que a proporção do SVG estique a linha. */}
+					<div className="relative h-80 lg:h-auto lg:min-h-80 lg:flex-1">
+						<RegionMap
+							label="Mapa de suspeitas da Região Metropolitana do Recife"
+							viewBox={RMR_VIEWBOX}
+							shapes={formas}
+							context={RMR_CONTEXTO}
+							enabledIds={habilitados}
+							containerIds={
+								municipio && formasBairro.length > 0
+									? new Set([municipio.id])
+									: undefined
+							}
+							focusIds={foco}
+							selectedId={bairro?.id ?? municipio?.id ?? null}
+							colorScale="sequential"
+							getIntensity={(forma) =>
+								maximo > 0
+									? (linhaDe(forma)?.kwh_recuperavel_est ?? 0) / maximo
+									: 0
+							}
+							legend={{
+								title: "Energia a recuperar (kWh/mês)",
+								ticks: temDados
+									? [
+											formatKWh(0),
+											formatKWh(maximo / 2, { compacto: true }),
+											formatKWh(maximo, { compacto: true }),
+										]
+									: [formatKWh(null), formatKWh(null), formatKWh(null)],
+								description: `De zero à maior estimativa entre os ${formasBairro.length > 0 ? "bairros do município" : "municípios"} com suspeitas na malha. Quanto maior, mais intensa a cor.`,
+							}}
+							getHref={(forma) =>
+								router.buildLocation({
+									to: "/perdas",
+									search: searchPara("/perdas", {
+										...recorteDe(forma),
+										pagina: undefined,
+									}) as never,
+								}).href
+							}
+							onSelect={(forma) => onChange(recorteDe(forma))}
+							onClear={() =>
+								onChange(
+									recorte.bairro
+										? { ...recorte, bairro: undefined }
+										: { ...recorte, municipio: undefined, bairro: undefined },
+								)
+							}
+							clearLabel={
 								recorte.bairro
-									? { ...recorte, bairro: undefined }
-									: { ...recorte, municipio: undefined, bairro: undefined },
-							)
-						}
-						clearLabel={
-							recorte.bairro
-								? `Todo o município de ${recorte.municipio}`
-								: "Todos os municípios"
-						}
-						describe={(forma) => {
-							const linha = linhaDe(forma);
-							return linha ? descricao(linha) : "Sem suspeitas nesta região.";
-						}}
-						className="h-80 lg:h-[26rem]"
-					/>
+									? `Todo o município de ${recorte.municipio}`
+									: "Todos os municípios"
+							}
+							describe={(forma) => {
+								const linha = linhaDe(forma);
+								return linha ? descricao(linha) : "Sem suspeitas nesta região.";
+							}}
+							className="absolute inset-0"
+						/>
+					</div>
 					{carregando ? (
 						<output className="text-small text-text-muted">
 							Carregando suspeitas no mapa…
@@ -214,15 +211,15 @@ export function MapaSuspeitas({
 								Tentar de novo
 							</Button>
 						</div>
-					) : (
+					) : recorte.municipio && !municipio ? (
 						<output className="text-small text-text-muted">
-							{recorte.municipio && !municipio
-								? "Município fora da malha da RMR. Use a lista ao lado."
-								: !temDados
-									? "Sem estimativa de energia nas regiões deste mapa."
-									: "Maior energia estimada, cor mais intensa."}
+							Município fora da malha da RMR. Use a lista ao lado.
 						</output>
-					)}
+					) : !temDados ? (
+						<output className="text-small text-text-muted">
+							Sem estimativa de energia nas regiões deste mapa.
+						</output>
+					) : null}
 				</div>
 				<div className="flex min-w-0 flex-col gap-2">
 					<h3 className="text-body font-medium text-text">

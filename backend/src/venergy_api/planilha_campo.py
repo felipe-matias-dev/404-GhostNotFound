@@ -36,6 +36,14 @@ RESULTADOS = {
     "CONFIRMADA": ResultadoOrdem.IRREGULAR_CONFIRMADA,
     "SEM IRREGULARIDADE": ResultadoOrdem.REGULAR,
     "NADA CONSTA": ResultadoOrdem.REGULAR,
+    "NÃO REALIZADA": ResultadoOrdem.NAO_REALIZADA,
+    "NAO REALIZADA": ResultadoOrdem.NAO_REALIZADA,
+}
+
+# Como a observação da ordem chama o resultado que não traz tipo nem kWh.
+SITUACAO_SEM_TIPO = {
+    ResultadoOrdem.REGULAR: "sem irregularidade",
+    ResultadoOrdem.NAO_REALIZADA: "visita não realizada",
 }
 
 PADRAO_ORDEM = re.compile(r"OI-(\d+)")
@@ -183,32 +191,45 @@ def _ler_linha(aba: str, numero: int, cod_uc: str, celula: dict[str, object]) ->
                 + _texto(celula.get("kwh_recuperado"))
             )
     else:
+        situacao = SITUACAO_SEM_TIPO[resultado].capitalize()
         if tipo is not None:
-            raise _LinhaInvalida("Sem irregularidade com tipo de irregularidade preenchido")
+            raise _LinhaInvalida(f"{situacao} com tipo de irregularidade preenchido")
         if kwh is not None and kwh > 0:
-            raise _LinhaInvalida("Sem irregularidade com kWh recuperado maior que zero")
+            raise _LinhaInvalida(f"{situacao} com kWh recuperado maior que zero")
 
-    partes = ["sem irregularidade" if tipo is None else tipo.lower()]
+    partes = [SITUACAO_SEM_TIPO[resultado] if tipo is None else tipo.lower()]
     if kwh is not None and tipo is not None:
         partes.append(f"{_formatar_kwh(kwh)} kWh recuperados")
     if inspetor:
         partes.append(f"inspetor {inspetor}")
     if data is not None:
         partes.append(data.strftime("%d/%m/%Y"))
-    observacao = "Planilha de campo: " + ", ".join(partes)
-    if inspecao:
-        observacao += f" (inspeção {inspecao})"
+    observacao = _montar_observacao(partes, _motivo(celula), inspecao)
     exportada = PADRAO_ORDEM.fullmatch(inspecao)
     return LinhaCampo(
         aba,
         numero,
         cod_uc,
         resultado,
-        observacao[:MAX_OBSERVACAO],
+        observacao,
         tipo,
         kwh if resultado is ResultadoOrdem.IRREGULAR_CONFIRMADA else None,
         int(exportada.group(1)) if exportada else None,
     )
+
+
+def _motivo(celula: dict[str, object]) -> str:
+    return " ".join(_texto(celula.get("observacao") or celula.get("observação")).split())
+
+
+def _montar_observacao(partes: list[str], motivo: str, inspecao: str) -> str:
+    """O texto livre da equipe é o que cede ao teto: a referência da inspeção não pode sumir."""
+    observacao = "Planilha de campo: " + ", ".join(partes)
+    sufixo = f" (inspeção {inspecao})" if inspecao else ""
+    espaco = MAX_OBSERVACAO - len(observacao) - len(": ") - len(sufixo)
+    if motivo and espaco > 0:
+        observacao += ": " + motivo[:espaco]
+    return (observacao + sufixo)[:MAX_OBSERVACAO]
 
 
 def _vazio(valor: object) -> bool:
@@ -286,6 +307,7 @@ COLUNAS_EXPORTACAO = (
     "resultado",
     "tipo_irregularidade",
     "kwh_recuperado",
+    "observacao",
     "municipio",
     "bairro",
 )
@@ -293,7 +315,7 @@ COLUNAS_EXPORTACAO = (
 
 # Linhas que a validação das colunas cobre: sobra folga para a equipe acrescentar linhas.
 LINHAS_VALIDADAS = MAX_LINHAS
-OPCOES_RESULTADO = ("CONFIRMADA", "SEM IRREGULARIDADE")
+OPCOES_RESULTADO = ("CONFIRMADA", "SEM IRREGULARIDADE", "NÃO REALIZADA")
 
 
 def _validar_colunas(aba) -> None:
@@ -304,9 +326,12 @@ def _validar_colunas(aba) -> None:
         formula1='"' + ",".join(OPCOES_RESULTADO) + '"',
         allow_blank=True,
         errorTitle="Resultado inválido",
-        error="Escolha CONFIRMADA ou SEM IRREGULARIDADE.",
+        error="Escolha CONFIRMADA, SEM IRREGULARIDADE ou NÃO REALIZADA.",
         promptTitle="Resultado",
-        prompt="CONFIRMADA: achou irregularidade. SEM IRREGULARIDADE: não achou.",
+        prompt=(
+            "CONFIRMADA: achou irregularidade. SEM IRREGULARIDADE: não achou. "
+            "NÃO REALIZADA: não conseguiu vistoriar (explique na observação)."
+        ),
     )
     data = DataValidation(
         type="date",
@@ -343,7 +368,9 @@ def montar_planilha(ordens: Iterable[tuple[int, str, str | None, str | None]]) -
     aba.title = "em-campo"
     aba.append(list(COLUNAS_EXPORTACAO))
     for ordem_id, cod_uc, municipio, bairro in ordens:
-        aba.append([f"OI-{ordem_id}", cod_uc, None, None, None, None, None, municipio, bairro])
+        aba.append(
+            [f"OI-{ordem_id}", cod_uc, None, None, None, None, None, None, municipio, bairro]
+        )
     _validar_colunas(aba)
     saida = BytesIO()
     livro.save(saida)

@@ -86,13 +86,14 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | [DEC-037](#dec-037--gráficos-do-portal-em-svg-próprio-com-d3-só-para-as-contas) | Gráficos do portal em SVG próprio, com d3 só para as contas | 27/10/2026 | João Euclides | adotada, revisada pela [DEC-041](#dec-041--redesign-da-tela-da-diretoria-a-tesoura-primeiro-e-indicadores-por-período-no-backend) |
 | [DEC-041](#dec-041--redesign-da-tela-da-diretoria-a-tesoura-primeiro-e-indicadores-por-período-no-backend) | Redesign da tela da diretoria: a tesoura primeiro, e indicadores por período no backend | 27/10/2026 | João Euclides | adotada |
 | [DEC-042](#dec-042--visão-360-da-uc-e-comparação-sazonal-do-consumo) | Visão 360 da UC e comparação sazonal do consumo | 28/10/2026 | João Euclides | adotada, revisada pela [DEC-044](#dec-044--visão-360-da-unidade-consumidora-rota-única-janela-da-gold-e-regra-da-conta-alta) |
-| [DEC-043](#dec-043--palette-global-de-ucs-e-navegação-por-contexto) | Palette global de UCs e navegação por contexto | 28/10/2026 | João Euclides | adotada |
+| [DEC-043](#dec-043--palette-global-de-ucs-e-navegação-por-contexto) | Palette global de UCs e navegação por contexto | 28/10/2026 | João Euclides | adotada, revisada em parte pela [DEC-078](#dec-078--busca-de-uc-pelo-código-como-o-atendente-digita) |
 | [DEC-045](#dec-045--período-e-histórico-da-tela-de-rede) | Período e histórico da tela de Rede | 29/10/2026 | João Euclides | adotada |
 | [DEC-054](#dec-054--comparação-de-indicadores-exige-períodos-completos-e-em-ordem) | Comparação de indicadores exige períodos completos e em ordem | 30/10/2026 | João Euclides | adotada |
 | [DEC-060](#dec-060--filtros-compartilhados-entre-as-telas-do-portal) | Filtros compartilhados entre as telas do portal | 30/10/2026 | João Euclides | adotada |
 | [DEC-069](#dec-069--insight-de-ia-ao-lado-da-leitura-que-ele-narra) | Insight de IA ao lado da leitura que ele narra | 01/11/2026 | João Euclides | adotada, revisada pela [DEC-066](#dec-066--insight-da-receita-dá-a-conclusão-não-repete-a-tela) |
 | [DEC-071](#dec-071--tela-de-rede-indicadores-do-recorte-contra-a-base-e-histórico-contra-a-empresa) | Tela de Rede: indicadores do recorte contra a base e histórico contra a empresa | 01/11/2026 | João Euclides | adotada |
 | [DEC-072](#dec-072--tela-de-rede-quem-piorou-onde-atacar-e-por-que-cai) | Tela de Rede: quem piorou, onde atacar e por que cai | 01/11/2026 | João Euclides | adotada |
+| [DEC-078](#dec-078--busca-de-uc-pelo-código-como-o-atendente-digita) | Busca de UC pelo código como o atendente digita | 04/11/2026 | João Euclides | adotada |
 
 ### Acesso, segurança e operação
 
@@ -1450,7 +1451,7 @@ Decisões de 19/10/2026, anteriores à numeração: [convenções do frontend](#
   Seleção por teclado (setas, Home/End, Enter), ponteiro ou toque. Esc/fundo/fechar dispensam
   o modal. Reutiliza `Modal`, incluindo foco preso, restauração de foco, `inert` e scroll lock,
   e o feedback de seleção/reordenação do Interior como referência, com tokens VE-360 e reduced-motion.
-- **Busca:** o código continua textual e exato. Não existe autocomplete global por nome nem
+- **Busca:** (revisada pela [DEC-078](#dec-078--busca-de-uc-pelo-código-como-o-atendente-digita): código digitado normalizado e autocomplete do cadastro) o código continua textual e exato. Não existe autocomplete global por nome nem
   normalização arbitrária de zeros. O filtro é somente sobre os códigos recentes. A palette
   consulta o endpoint agregado e só navega após sucesso, preenchendo o cache da página com
   essa resposta. Falhas permanecem na palette; alterar o texto ou fechar aborta o pedido.
@@ -1900,9 +1901,10 @@ Decisões de 19/10/2026, anteriores à numeração: [convenções do frontend](#
 - **Decisão:** as duas pontas usam a mesma rota e o mesmo formato:
   - **Exportar.** `GET /ordens-inspecao/planilha` (só o perfil `perdas`) baixa um XLSX com as ordens `EM_CAMPO`, uma por
     linha, com as colunas de `inspecoes.xlsx` (`id_inspecao`, `id_uc`, `data`, `inspetor`, `resultado`,
-    `tipo_irregularidade`, `kwh_recuperado`) e, ao final, `municipio` e `bairro` para a equipe saber onde fica a unidade. O
+    `tipo_irregularidade`, `kwh_recuperado`), a coluna `observacao` (o motivo, em texto livre) e, ao final, `municipio` e
+    `bairro` para a equipe saber onde fica a unidade. O
     `id_inspecao` sai como `OI-<id da ordem>` e `id_uc` já vem preenchido; o resto fica em branco para a equipe preencher. A planilha já sai com seleção nas colunas: `resultado` é uma lista
-    (`CONFIRMADA` ou `SEM IRREGULARIDADE`), `data` aceita só data e `kwh_recuperado` só número maior ou igual a zero. É um apoio
+    (`CONFIRMADA`, `SEM IRREGULARIDADE` ou `NÃO REALIZADA`), `data` aceita só data e `kwh_recuperado` só número maior ou igual a zero. É um apoio
     à equipe: o upload continua conferindo tudo, porque um valor colado por cima da lista passa pela planilha;
     Exporta só as ordens em campo, porque são as únicas que o upload pode concluir: a linha exportada sempre corresponde a uma
     ordem que dá para concluir. Sem ordens em campo, o arquivo sai só com o cabeçalho;
@@ -1922,15 +1924,27 @@ Decisões de 19/10/2026, anteriores à numeração: [convenções do frontend](#
   - **Regras da Silver, mais o milhar digitado.** `resultado` aceita as grafias `IRREGULARIDADE CONFIRMADA`, `CONFIRMADA` (→
     `IRREGULAR_CONFIRMADA`), `SEM IRREGULARIDADE` e `NADA CONSTA` (→ `REGULAR`). Tipo ausente (`-`, `N/A`, `NULL`, vazio),
     data em quatro formatos e kWh com vírgula decimal são tratados como no pipeline. Confirmada exige tipo e kWh maior que
-    zero; sem irregularidade exige tipo vazio e kWh zero; kWh negativo é rejeitado. UC repetida: vale a primeira linha. A
+    zero; sem irregularidade exige tipo vazio e kWh zero; kWh negativo é rejeitado. `NÃO REALIZADA` e `NAO REALIZADA` (→
+    `NAO_REALIZADA`, DEC-009) seguem a mesma regra do sem irregularidade, com tipo vazio e kWh zero. Esse resultado não vinha da
+    Silver (o pipeline só conhece os dois primeiros): entrou em 03/11/2026, porque o modal de conclusão já o aceitava e a
+    planilha ficou com menos resultados que a tela. UC repetida: vale a primeira linha. A
     única diferença para a Silver é o ponto de milhar em texto digitado: "1.234,5" e "1.234" valem 1.234,5 e 1.234 kWh. A
     Silver só troca a vírgula por ponto, o que basta para a planilha do case (a INSP-07 só cataloga a vírgula decimal, e a
     trava da Silver garante que nenhum kWh virou nulo), mas leria "1.234" digitado à mão como 1,234 kWh. Célula numérica do
     Excel não passa por essa regra;
   - **Dados extras na observação.** A ordem só guarda resultado e observação; tipo, kWh, data, inspetor e código da inspeção
     entram no texto ("Planilha de campo: desvio direto, 120,5 kWh recuperados, inspetor Fulano, 12/08/2025 (inspeção INS-1)").
+  - **Motivo da equipe.** A coluna opcional `observacao` (também lida como `observação`) vale para qualquer resultado, como o
+    campo "Observação (opcional)" do modal, e entra depois dos dados, antes do código da inspeção ("Planilha de campo: visita
+    não realizada, inspetor Fulano, 14/08/2025: imóvel fechado (inspeção OI-7)"). É o que separa o imóvel fechado do acesso
+    negado ao medir os dias de campo perdidos (DEC-009). Passando de 1.000 caracteres, o corte é no motivo, e não na
+    referência da inspeção. Uma planilha sem a coluna continua valendo, e o motivo é dado: aparece escapado no cartão e no
+    histórico. A coluna não é obrigatória em `NÃO REALIZADA`, para ficar igual ao modal;
 - **Descartado:**
   - **tudo ou nada**, porque uma linha errada travaria o arquivo inteiro e o aceite pede o relatório de rejeitadas;
+  - **aceitar `CANCELADA` na planilha**, porque cancelar é uma transição (`EM_CAMPO → CANCELADA`) e não um resultado de
+    inspeção, e o upload só conclui. Visita que não aconteceu por falta de acesso é `NÃO REALIZADA`, que mede dia de campo
+    perdido; cancelada é visita que deixou de ser necessária (DEC-009);
   - **enviar a campo e concluir no mesmo upload**, que cria um envio no histórico que ninguém fez;
   - **aba de instruções na planilha**, descartada por uma lista de seleção nas próprias colunas, que evita o erro em vez de explicá-lo
     (e o upload teria de ignorar a aba);
@@ -2239,6 +2253,18 @@ Decisões de 19/10/2026, anteriores à numeração: [convenções do frontend](#
   - `make eval-insights` cobre as quatro telas (`TELAS=rede,receita` escolhe) e confere cada texto como a rota, contra as leituras que a IA escolheu;
   - o prompt `insight/v3` continua no repositório. Sem `readings`, a conferência volta a comparar o texto com a reserva.
   - **Custo por insight.** Cada clique em "Gerar insight" pode chamar o modelo até três vezes: a nova tentativa do redator quando um número do texto não está nas métricas (`PydanticAiInsightWriter.narrate`), a nova tentativa do backend com o motivo da recusa (`redigir`), e o próximo clique, porque um texto recusado ou um erro do provedor não entra no cache. A cota gratuita conta cada uma. Por isso o insight é sempre um clique do usuário, e não é carregado junto com a tela.
+
+## DEC-078 · Busca de UC pelo código como o atendente digita
+
+- **Data:** 04/11/2026 · **Área:** Portal e backend · **Autor:** João Euclides · **Revisa:** [DEC-043](#dec-043--palette-global-de-ucs-e-navegação-por-contexto) (busca)
+- **Contexto:** na Gold real o código é `UC` + 6 dígitos (`UC144997`), mas o cliente fala só o número. A palette tratava o texto digitado como código exato: `144997` ou `uc 144997` chamavam `/visao-360` e voltavam `404`, e a única opção do autocomplete era o próprio texto. Depois do erro, o texto antigo continuava no campo e o código novo era concatenado a ele.
+- **Decisão:**
+  - **Resolução no backend:** as rotas `/{cod_uc}` e `/{cod_uc}/visao-360` tentam primeiro o código exato. Sem ele, comparam só letras e dígitos, sem caixa (`uc 144997` e `UC-144997` viram `UC144997`), e aceitam o número sem o prefixo de letras quando uma única UC tem esse número. Dois códigos com o mesmo número (`UC1024` e `TESTE1024`) continuam `404` para `1024`: o backend não escolhe entre duas UCs.
+  - **Autocomplete do banco:** `GET /unidades-consumidoras/busca?q=` devolve até 8 UCs (`limite` até 20) cujo código normalizado contém o texto, com município, bairro e classe do cadastro, sem dado pessoal. Ordem: código ou número igual ao digitado, depois os que começam por ele, depois os que o contêm.
+  - **Palette:** as opções são as UCs encontradas, seguidas dos recentes que batem com o texto. Enter consulta a opção ativa; se a busca ainda não respondeu, consulta o texto digitado, que o backend resolve. O código aparece como está no cadastro, sem o prefixo "UC" repetido.
+  - **Erro:** UC não encontrada não oferece "Tentar de novo" (repetiria o mesmo `404`): o campo recebe o foco com o texto selecionado, e digitar substitui o código. Falha de rede ou do servidor mantém "Tentar de novo". Na página `/uc`, a UC inexistente oferece "Buscar outra UC", que abre a palette vazia. O placeholder é "Ex.: UC999999", e o (i) do campo lista os formatos aceitos.
+- **Alternativas descartadas:** acrescentar "UC" ao número só no frontend (o contrato não fixa o formato do código, e a amostra usa `0001`); preencher zeros à esquerda (`1` não é `0001`; a DEC-043 continua valendo nisso).
+- **Consequências:** a busca percorre `gold_dim_uc` com `regexp_replace` (cerca de 45 mil linhas na Gold real, sem índice próprio); se o cadastro crescer muito, entra um índice de expressão. Testes em `backend/tests/test_unidades.py` e `test_unidades_visao_360.py`.
 
 ## Convenções do frontend (sem número)
 

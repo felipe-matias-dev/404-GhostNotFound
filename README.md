@@ -31,6 +31,7 @@ Time 404-GhostNotFound · Rocket Lab 2026.2 · Visagio
 - [Introdução](#introdução)
 - [A resposta em 30 segundos](#a-resposta-em-30-segundos)
 - [Funcionalidades](#funcionalidades)
+- [Arquitetura](#arquitetura)
 - [Pré-requisitos](#pré-requisitos)
 - [Instalação](#instalação)
 - [Trazendo os arquivos brutos](#trazendo-os-arquivos-brutos)
@@ -117,6 +118,24 @@ Hipóteses, método e recomendações: [diagnóstico da receita](docs/diagnostic
 
 Tour completo por perfil: [guia do portal](docs/portal.md).
 
+# Arquitetura
+
+Os arquivos brutos passam por Bronze → Silver → Gold no Databricks; a Gold chega ao
+PostgreSQL pela carga; a API serve o portal e chama o agente, que lê só as views da
+camada semântica.
+
+| Camada | Tecnologia | Por que |
+|---|---|---|
+| Dados | Databricks (PySpark, compute serverless), Workflow em YAML | Bronze → Silver → Gold com travas entre as camadas e Job versionado no Git |
+| Banco | PostgreSQL 17 em Docker | Usuário somente leitura nativo para o agente, que só lê o schema `semantic`, e schemas `gold`/`app` separados ([DEC-002](docs/decisoes.md#dec-002--banco-local-postgresql), [DEC-056](docs/decisoes.md#dec-056--views-do-agente-no-schema-semantic-d1)) |
+| API | FastAPI, SQLAlchemy 2.1, psycopg 3 | Mesma stack Pydantic do agente; energia e dinheiro em `numeric` ([DEC-010](docs/decisoes.md#dec-010--energia-e-dinheiro-como-numeric-número-na-api)) |
+| Portal | React 19, TanStack Start (SPA), Tailwind 4, Base UI | Rotas, cache e tabelas do mesmo ecossistema; gráficos em SVG próprio ([DEC-037](docs/decisoes.md#dec-037--gráficos-do-portal-em-svg-próprio-com-d3-só-para-as-contas)) |
+| Agente | PydanticAI, Gemini 3.1 Flash-Lite, sqlglot | Saída tipada e SQL validado por parser, não por regex ([spec do agente](ai-agent/docs/specs/2026-10-19-architecture-design.md)) |
+| Qualidade | uv (workspace), ruff, Biome, pytest, Vitest, pre-commit, gitleaks, GitHub Actions | As mesmas checagens no commit e no CI ([DEC-007](docs/decisoes.md#dec-007--hooks-de-pre-commit-e-ci)) |
+
+Diagramas, ADRs e domínio: [arquitetura](docs/arquitetura.md). Principais decisões
+arquiteturais, travas do pipeline e testes: [confiabilidade](docs/confiabilidade.md).
+
 # Pré-requisitos
 
 O projeto é todo dockerizado: o único requisito para subir banco, API e portal é o
@@ -183,6 +202,8 @@ flowchart LR
    notebooks direto da `main` e exporta a Gold para `/Volumes/v_energy/gold/csv`.
 3. **Baixe os 12 CSVs** desse volume para `data/gold/`, substituindo a amostra.
 4. **Carregue:** `docker compose run --rm api python -m venergy_api.carga`.
+
+![Execução bem-sucedida do Workflow v_energy_workflow no Databricks](docs/img/workflow-databricks.png)
 
 A carga confere cada linha contra o contrato antes de gravar: um arquivo fora do
 contrato cancela tudo e o banco continua como estava. As ordens de inspeção e a

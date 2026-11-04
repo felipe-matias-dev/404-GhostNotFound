@@ -14,7 +14,7 @@ produto. O registro completo, com todas as decisões numeradas e as suposições
 
   | Frente | Testes | Onde rodam |
   |---|---|---|
-  | Backend | 600 funções `pytest` | CI, contra um Postgres de verdade |
+  | Backend | 612 funções `pytest` | CI, contra um Postgres de verdade |
   | Agente de IA | 400 funções `pytest`, inclusive integração com o banco | CI, contra um Postgres de verdade |
   | Frontend | 204 casos Vitest e 26 stories no Storybook | CI, com checagem de tipos e build |
 
@@ -48,9 +48,9 @@ produto. O registro completo, com todas as decisões numeradas e as suposições
 
 **Planilha de campo: exportar as ordens em campo e subir o resultado** · [DEC-062](decisoes.md#dec-062--planilha-de-campo-exportar-as-ordens-em-campo-e-subir-o-resultado)
 - **Problema:** a equipe volta de campo com uma planilha, e digitar cada resultado ordem por ordem é o retrabalho que o Rafael quer evitar.
-- **Decisão:** `GET /ordens-inspecao/planilha` exporta as ordens em campo no formato de `inspecoes.xlsx`, e `POST /ordens-inspecao/planilha` liga cada linha à ordem em campo da unidade consumidora, conclui as válidas e devolve as rejeitadas com o motivo. As regras de limpeza são as da Silver (grafias do resultado, datas, vírgula decimal), mais o ponto de milhar digitado à mão.
-- **Descartado:** tudo ou nada, porque uma linha escrita errada travaria o arquivo inteiro; e concluir ordem que ainda não foi enviada a campo, que pularia a máquina de estados.
-- **Efeito:** a planilha exportada volta pelo upload sem remontar nada, reenviar o mesmo arquivo não muda nada, e o histórico mostra quem subiu a planilha. O tipo de irregularidade e o kWh recuperado vão para colunas próprias da ordem, como no modal de conclusão ([DEC-075](decisoes.md#dec-075--ordem-de-inspeção-guarda-o-contexto-da-fila-e-o-resultado-de-campo)); a data e o inspetor, que não têm coluna, ficam só no resumo da linha gravado na observação. A tela de Perdas tem os botões de baixar e de enviar, com a tabela das linhas rejeitadas; a planilha sai com seleção em resultado, data e kWh.
+- **Decisão:** `GET /ordens-inspecao/planilha` exporta as ordens em campo no formato de `inspecoes.xlsx`, e `POST /ordens-inspecao/planilha` liga cada linha à ordem em campo da unidade consumidora, conclui as válidas e devolve as rejeitadas com o motivo. As regras de limpeza são as da Silver (grafias do resultado, datas, vírgula decimal), mais o ponto de milhar digitado à mão. A planilha aceita os mesmos três resultados do modal de conclusão (irregularidade confirmada, sem irregularidade e visita não realizada) e uma coluna opcional de observação para a equipe explicar o motivo.
+- **Descartado:** tudo ou nada, porque uma linha escrita errada travaria o arquivo inteiro; concluir ordem que ainda não foi enviada a campo, que pularia a máquina de estados; e aceitar `CANCELADA` na planilha, porque cancelar é uma transição, não um resultado de inspeção.
+- **Efeito:** a planilha exportada volta pelo upload sem remontar nada, reenviar o mesmo arquivo não muda nada, e o histórico mostra quem subiu a planilha. O tipo de irregularidade e o kWh recuperado vão para colunas próprias da ordem, como no modal de conclusão ([DEC-075](decisoes.md#dec-075--ordem-de-inspeção-guarda-o-contexto-da-fila-e-o-resultado-de-campo)); a data, o inspetor e o motivo da equipe, que não têm coluna, ficam no resumo da linha gravado na observação, o que separa o imóvel fechado do acesso negado ao medir os dias de campo perdidos. A tela de Perdas tem os botões de baixar e de enviar, com a tabela das linhas rejeitadas; a planilha sai com seleção em resultado, data e kWh.
 
 **Tela de ordens que se atualiza sozinha** · [DEC-063](decisoes.md#dec-063--ordens-de-inspeção-em-tempo-real-aviso-no-commit-e-sse)
 - **Problema:** dois analistas de perdas olham a mesma ordem, e quem não recarrega a página vê o status antigo.

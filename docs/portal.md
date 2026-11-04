@@ -90,7 +90,10 @@ Kanban ou tabela, com enviar a campo, concluir, cancelar, tempo por etapa e plan
   UCs selecionadas, a única soma feita na tela
   ([DEC-076](decisoes.md#dec-076--tela-de-perdas-indicadores-mapa-última-inspeção-e-filtros-novos-da-fila)).
 - **Planilha de campo:** o botão de baixar exporta as ordens em campo no formato de
-  `inspecoes.xlsx`, com seleção em resultado, data e kWh. O de enviar liga cada linha
+  `inspecoes.xlsx`, mais a coluna `observacao`, com seleção em resultado (`CONFIRMADA`,
+  `SEM IRREGULARIDADE` ou `NÃO REALIZADA`), data e kWh. A visita não realizada segue a regra
+  do sem irregularidade (tipo vazio e kWh zero), e a observação, opcional em qualquer resultado,
+  guarda o motivo da equipe, como "imóvel fechado". O de enviar liga cada linha
   à ordem em campo da UC, conclui as válidas e mostra a tabela das rejeitadas com o motivo.
   Reenviar o mesmo arquivo não muda nada
   ([DEC-062](decisoes.md#dec-062--planilha-de-campo-exportar-as-ordens-em-campo-e-subir-o-resultado)).
@@ -104,8 +107,11 @@ Kanban ou tabela, com enviar a campo, concluir, cancelar, tempo por etapa e plan
 
 ## Consulta de UC (Camila)
 
-Use **Consulta de UC** na sidebar ou Ctrl/Cmd + K para abrir a palette. Busque pelo código
-exatamente como aparece na conta, preservando zeros iniciais, ou selecione uma consulta recente.
+Use **Consulta de UC** na sidebar ou Ctrl/Cmd + K para abrir a palette. Digite o código com ou
+sem o prefixo (`UC144997`, `uc 144997` ou `144997`): as opções vêm do cadastro, com município e
+bairro, e as consultas recentes aparecem logo abaixo. Zeros à esquerda não são inventados
+(`1` não é `0001`), e um número que aponta para duas UCs continua sem resultado
+([DEC-078](decisoes.md#dec-078--busca-de-uc-pelo-código-como-o-atendente-digita)).
 Somente os cinco códigos consultados com sucesso mais recentemente ficam salvos neste navegador,
 sem titular ou valores; a ação **Limpar recentes** remove a lista.
 
@@ -113,7 +119,8 @@ O link `/uc?cod_uc=0001` continua abrindo a visão 360 diretamente. Sem código,
 entrada compacta para abrir a busca. A palette valida a consulta antes de navegar e a tela
 reúne cadastro mascarado, consumo, contas pendentes, medidor/GD, interrupções e chamados em
 uma única consulta: `GET /unidades-consumidoras/{cod_uc}/visao-360`. A rota antiga de cadastro
-permanece disponível. O fluxo de entrada e os limites do histórico local estão na DEC-043.
+permanece disponível. O fluxo de entrada e os limites do histórico local estão na
+[DEC-043](decisoes.md#dec-043--palette-global-de-ucs-e-navegação-por-contexto).
 
 O diagnóstico segue a DEC-044 e o `Uc360Schema` aprovado no PR #55: a referência é a última
 competência **de toda a Gold**, não a última fatura da UC. A tendência vem do backend:

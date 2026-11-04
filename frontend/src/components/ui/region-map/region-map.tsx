@@ -726,23 +726,34 @@ export function RegionMap({
 						{legend.title}
 						<span className="sr-only">. {legend.description}</span>
 					</figcaption>
-					<div
-						aria-hidden
-						className="h-2.5 w-36 rounded-sm border border-border-strong"
-						style={{
-							backgroundImage:
-								colorScale === "sequential"
-									? SEQUENTIAL_GRADIENT
-									: LEGEND_GRADIENT,
-						}}
-					/>
-					<div
-						aria-hidden
-						className="mt-0.5 flex justify-between text-small text-text-muted tabular-nums"
-					>
-						{([0, 1, 2] as const).map((posicao) => (
-							<span key={posicao}>{legend.ticks[posicao]}</span>
-						))}
+					{/* Barra e rótulos com a mesma largura: cada rótulo fica sob o ponto da escala
+					    que nomeia (início, meio e fim), marcado por um traço. */}
+					<div aria-hidden className="relative min-w-48">
+						<div
+							className="h-2.5 w-full rounded-sm border border-border-strong"
+							style={{
+								backgroundImage:
+									colorScale === "sequential"
+										? SEQUENTIAL_GRADIENT
+										: LEGEND_GRADIENT,
+							}}
+						/>
+						<div className="relative h-1">
+							{(["left-0", "left-1/2", "right-0"] as const).map((lado) => (
+								<span
+									key={lado}
+									className={cn(
+										"absolute top-0 h-1 w-px bg-border-strong",
+										lado,
+									)}
+								/>
+							))}
+						</div>
+						<div className="grid grid-cols-3 gap-2 text-small text-text-muted tabular-nums">
+							<span className="text-left">{legend.ticks[0]}</span>
+							<span className="text-center">{legend.ticks[1]}</span>
+							<span className="text-right">{legend.ticks[2]}</span>
+						</div>
 					</div>
 					{semDado.some((s) => !containerIds?.has(s.id)) && (
 						<div className="mt-1.5 flex items-center gap-1.5 text-small text-text-muted">

@@ -73,6 +73,70 @@ def test_no_irregularity_becomes_regular() -> None:
     )
 
 
+def test_visit_not_done_is_its_own_result_and_keeps_the_reason() -> None:
+    (linha,) = ler_planilha(
+        uma_aba(
+            [
+                "INS-9",
+                "0009",
+                "2025-08-14",
+                "Fulano",
+                "NÃO REALIZADA",
+                None,
+                None,
+                "imóvel fechado",
+            ],
+            cabecalho=[*CABECALHO, "observacao"],
+        )
+    ).validas
+
+    assert linha.resultado is ResultadoOrdem.NAO_REALIZADA
+    assert (linha.tipo_irregularidade, linha.kwh_recuperado) == (None, None)
+    assert linha.observacao == (
+        "Planilha de campo: visita não realizada, inspetor Fulano, 14/08/2025: "
+        "imóvel fechado (inspeção INS-9)"
+    )
+
+
+def test_the_note_column_is_added_to_any_result() -> None:
+    (linha,) = ler_planilha(
+        uma_aba(
+            [*CONFIRMADA, "medidor ligado direto na rede"], cabecalho=[*CABECALHO, "observacao"]
+        )
+    ).validas
+
+    assert linha.observacao.endswith(": medidor ligado direto na rede (inspeção INS-1)")
+
+
+def test_the_note_header_may_carry_the_accent() -> None:
+    (linha,) = ler_planilha(
+        uma_aba(
+            ["0009", "NAO REALIZADA", "cão bravo"], cabecalho=["id_uc", "resultado", "Observação"]
+        )
+    ).validas
+
+    assert linha.observacao == "Planilha de campo: visita não realizada: cão bravo"
+
+
+def test_a_blank_note_adds_nothing() -> None:
+    (linha,) = ler_planilha(
+        uma_aba([*SEM_IRREGULARIDADE, "  "], cabecalho=[*CABECALHO, "observacao"])
+    ).validas
+
+    assert linha.observacao == (
+        "Planilha de campo: sem irregularidade, inspetor Ciclana, 13/08/2025 (inspeção INS-2)"
+    )
+
+
+def test_a_long_note_is_cut_before_the_inspection_reference() -> None:
+    (linha,) = ler_planilha(
+        uma_aba([*SEM_IRREGULARIDADE, "x" * 2000], cabecalho=[*CABECALHO, "observacao"])
+    ).validas
+
+    assert len(linha.observacao) == planilha_campo.MAX_OBSERVACAO
+    assert linha.observacao.endswith("x (inspeção INS-2)")
+
+
 @pytest.mark.parametrize(
     ("escrito", "esperado"),
     [
@@ -80,6 +144,8 @@ def test_no_irregularity_becomes_regular() -> None:
         ("  Irregularidade   Confirmada ", ResultadoOrdem.IRREGULAR_CONFIRMADA),
         ("sem irregularidade", ResultadoOrdem.REGULAR),
         ("NADA CONSTA", ResultadoOrdem.REGULAR),
+        ("não realizada", ResultadoOrdem.NAO_REALIZADA),
+        ("  NAO   REALIZADA ", ResultadoOrdem.NAO_REALIZADA),
     ],
 )
 def test_result_spellings_are_normalized(escrito: str, esperado: ResultadoOrdem) -> None:
@@ -136,6 +202,11 @@ def test_numeric_uc_cell_is_read_as_text() -> None:
         (
             ["I", "0001", None, None, "SEM IRREGULARIDADE", "BY-PASS", 0],
             "Sem irregularidade com tipo",
+        ),
+        (["I", "0001", None, None, "NÃO REALIZADA", None, 7], "Visita não realizada com kWh"),
+        (
+            ["I", "0001", None, None, "NÃO REALIZADA", "BY-PASS", 0],
+            "Visita não realizada com tipo",
         ),
         (["I", "0001", None, None, "CONFIRMADA", "BY-PASS", "muito"], "kWh recuperado inválido"),
         (["I", "0001", None, None, "CONFIRMADA", "BY-PASS", "0,0004"], "até três casas"),

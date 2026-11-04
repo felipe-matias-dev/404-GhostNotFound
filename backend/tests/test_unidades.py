@@ -102,3 +102,50 @@ def test_returns_404_when_the_consumer_unit_does_not_exist(client: TestClient) -
 
     assert response.status_code == 404
     assert response.json() == {"detail": "Unidade consumidora 9999 não encontrada"}
+
+
+def _add_ucs(engine: Engine, *codigos: str) -> None:
+    with Session(engine) as session, session.begin():
+        session.add_all([DimUc(**{**STORED_UC, "cod_uc": codigo}) for codigo in codigos])
+
+
+@pytest.mark.parametrize("digitado", ["144997", "uc 144997", "UC-144997", "uc144997"])
+def test_resolves_the_code_as_the_attendant_types_it(
+    client: TestClient, engine: Engine, digitado: str
+) -> None:
+    _add_ucs(engine, "UC144997", "UC1449970")
+
+    response = client.get(f"/unidades-consumidoras/{digitado}")
+
+    assert response.status_code == 200
+    assert response.json()["cod_uc"] == "UC144997"
+
+
+def test_number_shared_by_two_units_is_not_resolved(client: TestClient, engine: Engine) -> None:
+    _add_ucs(engine, "UC1024", "TESTE1024")
+
+    response = client.get("/unidades-consumidoras/1024")
+
+    assert response.status_code == 404
+
+
+def test_search_ranks_exact_then_prefix_then_contained(client: TestClient, engine: Engine) -> None:
+    _add_ucs(engine, "UC101024", "UC1024", "UC102400", "UC144997")
+
+    response = client.get("/unidades-consumidoras/busca", params={"q": " 1024 "})
+
+    assert response.status_code == 200
+    assert [uc["cod_uc"] for uc in response.json()] == ["UC1024", "UC102400", "UC101024"]
+    assert response.json()[0] == {
+        "cod_uc": "UC1024",
+        "municipio": "Recife",
+        "bairro": "Boa Viagem",
+        "classe_cadastro": "Residencial",
+    }
+
+
+def test_search_without_letters_or_digits_returns_nothing(client: TestClient) -> None:
+    response = client.get("/unidades-consumidoras/busca", params={"q": "%_ -"})
+
+    assert response.status_code == 200
+    assert response.json() == []
