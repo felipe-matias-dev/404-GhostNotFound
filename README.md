@@ -94,14 +94,15 @@ Hipóteses, método e recomendações: [diagnóstico da receita](docs/diagnostic
 # Funcionalidades
 
 - **Visão geral e Receita** para a diretoria: ponte em cascata da receita, mapa da
-  Região Metropolitana do Recife, drill-down município → bairro → classe e insight de
-  IA gerado sob pedido.
+  Região Metropolitana do Recife e drill-down município → bairro → classe.
 - **Rede** para a operação: DEC e FEC por alimentador e bairro contra o período base,
   quem piorou e "por que a luz cai", com mapa coroplético.
 - **Perdas** para a equipe de inspeção: fila de suspeitas com mapa e acerto das inspeções,
   ordens em Kanban que se atualiza sozinho, prazos por etapa e planilha de campo de ida e volta.
 - **Visão 360 da UC** para o atendimento: cadastro, consumo, faturas em aberto, medidor,
   interrupções, chamados e "por que a conta mudou", em reais.
+- **Insights de IA nas cinco telas,** gerados sob pedido: a IA escolhe entre leituras que o
+  backend calcula, e o texto é descartado se citar um número fora delas.
 - **Agente Text-to-SQL** em português: um `SELECT` validado por parser, executado
   somente leitura, com auditoria de cada resposta.
 - **Pipeline Medalhão no Databricks** com travas entre as camadas: uma falha para o Job
@@ -124,7 +125,7 @@ Dois recursos dependem de serviços externos, e o resto funciona sem eles:
 
 | Para | Você precisa de | Sem isso |
 |---|---|---|
-| Perguntar ao agente de IA e gerar insights | Uma chave do Gemini ([aistudio.google.com](https://aistudio.google.com)), uma por pessoa | Tudo sobe; o chat responde `503` e o insight da Receita mostra só a leitura automática |
+| Perguntar ao agente de IA e gerar insights | Uma chave do Gemini ([aistudio.google.com](https://aistudio.google.com)), uma por pessoa | Tudo sobe; o chat responde `503` e os insights mostram só a leitura automática do backend |
 | Processar os arquivos brutos do case | Um workspace do Databricks com Unity Catalog | O portal roda com a amostra sintética |
 
 Opcionais, para quem vai desenvolver:

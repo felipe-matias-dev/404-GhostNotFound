@@ -72,7 +72,8 @@ Permissões, cookie e limite de tentativas:
 ## Agente de IA
 
 O agente precisa de `GOOGLE_API_KEY` no `.env` (chave do Gemini, uma por pessoa). Sem ela,
-tudo sobe, mas `POST /ai/ask` responde `503`. Cada resposta fica em `app.ai_auditoria` e se lê
+tudo sobe, mas `POST /ai/ask` responde `503`, e o botão **Gerar insight** das telas mostra só a
+leitura automática do backend. Cada resposta do agente fica em `app.ai_auditoria` e se lê
 em `GET /ai/audit/{id}` ([DEC-034](decisoes.md#dec-034--auditoria-do-agente-de-ia-gravação-leitura-e-subida-sem-a-chave)).
 
 Modelos reserva (`GEMINI_FALLBACK_MODEL`) e a chave do OpenRouter são opcionais; o
@@ -115,6 +116,7 @@ make ci        # roda local o mesmo que o CI: lint, testes e build do frontend
 | `setup`, `openapi` | `uv` e Node |
 | `test`, `eval` | `uv` e Docker (sobem o banco antes) |
 | `lint`, `eval-compare` | `uv` |
+| `eval-insights` | `uv`, o banco no ar com a Gold real carregada e a chave do Gemini: rodada fixa dos insights das cinco telas, com o relatório fora do Git (`TELAS=rede,receita` escolhe as telas) |
 | `frontend-check` | Node |
 | `ci` | `uv`, Node e Docker |
 

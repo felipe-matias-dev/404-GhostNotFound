@@ -32,10 +32,8 @@ navegador ([DEC-060](decisoes.md#dec-060--filtros-compartilhados-entre-as-telas-
 - **Visão geral:** indicadores comercial, de rede e de atendimento do recorte.
 - **Receita:** ponte em cascata, mapa da Região Metropolitana do Recife e drill-down
   município → bairro → classe.
-- **Insight de IA:** fica ao lado da frase de leitura da ponte e só chama o modelo quando a
-  pessoa clica em **Gerar insight**. O texto narra um JSON de métricas da Gold e é descartado
-  se citar um número que não está nele
-  ([DEC-069](decisoes.md#dec-069--insight-de-ia-ao-lado-da-leitura-que-ele-narra)).
+- **Insight de IA:** na Visão geral, ao lado da frase do título; na Receita, ao lado da frase de
+  leitura da ponte ([insights de IA](#insights-de-ia)).
 
 O método por trás da ponte: [diagnóstico da receita](diagnostico-receita.md).
 
@@ -139,6 +137,31 @@ conta cobriu aparecem só como texto, sem entrar na divisão. As partes vêm pro
 conta. Sem a conta do ano anterior, o card diz que não há com o que comparar, e uma leitura
 estimada ganha um aviso. Fórmula e limites em
 [DEC-057](decisoes.md#dec-057--variação-da-conta-da-unidade-consumidora-dividida-por-motivo).
+
+## Insights de IA
+
+Cinco telas têm o botão **Gerar insight**, ao lado da leitura que o insight aprofunda:
+
+| Tela | Onde | Rota |
+|---|---|---|
+| Visão geral | Frase do título | `GET /indicadores/insight` |
+| Receita | Frase de leitura da ponte | `GET /receita/insight` |
+| Rede | Legenda do ranking de alimentadores | `GET /continuidade/insight` |
+| Perdas | Ao lado do seletor Suspeitas / Inspeções | `GET /fila-suspeitas/insight` |
+| Consulta de UC | Card "Por que a conta mudou" | `GET /unidades-consumidoras/{cod_uc}/insight` |
+
+- **A IA escolhe, o backend calcula.** O backend monta as leituras candidatas do recorte, com os
+  números prontos; a IA escolhe uma ou duas, as que mais importam para quem usa a tela, e
+  escreve o texto. O backend descarta o texto que cita um número fora das leituras escolhidas
+  ou omite os nomes dos lugares que elas apontam
+  ([DEC-077](decisoes.md#dec-077--insights-de-ia-nas-telas-do-dia-a-dia-com-a-ia-escolhendo-a-leitura)).
+- **Só no clique.** O modelo é chamado quando a pessoa clica, nunca ao abrir a tela; o texto
+  fica em cache pelo conteúdo das métricas, e uma Gold recarregada gera um insight novo
+  ([DEC-069](decisoes.md#dec-069--insight-de-ia-ao-lado-da-leitura-que-ele-narra)).
+- **Sem IA, a leitura da regra.** Com a IA desligada, o provedor fora ou o texto recusado duas
+  vezes, a caixa mostra a leitura calculada pelo backend como **Leitura automática**.
+- **Nenhum dado pessoal vai ao modelo.** O insight da UC leva só as variações da conta e do
+  consumo, sem o código da UC; o de Perdas, só os totais que a tela já mostra.
 
 ## Agente de IA e auditoria (Patrícia)
 

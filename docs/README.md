@@ -9,7 +9,7 @@ em diante, cada documento aprofunda um assunto.
 |---|---|
 | [Instalação e operação local](instalacao.md) | Docker Compose passo a passo, logins, chave do Gemini, `make`, observabilidade e problemas comuns |
 | [Dos arquivos brutos ao portal](dados-brutos.md) | Upload no Databricks, Workflow, download da Gold, carga no banco e agendamento |
-| [Guia do portal](portal.md) | Cada tela por perfil: Receita, Rede, Perdas, Consulta de UC e filtros compartilhados |
+| [Guia do portal](portal.md) | Cada tela por perfil: Visão geral, Receita, Rede, Perdas, Consulta de UC, insights de IA e filtros compartilhados |
 | [Agente de IA](agente-ia.md) | Status das respostas, camadas de segurança e resultados da avaliação |
 
 ## Entenda o projeto

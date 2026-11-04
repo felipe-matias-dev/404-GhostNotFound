@@ -80,7 +80,7 @@ produto. O registro completo, com todas as decisões numeradas e as suposições
 
 **Agente só sobre views validadas por parser, e o LLM só narra** · [ADR-03 e ADR-04](arquitetura.md#7-decisões-técnicas)
 - **Descartado:** SQL livre e ferramentas parametrizadas.
-- **Efeito:** mesmo com o prompt manipulado, o banco não aceita escrita. O insight das telas narra um JSON de métricas da Gold e é descartado se citar um número que não está nele. No portal, ele fica ao lado da leitura do gráfico que narra e só chama o modelo quando a pessoa clica em **Gerar insight** ([DEC-069](decisoes.md#dec-069--insight-de-ia-ao-lado-da-leitura-que-ele-narra)).
+- **Efeito:** mesmo com o prompt manipulado, o banco não aceita escrita. Os insights da Visão geral, da Receita, da Rede, de Perdas e da UC partem de leituras candidatas que o backend calcula; a IA escolhe uma ou duas e escreve o texto, e o backend o descarta se citar um número fora das leituras escolhidas ([DEC-077](decisoes.md#dec-077--insights-de-ia-nas-telas-do-dia-a-dia-com-a-ia-escolhendo-a-leitura)). No portal, cada insight fica ao lado da leitura que aprofunda e só chama o modelo quando a pessoa clica em **Gerar insight** ([DEC-069](decisoes.md#dec-069--insight-de-ia-ao-lado-da-leitura-que-ele-narra)).
 
 **Workflow mensal e reprocessamento completo** · [DEC-039](decisoes.md#dec-039--workflow-do-databricks-e-agendamento-mensal)
 - **Agendamento:** dia 6, D+5 do fechamento do faturamento. Os detalhes estão em [dos arquivos brutos ao portal](dados-brutos.md#agendamento-do-workflow).

@@ -1,9 +1,11 @@
 # Agente de IA
 
 O agente Text-to-SQL responde em português perguntas sobre consumo, faturamento,
-interrupções e atendimento, consultando a Gold no PostgreSQL local. Também narra os
-insights das telas. É chamado pelo backend em `POST /ai/ask`; para ligá-lo, basta a
-`GOOGLE_API_KEY` no `.env` ([instalação](instalacao.md#agente-de-ia)).
+interrupções e atendimento, consultando a Gold no PostgreSQL local. Também redige os
+insights da Visão geral, da Receita, da Rede, de Perdas e da UC, escolhendo entre as leituras
+que o backend calcula ([DEC-077](decisoes.md#dec-077--insights-de-ia-nas-telas-do-dia-a-dia-com-a-ia-escolhendo-a-leitura)).
+É chamado pelo backend em `POST /ai/ask`; para ligá-lo, basta a `GOOGLE_API_KEY` no `.env`
+([instalação](instalacao.md#agente-de-ia)).
 
 Documentação técnica do módulo: [`ai-agent/README.md`](../ai-agent/README.md),
 [mapa do estado atual](../ai-agent/docs/architecture.md) e a
