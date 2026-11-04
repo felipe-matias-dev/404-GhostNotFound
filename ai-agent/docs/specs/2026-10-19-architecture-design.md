@@ -22,11 +22,11 @@ O agente transforma uma pergunta em português numa consulta SQL somente leitura
 - narração com verificação numérica, texto determinístico com valores e `prompts/v2` (PR #36, item 8, DEC-019);
 - `InsightWriter` (PRs #37 e #40, item 9).
 
-**Na branch `feat/ai-agent-memoria-orcamento` (G1-10, DEC-046, proposta):** follow-up com memória, orçamento de tokens por sessão e `prompts/v3`. A rodada do golden set que libera a troca do prompt padrão ainda não foi feita (§11).
+**Na `main` (G1-10, DEC-046, aceita em 30/10/2026):** follow-up com memória, orçamento de tokens por sessão e `prompts/v3`, que é o padrão. A rodada do golden set que compara v2 e v3 segue como pendência registrada (§11).
 
-**Em revisão:** red team, runner de métricas e linha de base (item 7, PR #41, §9.6); avaliação comparativa e juiz (branch `feat/ai-agent-avaliacao-comparativa-juiz`, §9.4 e §9.5, DEC-047).
+**Também na `main`:** red team, runner de métricas e linha de base (item 7, PR #41, §9.6); avaliação comparativa e juiz (PR #85, §9.4 e §9.5, DEC-047), com a calibração e a rodada final na Gold real em 03/11/2026 (PR #135, issue #116).
 
-**Falta:** a revisão humana do golden set e as decisões da §9.6. Os eventos de progresso para SSE (issue #38), adiados em 24/10/2026, foram retomados em 30/10/2026 (DEC-055).
+**Falta:** as decisões da §9.6. Os eventos de progresso para SSE (issue #38), adiados em 24/10/2026, foram retomados em 30/10/2026 (DEC-055).
 
 **Critério de sucesso de cada feature:** `uv run pytest` e `uv run ruff check` passam em `ai-agent/` (inclusive no CI), os contratos desta spec batem com o código e os testes da §8 cobrem as regras novas.
 
@@ -118,7 +118,7 @@ ai-agent/
 | `model` | `str` | Modelo que respondeu de fato (G1-06), com o nome que o provedor devolve, sem o prefixo da configuração (`gemini-3.1-flash-lite`, e não `google-gla:gemini-3.1-flash-lite`); quando a pergunta é barrada antes do LLM, é o modelo configurado no mesmo formato |
 | `prompt_version` | `str` | — |
 | `latency_ms` | `int` | `≥ 0` (G1-06) |
-| `input_tokens` | `int` | `≥ 0`, padrão `0`. Tokens de entrada das chamadas ao gerador de SQL neste pedido, somando todas as tentativas. A narrativa não entra: a porta `AnswerWriter` devolve só texto. O backend grava na auditoria (DEC-046) |
+| `input_tokens` | `int` | `≥ 0`, padrão `0`. Tokens de entrada de todas as chamadas do pedido: ao gerador de SQL (somando todas as tentativas), à narração e as chamadas que falharam. A narração entra, porque o total é somado no mesmo acumulador. O backend grava na auditoria (DEC-046) |
 | `output_tokens` | `int` | `≥ 0`, padrão `0`. Idem, tokens de saída |
 
 Invariantes:
@@ -178,7 +178,7 @@ O caso de uso `application/ask.py` implementa `TextToSqlAgent` encadeando as por
    - Quando o resultado é pequeno (até 5 linhas e 4 colunas), o texto determinístico traz os valores em pt-BR (`Resultado: total = 3.`; nulo vira "sem valor"). Assim a resposta tem o número mesmo quando a narrativa cai na verificação (DEC-019). Resultado maior fica só em `rows`.
    - Item 8: o `AnswerWriter` substitui esse texto por uma narrativa. Se a verificação numérica falhar (§7.3 do guia), volta para o texto determinístico.
 8. **Mensagens de `unknown`, `refused` e `failed`:** textos fixos em português, sem LLM, em `refused_reason` e em `answer`. O modelo não escreve o motivo de não ter respondido.
-9. **Tokens.** `AgentAnswer.input_tokens` e `output_tokens` somam as `Generation` do pedido, também nos status sem SQL e na falha depois de uma tentativa. Pergunta barrada antes do modelo leva 0.
+9. **Tokens.** `AgentAnswer.input_tokens` e `output_tokens` somam as `Generation` do pedido, a narração e os tokens gastos em chamadas que falharam (gerador ou narração). Vale também nos status sem SQL e na falha depois de uma tentativa. Pergunta barrada antes do modelo leva 0.
 10. **Logs estruturados:** uma linha JSON por etapa (stdlib `logging`), com `request_id`, `session_id`, número da tentativa, etapa, status, SQL, motivo ou tipo de erro, número de linhas, latência da etapa, modelo, tokens e `prompt_version` (§12 do guia). Sem a amostra de linhas, para não levar dado pessoal aos logs. As etapas `orcamento` (tokens usados e orçamento) e `historico` (só a quantidade de turnos lidos) nunca registram o texto de perguntas anteriores.
 
 ### 5.2 Dados não são instruções
