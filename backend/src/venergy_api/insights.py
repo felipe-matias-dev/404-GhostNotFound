@@ -20,11 +20,13 @@ from venergy_api.schemas import InsightSchema
 CAPACIDADE_PADRAO = 256
 # Uma ou duas leituras: mais que isso vira a lista que a tela já mostra.
 MAX_ESCOLHIDAS = 2
-# Folga para o modelo reescrever a leitura, sem espaço para ele acrescentar outra conclusão.
+# Folga para o modelo reescrever a leitura, sem espaço para ele acrescentar outra conclusão: ao
+# menos 40 caracteres, e 30% do tamanho quando ele junta duas leituras numa frase.
 FOLGA_DO_TEXTO = 40
-# Sentido de cada afirmação, na ordem do texto. "Ganho" fica de fora: é o nome do efeito do preço.
+FOLGA_PROPORCIONAL = 0.3
+# Sentido de cada afirmação. "Ganho" é alta: "o ganho de receita foi de 14,3%".
 _SENTIDO = re.compile(
-    r"\b(?:(?P<alta>cresc\w*|sub\w*|alta|aument\w*)"
+    r"\b(?:(?P<alta>cresc\w*|sub\w*|alta|aument\w*|ganh\w*)"
     r"|(?P<queda>recu\w*|ca[ií]\w*|qued\w*|perd\w*|redu\w*|derrub\w*))\b",
     re.IGNORECASE,
 )
@@ -98,7 +100,8 @@ def texto_fiel(texto: str, leitura: str, proibidos: re.Pattern[str]) -> bool:
     em qualquer ordem: juntar duas leituras que repetem um número continua valendo, e trocar
     uma alta por uma queda nunca vale. Na dúvida, o custo é mostrar o texto da regra.
     """
-    if proibidos.search(texto) or len(texto) > len(leitura) + FOLGA_DO_TEXTO:
+    folga = max(FOLGA_DO_TEXTO, len(leitura) * FOLGA_PROPORCIONAL)
+    if proibidos.search(texto) or len(texto) > len(leitura) + folga:
         return False
     return _numeros(texto) == _numeros(leitura) and _sentidos(leitura) <= _sentidos(texto)
 

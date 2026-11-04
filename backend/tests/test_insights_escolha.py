@@ -71,3 +71,9 @@ def test_a_variation_with_its_direction_flipped_is_refused_in_any_order() -> Non
     assert texto_aceito(
         "A energia recuou 4,0%, e a receita cresceu 8,0%.", metricas, ("receita",), NADA
     )
+
+
+def test_a_gain_counts_as_a_rise() -> None:
+    metricas = com_candidatas([("classe", "Na classe A4, a receita cresceu 14,3%.")], {})
+
+    assert texto_aceito("O ganho de receita da classe A4 foi de 14,3%.", metricas, (), NADA)

@@ -143,7 +143,7 @@ def get_visao_360(cod_uc: str, session: SessionDep) -> Uc360Schema:
     )
 
 
-def _metricas_da_uc(session: Session, cod_uc: str) -> dict[str, object] | None:
+def consultar_metricas_da_uc(session: Session, cod_uc: str) -> dict[str, object] | None:
     _buscar_uc(session, cod_uc)
     referencia, faturas = _faturas_da_janela(session, cod_uc)
     return metricas_da_uc(
@@ -163,7 +163,7 @@ async def get_insight(
 ) -> InsightSchema:
     """Um insight de IA para o atendente: se o consumo da UC subiu mesmo, e se é de um mês só."""
     # As mesmas contas da visão 360, fora do laço de eventos: a sessão do backend é síncrona.
-    metricas = await run_in_threadpool(_metricas_da_uc, session, cod_uc)
+    metricas = await run_in_threadpool(consultar_metricas_da_uc, session, cod_uc)
     if metricas is None:
         return InsightSchema(texto=None, metricas=None)
     return await narrar(
