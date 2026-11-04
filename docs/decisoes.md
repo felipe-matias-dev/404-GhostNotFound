@@ -68,7 +68,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | [DEC-051](#dec-051--filtro-de-queda-na-fila-de-suspeitas) | Filtro de queda na fila de suspeitas | 29/10/2026 | João Euclides | adotada |
 | [DEC-058](#dec-058--período-é-contexto-em-perdas-e-a-consulta-de-uc-não-é-limitada-pelo-recorte) | Período é contexto em Perdas e a consulta de UC não é limitada pelo recorte | 30/10/2026 | João Euclides | adotada |
 | [DEC-059](#dec-059--ordem-de-uc-ausente-do-cadastro-da-gold-fica-fora-da-lista-quando-há-recorte) | Ordem de UC ausente do cadastro da Gold fica fora da lista quando há recorte | 30/10/2026 | João Euclides | adotada |
-| [DEC-062](#dec-062--planilha-de-campo-exportar-as-ordens-em-campo-e-subir-o-resultado) | Planilha de campo: exportar as ordens em campo e subir o resultado | 30/10/2026 | Felipe | adotada |
+| [DEC-062](#dec-062--planilha-de-campo-exportar-as-ordens-em-campo-e-subir-o-resultado) | Planilha de campo: exportar as ordens em campo e subir o resultado | 30/10/2026 | Felipe | adotada, revisada em parte pela [DEC-075](#dec-075--ordem-de-inspeção-guarda-o-contexto-da-fila-e-o-resultado-de-campo) |
 | [DEC-063](#dec-063--ordens-de-inspeção-em-tempo-real-aviso-no-commit-e-sse) | Ordens de inspeção em tempo real: aviso no commit e SSE | 01/11/2026 | Felipe | adotada |
 | [DEC-064](#dec-064--tempo-das-ordens-no-status-e-por-etapa) | Tempo das ordens no status e por etapa | 01/11/2026 | Felipe | adotada |
 | [DEC-075](#dec-075--ordem-de-inspeção-guarda-o-contexto-da-fila-e-o-resultado-de-campo) | Ordem de inspeção guarda o contexto da fila e o resultado de campo | 02/11/2026 | João Euclides | adotada |
