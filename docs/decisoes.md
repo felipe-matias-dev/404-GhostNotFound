@@ -77,6 +77,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | 02/11/2026 | DEC-075: a ordem de inspeção guarda, na geração, a posição, os motivos e o kWh/mês estimado da UC na fila, e, na conclusão como irregular, o tipo de irregularidade e o kWh recuperado em colunas próprias (PATCH e planilha de campo, com o kWh de 0,001 ao teto de `numeric(16,3)`) | A fila é recriada a cada carga: sem a cópia, não se sabe por que a ordem foi gerada; sem o resultado estruturado, o portal não mede quanto as ordens recuperaram | João Euclides |
 | 02/11/2026 | DEC-076: a tela de Perdas ganha faixa de indicadores (suspeitas, ordens e acerto das inspeções do portal contra a Gold), mapa e ranking de suspeitas por município e bairro, última inspeção de cada UC da fila com filtro por meses, filtro "sem ordem ativa" e total de kWh da seleção | O gerente via a lista de trabalho, mas não se ela acerta, onde a perda se concentra nem quais UCs já foram vistoriadas; toda conta fica no backend, exceto a soma das linhas que o usuário selecionou na página, que é apresentação | João Euclides |
 | 03/11/2026 | DEC-077: insights de IA também na Visão Geral, na Rede, na Unidade consumidora e em Perdas; em todas as telas a IA escolhe entre as leituras candidatas que o backend calcula e escreve o insight, e o backend confere o texto contra as leituras escolhidas (prompt `insight/v4`) | O case pede insights "nas telas que uso no dia a dia", e não numa tela só; com a regra escolhendo a leitura, a IA só redigia e a interpretação ficava fixa | Luis Felipe |
+| 04/11/2026 | DEC-078: a busca de UC aceita o código como o atendente digita (`144997`, `uc 144997`, `UC-144997`) e o autocomplete da palette vem do banco, por `GET /unidades-consumidoras/busca`; revisa a busca exata da DEC-043; API 0.14.0 | `144997` dava `404` embora `UC144997` existisse, e a opção do autocomplete era só o eco do texto digitado | João Euclides |
 
 ## DEC-001 · Localização dos arquivos de origem (landing)
 
@@ -1476,7 +1477,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   Seleção por teclado (setas, Home/End, Enter), ponteiro ou toque. Esc/fundo/fechar dispensam
   o modal. Reutiliza `Modal`, incluindo foco preso, restauração de foco, `inert` e scroll lock,
   e o feedback de seleção/reordenação do Interior como referência, com tokens VE-360 e reduced-motion.
-- **Busca:** o código continua textual e exato. Não existe autocomplete global por nome nem
+- **Busca:** (revisada pela DEC-078: código digitado normalizado e autocomplete do cadastro) o código continua textual e exato. Não existe autocomplete global por nome nem
   normalização arbitrária de zeros. O filtro é somente sobre os códigos recentes. A palette
   consulta o endpoint agregado e só navega após sucesso, preenchendo o cache da página com
   essa resposta. Falhas permanecem na palette; alterar o texto ou fechar aborta o pedido.
@@ -2186,3 +2187,15 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   - `make eval-insights` cobre as quatro telas (`TELAS=rede,receita` escolhe) e confere cada texto como a rota, contra as leituras que a IA escolheu;
   - o prompt `insight/v3` continua no repositório. Sem `readings`, a conferência volta a comparar o texto com a reserva.
   - **Custo por insight.** Cada clique em "Gerar insight" pode chamar o modelo até três vezes: a nova tentativa do redator quando um número do texto não está nas métricas (`PydanticAiInsightWriter.narrate`), a nova tentativa do backend com o motivo da recusa (`redigir`), e o próximo clique, porque um texto recusado ou um erro do provedor não entra no cache. A cota gratuita conta cada uma. Por isso o insight é sempre um clique do usuário, e não é carregado junto com a tela.
+
+## DEC-078 · Busca de UC pelo código como o atendente digita
+
+- **Data:** 04/11/2026 · **Área:** Portal e backend · **Autor:** João Euclides · **Revisa:** DEC-043 (busca)
+- **Contexto:** na Gold real o código é `UC` + 6 dígitos (`UC144997`), mas o cliente fala só o número. A palette tratava o texto digitado como código exato: `144997` ou `uc 144997` chamavam `/visao-360` e voltavam `404`, e a única opção do autocomplete era o próprio texto. Depois do erro, o texto antigo continuava no campo e o código novo era concatenado a ele.
+- **Decisão:**
+  - **Resolução no backend:** as rotas `/{cod_uc}` e `/{cod_uc}/visao-360` tentam primeiro o código exato. Sem ele, comparam só letras e dígitos, sem caixa (`uc 144997` e `UC-144997` viram `UC144997`), e aceitam o número sem o prefixo de letras quando uma única UC tem esse número. Dois códigos com o mesmo número (`UC1024` e `TESTE1024`) continuam `404` para `1024`: o backend não escolhe entre duas UCs.
+  - **Autocomplete do banco:** `GET /unidades-consumidoras/busca?q=` devolve até 8 UCs (`limite` até 20) cujo código normalizado contém o texto, com município, bairro e classe do cadastro, sem dado pessoal. Ordem: código ou número igual ao digitado, depois os que começam por ele, depois os que o contêm.
+  - **Palette:** as opções são as UCs encontradas, seguidas dos recentes que batem com o texto. Enter consulta a opção ativa; se a busca ainda não respondeu, consulta o texto digitado, que o backend resolve. O código aparece como está no cadastro, sem o prefixo "UC" repetido.
+  - **Erro:** UC não encontrada não oferece "Tentar de novo" (repetiria o mesmo `404`): o campo recebe o foco com o texto selecionado, e digitar substitui o código. Falha de rede ou do servidor mantém "Tentar de novo". Na página `/uc`, a UC inexistente oferece "Buscar outra UC", que abre a palette vazia. O placeholder é "Ex.: UC999999", e o (i) do campo lista os formatos aceitos.
+- **Alternativas descartadas:** acrescentar "UC" ao número só no frontend (o contrato não fixa o formato do código, e a amostra usa `0001`); preencher zeros à esquerda (`1` não é `0001`; a DEC-043 continua valendo nisso).
+- **Consequências:** a busca percorre `gold_dim_uc` com `regexp_replace` (cerca de 45 mil linhas na Gold real, sem índice próprio); se o cadastro crescer muito, entra um índice de expressão. Testes em `backend/tests/test_unidades.py` e `test_unidades_visao_360.py`.

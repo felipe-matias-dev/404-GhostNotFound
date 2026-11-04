@@ -3,6 +3,7 @@ import {
 	BuildingsIcon,
 	CircleNotchIcon,
 	ClockCounterClockwiseIcon,
+	InfoIcon,
 	MagnifyingGlassIcon,
 } from "@phosphor-icons/react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -21,10 +22,22 @@ import {
 } from "react";
 import { Button } from "#/components/ui/button";
 import { Modal } from "#/components/ui/modal";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipTrigger,
+} from "#/components/ui/tooltip";
 import { useFiltrosPortal } from "#/features/filtros";
 import { ApiError } from "#/lib/api";
 import { buscarVisao360, unidadeConsumidoraKeys } from "../api";
+import { useBuscaUc } from "../hooks/use-busca-uc";
 import { adicionarRecente, parseRecentes, RECENTES_UC_KEY } from "../recentes";
+
+const FORMATO_UC = "Aceita UC144997, uc 144997 ou só 144997.";
+
+function chaveUc(texto: string) {
+	return texto.toUpperCase().replace(/[^0-9A-Z]/g, "");
+}
 
 const ConsultaUcContext = createContext<{
 	abrir: () => void;
@@ -185,11 +198,13 @@ function BuscaUc({
 	const reduced = useReducedMotion();
 	const uid = useId();
 	const codigo = texto.trim();
+	const busca = useBuscaUc(codigo);
+	const encontradas = new Map(busca.ucs.map((uc) => [uc.cod_uc, uc]));
+	const chave = chaveUc(codigo);
 	const filtrados = recentes.filter(
-		(item) =>
-			item.toLowerCase().includes(codigo.toLowerCase()) && item !== codigo,
+		(item) => chaveUc(item).includes(chave) && !encontradas.has(item),
 	);
-	const opcoes = codigo ? [codigo, ...filtrados] : recentes;
+	const opcoes = codigo ? [...encontradas.keys(), ...filtrados] : recentes;
 	const ativo =
 		selecionado && opcoes.includes(selecionado) ? selecionado : opcoes[0];
 	const index = opcoes.indexOf(ativo);
@@ -220,13 +235,19 @@ function BuscaUc({
 			}
 		} catch (error) {
 			if (controller.signal.aborted) return;
-			setErro({
-				codigo: valor,
-				mensagem:
-					error instanceof ApiError && error.status === 404
-						? "UC não encontrada. Confira o código informado."
-						: "Não foi possível consultar esta UC. Tente de novo.",
-			});
+			const naoEncontrada = error instanceof ApiError && error.status === 404;
+			setErro(
+				naoEncontrada
+					? {
+							mensagem: `Nenhuma UC com o código “${valor}”. Confira o número (ex.: UC999999).`,
+						}
+					: {
+							codigo: valor,
+							mensagem: "Não foi possível consultar esta UC. Tente de novo.",
+						},
+			);
+			inputRef.current?.focus();
+			inputRef.current?.select();
 		} finally {
 			if (!controller.signal.aborted) setPendente(null);
 		}
@@ -249,8 +270,10 @@ function BuscaUc({
 			setSelecionado(opcoes[next]);
 		} else if (event.key === "Enter") {
 			event.preventDefault();
-			if (ativo) void consultar(ativo);
-			else setErro({ mensagem: "Informe o número da UC." });
+			if (busca.buscando || !ativo) {
+				if (codigo) void consultar(codigo);
+				else setErro({ mensagem: "Informe o número da UC." });
+			} else void consultar(ativo);
 		}
 	}
 
@@ -276,7 +299,7 @@ function BuscaUc({
 					aria-invalid={Boolean(erro)}
 					autoComplete="off"
 					spellCheck={false}
-					placeholder="Digite o número da UC"
+					placeholder="Ex.: UC999999"
 					value={texto}
 					onChange={(event) => {
 						pedido.current?.abort();
@@ -288,19 +311,35 @@ function BuscaUc({
 					onKeyDown={teclado}
 					className="h-full min-w-0 flex-1 bg-transparent text-body text-text outline-none placeholder:text-text-muted focus-visible:shadow-none"
 				/>
-				{pendente && (
+				{(pendente || busca.buscando) && (
 					<CircleNotchIcon
 						aria-hidden
 						className="size-4 shrink-0 animate-spin text-text-muted motion-reduce:animate-none"
 					/>
 				)}
+				<Tooltip>
+					<TooltipTrigger
+						delay={300}
+						render={
+							<Button
+								variant="ghost"
+								size="icon-sm"
+								aria-label={`Formato do código: ${FORMATO_UC}`}
+								className="-mr-1.5 text-text-muted hover:text-text"
+							/>
+						}
+					>
+						<InfoIcon aria-hidden />
+					</TooltipTrigger>
+					<TooltipContent>{FORMATO_UC}</TooltipContent>
+				</Tooltip>
 			</div>
 			<p id={`${uid}-dica`} className="text-small text-text-muted">
-				Busque pelo código da conta ou escolha uma UC recente.
+				Busque pelo código da UC, com ou sem “UC”, ou escolha uma recente.
 			</p>
 			<div className="flex h-6 items-center justify-between gap-2">
 				<p className="text-small text-text-muted">
-					{codigo ? "Consultar unidade" : "Consultas recentes"}
+					{codigo ? "Unidades encontradas" : "Consultas recentes"}
 				</p>
 				{recentes.length > 0 && (
 					<Button size="xs" variant="ghost" onClick={limpar}>
@@ -317,8 +356,8 @@ function BuscaUc({
 					className="flex flex-col gap-1"
 				>
 					{opcoes.map((item, i) => {
-						const isRecent = !codigo || i > 0;
-						const Icone = isRecent ? ClockCounterClockwiseIcon : BuildingsIcon;
+						const uc = encontradas.get(item);
+						const Icone = uc ? BuildingsIcon : ClockCounterClockwiseIcon;
 						return (
 							<motion.div
 								key={item}
@@ -350,10 +389,10 @@ function BuscaUc({
 										className="size-4 shrink-0 text-text-muted"
 									/>
 									<span className="min-w-0 flex-1 truncate font-mono">
-										UC {item}
+										{item}
 									</span>
-									<span className="shrink-0 text-small text-text-muted">
-										{isRecent ? "Recente" : "Consultar"}
+									<span className="shrink-0 truncate text-small text-text-muted">
+										{uc ? `${uc.municipio} · ${uc.bairro}` : "Recente"}
 									</span>
 									{item === ativo && (
 										<ArrowElbowDownLeftIcon
@@ -368,7 +407,13 @@ function BuscaUc({
 				</div>
 				{!opcoes.length && (
 					<p className="px-3 py-8 text-body text-text-muted">
-						Nenhuma UC consultada neste navegador.
+						{!codigo
+							? "Nenhuma UC consultada neste navegador."
+							: busca.buscando
+								? "Buscando…"
+								: busca.erro
+									? "Busca indisponível. Enter consulta o código digitado."
+									: `Nenhuma UC com “${codigo}”.`}
 					</p>
 				)}
 			</div>
@@ -394,7 +439,7 @@ function BuscaUc({
 			)}
 			<output className="text-small text-text-muted">
 				{pendente
-					? `Consultando UC ${pendente}…`
+					? `Consultando ${pendente}…`
 					: localDisponivel
 						? "Recentes salvos apenas neste navegador."
 						: "Armazenamento indisponível. Recentes mantidos apenas nesta sessão."}

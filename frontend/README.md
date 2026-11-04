@@ -227,9 +227,10 @@ Insight de IA de uma tela (DEC-069): `InsightIa` (`#/features/agente`) vai ao la
 
 - **Consulta de UC** na sidebar abre a palette global, também disponível por Ctrl/Cmd + K.
   A navegação se divide em **Minha área** e **Outras consultas**, conforme as prioridades do cargo, mantendo todas as telas acessíveis.
-- A palette consulta `GET /unidades-consumidoras/{cod_uc}/visao-360` antes de navegar para
+- A palette busca as UCs em `GET /unidades-consumidoras/busca` enquanto o usuário digita e
+  consulta `GET /unidades-consumidoras/{cod_uc}/visao-360` antes de navegar para
   `/uc?cod_uc=...`. A resposta preenche o cache da visão 360, sem uma segunda consulta.
-  O código continua textual e exato; filtrar recentes não é busca global nem resolução aproximada de identidade.
+  O backend resolve o código digitado (`144997`, `uc 144997`) para o do cadastro; zeros à esquerda não são inventados (DEC-078).
 - Os cinco códigos consultados com sucesso mais recentemente ficam em `localStorage`
   (`venergy:ucs-recentes`), sem nomes ou dados financeiros. Reconsulta move o código ao topo.
   **Limpar recentes** apaga a lista. Armazenamento bloqueado mantém a sessão funcional e informa a limitação.

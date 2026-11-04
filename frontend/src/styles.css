@@ -261,6 +261,12 @@
     min-height: 100%;
   }
 
+  /* Com color-scheme escuro, o polegar padrão some contra o fundo. `scrollbar-color` é
+     herdado e vale para toda área com rolagem, nos dois temas. */
+  html {
+    scrollbar-color: var(--color-text-disabled) transparent;
+  }
+
   body {
     margin: 0;
     -webkit-font-smoothing: antialiased;

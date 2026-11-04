@@ -1,5 +1,5 @@
 import { api, unwrap } from "#/lib/api";
-import type { Uc360 } from "./types";
+import type { Uc360, UcEncontrada } from "./types";
 
 export const unidadeConsumidoraKeys = {
 	visao360: (codUc: string | undefined) =>
@@ -8,6 +8,7 @@ export const unidadeConsumidoraKeys = {
 	// antigo não reaparece ao lado dos números novos.
 	insight: (codUc: string, versao: unknown) =>
 		["unidadeConsumidora", "insight", codUc, versao] as const,
+	busca: (texto: string) => ["unidadeConsumidora", "busca", texto] as const,
 };
 
 export function buscarVisao360(
@@ -27,6 +28,18 @@ export function buscarInsightUc(codUc: string) {
 	return unwrap(
 		api.GET("/unidades-consumidoras/{cod_uc}/insight", {
 			params: { path: { cod_uc: codUc } },
+		}),
+	);
+}
+
+export function buscarUcs(
+	texto: string,
+	signal?: AbortSignal,
+): Promise<UcEncontrada[]> {
+	return unwrap(
+		api.GET("/unidades-consumidoras/busca", {
+			params: { query: { q: texto } },
+			signal,
 		}),
 	);
 }
