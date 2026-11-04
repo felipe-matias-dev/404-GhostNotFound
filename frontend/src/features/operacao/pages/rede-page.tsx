@@ -19,7 +19,7 @@ import {
 	SegmentedControl,
 	type SegmentedOption,
 } from "#/components/ui/segmented-control";
-import { InsightIa } from "#/features/agente";
+import { InsightIa, indisponivelDoInsight } from "#/features/agente";
 import { CLASSE_ROTULO, useFiltrosPortal } from "#/features/filtros";
 import { cn } from "#/lib/utils";
 import {
@@ -495,10 +495,7 @@ export function RedePage() {
 											texto={insight.data?.texto}
 											origem={insight.data?.origem}
 											carregando={insight.isFetching}
-											indisponivel={
-												insight.isError ||
-												(insight.data !== undefined && !insight.data.texto)
-											}
+											indisponivel={indisponivelDoInsight(insight)}
 											onGerar={() => {
 												void insight.refetch();
 											}}

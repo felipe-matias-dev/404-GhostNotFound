@@ -4,7 +4,7 @@ import {
 	PopoverContent,
 	PopoverTrigger,
 } from "#/components/ui/popover";
-import { InsightIa } from "#/features/agente";
+import { InsightIa, indisponivelDoInsight } from "#/features/agente";
 import { formatBRL, formatCompetencia } from "#/lib/format";
 import { cn } from "#/lib/utils";
 import { maiorParte, partesDaConta, textoDosDias } from "../conversions";
@@ -68,10 +68,7 @@ export function VariacaoContaUc({ data }: { data: Uc360 }) {
 					texto={insight.data?.texto}
 					origem={insight.data?.origem}
 					carregando={insight.isFetching}
-					indisponivel={
-						insight.isError ||
-						(insight.data !== undefined && !insight.data.texto)
-					}
+					indisponivel={indisponivelDoInsight(insight)}
 					onGerar={() => {
 						void insight.refetch();
 					}}

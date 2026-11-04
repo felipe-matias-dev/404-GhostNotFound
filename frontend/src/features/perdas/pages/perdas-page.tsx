@@ -1,6 +1,6 @@
 import { getRouteApi } from "@tanstack/react-router";
 import { Pagina } from "#/components/layout/pagina";
-import { InsightIa } from "#/features/agente";
+import { InsightIa, indisponivelDoInsight } from "#/features/agente";
 import { useSession } from "#/features/auth";
 import type { Recorte } from "#/lib/filtros";
 import { useMediaQuery } from "#/lib/use-media-query";
@@ -95,10 +95,7 @@ function OrdensSecao() {
 					texto={insight.data?.texto}
 					origem={insight.data?.origem}
 					carregando={insight.isFetching}
-					indisponivel={
-						insight.isError ||
-						(insight.data !== undefined && !insight.data.texto)
-					}
+					indisponivel={indisponivelDoInsight(insight)}
 					onGerar={() => {
 						void insight.refetch();
 					}}

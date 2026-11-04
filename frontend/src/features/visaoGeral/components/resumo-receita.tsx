@@ -8,7 +8,7 @@ import type { ReactNode } from "react";
 import { Button, buttonVariants } from "#/components/ui/button";
 import { KpiDelta, KpiValue } from "#/components/ui/kpi-card";
 import { TrendChart } from "#/components/ui/trend-chart";
-import { InsightIa } from "#/features/agente";
+import { InsightIa, indisponivelDoInsight } from "#/features/agente";
 import { useFiltrosPortal } from "#/features/filtros";
 import {
 	DEFINICOES,
@@ -173,10 +173,7 @@ export function ResumoReceita({
 							texto={insight.data?.texto}
 							origem={insight.data?.origem}
 							carregando={insight.isFetching}
-							indisponivel={
-								insight.isError ||
-								(insight.data !== undefined && !insight.data.texto)
-							}
+							indisponivel={indisponivelDoInsight(insight)}
 							onGerar={() => {
 								void insight.refetch();
 							}}
