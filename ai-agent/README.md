@@ -175,5 +175,5 @@ GEMINI_FALLBACK_MODEL=google-gla:gemini-3.5-flash,openrouter:nvidia/nemotron-3.5
 ### Dia da apresentação
 
 - Use a chave de quem não rodou nada no dia; a cota renova por volta das 4h (horário de Brasília). Leve a chave de outro integrante como segunda opção: trocar o `GOOGLE_API_KEY` no `.env` da raiz e reiniciar a API leva menos de um minuto.
-- Não rode avaliação no dia: uma rodada do golden set gasta de 90 a 140 chamadas. Uma pergunta ao agente gasta cerca de 2 (SQL e narração), e um insight de tela, 1 por combinação de filtros (fica em cache).
+- Não rode avaliação no dia: uma rodada completa do golden set na Gold real (95 dos 105 itens; os outros 10 valem só para a amostra, pelo campo `datasets`, com juiz) gasta cerca de 130 chamadas ao gerador e de 35 a 60 ao juiz, mais as novas tentativas quando há 503. Uma pergunta ao agente gasta cerca de 2 (SQL e narração), e um insight de tela, 1 por combinação de filtros (fica em cache).
 - Antes de começar, faça uma pergunta de teste pelo portal ou pelo `POST /ai/ask`. A resposta mostra o `model` que respondeu: se for o reserva, o principal está sem cota.
