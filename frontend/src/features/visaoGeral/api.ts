@@ -1,5 +1,6 @@
 import { api, unwrap } from "#/lib/api";
 import type { ParPeriodos, Recorte } from "#/lib/filtros";
+import { periodosDoInsight } from "./conversions";
 
 export const visaoGeralKeys = {
 	all: ["visaoGeral"] as const,
@@ -19,17 +20,10 @@ export function buscarJanelas(meses: number, recorte: Recorte) {
 }
 
 /** O insight de IA da comparação de indicadores do par, no recorte. */
-export function buscarInsight(
-	{ periodo_base, periodo_atual }: ParPeriodos,
-	recorte: Recorte,
-) {
-	const [base_inicio = "", base_fim = ""] = periodo_base.split("/");
-	const [atual_inicio = "", atual_fim = ""] = periodo_atual.split("/");
+export function buscarInsight(par: ParPeriodos, recorte: Recorte) {
 	return unwrap(
 		api.GET("/indicadores/insight", {
-			params: {
-				query: { base_inicio, base_fim, atual_inicio, atual_fim, ...recorte },
-			},
+			params: { query: { ...periodosDoInsight(par), ...recorte } },
 		}),
 	);
 }
