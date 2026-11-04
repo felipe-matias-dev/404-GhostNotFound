@@ -9,6 +9,46 @@ Documentos relacionados:
 - [Decisões e suposições](decisoes.md): registro das decisões tomadas (`DEC-NNN`).
 - [Dicionário de dados](dicionario-de-dados.md): definição de cada coluna e métrica da Gold.
 
+## Visão geral do sistema
+
+```mermaid
+flowchart LR
+  SRC["Fontes legadas<br/>CSV · JSON · XLSX"]
+
+  subgraph DBX["Databricks · Job mensal"]
+    BR["Bronze<br/>dado bruto auditado"] --> SV["Silver<br/>limpo e tipado"] --> GD["Gold<br/>12 tabelas"]
+  end
+
+  subgraph PG["PostgreSQL 17"]
+    GOLD[("gold<br/>recarregável")]
+    SEM["views sem_*"]
+    APP[("app<br/>ordens e auditoria")]
+  end
+
+  SRC --> BR
+  GD -- "12 CSVs" --> CARGA["Carga validada<br/>contra o contrato"]
+  CARGA --> GOLD
+  GOLD --> SEM
+  API["FastAPI"] --> GOLD
+  API <--> APP
+  API --> AG["Agente Text-to-SQL<br/>PydanticAI + Gemini"]
+  AG -- "usuário somente leitura" --> SEM
+  WEB["Portal React"] -- "client tipado do OpenAPI" --> API
+```
+
+- **Contrato antes de implementação.** Portal e agente trabalham contra o contrato da Gold ([`contracts/gold_schema.yaml`](../contracts/gold_schema.yaml), v0.3.0) e uma amostra sintética desde o primeiro dia, sem esperar o dado real nem expor o dataset ([DEC-003](decisoes.md#dec-003--walking-skeleton-com-amostra-sintética)). O frontend gera o client a partir de [`contracts/openapi.json`](../contracts/openapi.json) e quebra na compilação se a API mudar ([DEC-005](decisoes.md#dec-005--contrato-openapi-entre-api-e-frontend)).
+- **A Gold é descartável; o trabalho do usuário, não.** A carga recria o schema `gold` a cada execução e nunca apaga nem altera uma linha do `app`, onde ficam as ordens de inspeção e a auditoria do agente: ela só cria as tabelas que faltam e acrescenta colunas novas ([DEC-002](decisoes.md#dec-002--banco-local-postgresql), [DEC-050](decisoes.md#dec-050--autoria-nos-eventos-das-ordens-de-inspeção)).
+- **Um número, uma fonte.** Cálculos de negócio (PVM, DEC/FEC, score de suspeita) ficam na Gold e no backend. O frontend só exibe, e o agente lê as métricas prontas em vez de recalculá-las.
+
+| Camada | Tecnologia | Por que |
+|---|---|---|
+| Dados | Databricks (PySpark, compute serverless), Workflow em YAML | Bronze → Silver → Gold com travas entre as camadas e Job versionado no Git |
+| Banco | PostgreSQL 17 em Docker | Usuário somente leitura nativo para o agente e schemas `gold`/`app` separados ([DEC-002](decisoes.md#dec-002--banco-local-postgresql)) |
+| API | FastAPI, SQLAlchemy 2.1, psycopg 3 | Mesma stack Pydantic do agente; energia e dinheiro em `numeric` ([DEC-010](decisoes.md#dec-010--energia-e-dinheiro-como-numeric-número-na-api)) |
+| Portal | React 19, TanStack Start (SPA), Tailwind 4, Base UI | Rotas, cache e tabelas do mesmo ecossistema; gráficos em SVG próprio ([DEC-037](decisoes.md#dec-037--gráficos-do-portal-em-svg-próprio-com-d3-só-para-as-contas)) |
+| Agente | PydanticAI, Gemini 3.1 Flash-Lite, sqlglot | Saída tipada e SQL validado por parser, não por regex ([spec do agente](../ai-agent/docs/specs/2026-10-19-architecture-design.md)) |
+| Qualidade | uv (workspace), ruff, Biome, pytest, Vitest, pre-commit, gitleaks, GitHub Actions | As mesmas checagens no commit e no CI ([DEC-007](decisoes.md#dec-007--hooks-de-pre-commit-e-ci)) |
+
 ## 1. Princípios
 
 O case define o objetivo: "A plataforma é o meio. A resposta é o que o cliente está comprando." (§1). Daí vêm quatro regras:
@@ -150,11 +190,11 @@ Decisões estruturais do projeto. Cada uma, ao ser fechada, ganha uma entrada `D
 
 | ID | Tema | Opções avaliadas | Escolha | Justificativa | Status |
 |---|---|---|---|---|---|
-| ADR-01 | Banco local | SQLite, PostgreSQL | PostgreSQL (Docker) | Role somente leitura nativa para o agente, concorrência nas OIs, schemas `gold`/`app` separados | Adotada ([DEC-002](decisoes.md)) |
+| ADR-01 | Banco local | SQLite, PostgreSQL | PostgreSQL (Docker) | Role somente leitura nativa para o agente, concorrência nas OIs, schemas `gold`/`app` separados | Adotada ([DEC-002](decisoes.md#dec-002--banco-local-postgresql)) |
 | ADR-02 | Framework do agente | PydanticAI, LangGraph, LangChain | PydanticAI | Saída tipada (`AgentAnswer`), mesma stack Pydantic do FastAPI, comportamento auditável | Adotada ([spec do agente](../ai-agent/docs/specs/2026-10-19-architecture-design.md)) |
 | ADR-03 | Estratégia do agente | SQL livre, SQL sobre views semânticas, ferramentas parametrizadas | SQL apenas sobre views `sem_*`, validado por parser (um único `SELECT`, `LIMIT` obrigatório, allowlist de views), executado com role somente leitura | Defesa em profundidade: mesmo com o prompt manipulado, o banco não aceita escrita | Adotada ([spec do agente](../ai-agent/docs/specs/2026-10-19-architecture-design.md)) |
-| ADR-04 | Insights embutidos | LLM calcula, LLM só narra números prontos | LLM só narra um JSON de métricas da Gold e cita os números | Fidelidade ao dado verificável; nenhuma aritmética no LLM | Adotada ([spec do agente](../ai-agent/docs/specs/2026-10-19-architecture-design.md)) |
+| ADR-04 | Insights embutidos | LLM calcula, LLM só narra números prontos | LLM só narra um JSON de métricas da Gold e cita os números | Fidelidade ao dado verificável; nenhuma aritmética no LLM | Adotada ([spec do agente](../ai-agent/docs/specs/2026-10-19-architecture-design.md)); desde a [DEC-077](decisoes.md#dec-077--insights-de-ia-nas-telas-do-dia-a-dia-com-a-ia-escolhendo-a-leitura), em cinco telas, a IA escolhe entre as leituras candidatas que o backend calcula |
 | ADR-05 | Score de suspeita | Regras, ML supervisionado, híbrido | Regras explicáveis com pontos: queda do consumo médio (12 últimas competências contra as 12 anteriores), medidor eletromecânico e parte das leituras estimadas; desempate pela energia a recuperar. O resultado é a posição da UC no ranking (1 = mais suspeita) | Motivo legível para o gerente de perdas e precisão medida nas inspeções, com a janela na data de cada inspeção | Adotada em parte ([DEC-030](decisoes.md#dec-030--regras-aplicadas-na-gold-ucs-ocorrências-gd-e-fila-de-suspeitas)): só as regras. O modelo treinado nas inspeções e os sinais de consumo zero e de desvio em relação aos vizinhos ficaram de fora; o desvio em relação ao bairro foi testado na calibração da fila e descartado, porque quase não separava as inspeções confirmadas das sem irregularidade (registrado no notebook `Silver_to_Gold`, seção 10) |
 | ADR-06 | Decomposição de receita | Preço/volume (2 fatores), PVM com mix de classe | PVM com efeito mix por classe e drill-down por município/bairro; o efeito preço se divide em `efeito_tarifa` e `efeito_bandeira`, e `possui_gd` entra no grão para isolar o efeito GD | Separa reajuste e bandeira (preço), queda de kWh (volume, com a GD à parte) e mudança de perfil (mix) | Adotada ([DEC-023](decisoes.md#dec-023--medidas-de-receita-reconciliação-e-ajustes-de-colunas-da-gold), [DEC-029](decisoes.md#dec-029--método-do-efeito-bandeira) e [DEC-073](decisoes.md#dec-073--receita_energia-confirmada-como-base-do-pvm-e-da-tarifa-média)) |
 | ADR-07 | Agendamento do Workflow | Diário, mensal, por evento | Mensal, após o fechamento do ciclo de faturamento (ex.: D+5), com ingestão incremental por competência | A origem muda mensalmente; execução diária gastaria compute sem dado novo | Adotada em parte ([DEC-039](decisoes.md#dec-039--workflow-do-databricks-e-agendamento-mensal)): agendamento mensal no dia 6, pausado; reprocessamento completo em vez de incremental |
-| ADR-08 | Leitura do XLSX no Databricks | `openpyxl` + pandas → Spark, `spark-excel` | Leitor nativo `format("excel")` do Databricks, conferido célula a célula contra o XML da planilha | O `openpyxl` não existe no Databricks Serverless e não se instala nada; a conferência garante que nenhum valor muda | Adotada ([DEC-008](decisoes.md)) |
+| ADR-08 | Leitura do XLSX no Databricks | `openpyxl` + pandas → Spark, `spark-excel` | Leitor nativo `format("excel")` do Databricks, conferido célula a célula contra o XML da planilha | O `openpyxl` não existe no Databricks Serverless e não se instala nada; a conferência garante que nenhum valor muda | Adotada ([DEC-008](decisoes.md#dec-008--contrato-da-bronze-auditoria-básica)) |

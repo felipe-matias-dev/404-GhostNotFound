@@ -1,83 +1,136 @@
 # Decisões e suposições
 
-Registro das decisões tomadas pelo time onde os requisitos do case não eram explícitos. Alimenta a seção de suposições do README.
+Registro das decisões tomadas pelo time onde os requisitos do case não eram explícitos. Cada decisão tem um número `DEC-NNN`, que não muda depois de publicado, e uma seção própria com contexto, decisão, alternativas descartadas e consequências. As principais suposições também aparecem no [README](../README.md#suposições).
 
-| Data | Decisão | Motivo | Quem |
-|---|---|---|---|
-| 19/10/2026 | DEC-001: arquivos de origem em `v_energy.default.landing`; `bronze` só com tabelas | Separa arquivos imutáveis de tabelas recriáveis | Arthur |
-| 19/10/2026 | Frontend com TanStack Start em modo SPA (React + TypeScript + Vite) | O gerador já integra Router, Query, Form, Table, devtools e React Compiler; SSR desligado porque o FastAPI é o único backend | João Euclides |
-| 19/10/2026 | Autenticação e perfis ficam no FastAPI; better-auth removido do frontend | Pensei em usar BetterAuth, porém, permissão precisa ser checada onde estão os dados, melhor evitar um segundo backend em Node com sessões que o FastAPI não valida | João Euclides |
-| 19/10/2026 | Em dev, o Vite encaminha `/api/*` para o FastAPI removendo o prefixo; base da API configurável por `VITE_API_URL` | Evita CORS no desenvolvimento e não exige prefixo `/api` nas rotas do backend; endereço do backend ainda não definido | João Euclides |
-| 19/10/2026 | Frontend em camadas por feature (`features/<feature>` com `api.ts`, `hooks`, `pages`; `routes/` só define rotas) | Times e agentes seguem a mesma organização; regras em `frontend/README.md` e `frontend/CLAUDE.md` | João Euclides |
-| 19/10/2026 | Cálculos de negócio (DEC/FEC, efeito-preço × efeito-volume) ficam na camada Gold/backend; o frontend só exibe | Uma única fonte dos números para portal e agente de IA | João Euclides |
-| 19/10/2026 | Valores exibidos (R$, kWh, %, competência, datas) formatados só por `frontend/src/lib/format.ts` | Mesmo número com o mesmo formato em todas as telas | João Euclides |
-| 19/10/2026 | DEC-002: banco local PostgreSQL em Docker, com schemas `gold` e `app` | Usuário somente leitura nativo para o agente; recarga da Gold não apaga as ordens de inspeção | Time |
-| 19/10/2026 | DEC-003: walking skeleton com amostra sintética da Gold | Integração entre camadas testada desde o início, sem depender do dataset confidencial | Time |
-| 19/10/2026 | DEC-004: Gold entregue em CSV, um arquivo por tabela, em `data/gold/` | Um único caminho de carga, validado contra o contrato, para amostra e Gold real | Felipe |
-| 19/10/2026 | DEC-005: contrato API → frontend em `contracts/openapi.json`, gerado pelo FastAPI; client com `openapi-typescript` + `openapi-fetch` | O front quebra na compilação quando o contrato muda; a mudança de contrato aparece no diff do PR | João Euclides |
-| 19/10/2026 | DEC-006: `docker compose up` sobe banco, API e Vite em modo de desenvolvimento | Um comando roda o portal em qualquer máquina; deploy em nuvem está fora do escopo | João Euclides |
-| 19/10/2026 | DEC-007: qualidade garantida por pre-commit local e pelo mesmo conjunto de checagens no CI | Código formatado e contrato em dia sem depender de lembrar; o CI barra quem pula o hook | João Euclides |
-| 19/10/2026 | DEC-008: Bronze com auditoria básica (full refresh, tudo string, `ingestion_timestamp` e `source_file`) | Dados o mais próximos da origem; rastreabilidade sem log próprio de ingestão | Alisson |
-| 20/10/2026 | DEC-009: ordens de inspeção em `app.ordem_inspecao` + `app.ordem_evento`, sem FK para a Gold, com máquina de estados e no máximo uma OI ativa por UC | O trabalho de campo sobrevive a cada recarga da Gold; o resultado registrado mede se a fila de suspeitas acerta | Felipe |
-| 20/10/2026 | DEC-010: energia e dinheiro como `numeric` no banco e número no JSON da API | Somas em SQL sem resíduo de arredondamento; o frontend recebe número, sem converter texto | Felipe |
-| 20/10/2026 | DEC-011: contrato da Gold com `competencia` em texto (`AAAA-MM`) e três cópias independentes de Silver → Gold | Texto preserva o formato em CSV e em todas as camadas; três cópias comparadas dão uma Gold mais sólida | Alisson |
-| 21/10/2026 | DEC-012: tokens do frontend vêm do design system da marca VE-360 (paleta OKLCH a partir de #f2c94c, neutros `graphite`, Inter Tight + Söhne Breit + JetBrains Mono); escalas padrão do Tailwind removidas | Uma única fonte de cor, tipo, raio e sombra; utilitário fora do sistema não gera CSS | João Euclides |
-| 21/10/2026 | DEC-013: componentes base trazidos do shadcn/ui no estilo `base-nova` (Base UI) e do interior.dev para `frontend/src/components/ui/`, adaptados aos tokens; nenhuma biblioteca de componentes como dependência | O código fica no repositório e segue os tokens da marca; uma única base de primitivas (Base UI, sem Radix) | João Euclides |
-| 21/10/2026 | DEC-014: o backend espelha o contrato da Gold (6 de 9 tabelas), conferido por teste no CI; a carga recria as tabelas da Gold | Divergência entre contrato e backend aparece no CI, e não na carga da Gold real; coluna nova no contrato entra sem apagar tabela à mão | Felipe |
-| 21/10/2026 | DEC-015 (aceita em 29/10/2026): a Gold real pode ir ao Gemini pelo plano gratuito (narrativa, insight, memória e juiz); o dataset e qualquer saída com dados dele nunca vão ao Git | O dataset é do case e o risco do Free Tier é aceito; a regra que protege os dados é a DEC-024 | Luis Felipe |
-| 21/10/2026 | DEC-016 (proposta): a `prompts/v1/` recebe a delimitação do SQL anterior e das linhas de exemplo sem virar `prompts/v2/`, só nesta mudança, antes de a v1 chegar à `main` | O golden set ainda não rodou com dados; criar a v2 mudaria o `prompt_version` da auditoria sem ganho real | GenAI |
-| 22/10/2026 | DEC-017: backend e agente formam um workspace do uv, com um único `uv.lock` na raiz | Com o `/ai`, a API instala o agente; uma resolução só garante que o que é testado é o que roda | Luis Felipe |
-| 22/10/2026 | DEC-018: a camada semântica monta relações entre views só pelas chaves estrangeiras do contrato e pelas chaves de entidade (`cod_uc`, `cod_alimentador`) | Juntar views só pelo período gera produto cartesiano | Lucas |
-| 22/10/2026 | DEC-019 (reservada): verificação numérica da narrativa do agente, registrada no PR #36 | Número já citado na spec e em `ai-agent/docs/architecture.md`; a seção entra com o PR | Lucas |
-| 22/10/2026 | DEC-020: o `AgentAnswer` ganha `status` (`answered`, `unknown`, `clarify`, `refused`, `failed`), `truncated`, `refused_reason`, `model` e `latency_ms`, com invariantes por status | O portal distingue resposta, "não sei", esclarecimento e falha; a auditoria guarda modelo e latência | Lucas |
-| 22/10/2026 | DEC-021: com filtro de município, bairro ou classe, a receita e o kWh são somados no backend a partir da fato e do cadastro; DEC e FEC ficam no total da empresa e por alimentador | Receita e kWh se somam; somar DEC de alimentadores por bairro daria um número errado | Felipe |
-| 21/10/2026 | DEC-022: o agente só lê colunas não sensíveis das tabelas liberadas no contrato, e "receita" sem qualificador é a receita faturada | Dado pessoal e texto livre ficam fora do agente; uma definição única de receita evita respostas divergentes | Alisson |
-| 22/10/2026 | DEC-023: receita da Gold em três medidas (total, energia e tributos), com a energia como base provisória do PVM (confirmada na DEC-073); consumo médio nulo sem leitura; `potencia_kwp`; reconciliação do faturamento e da energia | Nenhum valor descartado sem explicação; os números da diretoria podem ser conciliados com os da Gold | Alisson |
-| 22/10/2026 | DEC-024: resultados agregados necessários para sustentar uma hipótese podem ir ao repositório; identificação de pessoas e de UCs e dado de LGPD ficam mascarados; linha a linha, amostras e outputs nunca sobem | O diagnóstico precisa mostrar a evidência, mas o dataset é confidencial e há dado pessoal | Alisson |
-| 23/10/2026 | DEC-025 (proposta): mapa da RMR com a malha municipal 2025 e a malha de bairros do Censo 2022 do IBGE, os 15 municípios da LC estadual 382/2018, e município e bairro da Gold casados com os do mapa pelo nome normalizado | O mapa vira o seletor principal de município e bairro sem mudar o contrato da Gold; o que está na Gold é clicável, o resto aparece apagado | João Euclides |
-| 23/10/2026 | DEC-026: ações das OIs na tela de perdas (enviar a campo, concluir, cancelar, histórico, gerar) com Kanban das ativas e troca Kanban ⇄ tabela lembrada no navegador | O gerente acompanha e move as OIs sem sair da tela; o backend continua sendo o dono da máquina de estados | João Euclides |
-| 24/10/2026 | DEC-027: contrato da Gold v0.3: tabelas da UC 360 com colunas e chave, `gold_inspecoes_uc`, GD e ligação na dimensão, leitura, medidor e bandeira no fato, alimentador e tipo de medidor na chave dos recortes, componentes de faturas e leituras | Responder a UC 360, as hipóteses H1, H2 e H5 e filtrar qualquer período por alimentador, medidor e inadimplência | Alisson |
-| 24/10/2026 | DEC-028: a decomposição grava todos os pares de mesmos meses em anos diferentes; pares de trechos diferentes ficam para o backend, se necessário | Gravar todas as combinações passaria de 1 bilhão de linhas; os totais de qualquer período já saem da soma dos meses | Alisson |
-| 24/10/2026 | DEC-029: método do efeito bandeira: acréscimo fixo por kWh por bandeira, conferido no dado | Fecha a pendência da DEC-023 com uma regra verificável e exata | Alisson |
-| 24/10/2026 | DEC-030: regras aplicadas na Gold: `n_uc` de UCs faturadas (PRODIST), ocorrências antes da ligação fora (OCO-04), potência em Wp convertida, vazio × zero nos recortes, fila de suspeitas calibrada e medida na data das inspeções | Denominador do DEC/FEC como no PRODIST e fila explicável e medida; revisada com a comparação das cópias | Alisson |
-| 26/10/2026 | DEC-031: a API lista os pares de períodos da decomposição e passa a exigir o par; API 0.5.0 | A Gold grava centenas de pares (DEC-028): sem o par, a resposta somaria períodos que não se comparam, e o seletor precisa saber quais existem | Felipe |
-| 24/10/2026 | DEC-032: DEC e FEC de um período de vários meses somam os valores mensais, nunca a média | Indicador de continuidade é acumulado; a média dos meses subestima o período e o agente alternava entre as duas formas | Luis Felipe |
-| 26/10/2026 | DEC-033: DEC e FEC de um período saem da soma dos componentes ÷ média mensal de UCs, no backend, com rotas por alimentador, ranking e recortes; fila de suspeitas paginada com a ordem de inspeção ativa; API 0.6.0 | DEC e FEC não se somam nem se tiram a média entre recortes; a fila mostra quais UCs já têm ordem, para a tela não oferecer o que daria 409 | Felipe |
-| 27/10/2026 | DEC-034: cada resposta do agente de IA é gravada em `app.ai_auditoria` (qualquer status) por `POST /ai/ask`, e lida por `GET /ai/audit/{id}`; sem a chave do Gemini a API sobe e o `/ai` responde 503; API 0.7.0 | A auditoria só serve se ninguém recebe uma resposta que não dá para conferir depois; e a chave ausente não pode derrubar o `/health` nem as telas | Felipe |
-| 27/10/2026 | DEC-038: a carga da Gold lê cada CSV aos poucos e grava em lotes de 10 mil linhas, depois de uma primeira rodada que só confere os arquivos; a memória deixa de crescer com o tamanho da Gold | A carga antiga guardava os 12 CSVs inteiros na memória e derrubou o WSL de 8 GB com os ~4 milhões de linhas da Gold real; a conferência antes de gravar continua garantindo que um arquivo fora do contrato não altera o banco | Felipe |
-| 27/10/2026 | DEC-039: Workflow do Databricks com os notebooks lidos do GitHub (`main`), serverless, Landing → Bronze → Silver → Gold + export, reprocessando tudo (diverge da ADR-07); agendamento mensal no dia 6, pausado | Roda o código revisado e mantém o tudo ou nada de cada camada numa extração única; a origem fecha o faturamento uma vez por mês | Arthur |
-| 27/10/2026 | DEC-041: redesign da tela da diretoria: frase de leitura, receita e energia de 12 meses contra os 12 primeiros da base, tesoura em variação de 12 meses corridos e faixa mês contra mês com sparklines; área do `TrendChart` só com eixo a partir do zero; rotas `GET /indicadores/comparacao` e `GET /indicadores/janelas`; API 0.10.0 | A tela responde à pergunta da diretoria (receita sobe, volume cai) em vez de listar seis números de mesmo peso; a área sobre eixo truncado exagerava a variação; DEC, FEC, satisfação, base de UCs e tarifa de um período são contas de backend | João Euclides |
-| 28/10/2026 | DEC-042: a interface de UC consome exclusivamente `Uc360Schema` e as regras da DEC-044; a referência é global à Gold, e estabilidade não significa ausência de alta | Elimina o backend duplicado e mantém a apresentação fiel ao contrato aprovado do PR #55 | João Euclides |
-| 28/10/2026 | DEC-043: Consulta de UC na sidebar e Ctrl/Cmd + K abrem a palette global; só os cinco códigos consultados com sucesso ficam nos recentes locais | Consulta rápida sem abandonar o contexto, sem persistir nomes ou valores e sem navegar antes de validar a UC | João Euclides |
-| 27/10/2026 | DEC-040: `GET /receita/insight` devolve o insight de IA da tela de receita; o backend monta o JSON de métricas a partir da ponte da Gold, com valores arredondados como a tela os mostra, e guarda o texto num cache em memória pelo conteúdo das métricas; sem a chave do Gemini a rota responde 503; API 0.9.0 | O agente só aceita texto cujos números sejam exatamente valores do JSON (DEC-019), e uma Gold recarregada precisa gerar um insight novo, nunca um velho | Felipe |
-| 27/10/2026 | DEC-044: a visão 360 da unidade consumidora sai de uma rota só, `GET /unidades-consumidoras/{cod_uc}/visao-360`; os 12 meses terminam na última competência da Gold e a "conta alta" é o último mês contra o mesmo mês do ano anterior, com faixa de ±10%; integrada à API 0.9.0 da main | O atendente está com o cliente na linha: uma chamada só à API e uma resposta pronta para "o consumo subiu?", sem a tela refazer conta de negócio | Felipe |
-| 29/10/2026 | DEC-046 (aceita em 30/10/2026): follow-up com memória, orçamento de tokens e limite de perguntas por usuário; o histórico vem da auditoria do backend, `AgentAnswer` ganha `input_tokens` e `output_tokens`, `prompts/v3` e `429` em `POST /ai/ask` (API 0.10.0) | Follow-up ("e em Olinda?") sem o agente guardar estado nem ler `app`, e trava de custo por sessão | GenAI |
-| 29/10/2026 | DEC-045: tela de Rede usa período padrão de até 12 meses, aceita período válido da URL e apresenta histórico global do alimentador | Preserva o recorte escolhido e distingue o índice local do histórico do alimentador inteiro | João Euclides |
-| 29/10/2026 | DEC-047: avaliação comparativa sobre os itens em comum, aviso quando `failed` passa de 5%, e juiz (LLM as a judge) só em respostas `answered` narradas da amostra, com modelo diferente do gerador | Rodadas com versões diferentes do golden set só se comparam no que têm em comum, e o juiz não pode enviar linhas da Gold real a um modelo | Perylo |
-| 28/10/2026 | DEC-048: ordem de inspeção em campo pode voltar para gerada; a observação da volta fica só no histórico | Uma OI enviada a campo sem querer não precisa ser cancelada e gerada de novo, o que sujaria a métrica de visita desnecessária | Felipe |
-| 29/10/2026 | DEC-049: login com cookie httpOnly e cinco perfis; só `perdas` escreve nas ordens de inspeção e só `ti` lê a auditoria do agente | Esconder o menu não é segurança: a permissão é checada no backend, onde estão os dados; o agente já lê toda a Gold, então bloquear a leitura por tela daria falsa proteção | Felipe |
-| 01/11/2026 | DEC-065: o login bloqueia (429) depois de 5 senhas erradas do mesmo login e do mesmo endereço em 15 minutos, sem captcha | Barra o chute de senha sem serviço externo, chave nem internet, e sem deixar qualquer um trancar a conta de outra pessoa | Felipe |
-| 01/11/2026 | DEC-068: rastreamento opcional com OpenTelemetry: cada requisição vira um trace com as consultas ao Postgres (do backend e do agente) e as chamadas ao modelo, visto no Jaeger do perfil `observabilidade` do compose; desligado sem `VENERGY_API_RASTREAMENTO_ENDPOINT`, sem o conteúdo dos prompts | Mostra onde a API gasta o tempo, ligando a auditoria do agente ao trace pelo `request_id`, sem mudar o código do agente nem o clone limpo | Felipe |
-| 29/10/2026 | DEC-050: os eventos das ordens de inspeção guardam o login de quem agiu (`autor_login`), o histórico mostra o nome dele, e a carga e a subida da API acrescentam a coluna sem apagar o histórico | O gerente de perdas é o único que escreve, e a trilha precisa responder quem concluiu ou cancelou uma ordem; recriar a tabela para isso perderia o histórico de quem já usa o portal | Felipe |
-| 29/10/2026 | DEC-051: filtros da fila usam os sinais já informados nos motivos da Gold: queda, medidor eletromecânico e percentual de leituras estimadas | Mantém a fila fiel à Gold, sem recalcular métricas ou tratar ausência como zero; todos os filtros operam antes da paginação | João Euclides |
-| 30/10/2026 | DEC-062: o portal exporta as ordens em campo numa planilha e o upload da mesma planilha preenchida conclui as ordens, aplica as linhas válidas e devolve as rejeitadas com o motivo; o tipo, o kWh, a data e o inspetor ficam na observação da ordem | O case traz as duas pontas como diferenciais (enviar a fila à equipe de campo e registrar o resultado sem digitar); a planilha exportada já sai no formato que o upload lê, e uma linha escrita errada à mão não pode travar o arquivo da equipe inteira | Felipe |
-| 01/11/2026 | DEC-063: as telas de ordens de inspeção se atualizam sozinhas: o `pg_notify` sai na mesma transação da mudança, e `GET /ordens-inspecao/eventos` (SSE) repassa o aviso a cada tela aberta | O Postgres só entrega o aviso no commit, então a tela nunca mostra o que o banco desfez; dois analistas de perdas veem a mesma ordem ao mesmo tempo, sem F5 | Felipe |
-| 01/11/2026 | DEC-064: cada ordem ativa mostra há quanto tempo está no status atual, com selo de atraso (5 dias gerada, 10 em campo, suposição), e `GET /ordens-inspecao/tempos-por-etapa` dá a mediana e o p90 por etapa | A ordem esquecida em campo aparece sem o gerente abrir o histórico; o tempo vem do histórico das ordens, que é dado do backend | Felipe |
-| 30/10/2026 | DEC-057: a visão 360 devolve `variacao_conta`, a diferença da conta contra o mesmo mês do ano anterior dividida em consumo, tarifa, bandeira e tributos, com a fórmula da decomposição da receita (DEC-029); as partes somam exatamente a diferença; os dias faturados de cada conta vêm só como informação; API 0.12.0 | A atendente consegue dizer ao cliente por que a conta subiu, e não só se o consumo subiu; calculado no backend e sem IA, porque o número precisa ser exato e imediato com o cliente na linha | Felipe |
-| 30/10/2026 | DEC-060: filtros compartilhados viajam na URL (`municipio`, `bairro`, `classe` e o par de períodos) entre Visão geral, Receita, Rede e Perdas; filtros próprios de cada tela ficam só na memória da sessão | Trocar de tela não perde o recorte nem repete a escolha, e um link reproduz a análise; a URL continua sendo a fonte da verdade | João Euclides |
-| 30/10/2026 | DEC-058: em Perdas o período é só contexto, e a consulta individual de UC mostra o histórico completo, fora do recorte | A fila é um retrato da Gold sem competência e as ordens são estado atual; a visão 360 é o registro completo da UC, e limitá-la esconderia contas antigas em aberto | João Euclides |
-| 30/10/2026 | DEC-059: ordem de UC ausente do cadastro da Gold some da lista quando há recorte de município, bairro ou classe, e continua visível sem recorte | A localização só existe em `gold_dim_uc` e não pode ser inventada; a ordem sobrevive à recarga (DEC-009) e o gerente não pode perdê-la | João Euclides |
-| 01/11/2026 | DEC-069: o insight de IA de uma tela fica ao lado da frase de leitura do gráfico que ele narra e só é gerado quando o usuário clica em "Gerar insight" (marca do VE-360); o texto abre numa caixa e volta pelo botão "Insight feito por IA"; sem texto, a tela diz que o insight está indisponível. Primeiro na Receita, na ponte (`GET /receita/insight`, DEC-040) | O insight aprofunda a leitura da ponte, então fica nela, abaixo do título e dos filtros na hierarquia da tela; no Header ele se perdia ao lado do título. Gerar ao abrir a tela gastava tokens a cada recorte visitado, lido ou não | João Euclides |
-| 02/11/2026 | DEC-070: a checagem da narrativa do agente aceita o valor da linha arredondado às casas escritas, os dois meses de um par `AAAA-MM/AAAA-MM`, o ano de um prefixo `AAAA-%` e o ano sozinho quando o filtro cobre anos inteiros; as suposições chegam ao redator sem nomes técnicos | Na Gold real, 9 de 10 respostas saíam no texto de reserva; a maior parte era narrativa correta descartada pela própria checagem | Luis Felipe |
-| 01/11/2026 | DEC-071: a tela de Rede ganha a faixa de indicadores do recorte (DEC, FEC, horas interrompidas, interrupções e UCs) contra o período base, colunas de horas e interrupções com busca e ordenação na tabela, trilha no Header, e o painel do alimentador mostra DEC e FEC juntos com a empresa como referência; o parâmetro `serie` sai da URL | A operação precisa ver quem piorou, quanto pesa cada alimentador e se ele está fora do padrão da empresa, com dados que a API já devolvia; nada é calculado na tela | João Euclides |
-| 01/11/2026 | DEC-072: a tela de Rede ganha variação contra a base em cada linha, ranking de alimentadores com recorte, ranking plano de bairros, série do alimentador dentro do recorte contra o recorte inteiro e a seção "Por que cai" (causa, tipo, UCs atingidas e reincidentes, duração), de `gold_interrupcoes_uc` | A operação precisa saber quem piorou, onde atacar e por que cai, com dados que já estão na Gold; toda conta fica no backend | João Euclides |
-| 01/11/2026 | DEC-073: `receita_energia` confirmada como base do PVM e da tarifa média, depois do teste declarado da DEC-023 | O teste da DEC-023 não distingue as definições (no dataset, os tributos são proporção fixa da fatura); a decisão segue o conceito: tributos não são receita da distribuidora | Arthur |
-| 01/11/2026 | DEC-067: as UCs de teste do cadastro (UC-12, prefixo `TESTE`) ficam na `gold_dim_uc` até depois da entrega, documentadas | Não afetam receita, energia, DEC/FEC, recortes nem fila; tirá-las exigiria regravar Silver e Gold perto do code freeze | Arthur |
-| 03/11/2026 | DEC-074: task `testes_qualidade` no Workflow, depois do export, somente leitura: CSV × Gold, reconciliações entre tabelas e premissa da DEC-067 como críticos, variação de linhas como alerta, histórico em `v_energy.qualidade.resultados_testes` | O export é o único passo do pipeline sem trava, e é o que chega ao portal e ao agente | Arthur |
-| 02/11/2026 | DEC-075: a ordem de inspeção guarda, na geração, a posição, os motivos e o kWh/mês estimado da UC na fila, e, na conclusão como irregular, o tipo de irregularidade e o kWh recuperado em colunas próprias (PATCH e planilha de campo, com o kWh de 0,001 ao teto de `numeric(16,3)`) | A fila é recriada a cada carga: sem a cópia, não se sabe por que a ordem foi gerada; sem o resultado estruturado, o portal não mede quanto as ordens recuperaram | João Euclides |
-| 02/11/2026 | DEC-076: a tela de Perdas ganha faixa de indicadores (suspeitas, ordens e acerto das inspeções do portal contra a Gold), mapa e ranking de suspeitas por município e bairro, última inspeção de cada UC da fila com filtro por meses, filtro "sem ordem ativa" e total de kWh da seleção | O gerente via a lista de trabalho, mas não se ela acerta, onde a perda se concentra nem quais UCs já foram vistoriadas; toda conta fica no backend, exceto a soma das linhas que o usuário selecionou na página, que é apresentação | João Euclides |
-| 03/11/2026 | DEC-077: insights de IA também na Visão Geral, na Rede, na Unidade consumidora e em Perdas; em todas as telas a IA escolhe entre as leituras candidatas que o backend calcula e escreve o insight, e o backend confere o texto contra as leituras escolhidas (prompt `insight/v4`) | O case pede insights "nas telas que uso no dia a dia", e não numa tela só; com a regra escolhendo a leitura, a IA só redigia e a interpretação ficava fixa | Luis Felipe |
-| 04/11/2026 | DEC-078: a busca de UC aceita o código como o atendente digita (`144997`, `uc 144997`, `UC-144997`) e o autocomplete da palette vem do banco, por `GET /unidades-consumidoras/busca`; revisa a busca exata da DEC-043; API 0.14.0 | `144997` dava `404` embora `UC144997` existisse, e a opção do autocomplete era só o eco do texto digitado | João Euclides |
+- **Índice por tema:** o número leva à seção da decisão; as seções vêm em ordem numérica, depois do índice.
+- **Situação:** *adotada* vale hoje; *proposta* ainda espera confirmação; *revisada* aponta a decisão mais nova que muda parte dela, e a mais nova prevalece no que muda.
+- **Nova decisão:** use o [modelo](#como-registrar-uma-decisão) no fim do arquivo e o próximo número livre.
+
+## Índice
+
+### Processo, repositório e ambiente
+
+| DEC | Decisão | Data | Autor | Situação |
+|---|---|---|---|---|
+| [DEC-003](#dec-003--walking-skeleton-com-amostra-sintética) | Walking skeleton com amostra sintética | 19/10/2026 | Time | adotada |
+| [DEC-006](#dec-006--ambiente-de-desenvolvimento-em-docker) | Ambiente de desenvolvimento em Docker | 19/10/2026 | João Euclides | adotada |
+| [DEC-007](#dec-007--hooks-de-pre-commit-e-ci) | Hooks de pre-commit e CI | 19/10/2026 | João Euclides | adotada |
+| [DEC-017](#dec-017--workspace-do-uv-com-um-único-uvlock) | Workspace do uv com um único `uv.lock` | 22/10/2026 | Luis Felipe | adotada |
+| [DEC-024](#dec-024--o-que-pode-subir-ao-repositório-público) | O que pode subir ao repositório público | 22/10/2026 | Alisson | adotada |
+
+### Pipeline de dados e Gold
+
+| DEC | Decisão | Data | Autor | Situação |
+|---|---|---|---|---|
+| [DEC-001](#dec-001--localização-dos-arquivos-de-origem-landing) | Localização dos arquivos de origem (landing) | 19/10/2026 | Arthur | adotada |
+| [DEC-008](#dec-008--contrato-da-bronze-auditoria-básica) | Contrato da Bronze (auditoria básica) | 19/10/2026 | Alisson | adotada, revisada em parte pela [DEC-024](#dec-024--o-que-pode-subir-ao-repositório-público) |
+| [DEC-011](#dec-011--convenções-do-contrato-da-gold) | Convenções do contrato da Gold | 20/10/2026 | Alisson | adotada |
+| [DEC-023](#dec-023--medidas-de-receita-reconciliação-e-ajustes-de-colunas-da-gold) | Medidas de receita, reconciliação e ajustes de colunas da Gold | 22/10/2026 | Alisson | adotada, revisada pela [DEC-073](#dec-073--receita_energia-confirmada-como-base-do-pvm-e-da-tarifa-média) |
+| [DEC-027](#dec-027--contrato-da-gold-v03-uc-360-inspeções-e-recortes-completos) | Contrato da Gold v0.3: UC 360, inspeções e recortes completos | 24/10/2026 | Alisson | adotada |
+| [DEC-028](#dec-028--pares-de-períodos-da-decomposição-e-o-que-fica-para-o-backend) | Pares de períodos da decomposição e o que fica para o backend | 24/10/2026 | Alisson | adotada |
+| [DEC-029](#dec-029--método-do-efeito-bandeira) | Método do efeito bandeira | 24/10/2026 | Alisson | adotada |
+| [DEC-030](#dec-030--regras-aplicadas-na-gold-ucs-ocorrências-gd-e-fila-de-suspeitas) | Regras aplicadas na Gold: UCs, ocorrências, GD e fila de suspeitas | 24/10/2026 | Alisson | adotada |
+| [DEC-039](#dec-039--workflow-do-databricks-e-agendamento-mensal) | Workflow do Databricks e agendamento mensal | 27/10/2026 | Arthur | adotada |
+| [DEC-067](#dec-067--ucs-de-teste-do-cadastro-ficam-na-gold-documentadas) | UCs de teste do cadastro ficam na Gold, documentadas | 01/11/2026 | Arthur | adotada |
+| [DEC-073](#dec-073--receita_energia-confirmada-como-base-do-pvm-e-da-tarifa-média) | `receita_energia` confirmada como base do PVM e da tarifa média | 01/11/2026 | Arthur | adotada |
+| [DEC-074](#dec-074--testes-de-qualidade-do-export-e-da-gold) | Testes de qualidade do export e da Gold | 03/11/2026 | Arthur | adotada |
+
+### Banco, carga e contratos
+
+| DEC | Decisão | Data | Autor | Situação |
+|---|---|---|---|---|
+| [DEC-002](#dec-002--banco-local-postgresql) | Banco local PostgreSQL | 19/10/2026 | Time | adotada |
+| [DEC-004](#dec-004--entrega-da-gold-em-datagold) | Entrega da Gold em `data/gold/` | 19/10/2026 | Felipe | adotada |
+| [DEC-005](#dec-005--contrato-openapi-entre-api-e-frontend) | Contrato OpenAPI entre API e frontend | 19/10/2026 | João Euclides | adotada |
+| [DEC-010](#dec-010--energia-e-dinheiro-como-numeric-número-na-api) | Energia e dinheiro como `numeric`, número na API | 20/10/2026 | Felipe | adotada |
+| [DEC-014](#dec-014--o-backend-espelha-o-contrato-da-gold) | O backend espelha o contrato da Gold | 21/10/2026 | Felipe | adotada |
+| [DEC-038](#dec-038--carga-da-gold-em-lotes-com-uma-rodada-de-conferência-antes-de-gravar) | Carga da Gold em lotes, com uma rodada de conferência antes de gravar | 27/10/2026 | Felipe | adotada |
+
+### Indicadores e regras de negócio na API
+
+| DEC | Decisão | Data | Autor | Situação |
+|---|---|---|---|---|
+| [DEC-021](#dec-021--recortes-de-receita-somados-no-backend-decfec-só-no-total) | Recortes de receita somados no backend; DEC/FEC só no total | 22/10/2026 | Felipe | adotada, revisada pela [DEC-033](#dec-033--dec-e-fec-por-período-e-recorte-e-a-fila-de-suspeitas-paginada) |
+| [DEC-031](#dec-031--rota-de-pares-da-decomposição-e-par-de-períodos-obrigatório) | Rota de pares da decomposição e par de períodos obrigatório | 26/10/2026 | Felipe | adotada |
+| [DEC-032](#dec-032--dec-e-fec-de-um-período-somam-os-mensais) | DEC e FEC de um período somam os mensais | 24/10/2026 | Luis Felipe | adotada |
+| [DEC-033](#dec-033--dec-e-fec-por-período-e-recorte-e-a-fila-de-suspeitas-paginada) | DEC e FEC por período e recorte, e a fila de suspeitas paginada | 26/10/2026 | Felipe | adotada |
+| [DEC-044](#dec-044--visão-360-da-unidade-consumidora-rota-única-janela-da-gold-e-regra-da-conta-alta) | Visão 360 da unidade consumidora: rota única, janela da Gold e regra da conta alta | 27/10/2026 | Felipe | adotada |
+| [DEC-057](#dec-057--variação-da-conta-da-unidade-consumidora-dividida-por-motivo) | Variação da conta da unidade consumidora dividida por motivo | 30/10/2026 | Felipe | adotada |
+
+### Perdas e ordens de inspeção
+
+| DEC | Decisão | Data | Autor | Situação |
+|---|---|---|---|---|
+| [DEC-009](#dec-009--modelo-das-ordens-de-inspeção) | Modelo das ordens de inspeção | 20/10/2026 | Felipe | adotada |
+| [DEC-026](#dec-026--ações-das-ois-kanban-e-troca-de-visão-na-tela-de-perdas) | Ações das OIs, Kanban e troca de visão na tela de perdas | 23/10/2026 | João Euclides | adotada |
+| [DEC-048](#dec-048--ordem-em-campo-pode-voltar-para-gerada) | Ordem em campo pode voltar para gerada | 28/10/2026 | Felipe | adotada |
+| [DEC-050](#dec-050--autoria-nos-eventos-das-ordens-de-inspeção) | Autoria nos eventos das ordens de inspeção | 29/10/2026 | Felipe | adotada |
+| [DEC-051](#dec-051--filtro-de-queda-na-fila-de-suspeitas) | Filtro de queda na fila de suspeitas | 29/10/2026 | João Euclides | adotada |
+| [DEC-058](#dec-058--período-é-contexto-em-perdas-e-a-consulta-de-uc-não-é-limitada-pelo-recorte) | Período é contexto em Perdas e a consulta de UC não é limitada pelo recorte | 30/10/2026 | João Euclides | adotada |
+| [DEC-059](#dec-059--ordem-de-uc-ausente-do-cadastro-da-gold-fica-fora-da-lista-quando-há-recorte) | Ordem de UC ausente do cadastro da Gold fica fora da lista quando há recorte | 30/10/2026 | João Euclides | adotada |
+| [DEC-062](#dec-062--planilha-de-campo-exportar-as-ordens-em-campo-e-subir-o-resultado) | Planilha de campo: exportar as ordens em campo e subir o resultado | 30/10/2026 | Felipe | adotada, revisada em parte pela [DEC-075](#dec-075--ordem-de-inspeção-guarda-o-contexto-da-fila-e-o-resultado-de-campo) |
+| [DEC-063](#dec-063--ordens-de-inspeção-em-tempo-real-aviso-no-commit-e-sse) | Ordens de inspeção em tempo real: aviso no commit e SSE | 01/11/2026 | Felipe | adotada |
+| [DEC-064](#dec-064--tempo-das-ordens-no-status-e-por-etapa) | Tempo das ordens no status e por etapa | 01/11/2026 | Felipe | adotada |
+| [DEC-075](#dec-075--ordem-de-inspeção-guarda-o-contexto-da-fila-e-o-resultado-de-campo) | Ordem de inspeção guarda o contexto da fila e o resultado de campo | 02/11/2026 | João Euclides | adotada |
+| [DEC-076](#dec-076--tela-de-perdas-indicadores-mapa-última-inspeção-e-filtros-novos-da-fila) | Tela de Perdas: indicadores, mapa, última inspeção e filtros novos da fila | 02/11/2026 | João Euclides | adotada |
+
+### Portal: telas e interface
+
+| DEC | Decisão | Data | Autor | Situação |
+|---|---|---|---|---|
+| [DEC-012](#dec-012--tokens-do-frontend-vêm-do-design-system-da-marca) | Tokens do frontend vêm do design system da marca | 21/10/2026 | João Euclides | adotada |
+| [DEC-013](#dec-013--componentes-base-do-shadcnui-e-do-interiordev-no-repositório) | Componentes base do shadcn/ui e do interior.dev no repositório | 21/10/2026 | João Euclides | adotada |
+| [DEC-025](#dec-025--mapa-da-rmr-como-seletor-de-município-e-bairro-proposta) | Mapa da RMR como seletor de município e bairro | 23/10/2026 | João Euclides | proposta |
+| [DEC-035](#dec-035--soma-dos-efeitos-e-percentual-sobre-a-base-na-tela-de-receita) | Soma dos efeitos e percentual sobre a base na tela de receita | 27/10/2026 | João Euclides | adotada |
+| [DEC-036](#dec-036--tela-da-diretoria-compara-mês-contra-mês-até-existir-a-rota-de-comparação) | Tela da diretoria compara mês contra mês, até existir a rota de comparação | 27/10/2026 | João Euclides | adotada, revisada pela [DEC-041](#dec-041--redesign-da-tela-da-diretoria-a-tesoura-primeiro-e-indicadores-por-período-no-backend) |
+| [DEC-037](#dec-037--gráficos-do-portal-em-svg-próprio-com-d3-só-para-as-contas) | Gráficos do portal em SVG próprio, com d3 só para as contas | 27/10/2026 | João Euclides | adotada, revisada pela [DEC-041](#dec-041--redesign-da-tela-da-diretoria-a-tesoura-primeiro-e-indicadores-por-período-no-backend) |
+| [DEC-041](#dec-041--redesign-da-tela-da-diretoria-a-tesoura-primeiro-e-indicadores-por-período-no-backend) | Redesign da tela da diretoria: a tesoura primeiro, e indicadores por período no backend | 27/10/2026 | João Euclides | adotada |
+| [DEC-042](#dec-042--visão-360-da-uc-e-comparação-sazonal-do-consumo) | Visão 360 da UC e comparação sazonal do consumo | 28/10/2026 | João Euclides | adotada, revisada pela [DEC-044](#dec-044--visão-360-da-unidade-consumidora-rota-única-janela-da-gold-e-regra-da-conta-alta) |
+| [DEC-043](#dec-043--palette-global-de-ucs-e-navegação-por-contexto) | Palette global de UCs e navegação por contexto | 28/10/2026 | João Euclides | adotada, revisada em parte pela [DEC-078](#dec-078--busca-de-uc-pelo-código-como-o-atendente-digita) |
+| [DEC-045](#dec-045--período-e-histórico-da-tela-de-rede) | Período e histórico da tela de Rede | 29/10/2026 | João Euclides | adotada |
+| [DEC-054](#dec-054--comparação-de-indicadores-exige-períodos-completos-e-em-ordem) | Comparação de indicadores exige períodos completos e em ordem | 30/10/2026 | João Euclides | adotada |
+| [DEC-060](#dec-060--filtros-compartilhados-entre-as-telas-do-portal) | Filtros compartilhados entre as telas do portal | 30/10/2026 | João Euclides | adotada |
+| [DEC-069](#dec-069--insight-de-ia-ao-lado-da-leitura-que-ele-narra) | Insight de IA ao lado da leitura que ele narra | 01/11/2026 | João Euclides | adotada, revisada pela [DEC-066](#dec-066--insight-da-receita-dá-a-conclusão-não-repete-a-tela) |
+| [DEC-071](#dec-071--tela-de-rede-indicadores-do-recorte-contra-a-base-e-histórico-contra-a-empresa) | Tela de Rede: indicadores do recorte contra a base e histórico contra a empresa | 01/11/2026 | João Euclides | adotada |
+| [DEC-072](#dec-072--tela-de-rede-quem-piorou-onde-atacar-e-por-que-cai) | Tela de Rede: quem piorou, onde atacar e por que cai | 01/11/2026 | João Euclides | adotada |
+| [DEC-078](#dec-078--busca-de-uc-pelo-código-como-o-atendente-digita) | Busca de UC pelo código como o atendente digita | 04/11/2026 | João Euclides | adotada |
+
+### Acesso, segurança e operação
+
+| DEC | Decisão | Data | Autor | Situação |
+|---|---|---|---|---|
+| [DEC-049](#dec-049--login-com-cookie-httponly-e-perfis-por-cargo) | Login com cookie httpOnly e perfis por cargo | 29/10/2026 | Felipe | adotada |
+| [DEC-065](#dec-065--limite-de-tentativas-de-login-por-login-e-endereço) | Limite de tentativas de login por login e endereço | 01/11/2026 | Felipe | adotada |
+| [DEC-068](#dec-068--rastreamento-das-requisições-com-opentelemetry) | Rastreamento das requisições com OpenTelemetry | 01/11/2026 | Felipe | adotada |
+
+### Agente de IA
+
+| DEC | Decisão | Data | Autor | Situação |
+|---|---|---|---|---|
+| [DEC-015](#dec-015--gold-real-e-plano-gratuito-do-gemini-aceita) | Gold real e plano gratuito do Gemini | 21/10/2026 | GenAI | adotada |
+| [DEC-016](#dec-016--exceção-de-versionamento-do-prompt-v1-proposta) | Exceção de versionamento do prompt v1 | 21/10/2026 | GenAI | proposta |
+| [DEC-018](#dec-018--relações-entre-views-só-por-chave) | Relações entre views só por chave | 22/10/2026 | Lucas | adotada |
+| [DEC-019](#dec-019--verificação-numérica-da-narrativa) | Verificação numérica da narrativa | 22/10/2026 | Lucas | adotada, revisada pela [DEC-070](#dec-070--checagem-da-narrativa-sem-descartar-texto-correto) |
+| [DEC-020](#dec-020--contrato-agentanswer-com-status-aceita) | Contrato `AgentAnswer` com status | 22/10/2026 | Lucas | adotada |
+| [DEC-022](#dec-022--regras-do-agente-sobre-a-gold-e-decisões-da-daily-de-2110) | Regras do agente sobre a Gold e decisões da daily de 21/10 | 21/10/2026 | Alisson | adotada |
+| [DEC-034](#dec-034--auditoria-do-agente-de-ia-gravação-leitura-e-subida-sem-a-chave) | Auditoria do agente de IA: gravação, leitura e subida sem a chave | 27/10/2026 | Felipe | adotada |
+| [DEC-040](#dec-040--insight-de-ia-na-tela-de-receita-métricas-montadas-no-backend-cache-pelo-conteúdo) | Insight de IA na tela de Receita: métricas montadas no backend, cache pelo conteúdo | 27/10/2026 | Felipe | adotada, revisada pela [DEC-069](#dec-069--insight-de-ia-ao-lado-da-leitura-que-ele-narra) |
+| [DEC-046](#dec-046--memória-de-conversa-orçamento-de-tokens-e-limite-de-perguntas-por-usuário) | Memória de conversa, orçamento de tokens e limite de perguntas por usuário | 29/10/2026 | GenAI | adotada |
+| [DEC-047](#dec-047--avaliação-comparativa-e-llm-as-a-judge) | Avaliação comparativa e LLM as a judge | 29/10/2026 | Perylo | adotada |
+| [DEC-052](#dec-052--follow-up-sem-referência-vira-esclarecimento-antes-do-modelo) | Follow-up sem referência vira esclarecimento antes do modelo | 30/10/2026 | Luis Felipe | adotada |
+| [DEC-053](#dec-053--conversas-do-agente-por-usuário-no-banco) | Conversas do agente por usuário no banco | 30/10/2026 | Luis Felipe | adotada |
+| [DEC-055](#dec-055--etapas-do-agente-por-sse-em-post-aiaskstream) | Etapas do agente por SSE em `POST /ai/ask/stream` | 30/10/2026 | Luis Felipe | adotada |
+| [DEC-056](#dec-056--views-do-agente-no-schema-semantic-d1) | Views do agente no schema `semantic` (D1) | 30/10/2026 | Luis Felipe | adotada |
+| [DEC-061](#dec-061--queda-do-provedor-não-pode-prender-a-resposta-do-agente) | Queda do provedor não pode prender a resposta do agente | 31/10/2026 | Luis Felipe | adotada |
+| [DEC-066](#dec-066--insight-da-receita-dá-a-conclusão-não-repete-a-tela) | Insight da Receita dá a conclusão, não repete a tela | 01/11/2026 | Luis Felipe | adotada, revisada pela [DEC-077](#dec-077--insights-de-ia-nas-telas-do-dia-a-dia-com-a-ia-escolhendo-a-leitura) |
+| [DEC-070](#dec-070--checagem-da-narrativa-sem-descartar-texto-correto) | Checagem da narrativa sem descartar texto correto | 02/11/2026 | Luis Felipe | adotada |
+| [DEC-077](#dec-077--insights-de-ia-nas-telas-do-dia-a-dia-com-a-ia-escolhendo-a-leitura) | Insights de IA nas telas do dia a dia, com a IA escolhendo a leitura | 03/11/2026 | Luis Felipe | adotada |
+
+### Convenções sem número
+
+Decisões de 19/10/2026, anteriores à numeração: [convenções do frontend](#convenções-do-frontend-sem-número).
+
+---
 
 ## DEC-001 · Localização dos arquivos de origem (landing)
 
@@ -204,7 +257,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
     `CHOKIDAR_USEPOLLING`), porque eventos de arquivo não atravessam o volume no
     Docker Desktop do Windows.
   - A imagem da API é construída com contexto na raiz e instala o agente de IA pelo
-    workspace do uv (DEC-017); o compose monta `backend/src` e `ai-agent/src`.
+    workspace do uv ([DEC-017](#dec-017--workspace-do-uv-com-um-único-uvlock)); o compose monta `backend/src` e `ai-agent/src`.
 
 ## DEC-007 · Hooks de pre-commit e CI
 
@@ -215,7 +268,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   frontend e o build das imagens Docker em todo PR.
 - **Hooks:** higiene de arquivos (espaços, fim de linha LF, YAML/TOML/JSON válidos,
   conflitos, arquivos grandes, chaves privadas), gitleaks (segredos), ruff (Python),
-  Biome (frontend) e o contrato OpenAPI (DEC-005). Mensagens de commit não são
+  Biome (frontend) e o contrato OpenAPI ([DEC-005](#dec-005--contrato-openapi-entre-api-e-frontend)). Mensagens de commit não são
   validadas por hook: o padrão Conventional Commits segue como convenção do time.
 - **Motivo:** o `pre-commit` gerencia hooks de Python, Node e binários num lugar só;
   o husky só atende Node. O hook pode ser pulado com `--no-verify`, então o CI é o
@@ -223,7 +276,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Regras:**
   - Biome e geradores do contrato rodam com as versões do projeto (`npm ci` em
     `frontend/`, `uv` no backend). O ruff do hook tem a mesma versão do
-    `uv.lock` da raiz (DEC-017); ao atualizar um, atualize o outro.
+    `uv.lock` da raiz ([DEC-017](#dec-017--workspace-do-uv-com-um-único-uvlock)); ao atualizar um, atualize o outro.
   - O ruff roda só em `.py`: notebooks do Databricks usam `spark` e `dbutils` sem
     import, e os blocos de código dos `.md` não devem ser reformatados.
   - Nenhum hook modifica notebooks (`.ipynb`): eles são editados e versionados pelo
@@ -293,7 +346,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   `PATCH` (mudança de status, inclusive cancelar).
 - **Regras:**
   - Status `GERADA → EM_CAMPO → CONCLUIDA`, ou `CANCELADA` a partir dos dois primeiros.
-    `EM_CAMPO` também pode voltar para `GERADA` (DEC-048).
+    `EM_CAMPO` também pode voltar para `GERADA` ([DEC-048](#dec-048--ordem-em-campo-pode-voltar-para-gerada)).
     `CONCLUIDA` e `CANCELADA` são finais: para voltar ao imóvel, gera-se uma OI nova e o
     histórico mostra as duas visitas. Transição fora do mapa devolve `409`. A regra fica
     num módulo sem banco (`backend/src/venergy_api/ordens.py`), testado à parte.
@@ -326,8 +379,8 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Limitações:** a OI valida a UC contra `gold_dim_uc`, porque a fila de suspeitas
   (`gold_fila_suspeitas`) ainda não existe; quando existir, a tela da fila só passa a
   enviar os `cod_uc` escolhidos, sem mudança no backend. Os eventos antigos não registram
-  quem agiu, porque o portal ainda não tinha login; a autoria entrou na DEC-050. Alterar colunas exige recriar as
-  tabelas do `app`, já que não há migrações (a DEC-050 acrescenta uma coluna sem recriar).
+  quem agiu, porque o portal ainda não tinha login; a autoria entrou na [DEC-050](#dec-050--autoria-nos-eventos-das-ordens-de-inspeção). Alterar colunas exige recriar as
+  tabelas do `app`, já que não há migrações (a [DEC-050](#dec-050--autoria-nos-eventos-das-ordens-de-inspeção) acrescenta uma coluna sem recriar).
 
 ## DEC-010 · Energia e dinheiro como `numeric`, número na API
 
@@ -353,17 +406,17 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   recriada: `docker compose exec db psql -U venergy -d venergy -c "DROP TABLE
   gold.gold_dim_uc"` e, depois, a carga da Gold. Só a tabela da Gold é derrubada, e as
   ordens de inspeção do schema `app` ficam intactas.
-- **Atualização (21/10/2026):** desde a DEC-014, a própria carga recria as tabelas da Gold,
+- **Atualização (21/10/2026):** desde a [DEC-014](#dec-014--o-backend-espelha-o-contrato-da-gold), a própria carga recria as tabelas da Gold,
   e o `DROP TABLE` manual deixou de ser necessário.
 
 ## DEC-011 · Convenções do contrato da Gold
 
 - **Data:** 20/10/2026 · **Área:** Dados, Portal e IA · **Autor:** Alisson
 - **Contexto:** `contracts/gold_schema.yaml` (v0.1) é a fonte de verdade sobre tabelas e
-  colunas da Gold. Web e GenAI trabalham contra ele; os tipos são os do PostgreSQL (DEC-002).
+  colunas da Gold. Web e GenAI trabalham contra ele; os tipos são os do PostgreSQL ([DEC-002](#dec-002--banco-local-postgresql)).
 - **Decisão:**
   - `competencia` é texto no formato `AAAA-MM`, em todas as tabelas e no CSV.
-  - Energia e dinheiro seguem a DEC-010: `numeric` no banco, com a escala do contrato.
+  - Energia e dinheiro seguem a [DEC-010](#dec-010--energia-e-dinheiro-como-numeric-número-na-api): `numeric` no banco, com a escala do contrato.
   - Dados faz três cópias independentes da transformação Silver → Gold (Alisson, Arthur e
     Gabriel), todas contra o contrato, e as compara antes de definir a Gold exportada.
     Não há ordem nem dono único: cada um faz a sua versão por conta própria, e o time compara os
@@ -374,6 +427,18 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Regras relacionadas** (detalhes no contrato): chaves estrangeiras são lógicas, checadas
   no Data Quality e sem constraint no banco; colunas de lista vão numa célula do CSV,
   separadas por `;`; `tarifa_media` é nula quando `kwh_faturado = 0`.
+
+## DEC-012 · Tokens do frontend vêm do design system da marca
+
+- **Data:** 21/10/2026 · **Área:** Portal · **Autor:** João Euclides
+- **Decisão:** Tokens do frontend vêm do design system da marca VE-360 (paleta OKLCH a partir de #f2c94c, neutros `graphite`, Inter Tight + Söhne Breit + JetBrains Mono); escalas padrão do Tailwind removidas.
+- **Motivo:** Uma única fonte de cor, tipo, raio e sombra; utilitário fora do sistema não gera CSS.
+
+## DEC-013 · Componentes base do shadcn/ui e do interior.dev no repositório
+
+- **Data:** 21/10/2026 · **Área:** Portal · **Autor:** João Euclides
+- **Decisão:** Componentes base trazidos do shadcn/ui no estilo `base-nova` (Base UI) e do interior.dev para `frontend/src/components/ui/`, adaptados aos tokens; nenhuma biblioteca de componentes como dependência.
+- **Motivo:** O código fica no repositório e segue os tokens da marca; uma única base de primitivas (Base UI, sem Radix).
 
 ## DEC-014 · O backend espelha o contrato da Gold
 
@@ -463,12 +528,12 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   - **avaliação na Gold real só no modo "só SQL"** (`--dataset gold_real` liga `--sql-only`): o agente não monta o redator, então só a pergunta e o esquema (com linhas de exemplo sintéticas) chegam ao modelo, e nenhuma linha da Gold sai da máquina. O relatório vai para `eval/runs_gold/`, fora do Git. Feito no PR da issue #56. Na correção de SQL, a mensagem de erro do banco volta ao modelo; nos erros de dado (SQLSTATE da classe 22, como `invalid input syntax`), tudo o que vem depois do primeiro `:` da mensagem, que pode ser um código de UC, vira `<valor>` antes, e o contexto `LINE` sai (revisão do Lucas no #65). Nos erros de sintaxe e de coluna (classe 42), o que fica entre aspas é o nome que o próprio modelo escreveu, e a mensagem fica inteira;
   - **demonstração ao vivo com a Gold real:** só perguntas agregadas, que não devolvem `cod_uc` linha a linha;
   - **o que ainda manda dado da Gold ao modelo e precisa de decisão:** a narrativa do `/ai/ask` (as linhas da amostra da resposta) e o insight da tela de receita (#58, as métricas agregadas do recorte). Opções: aceitar o envio de agregados no plano gratuito, desligar a narrativa e o insight com a Gold real (o texto determinístico continua), ou usar uma chave da organização.
-- **Decisão final (29/10/2026, Luis Felipe; aprovada por Dados, Alisson, no PR #89):** a Gold real pode ir ao Gemini pelo plano gratuito, inclusive as linhas da narrativa, o insight, o histórico da memória e o juiz. O risco do Free Tier (uso do conteúdo pelo Google) é aceito, porque o dataset é do case. O que continua proibido é **subir o dataset ao Git**, ou qualquer saída com dados dele (DEC-024).
+- **Decisão final (29/10/2026, Luis Felipe; aprovada por Dados, Alisson, no PR #89):** a Gold real pode ir ao Gemini pelo plano gratuito, inclusive as linhas da narrativa, o insight, o histórico da memória e o juiz. O risco do Free Tier (uso do conteúdo pelo Google) é aceito, porque o dataset é do case. O que continua proibido é **subir o dataset ao Git**, ou qualquer saída com dados dele ([DEC-024](#dec-024--o-que-pode-subir-ao-repositório-público)).
 - **Consequências:**
   - a avaliação na Gold real deixa de ligar `--sql-only` por conta própria: narração e juiz rodam nas duas bases, e `--sql-only` vira só economia de cota;
   - os relatórios da Gold real continuam em `eval/runs_gold/`, fora do Git, porque o SQL e a justificativa do juiz podem trazer valores do dataset;
   - a demonstração ao vivo pode usar a Gold real sem restringir as perguntas;
-  - a amostra continua sendo a base do CI, que não pode ter o dataset (DEC-024), e dos itens com código fictício;
+  - a amostra continua sendo a base do CI, que não pode ter o dataset ([DEC-024](#dec-024--o-que-pode-subir-ao-repositório-público)), e dos itens com código fictício;
   - **memória:** a memória de conversa (G1-10, PR #86) ainda não está na `main`. Quando entrar, ela vale nas duas bases, como esta decisão diz: o #86 não desliga mais a memória na Gold real;
   - **rodadas com e sem narração não se comparam diretamente:** uma rodada só SQL mede o SQL e o status, e uma rodada narrada mede também o texto. A linha de base 2 (29/10/2026) foi só SQL.
 
@@ -613,14 +678,14 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
     UC. Os meses passados de uma UC que mudou de classe ou de bairro caem no recorte atual.
 - **Consequências:**
   - O contrato v0.2 confirmou o formato do período (`AAAA-MM/AAAA-MM`) e trouxe a
-    `gold_kpis_segmento_mensal` (DEC-023), com componentes somáveis por mês, município,
+    `gold_kpis_segmento_mensal` ([DEC-023](#dec-023--medidas-de-receita-reconciliação-e-ajustes-de-colunas-da-gold)), com componentes somáveis por mês, município,
     bairro, classe e GD. Ela resolve as duas limitações acima e permite DEC/FEC por recorte,
     calculado sobre os componentes. Trocar o `/receita/comparacao` para essa tabela e liberar
     DEC/FEC por recorte é uma tarefa própria, que revisa esta decisão.
   - O agente de IA, se responder sobre receita de um segmento, precisa somar a mesma fato com
     a mesma dimensão para bater com a tela.
   - **Atualização (26/10/2026):** DEC e FEC passam a ter recorte por município, bairro, alimentador e
-    classe, calculados sobre os componentes da `gold_kpis_segmento_mensal` (DEC-033). A troca do
+    classe, calculados sobre os componentes da `gold_kpis_segmento_mensal` ([DEC-033](#dec-033--dec-e-fec-por-período-e-recorte-e-a-fila-de-suspeitas-paginada)). A troca do
     `/receita/comparacao` para essa tabela continua pendente.
 
 ## DEC-022 · Regras do agente sobre a Gold e decisões da daily de 21/10
@@ -761,13 +826,13 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Pendências:** definir e validar o método do cálculo do efeito bandeira. Os dois grupos de leitura negativa foram testados e são exclusivos e completos: cada leitura
   negativa cai em exatamente uma das duas regras.
 - **Impacto:** muda colunas, nome e nulidade no contrato (`contracts/gold_schema.yaml`, v0.2). Pela
-  DEC-014, o ajuste do backend vai no mesmo PR, e o GenAI é avisado (camada semântica, PR #20).
+  [DEC-014](#dec-014--o-backend-espelha-o-contrato-da-gold), o ajuste do backend vai no mesmo PR, e o GenAI é avisado (camada semântica, PR #20).
 
 ## DEC-024 · O que pode subir ao repositório público
 
 - **Data:** 22/10/2026 · **Área:** Dados, Portal e IA · **Autor:** Alisson (decidido na daily de 22/10)
 - **Contexto:** o dataset do case é confidencial e o repositório é público. Até aqui a regra era não
-  publicar nada derivado do dataset (DEC-008). O diagnóstico da receita precisa mostrar a evidência
+  publicar nada derivado do dataset ([DEC-008](#dec-008--contrato-da-bronze-auditoria-básica)). O diagnóstico da receita precisa mostrar a evidência
   de cada hipótese, e isso exige números.
 - **Decisão:**
   - **Pode subir:** resultado agregado necessário para confirmar ou refutar uma hipótese ou para
@@ -790,8 +855,8 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Motivo:** o diagnóstico precisa de evidência para ser defensável diante da diretoria, e o
   agregado necessário à hipótese não identifica ninguém. O risco real está na identificação e em
   achados atribuíveis a um indivíduo.
-- **Substitui em parte:** a regra de "nenhum número do dataset" da DEC-008 (evidências em relatório
-  privado) e a pergunta em aberto da DEC-004 sobre a Gold agregada no repositório: o agregado
+- **Substitui em parte:** a regra de "nenhum número do dataset" da [DEC-008](#dec-008--contrato-da-bronze-auditoria-básica) (evidências em relatório
+  privado) e a pergunta em aberto da [DEC-004](#dec-004--entrega-da-gold-em-datagold) sobre a Gold agregada no repositório: o agregado
   necessário à hipótese pode subir; os CSVs da Gold continuam fora do Git.
 - **Em aberto:** confirmar com a Visagio que resultados agregados do diagnóstico podem ser públicos
   (o case marca os materiais como confidenciais e pede um repositório público).
@@ -813,10 +878,10 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 ## DEC-026 · Ações das OIs, Kanban e troca de visão na tela de perdas
 
 - **Data:** 23/10/2026 · **Área:** Portal · **Autor:** João Euclides
-- **Contexto:** o backend já expõe `PATCH`, `GET /{id}` (histórico) e `POST` das ordens de inspeção (DEC-009), mas a tela de perdas só listava as OIs.
+- **Contexto:** o backend já expõe `PATCH`, `GET /{id}` (histórico) e `POST` das ordens de inspeção ([DEC-009](#dec-009--modelo-das-ordens-de-inspeção)), mas a tela de perdas só listava as OIs.
 - **Decisão:**
   - a tela mostra só os botões das transições permitidas, a partir de uma cópia das `TRANSICOES` do backend (`ACOES_POR_STATUS` em `features/perdas/conversions.ts`). A cópia serve só para exibir: quem decide é o backend, que responde 409 a uma transição inválida, e a tela mostra a mensagem dele;
-  - enviar a campo é sem formulário (a observação é opcional e a OI ainda pode ser cancelada), mas o PATCH só sai depois de 6 s: um aviso embaixo da tela oferece "Desfazer" e "Enviar agora", e o tempo para enquanto o ponteiro ou o foco estão no aviso. Era o único desfazer: o backend não tinha a volta Em campo → Gerada (DEC-009), o que mudou na DEC-048. Concluída e Cancelada continuam finais. Sair da tela envia na hora o que estava agendado; fechar a aba pede confirmação do navegador;
+  - enviar a campo é sem formulário (a observação é opcional e a OI ainda pode ser cancelada), mas o PATCH só sai depois de 6 s: um aviso embaixo da tela oferece "Desfazer" e "Enviar agora", e o tempo para enquanto o ponteiro ou o foco estão no aviso. Era o único desfazer: o backend não tinha a volta Em campo → Gerada ([DEC-009](#dec-009--modelo-das-ordens-de-inspeção)), o que mudou na [DEC-048](#dec-048--ordem-em-campo-pode-voltar-para-gerada). Concluída e Cancelada continuam finais. Sair da tela envia na hora o que estava agendado; fechar a aba pede confirmação do navegador;
   - concluir e cancelar abrem um modal (Modal do interior.dev): concluir pede o resultado, cancelar pede segurar o botão (HoldToConfirm), porque não tem volta. O histórico, que é consulta, abre no painel lateral (Sheet);
   - Kanban e tabela ocupam a largura toda da tela, sem a descrição da tela no topo (o layout da tela de perdas será ajustado quando a fila de suspeitas entrar); o Kanban também estica até o fim da altura. Cada ação tem a cor do status a que leva (enviar = info, concluir = success, cancelar = danger);
   - Kanban com as ativas (Gerada, Em campo) completas e as finalizadas (Concluída, Cancelada) limitadas às últimas N por `atualizada_em`, com N pela altura da viewport: 3 abaixo de 900 px (notebook), 5 até 1299 px (PC 1080p), 8 a partir de 1300 px (desktop grande). "Ver todas" leva à tabela filtrada pelo status;
@@ -825,12 +890,12 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   - gerar OIs por códigos de UC digitados (repetidos ignorados, até 200 por pedido), enquanto não existe endpoint da fila de suspeitas;
   - Vitest no frontend só para funções puras (`src/**/__tests__/*.test.ts`, sem DOM).
 - **Motivo:** cobre o ciclo de vida da OI sem regra de negócio nova no frontend; o Kanban dá a visão do trabalho em andamento sem a lista de finalizadas crescer sem limite.
-- **Em aberto:** gerar a partir da fila de suspeitas quando houver `GET` da `gold_fila_suspeitas`. A autoria das mudanças, que também estava aqui, foi resolvida na DEC-050: o histórico mostra quem fez cada mudança.
+- **Em aberto:** gerar a partir da fila de suspeitas quando houver `GET` da `gold_fila_suspeitas`. A autoria das mudanças, que também estava aqui, foi resolvida na [DEC-050](#dec-050--autoria-nos-eventos-das-ordens-de-inspeção): o histórico mostra quem fez cada mudança.
 
 ## DEC-027 · Contrato da Gold v0.3: UC 360, inspeções e recortes completos
 
 - **Data:** 24/10/2026 · **Área:** Dados, Portal e IA · **Autor:** Alisson
-- **Status:** proposta; pela DEC-014, o backend entra no mesmo PR, e o GenAI é avisado (camada semântica).
+- **Status:** adotada: o contrato v0.3.0 está em `contracts/gold_schema.yaml`. Na proposta, pela [DEC-014](#dec-014--o-backend-espelha-o-contrato-da-gold), o backend entrou no mesmo PR, e o GenAI foi avisado (camada semântica).
 - **Contexto:** o check da Gold contra os consumidores mostrou lacunas: a UC 360 não tinha medidor, interrupções nem chamados
   (as tabelas estavam sem colunas); H1 não comparava a UC antes e depois da conexão da GD; H2 não tinha a taxa de irregularidade
   das inspeções por recorte; H5 não tinha leituras estimadas nem tipo de medidor; o portal não cruzava alimentador com bairro e
@@ -880,7 +945,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 ## DEC-029 · Método do efeito bandeira
 
 - **Data:** 24/10/2026 · **Área:** Dados · **Autor:** Alisson
-- **Contexto:** a DEC-023 separou `efeito_preco` em `efeito_tarifa` e `efeito_bandeira`, mas deixou o método pendente.
+- **Contexto:** a [DEC-023](#dec-023--medidas-de-receita-reconciliação-e-ajustes-de-colunas-da-gold) separou `efeito_preco` em `efeito_tarifa` e `efeito_bandeira`, mas deixou o método pendente.
 - **Conferência no dado:** a tarifa efetiva de cada mês (energia da fatura ÷ kWh, com leituras limpas) é a tarifa base da classe
   mais um acréscimo por kWh que depende só da bandeira e é igual em todas as classes. Sem o acréscimo, a tarifa base fica
   constante dentro de cada ciclo de reajuste (maio), em todas as classes; a única mudança fora de maio é no B1, em jan/2026.
@@ -898,7 +963,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 ## DEC-030 · Regras aplicadas na Gold: UCs, ocorrências, GD e fila de suspeitas
 
 - **Data:** 24/10/2026, revisada em 26/10/2026 com a comparação das cópias do Alisson e do Arthur, e em 27/10/2026 com a cópia do Gabriel e a calibração da fila · **Área:** Dados · **Autor:** Alisson
-- **Status:** as três cópias batem tabela por tabela (DEC-011); a cópia do Alisson, com as escolhas abaixo, é a base do notebook oficial.
+- **Status:** as três cópias batem tabela por tabela ([DEC-011](#dec-011--convenções-do-contrato-da-gold)); a cópia do Alisson, com as escolhas abaixo, é a base do notebook oficial.
 - **Decisão:**
   - **`n_uc`:** UCs **faturadas** na competência, como no PRODIST (denominador do DEC/FEC = UCs faturadas do conjunto). Ficam fora
     as UCs da UC-12, que nunca são faturadas, e os meses de ligação antes da primeira fatura. A base dos recortes e da continuidade
@@ -973,7 +1038,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 ## DEC-031 · Rota de pares da decomposição e par de períodos obrigatório
 
 - **Data:** 26/10/2026 · **Área:** Portal · **Autor:** Felipe
-- **Contexto:** a DEC-028 faz a Gold gravar todos os pares de mesmos meses em anos diferentes (cerca de 666 pares). Até a v0.2, a
+- **Contexto:** a [DEC-028](#dec-028--pares-de-períodos-da-decomposição-e-o-que-fica-para-o-backend) faz a Gold gravar todos os pares de mesmos meses em anos diferentes (cerca de 666 pares). Até a v0.2, a
   Gold trazia um par só, e `GET /receita/decomposicao` aceitava o par como filtro opcional e somava o que houvesse.
 - **Decisão:**
   - `GET /receita/decomposicao/periodos` devolve os pares gravados (`SELECT DISTINCT`), em ordem. É o que o seletor da tela
@@ -985,7 +1050,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   (666 vezes o número de municípios), e a tela não saberia qual mostrar. A tela de receita (`decomposicao-table`, `mapa-recorte` e
   `recorte-trilha`) passou a pedir o par e o escolhe pela rota `/receita/decomposicao/periodos`: abre na janela de 12 meses com o
   período atual mais recente e oferece só os pares gravados.
-- **Limite:** a rota só conhece os pares gravados. Pares de trechos diferentes (DEC-028) continuam fora, e entram só se o portal
+- **Limite:** a rota só conhece os pares gravados. Pares de trechos diferentes ([DEC-028](#dec-028--pares-de-períodos-da-decomposição-e-o-que-fica-para-o-backend)) continuam fora, e entram só se o portal
   precisar deles.
 - **Amostra:** o gerador grava os 78 pares de mesmos meses entre 2024 e 2025, para o seletor ter o que mostrar.
 
@@ -1005,7 +1070,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 
 ## DEC-033 · DEC e FEC por período e recorte, e a fila de suspeitas paginada
 
-- **Data:** 26/10/2026 · **Área:** Portal · **Autor:** Felipe · **Revisa:** DEC-021 (DEC e FEC só no total)
+- **Data:** 26/10/2026 · **Área:** Portal · **Autor:** Felipe · **Revisa:** [DEC-021](#dec-021--recortes-de-receita-somados-no-backend-decfec-só-no-total) (DEC e FEC só no total)
 - **Contexto:** o V1-07 pede as rotas das telas de DEC/FEC (a Beatriz quer os piores alimentadores e regiões para a manutenção
   preventiva) e da fila de perdas (o Rafael quer a fila da mais para a menos promissora, com o motivo e a energia a recuperar, e gera as
   ordens de inspeção a partir dela). Com a `gold_kpis_segmento_mensal` da v0.3 (alimentador na chave), DEC e FEC passam a poder ser
@@ -1063,16 +1128,16 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Limitações conhecidas:**
   - O `n_uc` vem como a Gold grava. A discussão do PR #42 sobre excluir do `n_uc` as UCs que nunca são faturadas (UC-12, PRODIST)
     muda o valor gravado, e não a conta da API.
-  - `/receita/comparacao` ainda soma a fato com o cadastro atual da UC (DEC-021). Trocá-lo pela `gold_kpis_segmento_mensal` continua
+  - `/receita/comparacao` ainda soma a fato com o cadastro atual da UC ([DEC-021](#dec-021--recortes-de-receita-somados-no-backend-decfec-só-no-total)). Trocá-lo pela `gold_kpis_segmento_mensal` continua
     sendo uma tarefa própria.
-- **Consequências:** a DEC-021 deixa de valer na frase "DEC, FEC… não têm recorte por segmento": desde esta decisão eles têm, calculados
+- **Consequências:** a [DEC-021](#dec-021--recortes-de-receita-somados-no-backend-decfec-só-no-total) deixa de valer na frase "DEC, FEC… não têm recorte por segmento": desde esta decisão eles têm, calculados
   sobre os componentes. O agente continua somando os mesmos componentes, então portal e agente dão o mesmo número.
 
 ## DEC-034 · Auditoria do agente de IA: gravação, leitura e subida sem a chave
 
 - **Data:** 27/10/2026 · **Área:** Portal e GenAI · **Autor:** Felipe · **Atende:** issue #48 (G1-06 e G1-09, spec do agente §10 D3)
 - **Contexto:** o analista só confia na resposta da IA se puder ver como ela chegou lá (SQL executado, views, linhas, modelo, versão do
-  prompt). O agente é somente leitura e não grava nada (DEC-020): persistir cada `AgentAnswer` e entregá-lo ao portal é do backend.
+  prompt). O agente é somente leitura e não grava nada ([DEC-020](#dec-020--contrato-agentanswer-com-status-aceita)): persistir cada `AgentAnswer` e entregá-lo ao portal é do backend.
 - **Decisão:**
   - **Tabela `app.ai_auditoria`**, criada pelo `create_all` que a carga já roda e que nunca apaga o schema `app`. Uma coluna por campo do
     `AgentAnswer`, mais `id`, `criado_em` (com fuso), `session_id` e `pergunta`. `rows`, `sources` e `assumptions` em `jsonb`. `status` e
@@ -1099,7 +1164,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   - Migração com Alembic: o projeto não tem migrações, e o `create_all` já cria a tabela sem tocar nas ordens de inspeção.
   - Um `jsonb` só com a resposta inteira: as colunas permitem filtrar por `status`, `session_id` ou data (ver só as recusas) sem abrir o JSON.
   - `status` e `confidence` como enum com `CHECK` (como nas ordens): um valor novo do agente faria a gravação falhar e a trilha se perderia.
-  - Guardar os `Decimal` da amostra como número: o `float` perde a exatidão (DEC-010). Vão como texto, como o `model_dump(mode="json")`
+  - Guardar os `Decimal` da amostra como número: o `float` perde a exatidão ([DEC-010](#dec-010--energia-e-dinheiro-como-numeric-número-na-api)). Vão como texto, como o `model_dump(mode="json")`
     do agente os entrega, e o portal mostra a amostra sem converter.
   - Montar o agente a cada requisição: recarregaria e validaria a camada semântica a cada pergunta. Montá-lo no import do módulo
     quebraria a importação sem `.env` e faria os testes dependerem do Gemini.
@@ -1113,7 +1178,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   - Sem expurgo: a tabela só cresce. A pergunta e as linhas ficam guardadas como o agente as devolveu, e podem conter dados de UC.
     A `pergunta` é o texto livre que o usuário digitou (até 2000 caracteres): se alguém digitar um CPF ou um nome, ele fica em `app`.
     Expurgo e mascaramento ficam em aberto.
-  - Leitura da auditoria: desde a DEC-049 só o perfil `ti` lê `GET /ai/audit/{id}`. A pergunta e as linhas continuam sem expurgo.
+  - Leitura da auditoria: desde a [DEC-049](#dec-049--login-com-cookie-httponly-e-perfis-por-cargo) só o perfil `ti` lê `GET /ai/audit/{id}`. A pergunta e as linhas continuam sem expurgo.
   - Sem migrações, mudar uma coluna da tabela exige apagá-la e recriá-la à mão, como nas ordens de inspeção.
 
 ## DEC-035 · Soma dos efeitos e percentual sobre a base na tela de receita
@@ -1123,9 +1188,9 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   do PR #51, Felipe apontou que a tela de receita faz duas contas sobre as linhas de `GET /receita/decomposicao`.
 - **Decisão:** a tela continua fazendo essas duas contas, e só elas:
   - **Ponte do recorte:** soma a `receita_base` e os `efeito_tarifa`, `efeito_bandeira`, `efeito_volume` e `efeito_mix` dos
-    segmentos do nível abaixo (os efeitos são somáveis, DEC-023), como o backend já faz em SQL para cada segmento. A receita atual
+    segmentos do nível abaixo (os efeitos são somáveis, [DEC-023](#dec-023--medidas-de-receita-reconciliação-e-ajustes-de-colunas-da-gold)), como o backend já faz em SQL para cada segmento. A receita atual
     da ponte é a base mais os efeitos, e não a soma de `receita_atual`. Cada linha fecha só dentro da tolerância do contrato
-    (R$ 0,025, DEC-029); somada sobre uns 90 bairros, a sobra passaria de R$ 1 e desalinharia o último degrau.
+    (R$ 0,025, [DEC-029](#dec-029--método-do-efeito-bandeira)); somada sobre uns 90 bairros, a sobra passaria de R$ 1 e desalinharia o último degrau.
   - **Percentual sobre a base:** efeito ÷ `receita_base` do próprio segmento, para a coluna "Var. %", o ranking em % e a cor do
     mapa. Sem receita base (segmento novo), não há percentual.
 - **Por que não é cálculo de negócio:** nenhuma fórmula do PVM é refeita. A tela soma e divide valores que a Gold já calculou, do
@@ -1142,13 +1207,13 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Contexto:** a tela da diretoria (V2-04, V2-05) mostra receita, kWh faturado, DEC, FEC, chamados e satisfação média do período
   atual e a variação sobre o período base. A API não tem uma rota que devolva esses seis indicadores para dois períodos: o
   `GET /receita/comparacao` só traz kWh e receita, e o `GET /receita/mensal` traz os seis por competência. Juntar vários meses de
-  DEC, FEC e satisfação não é soma nem média (DEC-033: componentes somados ÷ média mensal de UCs; satisfação = soma das notas ÷
+  DEC, FEC e satisfação não é soma nem média ([DEC-033](#dec-033--dec-e-fec-por-período-e-recorte-e-a-fila-de-suspeitas-paginada): componentes somados ÷ média mensal de UCs; satisfação = soma das notas ÷
   notas dadas), e essa conta não pode ficar no frontend.
 - **Decisão:**
   - Por ora, a tela compara **um mês contra outro**, com os valores de `GET /receita/mensal` como a Gold gravou. O mês atual abre no
     mais recente, e a base no mesmo mês do ano anterior (sem sazonalidade); o seletor troca o mês atual e oferece como base o mesmo
     mês do ano anterior ou o mês anterior.
-  - A tela só calcula a variação percentual (atual ÷ base − 1), como a tela de receita (DEC-035). Sem um dos lados ou com base zero,
+  - A tela só calcula a variação percentual (atual ÷ base − 1), como a tela de receita ([DEC-035](#dec-035--soma-dos-efeitos-e-percentual-sobre-a-base-na-tela-de-receita)). Sem um dos lados ou com base zero,
     o card mostra o valor sem variação.
   - A URL usa `periodo_base` e `periodo_atual` no formato `AAAA-MM/AAAA-MM`, igual à tela de receita: o card de receita abre a ponte no
     mesmo período, e trechos de vários meses cabem no mesmo formato.
@@ -1171,7 +1236,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
     movimento (`motion`) são do projeto.
   - Mês a mês: a série corrida da `gold_kpis_mensais`. Ano a ano: um ano por linha sobre jan–dez, o mais recente em destaque e o
     anterior como comparação. O tooltip mostra a variação sobre o mês anterior ou sobre o mesmo mês do ano anterior; é a mesma
-    conta de variação da DEC-036, sem nova regra de negócio.
+    conta de variação da [DEC-036](#dec-036--tela-da-diretoria-compara-mês-contra-mês-até-existir-a-rota-de-comparação), sem nova regra de negócio.
   - Indicador e visão ficam na URL (`indicador`, `tendencia`), como os outros filtros.
 - **Alternativa descartada:** Recharts (o gráfico do shadcn) ou outra biblioteca completa. A troca entre mês a mês e ano a ano
   redesenharia o gráfico do zero em vez de mudar a forma das linhas, o tema e a acessibilidade seguiriam o modelo dela e o
@@ -1227,7 +1292,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Por que o Git como fonte:** o Job roda o código revisado em PR, não uma cópia do workspace, e a Gold gravada fica rastreável
   a um commit da `main`.
 - **Reprocessamento completo, e não incremental:** cada run relê todos os arquivos da landing e regrava as três camadas (full
-  refresh, como na DEC-008). Isso **diverge da ADR-07**, que previa ingestão incremental por competência. O motivo: o dataset do
+  refresh, como na [DEC-008](#dec-008--contrato-da-bronze-auditoria-básica)). Isso **diverge da ADR-07**, que previa ingestão incremental por competência. O motivo: o dataset do
   case é uma extração única, o run completo leva cerca de 15 minutos, e o full refresh mantém o tudo ou nada de cada camada (as
   travas e o Resumo de cada notebook validam a tabela inteira). A carga incremental por competência fica como evolução para
   produção, quando o volume mensal justificar.
@@ -1237,7 +1302,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   única.
 - **Falhas:** o Resumo de cada notebook dá erro se alguma tabela falhar, e o Job para na primeira task com erro, sem gravar as
   camadas seguintes.
-- **Idempotência da Bronze no Job (atualizado em 28/10):** a conferência pós-gravação da Bronze (DEC-008) compara as duas
+- **Idempotência da Bronze no Job (atualizado em 28/10):** a conferência pós-gravação da Bronze ([DEC-008](#dec-008--contrato-da-bronze-auditoria-básica)) compara as duas
   últimas gravações de cada tabela por time travel. O VACUUM automático do Databricks (predictive optimization) apaga os arquivos
   antigos depois de 7 dias (`deletedFileRetentionDuration`), e com dado novo as duas gravações nem deveriam ser iguais: no Job
   mensal essa comparação falharia em todo run. Por isso o Job passa `exigir_idempotencia = nao` ao `Landing_to_Bronze`: a
@@ -1246,75 +1311,17 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Para produção:** basta despausar o agendamento. A carga incremental por competência continua como evolução, se o volume
   mensal justificar.
 
-## DEC-041 · Redesign da tela da diretoria: a tesoura primeiro, e indicadores por período no backend
-
-- **Data:** 27/10/2026 · **Área:** Portal · **Autor:** João Euclides · **Revisa:** DEC-036 (comparação só mês contra mês) e
-  DEC-037 (gráfico de um indicador por vez)
-- **Contexto:** a tela da DEC-036 mostrava seis cards de mesmo peso e um gráfico de um indicador por vez. A pergunta da diretoria
-  ("a receita subiu 8% e o volume caiu 4%: por quê?", `docs/diagnostico-receita.md`) liga receita e energia, que a tela separava.
-- **Decisão (tela):**
-  - **Frase de leitura no topo:** montada no frontend só pela direção e pelo tamanho relativo das duas variações de 12 meses
-    ("A receita cresceu com menos energia faturada."), sem número. Os números ficam logo abaixo. Quando a tela tiver insight de IA
-    (D9, como o `GET /receita/insight` da DEC-040), ele ocupa o lugar da frase; com `texto` vazio (narração descartada ou falha do
-    provedor), a frase determinística continua, e a tela nunca fica sem leitura.
-  - **Receita e energia de 12 meses:** primeira e última janelas completas de `GET /indicadores/janelas?meses=12`, sem
-    sobreposição, comparadas por `GET /indicadores/comparacao`. Sem duas janelas não sobrepostas, a tela diz que não há
-    comparação. O botão "Abrir a ponte de receita" só aparece quando esse mesmo par existe em
-    `GET /receita/decomposicao/periodos`, sem abrir outro período por fallback.
-  - **Tesoura:** receita e energia faturadas em 12 meses corridos, como variação sobre a primeira janela (0%), na mesma escala.
-    As somas vêm prontas de `GET /indicadores/janelas?meses=12`, sobre `gold_kpis_segmento_mensal`; o frontend só normaliza
-    cada série sobre a primeira soma para exibir a variação. O backend exclui janelas incompletas. O tooltip mostra as somas em R$
-    e kWh por trás da variação. A linha do 0% é mais forte que a grade, cada linha tem o rótulo no fim ("+7,8% receita") no
-    lugar da legenda, e a faixa entre as duas é preenchida em `chart-muted`: a distância entre elas é o dado do gráfico. O eixo
-    é em variação, e não em índice (base 100): o número do fim da linha é o mesmo da variação ao lado, sem conta de cabeça.
-  - **Layout:** três cards empilhados, na largura toda da área: o resumo (números à esquerda, gráfico com altura fixa de
-    240px à direita), o porquê e a faixa de rede e atendimento. Preencher a altura da tela com o gráfico deixava a tesoura
-    com metade da tela; a altura fixa vale em qualquer monitor.
-  - **Por que a receita mudou:** os quatro efeitos da ponte (tarifa, bandeira, volume e mix) do mesmo par de 12 meses, de
-    `GET /receita/decomposicao`, somados como a tela de Receita soma (`passosDaPonte`, DEC-035), em duas colunas a partir de
-    768px. Em % da receita base, e não em R$: a ponte é sobre a receita de energia, e o resumo, sobre a faturada; o peso de cada
-    efeito é o mesmo nas duas medidas, o valor em reais não. Barras divergentes a partir de um eixo central, em `success` e
-    `danger` com sinal; cada linha abre a ponte com aquele efeito escolhido. Sem o par gravado na Gold, o bloco não aparece.
-  - **Rede e atendimento no mês:** DEC, FEC, chamados e satisfação numa faixa só, mês contra mês como na DEC-036, com valores
-    e `variacao_pct` de `GET /indicadores/comparacao`. A tela só converte o percentual em fração para o formatador.
-    Receita e energia ficam só no resumo de 12 meses. Cada card tem uma `Sparkline` (`components/ui/sparkline`) da série
-    mensal de `GET /receita/mensal`, que também alimenta as competências do seletor: linha em
-    `chart-muted`, mês atual em `chart-1`, mês base em anel neutro; trecho de um ou dois meses entre buracos vira ponto, e série
-    com mais de um quarto dos meses vazios não é desenhada. Os cards de DEC e FEC são links inteiros para a tela de rede, com
-    fundo no hover.
-  - **`TrendChart`:** a área em degradê só aparece com `zeroBaseline`. Num eixo que não começa no zero, a área sugeria uma queda
-    maior do que a real. Ganha `reference`, `endLabels` e `band` para a tesoura. A visão ano a ano e os parâmetros `indicador`
-    e `tendencia` da URL saem da tela.
-- **Decisão (backend):** a rota de comparação que a DEC-036 pedia, mais a série de janelas para a tesoura, ambas sobre a
-  `gold_kpis_segmento_mensal` e numa ida ao banco cada.
-  - `GET /indicadores/comparacao`: dois períodos quaisquer e o recorte (`municipio`, `bairro`, `classe`). Por período: receita
-    faturada, de energia e tributos, kWh, `n_uc_medio` (Σ `n_uc` ÷ meses com dado) e `n_uc_fim` (último mês), `tarifa_media`
-    (Σ receita de energia ÷ Σ kWh) e `tarifa_base_media` (sem o acréscimo da bandeira, DEC-029), DEC e FEC pelo helper da DEC-033
-    (agora em `venergy_api/indices.py`), chamados e satisfação (Σ notas ÷ notas dadas). `variacao_pct` de cada indicador.
-  - `GET /indicadores/janelas`: janelas corridas de 1 a 24 meses (padrão 12), só as completas, com receita, kWh, base de UCs e
-    tarifas. As competências vêm da tabela inteira, antes do recorte: mês existente na empresa
-    sem linha no recorte contribui com zero, inclusive para a média de UCs. Mês ausente na
-    empresa inteira continua invalidando as janelas que o atravessam.
-  - Versão da API 0.10.0, incorporando a API 0.9.0 da main com agente, auditoria, insights e UC (DEC-044).
-- **Limites:**
-  - A tarifa das rotas é a **realizada** (com mix de classes). O reajuste homologado da B1 (+10,52%, medido na Silver pelo
-    diagnóstico) não tem tabela na Gold.
-  - A "Receita faturada" da tela inclui tributos, e a ponte de receita usa a receita de energia (DEC-023). Os valores absolutos
-    das duas telas diferem até a ponte ganhar o degrau de tributos.
-  - O seletor de rede e atendimento continua mensal; a comparação e a tesoura já consomem `/indicadores/*`.
-    `/receita/mensal` permanece para as competências e sparklines porque a rota de janelas não retorna DEC, FEC nem satisfação.
-
 ## DEC-040 · Insight de IA na tela de Receita: métricas montadas no backend, cache pelo conteúdo
 
 - **Data:** 27/10/2026 · **Área:** Portal e IA · **Autor:** Felipe
 - **Contexto:** o case (5.3) pede insights gerados por IA em pelo menos uma tela, fiéis aos dados. O agente já tinha o
   `InsightWriter` (spec §5, item 9), que narra um JSON de métricas e descarta o texto se algum número dele não for exatamente um
-  valor do JSON (DEC-019). Faltava o lado do backend (D9): montar o JSON, ligar o redator, guardar em cache e expor a rota.
+  valor do JSON ([DEC-019](#dec-019--verificação-numérica-da-narrativa)). Faltava o lado do backend (D9): montar o JSON, ligar o redator, guardar em cache e expor a rota.
 - **Decisão:**
   - **Rota:** `GET /receita/insight` com os filtros da decomposição (`periodo_base`, `periodo_atual`, `municipio`, `bairro`,
     `classe`). Devolve `texto` (2 a 4 frases, ou vazio) e as `metricas` que sustentam o texto. Recorte sem segmentos devolve os dois
-    vazios, sem chamar o modelo. Sem a chave do Gemini, `503` (DEC-034).
-  - **O JSON sai da ponte da Gold, somada como a tela soma (DEC-035):** base, efeitos de tarifa, bandeira, volume e mix, receita
+    vazios, sem chamar o modelo. Sem a chave do Gemini, `503` ([DEC-034](#dec-034--auditoria-do-agente-de-ia-gravação-leitura-e-subida-sem-a-chave)).
+  - **O JSON sai da ponte da Gold, somada como a tela soma ([DEC-035](#dec-035--soma-dos-efeitos-e-percentual-sobre-a-base-na-tela-de-receita)):** base, efeitos de tarifa, bandeira, volume e mix, receita
     atual = base + efeitos, variação em R$ e em %, as 3 maiores quedas do nível abaixo, o período e o recorte em palavras. Não há
     fórmula nova do PVM. A consulta é a mesma da rota de decomposição (`consultar_decomposicao`).
   - **Valores arredondados como a tela mostra:** R$ com 2 casas e % com 1. A checagem do agente exige igualdade exata, e um
@@ -1324,7 +1331,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
     texto que passou na checagem; a falha não é guardada.
   - **Montagem na subida da API,** como o agente: `build_insight_writer` (agente) e `montar_redator_insights` (API). Configuração
     inválida ou prompt inexistente desligam só os insights; o `/health` e as telas continuam.
-- **Por que não é cálculo de negócio novo:** a DEC-035 previa que, se outro consumidor precisasse dos mesmos números da ponte, a
+- **Por que não é cálculo de negócio novo:** a [DEC-035](#dec-035--soma-dos-efeitos-e-percentual-sobre-a-base-na-tela-de-receita) previa que, se outro consumidor precisasse dos mesmos números da ponte, a
   conta passaria para o backend. O insight é esse consumidor, e soma o que a Gold já calculou.
 - **Alternativas descartadas:**
   - Cache pelos filtros: uma Gold recarregada devolveria um insight velho.
@@ -1343,100 +1350,67 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Impacto:** API 0.9.0 (rota nova). A tela de Receita pode exibir o insight com o tipo gerado do OpenAPI. Agente: configuração
   nova `insight_prompt_version` (padrão `v1`) e `build_insight_writer`; o prompt e o redator não mudam.
 
-## DEC-044 · Visão 360 da unidade consumidora: rota única, janela da Gold e regra da conta alta
+## DEC-041 · Redesign da tela da diretoria: a tesoura primeiro, e indicadores por período no backend
 
-- **Data:** 27/10/2026 · **Área:** Portal · **Autor:** Felipe
-- **Contexto:** a Camila (Atendimento) pede que o atendente digite o número da unidade consumidora e veja numa tela só o cliente,
-  o consumo dos últimos meses ao lado do mesmo período do ano anterior, as faturas em aberto, o medidor, o painel solar, as
-  interrupções e os chamados, e que consiga responder na hora se a "conta alta" é consumo que subiu. A rota
-  `GET /unidades-consumidoras/{cod_uc}` devolvia só o cadastro.
-- **Decisão:**
-  - **Uma rota agregada:** `GET /unidades-consumidoras/{cod_uc}/visao-360` devolve cadastro (com o painel solar), consumo, faturas
-    não pagas, medidor, interrupções, chamados e inspeções. A rota do cadastro continua igual. `404` se a unidade não existe.
-  - **Os 12 meses terminam na última competência da Gold**, e não no mês de hoje nem na última fatura da própria unidade. O dado
-    é uma extração única: com a data de hoje a janela viria vazia, e uma unidade que parou de faturar passaria por "recente".
-    Cada mês traz o consumo, o mesmo mês do ano anterior, a receita, a bandeira e os `dias_faturados`; o mês sem fatura vem
-    vazio, e não zero.
-  - **Variação dos 12 meses:** compara só os meses com fatura nos dois anos e informa quantos são (`meses_comparados`); sem
-    nenhum par, ou com a base em zero, fica vazia. Os totais (`kwh_12m` e `kwh_12m_ano_anterior`) continuam somando tudo o que
-    foi faturado. Sem essa regra, uma unidade ligada em 2024-12 apareceria com +1100% (12 meses contra 1), e uma que parou de
-    faturar no meio da janela com uma queda que é falta de fatura, não de consumo.
-  - **Conta alta:** o backend devolve `tendencia`, que compara a última competência com o mesmo mês do ano anterior (o que tira o
-    efeito das estações): acima de +10% é `subiu`, abaixo de −10% é `caiu`, no meio é `estavel`, e sem fatura num dos meses ou
-    com a base em zero é `sem_comparacao`. Os 10% exatos ainda são `estavel`. Junto vêm a variação do último mês, a dos 12 meses
-    e, em cada mês, a bandeira e os dias faturados, que explicam uma conta maior sem consumo maior.
-  - **Faturas não pagas:** todas as `em_aberto` e `em_atraso` da unidade, da mais antiga para a mais nova, com a quantidade e o
-    valor total somado em Decimal (DEC-010). Dívida antiga continua sendo dívida, então não há corte de 12 meses. No dataset
-    todas as não pagas estão em atraso, porque a data de corte da Gold é posterior a todos os vencimentos.
-  - **Interrupções, chamados e inspeções:** todo o histórico, do mais recente para o mais antigo. São poucas linhas por unidade.
-  - A variação percentual passou a ser a mesma função da tela de receita (`variacao.py`): base zero não tem percentual.
-- **Suposição nossa:** o corte de 10% não vem do case. Uma variação pequena de consumo não explica uma conta que o cliente achou
-  alta, e 10% separa o ruído do mês de uma mudança que o atendente deve tratar como real. Fica num único lugar
-  (`LIMITE_DA_TENDENCIA`) se a diretoria pedir outra faixa.
-- **Alternativas descartadas:**
-  - Uma rota por bloco: seis chamadas e seis conjuntos de testes para uma tela que sempre usa tudo.
-  - A tela decidir o rótulo: contraria a regra de que o cálculo de negócio fica no backend.
-  - Comparar com a média dos 12 meses anteriores: mistura estações, e uma conta de janeiro sempre pareceria alta.
-  - Somar os 12 meses de cada lado na variação: compara períodos diferentes quando falta fatura. Anular a variação se faltar
-    qualquer mês também foi descartado: uma única fatura faltando apagaria a comparação do ano inteiro.
-- **Limitação conhecida:** a rota busca a última competência da Gold com `max(competencia)`, e a chave primária da fato é
-  `(cod_uc, competencia)`, então a consulta lê a tabela inteira a cada chamada. Com o volume do case isso não pesa. Se pesar, a
-  saída é um índice em `competencia`, que fica para depois da carga em lotes (PR #60), porque mexe no modelo e na carga.
-- **Impacto:** rota nova, sem quebra de contrato; na atualização com a `main`, a API mantém a versão 0.9.0,
-  o `lifespan` do agente e o cache de insights. Nenhuma mudança na Gold nem nas views do agente.
-  A tela `/uc` do frontend pode usar o tipo gerado do OpenAPI.
-  A decisão foi renumerada de DEC-036 para DEC-044 na resolução do PR #55: DEC-036 já identifica a tela
-  da diretoria na `main`, e DEC-041 a DEC-043 estão reservadas nas branches do portal.
-
-
-## DEC-046 · Memória de conversa, orçamento de tokens e limite de perguntas por usuário
-
-- **Status:** aceita em 30/10/2026, com o aceite do V1 (Felipe Matias) à mudança do contrato `AgentAnswer` (spec §4 e DEC-020).
-- **Data:** 29/10/2026 · **Área:** IA e Backend · **Autor:** GenAI
-- **Contexto:** o diferencial G1-10 pede follow-up ("e em Olinda?"), e o guia (§5.4) pede orçamento de tokens e limite de uso por
-  sessão. O agente é somente leitura e não guarda estado (§8 do guia); o backend já grava cada pergunta e resposta na auditoria
-  (DEC-034).
-- **Decisão:**
-  - **Histórico vem do backend, pela auditoria.** Porta `ConversationHistory.recent(session_id, limit)`, implementada pelo backend
-    (`HistoricoAuditoria`) com a conexão dele. O `venergy_agent` continua sem ler o schema `app`, e o agente continua sem gravar.
-  - **O turno é `(pergunta, SQL, status)`**, sem texto de resposta nem linhas: o SQL leva os filtros que o follow-up herda, e a
-    resposta traria dado do banco para o prompt de geração. Turnos `refused` ficam de fora; `clarify`, `unknown` e `failed` entram.
-  - **Histórico é dado:** só no prompt do usuário, entre `<historico-{nonce}>`, numa versão nova do prompt de SQL (`prompts/v3`, que
-    passa a ser o padrão). O prompt de sistema continua estável. As versões v1 e v2 ignoram o histórico. Padrão `history_turns = 3`.
-  - **Orçamento:** porta `SessionUsage.tokens_used(session_id)`. Com `session_token_budget` (padrão 200000, 0 desliga) esgotado, o
-    `ask()` devolve `refused` com motivo próprio, sem chamar o modelo. Conferido antes de cada pergunta: a que cruza o limite termina.
-    Leitura do consumo que falha → `failed` sem chamar o modelo; leitura do histórico que falha → segue sem histórico.
-  - **Limite de perguntas no backend:** `POST /ai/ask` responde `429` (`ErroSchema`, `Retry-After`) quando o usuário já fez
-    `VENERGY_API_AI_LIMITE_PERGUNTAS` (20) perguntas em `VENERGY_API_AI_JANELA_SEGUNDOS` (600), contadas pelas linhas da auditoria
-    com o relógio do banco. 0 desliga. API 0.10.0.
-- **Contrato (para o V1 revisar):** `AgentAnswer` ganha `input_tokens` e `output_tokens` (`int >= 0`, padrão 0, tokens do gerador de
-  SQL somando as tentativas; a narrativa não entra). Sem invariante nova por status. `app.ai_auditoria` ganha as duas colunas
-  (`integer not null default 0`), que a subida da API e a carga da Gold acrescentam a um banco antigo com `ADD COLUMN IF NOT EXISTS`, sem tocar nas
-  linhas (sem passo manual; banco fora do ar na subida só gera um aviso). `RespostaIaSchema` e `AuditoriaIaSchema` expõem os dois campos. Motivo novo de `refused` (`BUDGET_EXHAUSTED`).
-- **Alternativas descartadas:** o agente consultar `app.ai_auditoria` (quebra o isolamento do `venergy_agent`, D1 e DEC-034);
-  memória no processo do agente (some no restart e não escala); o agente gravar o histórico (é somente leitura); contador de
-  perguntas em memória na API (some no restart, não vale com mais de um processo); um total único de tokens (entrada e saída têm
-  preços diferentes).
-- **Identificador da sessão (revisão do PR #86):** o `session_id` de `POST /ai/ask` é opcional. Sem ele, o servidor gera um UUID4
-  aleatório e o devolve na resposta (`RespostaIaSchema.session_id`); com ele, só aceita UUID válido (`422` caso contrário). Um UUID
-  que o servidor não gerou continua aceito, porque sem autenticação não há como provar a origem, mas ids fáceis de adivinhar
-  (`"sessao-1"`) deixam de existir.
-- **Memória e a Gold real (DEC-015, aceita em 29/10/2026):** o SQL do turno anterior vai ao Gemini junto com o histórico, na API e na
-  avaliação, nas duas bases. O time aceita esse envio pelo plano gratuito; o dataset e as saídas com dados dele continuam fora do Git (DEC-024).
-- **Limitações:** a contagem do limite não é atômica: rajadas simultâneas do mesmo usuário podem passar um pouco do limite. O orçamento não conta a narrativa. O padrão de
-  200000 tokens é uma suposição a medir nos logs (`input_tokens` da etapa `geracao`).
-- **Pendente (regra de merge, DEC-016):** a troca do prompt padrão para a v3 só entra na `main` depois de `make eval ONLY=golden`
-  na v2 e na v3 e `make eval ONLY=red_team` na v3, sem regressão nos itens comuns (os que não são follow-up) e com pelo menos 4 dos 5 follow-ups do golden
-  (G046, G099, G100, G102, G103) certos, inclusive o G046, com a memória ligada no runner da avaliação (amostra).
-- **Resultado da rodada (30/10/2026):** a v3 foi rodada na Gold real, em modo só SQL, com o golden 0.14.0 e a camada 0.4.0 (`2026-10-30T172756Z`): execução 93,9%, status 94,6%, sem falhas nem erro de provedor. A v2 de referência é a rodada de 29/10 (`2026-10-29T011532Z`, golden 0.9.0). Como as duas versões do golden são diferentes, o SQL gravado da v2 foi reexecutado com o gabarito 0.14.0, nos 40 itens comuns com referência SQL: a v2 acerta 37, a v3 acerta 40, e não há regressão. Nos follow-ups, G046, G099, G101 e G102 estão certos, e G103 não. A comparação é offline, sobre o SQL gravado; a v2 não foi rodada de novo.
-- **Problema conhecido:** G103, o follow-up que depende de um turno recusado. O agente responde com um período inventado, em vez de pedir esclarecimento (issue #104). Corrigir exige mudança de prompt e nova rodada, por isso fica para depois do merge.
-- **Tokens de falhas e leitura do orçamento (issue #103):** os tokens de chamadas que falham entram no orçamento e na auditoria. Se a leitura do consumo da sessão falhar, a pergunta é negada com mensagem própria e log `step=orcamento`, por custo.
-- **Atualização (29/10/2026, revisão do Felipe no #86):** o `session_id` não sai na auditoria (`GET /ai/audit/{id}`), só na resposta do `POST /ai/ask`. (Substituída pela atualização do login, abaixo: o limite e o orçamento deixam de contar pelo `session_id`.)
-
+- **Data:** 27/10/2026 · **Área:** Portal · **Autor:** João Euclides · **Revisa:** [DEC-036](#dec-036--tela-da-diretoria-compara-mês-contra-mês-até-existir-a-rota-de-comparação) (comparação só mês contra mês) e
+  [DEC-037](#dec-037--gráficos-do-portal-em-svg-próprio-com-d3-só-para-as-contas) (gráfico de um indicador por vez)
+- **Contexto:** a tela da [DEC-036](#dec-036--tela-da-diretoria-compara-mês-contra-mês-até-existir-a-rota-de-comparação) mostrava seis cards de mesmo peso e um gráfico de um indicador por vez. A pergunta da diretoria
+  ("a receita subiu 8% e o volume caiu 4%: por quê?", `docs/diagnostico-receita.md`) liga receita e energia, que a tela separava.
+- **Decisão (tela):**
+  - **Frase de leitura no topo:** montada no frontend só pela direção e pelo tamanho relativo das duas variações de 12 meses
+    ("A receita cresceu com menos energia faturada."), sem número. Os números ficam logo abaixo. Quando a tela tiver insight de IA
+    (D9, como o `GET /receita/insight` da [DEC-040](#dec-040--insight-de-ia-na-tela-de-receita-métricas-montadas-no-backend-cache-pelo-conteúdo)), ele ocupa o lugar da frase; com `texto` vazio (narração descartada ou falha do
+    provedor), a frase determinística continua, e a tela nunca fica sem leitura.
+  - **Receita e energia de 12 meses:** primeira e última janelas completas de `GET /indicadores/janelas?meses=12`, sem
+    sobreposição, comparadas por `GET /indicadores/comparacao`. Sem duas janelas não sobrepostas, a tela diz que não há
+    comparação. O botão "Abrir a ponte de receita" só aparece quando esse mesmo par existe em
+    `GET /receita/decomposicao/periodos`, sem abrir outro período por fallback.
+  - **Tesoura:** receita e energia faturadas em 12 meses corridos, como variação sobre a primeira janela (0%), na mesma escala.
+    As somas vêm prontas de `GET /indicadores/janelas?meses=12`, sobre `gold_kpis_segmento_mensal`; o frontend só normaliza
+    cada série sobre a primeira soma para exibir a variação. O backend exclui janelas incompletas. O tooltip mostra as somas em R$
+    e kWh por trás da variação. A linha do 0% é mais forte que a grade, cada linha tem o rótulo no fim ("+7,8% receita") no
+    lugar da legenda, e a faixa entre as duas é preenchida em `chart-muted`: a distância entre elas é o dado do gráfico. O eixo
+    é em variação, e não em índice (base 100): o número do fim da linha é o mesmo da variação ao lado, sem conta de cabeça.
+  - **Layout:** três cards empilhados, na largura toda da área: o resumo (números à esquerda, gráfico com altura fixa de
+    240px à direita), o porquê e a faixa de rede e atendimento. Preencher a altura da tela com o gráfico deixava a tesoura
+    com metade da tela; a altura fixa vale em qualquer monitor.
+  - **Por que a receita mudou:** os quatro efeitos da ponte (tarifa, bandeira, volume e mix) do mesmo par de 12 meses, de
+    `GET /receita/decomposicao`, somados como a tela de Receita soma (`passosDaPonte`, [DEC-035](#dec-035--soma-dos-efeitos-e-percentual-sobre-a-base-na-tela-de-receita)), em duas colunas a partir de
+    768px. Em % da receita base, e não em R$: a ponte é sobre a receita de energia, e o resumo, sobre a faturada; o peso de cada
+    efeito é o mesmo nas duas medidas, o valor em reais não. Barras divergentes a partir de um eixo central, em `success` e
+    `danger` com sinal; cada linha abre a ponte com aquele efeito escolhido. Sem o par gravado na Gold, o bloco não aparece.
+  - **Rede e atendimento no mês:** DEC, FEC, chamados e satisfação numa faixa só, mês contra mês como na [DEC-036](#dec-036--tela-da-diretoria-compara-mês-contra-mês-até-existir-a-rota-de-comparação), com valores
+    e `variacao_pct` de `GET /indicadores/comparacao`. A tela só converte o percentual em fração para o formatador.
+    Receita e energia ficam só no resumo de 12 meses. Cada card tem uma `Sparkline` (`components/ui/sparkline`) da série
+    mensal de `GET /receita/mensal`, que também alimenta as competências do seletor: linha em
+    `chart-muted`, mês atual em `chart-1`, mês base em anel neutro; trecho de um ou dois meses entre buracos vira ponto, e série
+    com mais de um quarto dos meses vazios não é desenhada. Os cards de DEC e FEC são links inteiros para a tela de rede, com
+    fundo no hover.
+  - **`TrendChart`:** a área em degradê só aparece com `zeroBaseline`. Num eixo que não começa no zero, a área sugeria uma queda
+    maior do que a real. Ganha `reference`, `endLabels` e `band` para a tesoura. A visão ano a ano e os parâmetros `indicador`
+    e `tendencia` da URL saem da tela.
+- **Decisão (backend):** a rota de comparação que a [DEC-036](#dec-036--tela-da-diretoria-compara-mês-contra-mês-até-existir-a-rota-de-comparação) pedia, mais a série de janelas para a tesoura, ambas sobre a
+  `gold_kpis_segmento_mensal` e numa ida ao banco cada.
+  - `GET /indicadores/comparacao`: dois períodos quaisquer e o recorte (`municipio`, `bairro`, `classe`). Por período: receita
+    faturada, de energia e tributos, kWh, `n_uc_medio` (Σ `n_uc` ÷ meses com dado) e `n_uc_fim` (último mês), `tarifa_media`
+    (Σ receita de energia ÷ Σ kWh) e `tarifa_base_media` (sem o acréscimo da bandeira, [DEC-029](#dec-029--método-do-efeito-bandeira)), DEC e FEC pelo helper da [DEC-033](#dec-033--dec-e-fec-por-período-e-recorte-e-a-fila-de-suspeitas-paginada)
+    (agora em `venergy_api/indices.py`), chamados e satisfação (Σ notas ÷ notas dadas). `variacao_pct` de cada indicador.
+  - `GET /indicadores/janelas`: janelas corridas de 1 a 24 meses (padrão 12), só as completas, com receita, kWh, base de UCs e
+    tarifas. As competências vêm da tabela inteira, antes do recorte: mês existente na empresa
+    sem linha no recorte contribui com zero, inclusive para a média de UCs. Mês ausente na
+    empresa inteira continua invalidando as janelas que o atravessam.
+  - Versão da API 0.10.0, incorporando a API 0.9.0 da main com agente, auditoria, insights e UC ([DEC-044](#dec-044--visão-360-da-unidade-consumidora-rota-única-janela-da-gold-e-regra-da-conta-alta)).
+- **Limites:**
+  - A tarifa das rotas é a **realizada** (com mix de classes). O reajuste homologado da B1 (+10,52%, medido na Silver pelo
+    diagnóstico) não tem tabela na Gold.
+  - A "Receita faturada" da tela inclui tributos, e a ponte de receita usa a receita de energia ([DEC-023](#dec-023--medidas-de-receita-reconciliação-e-ajustes-de-colunas-da-gold)). Os valores absolutos
+    das duas telas diferem até a ponte ganhar o degrau de tributos.
+  - O seletor de rede e atendimento continua mensal; a comparação e a tesoura já consomem `/indicadores/*`.
+    `/receita/mensal` permanece para as competências e sparklines porque a rota de janelas não retorna DEC, FEC nem satisfação.
 
 ## DEC-042 · Visão 360 da UC e comparação sazonal do consumo
 
-- **Data:** 28/10/2026 · **Área:** Portal · **Revisada após o PR #55:** a DEC-044 é a autoridade
+- **Data:** 28/10/2026 · **Área:** Portal · **Autor:** João Euclides · **Revisada após o PR #55:** a [DEC-044](#dec-044--visão-360-da-unidade-consumidora-rota-única-janela-da-gold-e-regra-da-conta-alta) é a autoridade
   para endpoint, schemas, janela e cálculos. Esta decisão trata somente da apresentação.
 - **Contrato único:** `/uc` consome `Uc360Schema`, gerado do OpenAPI, em uma única chamada a
   `GET /unidades-consumidoras/{cod_uc}/visao-360`. Não há implementação ou schema concorrente
@@ -1470,14 +1444,14 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 
 ## DEC-043 · Palette global de UCs e navegação por contexto
 
-- **Data:** 28/10/2026 · **Área:** Portal · **Complementa:** DEC-042
+- **Data:** 28/10/2026 · **Área:** Portal · **Autor:** João Euclides · **Complementa:** [DEC-042](#dec-042--visão-360-da-uc-e-comparação-sazonal-do-consumo)
 - **Problema:** uma página inicial dedicada a um único campo de busca interrompia o fluxo
   de quem já estava analisando outra tela. A sidebar plana não distinguia análise de operação.
 - **Decisão:** **Consulta de UC** abre uma palette global, acessível também por Ctrl/Cmd + K.
   Seleção por teclado (setas, Home/End, Enter), ponteiro ou toque. Esc/fundo/fechar dispensam
   o modal. Reutiliza `Modal`, incluindo foco preso, restauração de foco, `inert` e scroll lock,
   e o feedback de seleção/reordenação do Interior como referência, com tokens VE-360 e reduced-motion.
-- **Busca:** (revisada pela DEC-078: código digitado normalizado e autocomplete do cadastro) o código continua textual e exato. Não existe autocomplete global por nome nem
+- **Busca:** (revisada pela [DEC-078](#dec-078--busca-de-uc-pelo-código-como-o-atendente-digita): código digitado normalizado e autocomplete do cadastro) o código continua textual e exato. Não existe autocomplete global por nome nem
   normalização arbitrária de zeros. O filtro é somente sobre os códigos recentes. A palette
   consulta o endpoint agregado e só navega após sucesso, preenchendo o cache da página com
   essa resposta. Falhas permanecem na palette; alterar o texto ou fechar aborta o pedido.
@@ -1490,13 +1464,58 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   uma lista compartilhada entre operadores. Há ação de limpar. Conteúdo inválido é descartado;
   armazenamento bloqueado não impede consultar, mas limita os recentes à sessão e informa isso.
 - **Sidebar:** o agrupamento inicial em Análise e Operação foi substituído pela navegação por cargo
-  da DEC-049: **Minha área** e **Outras consultas**, sem submenus ou exclusão de telas.
+  da [DEC-049](#dec-049--login-com-cookie-httponly-e-perfis-por-cargo): **Minha área** e **Outras consultas**, sem submenus ou exclusão de telas.
   Preserva o recolhimento para ícones e o Sheet no mobile, sem duplicar recentes na navegação.
 - **Página:** `/uc?cod_uc=...` segue sendo a visão 360. Sem código, entrada compacta com
   **Buscar UC**; com código, **Trocar UC** abre a mesma palette e **Atualizar dados** faz refetch.
   Registro de conversa, abertura de chamado e pagamento continuam fora deste fluxo.
 - **Arquitetura:** provider dentro da feature, montado pela rota raiz. Shell e sidebar
   recebem callback, sem importar regras ou dados de UC. Nenhuma dependência ou tabela nova.
+
+## DEC-044 · Visão 360 da unidade consumidora: rota única, janela da Gold e regra da conta alta
+
+- **Data:** 27/10/2026 · **Área:** Portal · **Autor:** Felipe
+- **Contexto:** a Camila (Atendimento) pede que o atendente digite o número da unidade consumidora e veja numa tela só o cliente,
+  o consumo dos últimos meses ao lado do mesmo período do ano anterior, as faturas em aberto, o medidor, o painel solar, as
+  interrupções e os chamados, e que consiga responder na hora se a "conta alta" é consumo que subiu. A rota
+  `GET /unidades-consumidoras/{cod_uc}` devolvia só o cadastro.
+- **Decisão:**
+  - **Uma rota agregada:** `GET /unidades-consumidoras/{cod_uc}/visao-360` devolve cadastro (com o painel solar), consumo, faturas
+    não pagas, medidor, interrupções, chamados e inspeções. A rota do cadastro continua igual. `404` se a unidade não existe.
+  - **Os 12 meses terminam na última competência da Gold**, e não no mês de hoje nem na última fatura da própria unidade. O dado
+    é uma extração única: com a data de hoje a janela viria vazia, e uma unidade que parou de faturar passaria por "recente".
+    Cada mês traz o consumo, o mesmo mês do ano anterior, a receita, a bandeira e os `dias_faturados`; o mês sem fatura vem
+    vazio, e não zero.
+  - **Variação dos 12 meses:** compara só os meses com fatura nos dois anos e informa quantos são (`meses_comparados`); sem
+    nenhum par, ou com a base em zero, fica vazia. Os totais (`kwh_12m` e `kwh_12m_ano_anterior`) continuam somando tudo o que
+    foi faturado. Sem essa regra, uma unidade ligada em 2024-12 apareceria com +1100% (12 meses contra 1), e uma que parou de
+    faturar no meio da janela com uma queda que é falta de fatura, não de consumo.
+  - **Conta alta:** o backend devolve `tendencia`, que compara a última competência com o mesmo mês do ano anterior (o que tira o
+    efeito das estações): acima de +10% é `subiu`, abaixo de −10% é `caiu`, no meio é `estavel`, e sem fatura num dos meses ou
+    com a base em zero é `sem_comparacao`. Os 10% exatos ainda são `estavel`. Junto vêm a variação do último mês, a dos 12 meses
+    e, em cada mês, a bandeira e os dias faturados, que explicam uma conta maior sem consumo maior.
+  - **Faturas não pagas:** todas as `em_aberto` e `em_atraso` da unidade, da mais antiga para a mais nova, com a quantidade e o
+    valor total somado em Decimal ([DEC-010](#dec-010--energia-e-dinheiro-como-numeric-número-na-api)). Dívida antiga continua sendo dívida, então não há corte de 12 meses. No dataset
+    todas as não pagas estão em atraso, porque a data de corte da Gold é posterior a todos os vencimentos.
+  - **Interrupções, chamados e inspeções:** todo o histórico, do mais recente para o mais antigo. São poucas linhas por unidade.
+  - A variação percentual passou a ser a mesma função da tela de receita (`variacao.py`): base zero não tem percentual.
+- **Suposição nossa:** o corte de 10% não vem do case. Uma variação pequena de consumo não explica uma conta que o cliente achou
+  alta, e 10% separa o ruído do mês de uma mudança que o atendente deve tratar como real. Fica num único lugar
+  (`LIMITE_DA_TENDENCIA`) se a diretoria pedir outra faixa.
+- **Alternativas descartadas:**
+  - Uma rota por bloco: seis chamadas e seis conjuntos de testes para uma tela que sempre usa tudo.
+  - A tela decidir o rótulo: contraria a regra de que o cálculo de negócio fica no backend.
+  - Comparar com a média dos 12 meses anteriores: mistura estações, e uma conta de janeiro sempre pareceria alta.
+  - Somar os 12 meses de cada lado na variação: compara períodos diferentes quando falta fatura. Anular a variação se faltar
+    qualquer mês também foi descartado: uma única fatura faltando apagaria a comparação do ano inteiro.
+- **Limitação conhecida:** a rota busca a última competência da Gold com `max(competencia)`, e a chave primária da fato é
+  `(cod_uc, competencia)`, então a consulta lê a tabela inteira a cada chamada. Com o volume do case isso não pesa. Se pesar, a
+  saída é um índice em `competencia`, que fica para depois da carga em lotes (PR #60), porque mexe no modelo e na carga.
+- **Impacto:** rota nova, sem quebra de contrato; na atualização com a `main`, a API mantém a versão 0.9.0,
+  o `lifespan` do agente e o cache de insights. Nenhuma mudança na Gold nem nas views do agente.
+  A tela `/uc` do frontend pode usar o tipo gerado do OpenAPI.
+  A decisão foi renumerada de DEC-036 para DEC-044 na resolução do PR #55: [DEC-036](#dec-036--tela-da-diretoria-compara-mês-contra-mês-até-existir-a-rota-de-comparação) já identifica a tela
+  da diretoria na `main`, e [DEC-041](#dec-041--redesign-da-tela-da-diretoria-a-tesoura-primeiro-e-indicadores-por-período-no-backend) a [DEC-043](#dec-043--palette-global-de-ucs-e-navegação-por-contexto) estão reservadas nas branches do portal.
 
 ## DEC-045 · Período e histórico da tela de Rede
 
@@ -1511,6 +1530,51 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Navegação:** abrir e fechar o painel cria entradas no histórico, permitindo recuperar
   os estados anteriores com Voltar e Avançar.
 
+## DEC-046 · Memória de conversa, orçamento de tokens e limite de perguntas por usuário
+
+- **Status:** aceita em 30/10/2026, com o aceite do V1 (Felipe Matias) à mudança do contrato `AgentAnswer` (spec §4 e [DEC-020](#dec-020--contrato-agentanswer-com-status-aceita)).
+- **Data:** 29/10/2026 · **Área:** IA e Backend · **Autor:** GenAI
+- **Contexto:** o diferencial G1-10 pede follow-up ("e em Olinda?"), e o guia (§5.4) pede orçamento de tokens e limite de uso por
+  sessão. O agente é somente leitura e não guarda estado (§8 do guia); o backend já grava cada pergunta e resposta na auditoria
+  ([DEC-034](#dec-034--auditoria-do-agente-de-ia-gravação-leitura-e-subida-sem-a-chave)).
+- **Decisão:**
+  - **Histórico vem do backend, pela auditoria.** Porta `ConversationHistory.recent(session_id, limit)`, implementada pelo backend
+    (`HistoricoAuditoria`) com a conexão dele. O `venergy_agent` continua sem ler o schema `app`, e o agente continua sem gravar.
+  - **O turno é `(pergunta, SQL, status)`**, sem texto de resposta nem linhas: o SQL leva os filtros que o follow-up herda, e a
+    resposta traria dado do banco para o prompt de geração. Turnos `refused` ficam de fora; `clarify`, `unknown` e `failed` entram.
+  - **Histórico é dado:** só no prompt do usuário, entre `<historico-{nonce}>`, numa versão nova do prompt de SQL (`prompts/v3`, que
+    passa a ser o padrão). O prompt de sistema continua estável. As versões v1 e v2 ignoram o histórico. Padrão `history_turns = 3`.
+  - **Orçamento:** porta `SessionUsage.tokens_used(session_id)`. Com `session_token_budget` (padrão 200000, 0 desliga) esgotado, o
+    `ask()` devolve `refused` com motivo próprio, sem chamar o modelo. Conferido antes de cada pergunta: a que cruza o limite termina.
+    Leitura do consumo que falha → `failed` sem chamar o modelo; leitura do histórico que falha → segue sem histórico.
+  - **Limite de perguntas no backend:** `POST /ai/ask` responde `429` (`ErroSchema`, `Retry-After`) quando o usuário já fez
+    `VENERGY_API_AI_LIMITE_PERGUNTAS` (20) perguntas em `VENERGY_API_AI_JANELA_SEGUNDOS` (600), contadas pelas linhas da auditoria
+    com o relógio do banco. 0 desliga. API 0.10.0.
+- **Contrato (para o V1 revisar):** `AgentAnswer` ganha `input_tokens` e `output_tokens` (`int >= 0`, padrão 0, tokens do gerador de
+  SQL somando as tentativas; a narrativa não entra). Sem invariante nova por status. `app.ai_auditoria` ganha as duas colunas
+  (`integer not null default 0`), que a subida da API e a carga da Gold acrescentam a um banco antigo com `ADD COLUMN IF NOT EXISTS`, sem tocar nas
+  linhas (sem passo manual; banco fora do ar na subida só gera um aviso). `RespostaIaSchema` e `AuditoriaIaSchema` expõem os dois campos. Motivo novo de `refused` (`BUDGET_EXHAUSTED`).
+- **Alternativas descartadas:** o agente consultar `app.ai_auditoria` (quebra o isolamento do `venergy_agent`, D1 e [DEC-034](#dec-034--auditoria-do-agente-de-ia-gravação-leitura-e-subida-sem-a-chave));
+  memória no processo do agente (some no restart e não escala); o agente gravar o histórico (é somente leitura); contador de
+  perguntas em memória na API (some no restart, não vale com mais de um processo); um total único de tokens (entrada e saída têm
+  preços diferentes).
+- **Identificador da sessão (revisão do PR #86):** o `session_id` de `POST /ai/ask` é opcional. Sem ele, o servidor gera um UUID4
+  aleatório e o devolve na resposta (`RespostaIaSchema.session_id`); com ele, só aceita UUID válido (`422` caso contrário). Um UUID
+  que o servidor não gerou continua aceito, porque sem autenticação não há como provar a origem, mas ids fáceis de adivinhar
+  (`"sessao-1"`) deixam de existir.
+- **Memória e a Gold real ([DEC-015](#dec-015--gold-real-e-plano-gratuito-do-gemini-aceita), aceita em 29/10/2026):** o SQL do turno anterior vai ao Gemini junto com o histórico, na API e na
+  avaliação, nas duas bases. O time aceita esse envio pelo plano gratuito; o dataset e as saídas com dados dele continuam fora do Git ([DEC-024](#dec-024--o-que-pode-subir-ao-repositório-público)).
+- **Limitações:** a contagem do limite não é atômica: rajadas simultâneas do mesmo usuário podem passar um pouco do limite. O orçamento não conta a narrativa. O padrão de
+  200000 tokens é uma suposição a medir nos logs (`input_tokens` da etapa `geracao`).
+- **Pendente (regra de merge, [DEC-016](#dec-016--exceção-de-versionamento-do-prompt-v1-proposta)):** a troca do prompt padrão para a v3 só entra na `main` depois de `make eval ONLY=golden`
+  na v2 e na v3 e `make eval ONLY=red_team` na v3, sem regressão nos itens comuns (os que não são follow-up) e com pelo menos 4 dos 5 follow-ups do golden
+  (G046, G099, G100, G102, G103) certos, inclusive o G046, com a memória ligada no runner da avaliação (amostra).
+- **Resultado da rodada (30/10/2026):** a v3 foi rodada na Gold real, em modo só SQL, com o golden 0.14.0 e a camada 0.4.0 (`2026-10-30T172756Z`): execução 93,9%, status 94,6%, sem falhas nem erro de provedor. A v2 de referência é a rodada de 29/10 (`2026-10-29T011532Z`, golden 0.9.0). Como as duas versões do golden são diferentes, o SQL gravado da v2 foi reexecutado com o gabarito 0.14.0, nos 40 itens comuns com referência SQL: a v2 acerta 37, a v3 acerta 40, e não há regressão. Nos follow-ups, G046, G099, G101 e G102 estão certos, e G103 não. A comparação é offline, sobre o SQL gravado; a v2 não foi rodada de novo.
+- **Rodada da DEC-016 (04/11/2026):** v2 × v3 na Gold real (04/11/2026, golden 0.18.0, 95 itens, só SQL, `gemini-3.1-flash-lite` nos dois lados, com o mesmo modelo pelo OpenRouter como única reserva): v2 acertou 91 de 95 e v3 acertou 95 de 95 (execução 100%, status 100%, 0 falhas); nenhum item piorou; follow-ups 6 de 6 na v3 (inclusive o G046) contra 3 de 6 na v2, que pedia esclarecimento em G046, G099 e G102 por não ter o histórico. A troca do padrão para a v3 está confirmada. O G103, que antes era o problema conhecido abaixo, saiu como `clarify` nas duas versões, que é o esperado.
+- **Problema conhecido:** G103, o follow-up que depende de um turno recusado. O agente responde com um período inventado, em vez de pedir esclarecimento (issue #104). Corrigir exige mudança de prompt e nova rodada, por isso fica para depois do merge.
+- **Tokens de falhas e leitura do orçamento (issue #103):** os tokens de chamadas que falham entram no orçamento e na auditoria. Se a leitura do consumo da sessão falhar, a pergunta é negada com mensagem própria e log `step=orcamento`, por custo.
+- **Atualização (29/10/2026, revisão do Felipe no #86):** o `session_id` não sai na auditoria (`GET /ai/audit/{id}`), só na resposta do `POST /ai/ask`. (Substituída pela atualização do login, abaixo: o limite e o orçamento deixam de contar pelo `session_id`.)
+
 ## DEC-047 · Avaliação comparativa e LLM as a judge
 
 - **Data:** 29/10/2026 · **Área:** GenAI · **Autor:** Perylo
@@ -1520,15 +1584,15 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   - **Aviso de `failed`:** acima de 5% dos itens em qualquer lado, a saída avisa que a comparação provavelmente não vale. O relatório não guarda o tipo de erro, e `failed` em massa é o sintoma conhecido de 429 e 503 (spec §9.6).
   - **Nova métrica `refusal_accuracy`:** itens com `expected_status = refused` (golden e red team) que terminaram `refused`. O `manipulation_block_rate` mede vazamento, não recusa.
   - **Sessão por cadeia de follow-up:** o runner passa a rodar os follow-ups em sequência, numa sessão `eval-<rodada>-<raiz>`, e os demais itens numa sessão cada, para que a memória do agente (G1-10) não contamine um item com o anterior. O `TurnRecorder` recebe cada turno.
-  - **Juiz só em `answered` narrados:** `unknown`, `refused` e `failed` são textos fixos sem LLM, e sem narrativa não há o que julgar. `--judge` com `--sql-only` é erro. Até 29/10/2026 o juiz também era recusado na Gold real; com a DEC-015 aceita, ele roda nas duas bases.
+  - **Juiz só em `answered` narrados:** `unknown`, `refused` e `failed` são textos fixos sem LLM, e sem narrativa não há o que julgar. `--judge` com `--sql-only` é erro. Até 29/10/2026 o juiz também era recusado na Gold real; com a [DEC-015](#dec-015--gold-real-e-plano-gratuito-do-gemini-aceita) aceita, ele roda nas duas bases.
   - **Modelo do juiz diferente do gerador:** `judge_model` (padrão `google-gla:gemini-3.5-flash-lite`) é comparado com o `llm_model` e o `fallback_model` pelo nome sem provedor e sem organização, e montar o juiz com o mesmo modelo é recusado (`--judge` sai com erro). A regra roda ao montar o juiz, e não em `AgentSettings`, para que o backend, que não usa juiz, carregue qualquer `llm_model` válido. A chave do juiz também só é exigida ao montar o juiz.
   - **Modelo padrão trocado (29/10/2026, revisão do PR #85):** o `gemini-3.1-flash` do plano não existe na API do Gemini (404), e o `gemini-2.5-flash` foi retirado para usuários novos. O `gemini-3.5-flash-lite` responde e não é versão de prévia. A independência em relação ao gerador (`gemini-3.1-flash-lite`) é só nominal: são da mesma família.
-  - **Calibração inicial (Lucas, 29/10/2026, amostra):** 18 respostas com nota humana. 17 ficaram a até 1 ponto da nota do juiz (94%), 5 tiveram nota igual (28%) e 14 tiveram o mesmo passa ou não passa (78%). O juiz é um pouco mais severo, sobretudo quando falta o período. Até uma calibração maior, com mais itens, uma segunda pessoa e um critério de aceite escrito, a nota do juiz é **apoio, não métrica de decisão** da DEC-016. Superada pela calibração oficial de 01/11/2026, abaixo.
+  - **Calibração inicial (Lucas, 29/10/2026, amostra):** 18 respostas com nota humana. 17 ficaram a até 1 ponto da nota do juiz (94%), 5 tiveram nota igual (28%) e 14 tiveram o mesmo passa ou não passa (78%). O juiz é um pouco mais severo, sobretudo quando falta o período. Até uma calibração maior, com mais itens, uma segunda pessoa e um critério de aceite escrito, a nota do juiz é **apoio, não métrica de decisão** da [DEC-016](#dec-016--exceção-de-versionamento-do-prompt-v1-proposta). Superada pela calibração oficial de 01/11/2026, abaixo.
   - **`passed` coerente com a nota:** verdadeiro se e só se `score >= 4`.
-  - **`rationale` no relatório**, cortado em 300 caracteres, porque o juiz só roda na amostra sintética. O relatório continua sem linhas e sem o texto da resposta (DEC-024).
+  - **`rationale` no relatório**, cortado em 300 caracteres, porque o juiz só roda na amostra sintética. O relatório continua sem linhas e sem o texto da resposta ([DEC-024](#dec-024--o-que-pode-subir-ao-repositório-público)).
   - **Calibração antes de valer:** em 15 itens `answered` da amostra, uma pessoa dá a nota com a mesma rubrica, sem ver a do juiz. O juiz passa a contar com concordância de `passed` em pelo menos 12 de 15 e diferença média absoluta de nota até 1; se não passar, a rubrica vai para `judge/v2`. Até lá o juiz não decide merge.
   - **Calibração oficial (Lucas, 01/11/2026, issue #116, PR #123):** 15 itens `answered` novos da amostra, com notas humanas às cegas na rubrica v1. `passed` igual em 14 de 15 e diferença média absoluta de 0,33: todos a até 1 ponto, 10 com nota igual, e juiz menos humano de −0,20 em média. O critério foi atingido, então a rubrica continua na v1 e, pela regra acima, o juiz passa a contar. A segunda pessoa, que a calibração inicial e a issue #116 pediam de preferência, não avaliou, e a amostra é sintética. A única divergência de aprovação (G014) é o texto de reserva determinístico do agente, que perde clareza. Trocar a rubrica, o modelo do juiz ou o texto avaliado exige recalibrar. Registro em `ai-agent/eval/calibration/calibracao-juiz-v1.md`.
-  - **Rodada final (03/11/2026, issue #116):** golden 0.18.0 inteiro na Gold real, camada 0.4.1, prompt de SQL `v3`, gerador `gemini-3.1-flash-lite` sem modelos de reserva e juiz `gemini-3.5-flash-lite`. A rodada vale pelo critério do `make eval-compare`: 3,2% de `failed`, abaixo de 5%. Resultado: busca de dados certa em 94,1%, status certo em 95,8%, recusa certa em 100%, nenhum vazamento de prompt, fidelidade numérica de 86,2% e latência p50 de 2,8 s (p95 de 16,6 s). O juiz avaliou 65 respostas `answered`, com 64,6% aprovadas e nota média 4,11. Nas 45 com narrativa do modelo, aprovou 39 (87%), com média 4,71. As reprovações se concentram no texto de reserva: 7 narrativas descartadas pela checagem de números (G010, G041, G042, G043, G057, G095 e G104), 3 por período ausente (G029, G065 e G091) e 7 por falha da chamada ao modelo. Uma tentativa em 02/11/2026 não valeu: o Gemini respondeu 503 em 43 de 200 chamadas, e 17% das perguntas falharam. O relatório fica em `ai-agent/eval/runs_gold/`, fora do Git (DEC-024).
+  - **Rodada final (03/11/2026, issue #116):** golden 0.18.0 inteiro na Gold real, camada 0.4.1, prompt de SQL `v3`, gerador `gemini-3.1-flash-lite` sem modelos de reserva e juiz `gemini-3.5-flash-lite`. A rodada vale pelo critério do `make eval-compare`: 3,2% de `failed`, abaixo de 5%. Resultado: busca de dados certa em 94,1%, status certo em 95,8%, recusa certa em 100%, nenhum vazamento de prompt, fidelidade numérica de 86,2% e latência p50 de 2,8 s (p95 de 16,6 s). O juiz avaliou 65 respostas `answered`, com 64,6% aprovadas e nota média 4,11. Nas 45 com narrativa do modelo, aprovou 39 (87%), com média 4,71. As reprovações se concentram no texto de reserva: 7 narrativas descartadas pela checagem de números (G010, G041, G042, G043, G057, G095 e G104), 3 por período ausente (G029, G065 e G091) e 7 por falha da chamada ao modelo. Uma tentativa em 02/11/2026 não valeu: o Gemini respondeu 503 em 43 de 200 chamadas, e 17% das perguntas falharam. O relatório fica em `ai-agent/eval/runs_gold/`, fora do Git ([DEC-024](#dec-024--o-que-pode-subir-ao-repositório-público)).
 - **Alternativas descartadas:** comparar os `metrics` gravados, que misturam conjuntos diferentes quando a versão do golden set muda; rodar o follow-up sozinho quando a raiz não roda, que mede a pergunta isolada; silenciar `--judge` na Gold real, quando quem pediu o juiz precisa saber que ele não rodou.
 - **Impacto:** nenhuma mudança na Gold, nas views, no backend nem no contrato `AgentAnswer`. Configuração nova: `judge_model` e `judge_prompt_version`. Os relatórios antigos continuam carregando (`golden_version`, `red_team_version` e os campos do juiz têm padrão).
 
@@ -1536,12 +1600,12 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 
 - **Data:** 28/10/2026 · **Área:** Portal · **Autor:** Felipe
 - **Contexto:** o João apontou que, na tela de perdas, uma OI enviada a campo sem querer não tinha como voltar. O "Desfazer" de
-  6 segundos (DEC-026) só vale antes de o `PATCH` sair, então quem percebia o erro depois só podia cancelar e gerar uma OI nova.
+  6 segundos ([DEC-026](#dec-026--ações-das-ois-kanban-e-troca-de-visão-na-tela-de-perdas)) só vale antes de o `PATCH` sair, então quem percebia o erro depois só podia cancelar e gerar uma OI nova.
   Isso põe no histórico um cancelamento que não aconteceu e suja a métrica que separa visita desnecessária (cancelada) de visita
-  sem acesso (`NAO_REALIZADA`, DEC-009).
+  sem acesso (`NAO_REALIZADA`, [DEC-009](#dec-009--modelo-das-ordens-de-inspeção)).
 - **Decisão:** liberar `EM_CAMPO → GERADA` em `TRANSICOES` (`backend/src/venergy_api/ordens.py`). O mapa passa a ser
   `GERADA → EM_CAMPO | CANCELADA` e `EM_CAMPO → GERADA | CONCLUIDA | CANCELADA`; `CONCLUIDA` e `CANCELADA` continuam finais.
-- **Por que a razão da DEC-009 não vale para `EM_CAMPO`:** ela tornou `CONCLUIDA` e `CANCELADA` finais porque reabrir apagaria o
+- **Por que a razão da [DEC-009](#dec-009--modelo-das-ordens-de-inspeção) não vale para `EM_CAMPO`:** ela tornou `CONCLUIDA` e `CANCELADA` finais porque reabrir apagaria o
   que aconteceu em campo. Uma OI em campo ainda não tem resultado, então não há o que apagar, e a volta fica no histórico
   (`app.ordem_evento`) como mais um evento.
 - **O que não muda:**
@@ -1553,21 +1617,21 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   sendo o que a equipe viu em campo ou o motivo do cancelamento; a observação que já estava lá não é sobrescrita.
 - **Alternativas descartadas:**
   - Só aumentar a janela do "Desfazer": continua cego para o erro percebido depois, e uma janela longa atrasa o envio de verdade.
-  - Rota de ação (`/devolver`): a DEC-009 já descartou rotas por ação, porque espalham a validação.
+  - Rota de ação (`/devolver`): a [DEC-009](#dec-009--modelo-das-ordens-de-inspeção) já descartou rotas por ação, porque espalham a validação.
   - Status novo (`DEVOLVIDA`): complica o mapa e o filtro por status sem ganho, já que o evento do histórico registra a volta.
 - **Impacto:** nenhuma mudança no contrato OpenAPI (o enum `StatusOrdem` é o mesmo). O "Desfazer" de 6 segundos continua, porque
   cobre o clique errado percebido na hora sem tocar no banco. A tela de perdas ainda não oferece a volta: falta uma ação nova em
   `ACOES_POR_STATUS` (`frontend/src/features/perdas/conversions.ts`), que é do João. Com ela, arrastar o cartão do Kanban de volta
   para a coluna "Gerada" também passa a valer, porque o arrastar usa o mesmo mapa.
-  A decisão foi renumerada de DEC-045 para DEC-048 na resolução do PR #79: DEC-045 já identifica a tela de Rede
-  na `main`, DEC-046 está reservada no PR #86 e DEC-047 é a avaliação comparativa.
+  A decisão foi renumerada de DEC-045 para DEC-048 na resolução do PR #79: [DEC-045](#dec-045--período-e-histórico-da-tela-de-rede) já identifica a tela de Rede
+  na `main`, [DEC-046](#dec-046--memória-de-conversa-orçamento-de-tokens-e-limite-de-perguntas-por-usuário) está reservada no PR #86 e [DEC-047](#dec-047--avaliação-comparativa-e-llm-as-a-judge) é a avaliação comparativa.
 
 ## DEC-049 · Login com cookie httpOnly e perfis por cargo
 
 - **Data:** 29/10/2026 · **Área:** Portal · **Autor:** Felipe
 - **Contexto:** o card V1-13 pede login com perfil por cargo e menu filtrado. A decisão de 19/10 já pôs autenticação e perfis no
-  FastAPI, e duas decisões deixaram lacunas à espera de login: as ordens de inspeção não registram quem agiu (DEC-009, DEC-026) e
-  qualquer pessoa que alcança a API lê a auditoria do agente (DEC-034).
+  FastAPI, e duas decisões deixaram lacunas à espera de login: as ordens de inspeção não registram quem agiu ([DEC-009](#dec-009--modelo-das-ordens-de-inspeção), [DEC-026](#dec-026--ações-das-ois-kanban-e-troca-de-visão-na-tela-de-perdas)) e
+  qualquer pessoa que alcança a API lê a auditoria do agente ([DEC-034](#dec-034--auditoria-do-agente-de-ia-gravação-leitura-e-subida-sem-a-chave)).
 - **Decisão:**
   - `POST /auth/login` confere a senha (hash Argon2, `pwdlib`) e grava um JWT HS256 num cookie `venergy_sessao` com `HttpOnly`,
     `SameSite=Lax` e validade de 8 horas; `GET /auth/me` devolve `{login, nome, perfil}` e `POST /auth/logout` apaga o cookie;
@@ -1615,17 +1679,17 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Limitações conhecidas:**
   - a senha de demonstração é a mesma para todos e serve só para rodar localmente;
   - o logout apaga o cookie, mas um token já copiado vale até expirar (8 horas), e um usuário apagado do banco também;
-  - sem limite de tentativas de login (resolvido na DEC-065);
+  - sem limite de tentativas de login (resolvido na [DEC-065](#dec-065--limite-de-tentativas-de-login-por-login-e-endereço));
   - o cookie não tem `Secure`, porque o portal roda em http no ambiente local; quem publicar com https liga o flag;
   - o portal e a API têm de ficar na mesma origem (o proxy `/api` do Vite faz isso), porque o CORS não libera credenciais.
-- **Em aberto:** a autoria. As ordens de inspeção passaram a guardá-la na DEC-050. Falta `app.ai_auditoria`, e a regra da
+- **Em aberto:** a autoria. As ordens de inspeção passaram a guardá-la na [DEC-050](#dec-050--autoria-nos-eventos-das-ordens-de-inspeção). Falta `app.ai_auditoria`, e a regra da
   auditoria poderia virar "o próprio autor ou a TI". Mexer em tabela que já existe, sem migrações, quebra o banco local de quem
-  não recriar as tabelas; a DEC-050 resolveu isso com `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` na carga e na subida da API.
+  não recriar as tabelas; a [DEC-050](#dec-050--autoria-nos-eventos-das-ordens-de-inspeção) resolveu isso com `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` na carga e na subida da API.
 
 - **Atualização (29/10/2026, login da DEC-049; revisão do Felipe no #86):** com o login, o backend sabe quem pergunta, e as
   limitações de "omitir ou trocar o `session_id` zera os contadores" e "quem souber o id lê o histórico" deixam de valer.
   - `app.ai_auditoria` ganha `usuario` (texto, o login de quem perguntou; nulo nas linhas de antes) e o índice `(usuario, id)`,
-    acrescentados pela subida da API e pela carga com `ADD COLUMN/INDEX IF NOT EXISTS`, sem tocar nas linhas, pelo ponto único `garantir_estrutura_do_app` da DEC-050.
+    acrescentados pela subida da API e pela carga com `ADD COLUMN/INDEX IF NOT EXISTS`, sem tocar nas linhas, pelo ponto único `garantir_estrutura_do_app` da [DEC-050](#dec-050--autoria-nos-eventos-das-ordens-de-inspeção).
   - **O limite de perguntas é por usuário**, em todas as sessões dele, com as mesmas variáveis (`VENERGY_API_AI_LIMITE_PERGUNTAS`,
     `VENERGY_API_AI_JANELA_SEGUNDOS`).
   - **Pedidos simultâneos do mesmo usuário passam um de cada vez** (trava por usuário na rota, revisão do Felipe em 30/10/2026): a contagem e a gravação da auditoria ficam na mesma vez, e o limite não é mais furado por rajadas. A trava vale dentro de um processo da API, que é como o projeto roda.
@@ -1641,8 +1705,8 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 ## DEC-050 · Autoria nos eventos das ordens de inspeção
 
 - **Data:** 29/10/2026 · **Área:** Portal · **Autor:** Felipe
-- **Contexto:** a DEC-049 trouxe o login, mas `app.ordem_evento` seguia sem registrar quem gerou, enviou a campo, concluiu ou
-  cancelou cada ordem (DEC-009, DEC-026). O case não pede isso: é uma extensão do perfil por cargo. Vale porque só o gerente de
+- **Contexto:** a [DEC-049](#dec-049--login-com-cookie-httponly-e-perfis-por-cargo) trouxe o login, mas `app.ordem_evento` seguia sem registrar quem gerou, enviou a campo, concluiu ou
+  cancelou cada ordem ([DEC-009](#dec-009--modelo-das-ordens-de-inspeção), [DEC-026](#dec-026--ações-das-ois-kanban-e-troca-de-visão-na-tela-de-perdas)). O case não pede isso: é uma extensão do perfil por cargo. Vale porque só o gerente de
   perdas escreve, e a trilha passa a responder "quem cancelou esta ordem?".
 - **Decisão:**
   - `app.ordem_evento` ganha `autor_login` (texto, pode ser nulo), preenchido com o login de quem chamou
@@ -1659,7 +1723,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
     dois caminhos apaga ou altera linha do `app`: criam o que falta e acrescentam colunas novas;
   - na subida, banco fora do ar não impede a API de subir: o log registra só o tipo do erro, sem a URL, e as rotas que usam o
     banco respondem erro como já respondiam. É a mesma regra do PR #86 para `app.ai_auditoria`, que passa a usar este ponto.
-- **Texto, sem chave estrangeira para `app.usuarios`:** um token vale até vencer mesmo que o usuário seja apagado (DEC-049). Com a
+- **Texto, sem chave estrangeira para `app.usuarios`:** um token vale até vencer mesmo que o usuário seja apagado ([DEC-049](#dec-049--login-com-cookie-httponly-e-perfis-por-cargo)). Com a
   chave estrangeira, a ação daria erro e a trilha se perderia. O evento guarda só o login; o nome é buscado em `app.usuarios`
   quando o histórico é lido, numa relação só de leitura. O front não teria de onde tirá-lo: o `GET /auth/me` só dá o nome de
   quem está logado, e o histórico mostra o de quem agiu.
@@ -1688,19 +1752,55 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Decisão:** a API extrai somente esse padrão, entre 0 e 100%, sem confundir com os percentuais de leituras estimadas. A distribuição cobre a fila inteira; o filtro por faixa inclusiva e a ordenação são aplicados antes da paginação. A fila sem filtro mantém também as UCs cujo motivo não foi reconhecido; com filtro elas ficam fora e são contadas separadamente na distribuição.
 - **Extensão (29/10/2026):** o painel combina queda com `medidor_eletromecanico=true` e os limites inclusivos `leituras_estimadas_min/max`, extraídos do motivo completo de leituras estimadas. A Gold só emite esse motivo para percentuais a partir de 25%; o filtro aceita limites de 25 a 100 e não abrange valores inferiores nem ausentes. A ausência também pode indicar dados indisponíveis, nunca é interpretada como zero. Os três sinais são combinados com AND antes da paginação.
 - **Limite:** o valor é o percentual inteiro já arredondado pela Gold, não uma nova conta. Alterar a redação do motivo exige atualizar o extrator; uma coluna numérica na Gold eliminaria essa dependência.
+- **Conferência na Gold real e limite aceito para a entrega (issue #100, 04/11/2026):** a issue propôs colunas numéricas da queda e das estimadas na Gold. Ficou para depois da entrega, porque exigiria reprocessar a Gold, subir o contrato para 0.4.0 e recarregar o banco em todas as máquinas no dia do freeze. Os textos vêm da célula da fila no `Silver_to_Gold.ipynb` (`format_string` com `%.0f`), que é do time: a redação só muda se alguém editar essa célula. Dois efeitos do valor arredondado, conferidos na Gold real carregada (export de 28/10, a mesma do Postgres local), recalculando a conta do notebook sobre `gold_fato_faturamento_mensal` para as 194 UCs da fila:
+  - **Queda arredondada contra os pontos:** os pontos usam a queda exata (3 pontos a partir de 30%), e o filtro usa o texto arredondado. Uma UC com 29,6% apareceria como "Queda de 30%" com 1 ponto. Na Gold real, o texto é o valor exato arredondado em todas as 194 UCs, e nenhuma está a menos de 1 ponto percentual dos 30%: o caso não acontece.
+  - **Estimadas abaixo de 25%:** o filtro não alcança. Na Gold real, nenhuma UC sem o motivo passa de 25% (com o `tipo_leitura` da fato; o notebook lê a Silver), e todas as UCs da fila têm leitura na janela; as que estão sem o motivo se dividem entre 0% e valores entre 0% e 25%, que o filtro não distingue.
+  - **Depois da entrega:** o backend pode recalcular a queda e as estimadas exatas sobre a fato, com a mesma conta do notebook, sem reprocessar a Gold; ou a Gold ganha as colunas, com o contrato 0.4.0. Uma Gold nova recalibrada precisa da mesma conferência.
 
 ## DEC-052 · Follow-up sem referência vira esclarecimento antes do modelo
 
-- **Data:** 30/10/2026
-- **Contexto:** turnos recusados não entram no histórico (DEC-046). O G103, "Agora faça o mesmo para Olinda.", ficava sem referência, e o modelo respondia com um palpite, contra o requisito central de não inventar (issue #104).
+- **Data:** 30/10/2026 · **Área:** GenAI · **Autor:** Luis Felipe
+- **Contexto:** turnos recusados não entram no histórico ([DEC-046](#dec-046--memória-de-conversa-orçamento-de-tokens-e-limite-de-perguntas-por-usuário)). O G103, "Agora faça o mesmo para Olinda.", ficava sem referência, e o modelo respondia com um palpite, contra o requisito central de não inventar (issue #104).
 - **Decisão:** quando o histórico da sessão está vazio e a pergunta depende de outro turno, o `AskUseCase` devolve `clarify` sem chamar o modelo. A regra está em `domain/followup.py` e cobre dois casos: pedidos de repetição ("faça o mesmo", "repita a mesma consulta", "o mesmo para X") e perguntas elípticas de até 4 palavras que começam com "e" ("E em Olinda?").
-- **Consequências:** o comportamento é determinístico e não gasta cota. Como não muda prompt, modelo nem camada semântica, não exige rodada da DEC-016 para entrar. Uma pergunta completa que começa com "e" segue para o modelo. Follow-ups escritos de outra forma também seguem, e aí vale o que o prompt manda. Se a leitura do histórico falhar, a pergunta dependente também recebe `clarify`.
+- **Consequências:** o comportamento é determinístico e não gasta cota. Como não muda prompt, modelo nem camada semântica, não exige rodada da [DEC-016](#dec-016--exceção-de-versionamento-do-prompt-v1-proposta) para entrar. Uma pergunta completa que começa com "e" segue para o modelo. Follow-ups escritos de outra forma também seguem, e aí vale o que o prompt manda. Se a leitura do histórico falhar, a pergunta dependente também recebe `clarify`.
+
+## DEC-053 · Conversas do agente por usuário no banco
+
+- **Data:** 30/10/2026 · **Área:** Backend e GenAI · **Autor:** Luis Felipe
+- **Contexto:** o portal guarda as conversas no `localStorage`, então elas não acompanham o usuário entre navegadores (issue #98). A auditoria já grava cada turno com o login, na coluna `usuario` ([DEC-046](#dec-046--memória-de-conversa-orçamento-de-tokens-e-limite-de-perguntas-por-usuário)), e é imutável.
+- **Decisão:** os turnos são lidos de `app.ai_auditoria`, sem cópia. A nova tabela `app.ai_sessao` guarda só título, estrela e exclusão lógica, e a linha nasce na primeira alteração, o que também cobre as conversas antigas. A issue propunha a coluna `usuario_login` e um upsert a cada pergunta; os dois ficaram de fora por serem desnecessários. Sem título próprio, vale a primeira pergunta, cortada em 80 caracteres.
+- **Regras:** sessão de outra pessoa, sem dono ou já excluída responde `404` em `PATCH` e `DELETE`. `POST /ai/ask` numa conversa excluída responde `409`, porque o turno novo ficaria invisível. `GET /ai/sessions` devolve no máximo 50 conversas, com as favoritas primeiro. O `DELETE` usa a trava do usuário e espera a pergunta em andamento terminar, para o turno não ser gravado numa conversa já escondida.
+- **Consequências:** excluir não apaga a auditoria, que segue legível pela TI. As linhas gravadas antes da coluna `usuario` não têm dono e não aparecem para ninguém. Desde 02/11/2026 o frontend usa essas rotas (issue #98): o `AgenteProvider` carrega as conversas de `GET /ai/sessions` e grava título, estrela e exclusão com `PATCH` e `DELETE`. A conversa nova só vai para o servidor depois da primeira resposta, e uma alteração que o servidor recusa volta na tela ao que ele guarda. O `localStorage` deixou de guardar conversas.
+
+## DEC-054 · Comparação de indicadores exige períodos completos e em ordem
+
+- **Data:** 30/10/2026 · **Área:** Portal · **Autor:** João Euclides
+- **Contexto:** a issue #66 pedia uma rota nova para comparar os indicadores entre dois períodos de vários meses, mas `GET /indicadores/comparacao` ([DEC-041](#dec-041--redesign-da-tela-da-diretoria-a-tesoura-primeiro-e-indicadores-por-período-no-backend)) já faz essa conta com os componentes somados ([DEC-033](#dec-033--dec-e-fec-por-período-e-recorte-e-a-fila-de-suspeitas-paginada)). Faltavam duas regras: um período sem dado virava variação de -100%, e nada impedia base depois do atual ou sobreposta a ele.
+- **Decisão:** não criar outra rota, nem mudar os parâmetros `base_inicio`, `base_fim`, `atual_inicio` e `atual_fim`. A base precisa terminar antes do início do atual, ou a rota responde `422`. Se faltar algum mês em um dos períodos, a rota responde `200` com os valores e `n_meses`, e a variação fica nula.
+- **Consequências:** a tela consegue mostrar o que existe sem exibir uma variação enganosa. A regra vale só para esta rota: `GET /receita/comparacao` continua como está. O frontend ainda precisa aceitar trechos de vários meses no seletor.
+
+## DEC-055 · Etapas do agente por SSE em `POST /ai/ask/stream`
+
+- **Data:** 30/10/2026 · **Área:** Backend e GenAI · **Autor:** Luis Felipe
+- **Contexto:** o time adiou os eventos de progresso em 24/10 (PR #39, fechado sem merge). A tela de chat já existe, e o time pediu a rota agora (issue #38).
+- **Decisão:** o agente ganha `stream()`, com as etapas e a resposta final, e `ask()` continua igual. A rota emite `stage` e termina em `answer`, com `audit_id` e `session_id`, ou em `error`. A cada 15 s sem evento vai um comentário `: ping`. O texto não chega por partes, porque os números são conferidos antes ([DEC-019](#dec-019--verificação-numérica-da-narrativa)). Verificações falhas antes do stream respondem com o status HTTP. Depois de aberto o stream, a verificação repete com a trava do usuário, e uma recusa nesse momento vira `error`.
+- **Cliente que desconecta:** o agente é cancelado, e a pergunta entra na auditoria como `failed`, para contar no limite e no orçamento por usuário. As etapas levam internamente os tokens já gastos, fora do JSON do SSE, e o registro os soma ao orçamento. Só os de uma chamada ao modelo ainda em curso ficam de fora, porque o provedor os informa ao terminar.
+- **Consequências:** `POST /ai/ask` segue disponível. O portal consome o stream, anuncia as etapas e mostra a resposta apenas no evento final. Minimizar ou fechar o widget só esconde a janela, sem cancelar: o botão flutuante indica a consulta em andamento e a resposta pode ser lida ao reabrir. Durante a consulta, o rascunho continua editável, mas novos envios, sugestões e repetições são bloqueados também no provider, sem substituir a consulta ativa. **Parar** cancela explicitamente e preserva o rascunho. Sair de `/agente`, criar ou trocar de conversa, remover a conversa em andamento, limpar o histórico ou desmontar o provider (inclusive no logout) também cancela. Uma consulta cancelada pode ser repetida; etapas, respostas e erros atrasados dela não alteram o turno nem encerram o indicador de uma nova consulta.
+- **Falha de protocolo no portal:** JSON inválido encerra a leitura com uma mensagem compreensível, sem expor o erro técnico do parser nem aproveitar eventos posteriores. Dados pendentes sem a linha vazia final do SSE continuam descartados; se não houver resposta completa, o turno termina em erro e pode ser repetido.
+
+## DEC-056 · Views do agente no schema `semantic` (D1)
+
+- **Data:** 30/10/2026 · **Área:** GenAI e infraestrutura · **Autor:** Luis Felipe
+- **Contexto:** as views `sem_*` ficavam em `gold`, onde o `venergy_agent` lia todas as tabelas, inclusive colunas sensíveis e a fila de suspeitas, que as views deixam de fora. A allowlist só valia no validador.
+- **Decisão:** as views passam para o schema `semantic`, e o `venergy_agent` tem `USAGE` e `SELECT` só nele, sem acesso a `gold` nem a `app`. A role ganha `statement_timeout` de 30 s, acima do timeout de 10 s de cada consulta. O padrão de `allowed_schema` passa a ser `semantic`.
+- **Banco existente:** a carga e a subida da API aplicam as permissões e, se a Gold já estiver carregada, recriam as views em `semantic`, sem apagar dados. Banco novo recebe tudo do `01-init.sh`.
+- **Consequências:** o modelo não vê o nome do schema, então o prompt não muda. A carga continua apagando e recriando as views na mesma transação.
 
 ## DEC-057 · Variação da conta da unidade consumidora dividida por motivo
 
 - **Data:** 30/10/2026 · **Área:** Portal · **Autor:** Felipe
 - **Contexto:** o case pede que o atendente responda ao cliente na hora, "inclusive quando ele reclama de conta alta". A visão 360
-  (DEC-044) só dizia se o **consumo** subiu, e a tela já admitia o limite: "a comparação de consumo não explica sozinha a variação do
+  ([DEC-044](#dec-044--visão-360-da-unidade-consumidora-rota-única-janela-da-gold-e-regra-da-conta-alta)) só dizia se o **consumo** subiu, e a tela já admitia o limite: "a comparação de consumo não explica sozinha a variação do
   valor da conta". Do ano anterior ela trazia só o kWh, sem a conta em reais. Na amostra sintética, a unidade 0001 tem consumo na faixa
   de estabilidade (174 kWh contra 179), mas a conta de dez/2025 é R$ 9,23 maior que a de dez/2024: o atendente via o consumo e não
   tinha como explicar a diferença.
@@ -1716,8 +1816,8 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   diz "esta conta cobriu X dias; a do ano anterior, Y" e eles não entram na divisão. A primeira versão separava uma parte "dias" do
   consumo (ver as alternativas descartadas).
 
-  É a mesma identidade da DEC-029 (volume + tarifa + bandeira = variação da receita de energia), aplicada a uma fatura. Os valores são
-  `Decimal` (DEC-010); dias, consumo e bandeira são arredondados para centavos e a **tarifa fica com a sobra do arredondamento**, para a
+  É a mesma identidade da [DEC-029](#dec-029--método-do-efeito-bandeira) (volume + tarifa + bandeira = variação da receita de energia), aplicada a uma fatura. Os valores são
+  `Decimal` ([DEC-010](#dec-010--energia-e-dinheiro-como-numeric-número-na-api)); dias, consumo e bandeira são arredondados para centavos e a **tarifa fica com a sobra do arredondamento**, para a
   soma fechar sem uma linha "arredondamento". Exemplo da amostra sintética, unidade 0001, dez/2025 contra dez/2024: a conta subiu
   R$ 9,23, sendo tarifa +R$ 11,82, consumo −R$ 4,43, tributos +R$ 1,84 e bandeira R$ 0,00 (verde nos dois meses).
   - **Sem dias** numa das contas: o campo daquela conta vem vazio; a divisão não muda.
@@ -1726,7 +1826,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
     `sem_comparacao` da `tendencia`.
   - **`leitura_estimada`** é verdadeiro quando uma das duas leituras foi estimada: a próxima leitura real corrige o consumo.
 - **Suposição nossa:** o case não define como explicar uma conta. A comparação é com o **mesmo mês do ano anterior**, a mesma base da
-  `tendencia` da DEC-044, para os dois blocos da tela falarem do mesmo par de contas e para tirar o efeito das estações.
+  `tendencia` da [DEC-044](#dec-044--visão-360-da-unidade-consumidora-rota-única-janela-da-gold-e-regra-da-conta-alta), para os dois blocos da tela falarem do mesmo par de contas e para tirar o efeito das estações.
 - **Alternativas descartadas:**
   - Comparar com a conta do mês anterior: é o que o cliente costuma dizer ("veio mais alta que a de novembro"), mas mistura estações e
     deixaria dois pares de contas diferentes lado a lado na tela. A tela deve dizer a competência comparada.
@@ -1737,14 +1837,14 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
     na tela como texto.
   - Uma fórmula própria, sem relação com a da receita: a conta de um cliente e a receita da empresa passam a se explicar pelo mesmo método.
   - Uma linha "arredondamento": confunde a atendente; a sobra vai para a tarifa.
-  - Uma rota nova: a visão 360 já busca 24 meses de faturas, e o cliente está na linha (DEC-044).
+  - Uma rota nova: a visão 360 já busca 24 meses de faturas, e o cliente está na linha ([DEC-044](#dec-044--visão-360-da-unidade-consumidora-rota-única-janela-da-gold-e-regra-da-conta-alta)).
   - Calcular na tela: a API não entregava `receita_bandeira` nem `tributos`, e cálculo de negócio fica no backend.
   - Um texto de IA no lugar da tabela (G2-05 do backlog): o número precisa ser exato e imediato, não espera o modelo e não falha quando
     ele cai. O insight com IA continua na tela de Receita, que cumpre o que o case pede (pelo menos uma tela). O G2-05 pode narrar
     esse JSON depois.
 - **Limitações conhecidas:**
   - A parte "tributos" é a variação total dos impostos, sem separar alíquota de base de cálculo.
-  - `receita_energia`, base das partes consumo, bandeira e tarifa, foi confirmada na DEC-073: se a definição mudar um dia, a fórmula acompanha sem mudar o
+  - `receita_energia`, base das partes consumo, bandeira e tarifa, foi confirmada na [DEC-073](#dec-073--receita_energia-confirmada-como-base-do-pvm-e-da-tarifa-média): se a definição mudar um dia, a fórmula acompanha sem mudar o
     contrato da rota.
   - O consumo mistura gastar mais por dia e a conta cobrir mais dias: com o dado atual não há como separar os dois sem inventar
     uma proporção. Os dias na tela deixam a atendente ver quando a diferença de dias é grande.
@@ -1752,28 +1852,23 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Impacto:** campo novo na rota existente, sem quebra de contrato; API 0.12.0, com `contracts/openapi.json` e os tipos do client
   regenerados. Nenhuma mudança na Gold nem no agente. A tela da visão 360 pode exibir o campo com o tipo gerado do OpenAPI.
 
-## DEC-055 · Etapas do agente por SSE em `POST /ai/ask/stream`
+## DEC-058 · Período é contexto em Perdas e a consulta de UC não é limitada pelo recorte
 
-- **Data:** 30/10/2026
-- **Contexto:** o time adiou os eventos de progresso em 24/10 (PR #39, fechado sem merge). A tela de chat já existe, e o time pediu a rota agora (issue #38).
-- **Decisão:** o agente ganha `stream()`, com as etapas e a resposta final, e `ask()` continua igual. A rota emite `stage` e termina em `answer`, com `audit_id` e `session_id`, ou em `error`. A cada 15 s sem evento vai um comentário `: ping`. O texto não chega por partes, porque os números são conferidos antes (DEC-019). Verificações falhas antes do stream respondem com o status HTTP. Depois de aberto o stream, a verificação repete com a trava do usuário, e uma recusa nesse momento vira `error`.
-- **Cliente que desconecta:** o agente é cancelado, e a pergunta entra na auditoria como `failed`, para contar no limite e no orçamento por usuário. As etapas levam internamente os tokens já gastos, fora do JSON do SSE, e o registro os soma ao orçamento. Só os de uma chamada ao modelo ainda em curso ficam de fora, porque o provedor os informa ao terminar.
-- **Consequências:** `POST /ai/ask` segue disponível. O portal consome o stream, anuncia as etapas e mostra a resposta apenas no evento final. Minimizar ou fechar o widget só esconde a janela, sem cancelar: o botão flutuante indica a consulta em andamento e a resposta pode ser lida ao reabrir. Durante a consulta, o rascunho continua editável, mas novos envios, sugestões e repetições são bloqueados também no provider, sem substituir a consulta ativa. **Parar** cancela explicitamente e preserva o rascunho. Sair de `/agente`, criar ou trocar de conversa, remover a conversa em andamento, limpar o histórico ou desmontar o provider (inclusive no logout) também cancela. Uma consulta cancelada pode ser repetida; etapas, respostas e erros atrasados dela não alteram o turno nem encerram o indicador de uma nova consulta.
-- **Falha de protocolo no portal:** JSON inválido encerra a leitura com uma mensagem compreensível, sem expor o erro técnico do parser nem aproveitar eventos posteriores. Dados pendentes sem a linha vazia final do SSE continuam descartados; se não houver resposta completa, o turno termina em erro e pode ser repetido.
-## DEC-053 · Conversas do agente por usuário no banco
+- **Data:** 30/10/2026 · **Área:** Portal · **Autor:** João Euclides
+- **Contexto:** com a [DEC-060](#dec-060--filtros-compartilhados-entre-as-telas-do-portal), recorte e período passaram a acompanhar o usuário entre as telas. Duas telas não são análise de período: a fila de suspeitas é um retrato da Gold, sem competência, e as ordens de inspeção são estado atual em `app`; a consulta individual de UC é o registro completo de uma unidade, aberta com o cliente na linha.
+- **Decisão:**
+  - **Perdas.** Município, bairro e classe filtram a fila e a lista de ordens (na fila, antes da paginação). O seletor de período não aparece, e nem `GET /fila-suspeitas` nem `GET /ordens-inspecao` têm parâmetro de período. O período que estiver na URL é preservado apenas como contexto para as outras telas, sem alterar a fila nem as ordens. Os sinais próprios da fila continuam locais ([DEC-051](#dec-051--filtro-de-queda-na-fila-de-suspeitas)).
+  - **Consulta de UC.** `/uc` aceita os campos compartilhados só para exibir o contexto da análise na faixa (`Contexto da análise: ...`). A visão 360 continua a da [DEC-044](#dec-044--visão-360-da-unidade-consumidora-rota-única-janela-da-gold-e-regra-da-conta-alta): 12 meses até a última competência da Gold, faturas em aberto sem corte por período e históricos paginados somente na apresentação. Nenhum filtro da análise corta consumo, dívidas, interrupções, chamados ou inspeções.
+- **Alternativas descartadas:** filtrar as ordens pelo período de criação (a pergunta do gerente é o andamento, não a data em que a OI nasceu); e limitar a visão 360 ao período ou ao recorte da análise (esconderia contas antigas em aberto e interrupções fora da janela, e a referência da [DEC-044](#dec-044--visão-360-da-unidade-consumidora-rota-única-janela-da-gold-e-regra-da-conta-alta) é a Gold inteira).
+- **Consequências:** os números de Perdas não mudam quando o período é trocado em outra tela, e o link `/uc?cod_uc=...&municipio=...&periodo_atual=...` mostra o mesmo histórico com ou sem recorte; o contexto muda só a faixa da tela. A barra informa na própria tela que a consulta individual não é limitada pelos filtros.
 
-- **Data:** 30/10/2026
-- **Contexto:** o portal guarda as conversas no `localStorage`, então elas não acompanham o usuário entre navegadores (issue #98). A auditoria já grava cada turno com o login, na coluna `usuario` (DEC-046), e é imutável.
-- **Decisão:** os turnos são lidos de `app.ai_auditoria`, sem cópia. A nova tabela `app.ai_sessao` guarda só título, estrela e exclusão lógica, e a linha nasce na primeira alteração, o que também cobre as conversas antigas. A issue propunha a coluna `usuario_login` e um upsert a cada pergunta; os dois ficaram de fora por serem desnecessários. Sem título próprio, vale a primeira pergunta, cortada em 80 caracteres.
-- **Regras:** sessão de outra pessoa, sem dono ou já excluída responde `404` em `PATCH` e `DELETE`. `POST /ai/ask` numa conversa excluída responde `409`, porque o turno novo ficaria invisível. `GET /ai/sessions` devolve no máximo 50 conversas, com as favoritas primeiro. O `DELETE` usa a trava do usuário e espera a pergunta em andamento terminar, para o turno não ser gravado numa conversa já escondida.
-- **Consequências:** excluir não apaga a auditoria, que segue legível pela TI. As linhas gravadas antes da coluna `usuario` não têm dono e não aparecem para ninguém. Desde 02/11/2026 o frontend usa essas rotas (issue #98): o `AgenteProvider` carrega as conversas de `GET /ai/sessions` e grava título, estrela e exclusão com `PATCH` e `DELETE`. A conversa nova só vai para o servidor depois da primeira resposta, e uma alteração que o servidor recusa volta na tela ao que ele guarda. O `localStorage` deixou de guardar conversas.
-## DEC-056 · Views do agente no schema `semantic` (D1)
+## DEC-059 · Ordem de UC ausente do cadastro da Gold fica fora da lista quando há recorte
 
-- **Data:** 30/10/2026
-- **Contexto:** as views `sem_*` ficavam em `gold`, onde o `venergy_agent` lia todas as tabelas, inclusive colunas sensíveis e a fila de suspeitas, que as views deixam de fora. A allowlist só valia no validador.
-- **Decisão:** as views passam para o schema `semantic`, e o `venergy_agent` tem `USAGE` e `SELECT` só nele, sem acesso a `gold` nem a `app`. A role ganha `statement_timeout` de 30 s, acima do timeout de 10 s de cada consulta. O padrão de `allowed_schema` passa a ser `semantic`.
-- **Banco existente:** a carga e a subida da API aplicam as permissões e, se a Gold já estiver carregada, recriam as views em `semantic`, sem apagar dados. Banco novo recebe tudo do `01-init.sh`.
-- **Consequências:** o modelo não vê o nome do schema, então o prompt não muda. A carga continua apagando e recriando as views na mesma transação.
+- **Data:** 30/10/2026 · **Área:** Portal e dados · **Autor:** João Euclides
+- **Contexto:** `app.ordem_inspecao` não tem chave estrangeira para a Gold ([DEC-009](#dec-009--modelo-das-ordens-de-inspeção)), para a carga não apagar as ordens. Uma recarga pode tirar do cadastro (`gold_dim_uc`) uma UC que já tem ordem, e a ordem continua válida e precisa aparecer para o gerente. A localização de uma ordem, porém, só existe no cadastro.
+- **Decisão:** sem recorte, `GET /ordens-inspecao` continua devolvendo todas as ordens, inclusive as de UCs que não estão no cadastro. Com `municipio`, `bairro` ou `classe`, a consulta junta `gold_dim_uc` e as ordens dessas UCs ficam fora da resposta. `bairro` sem `municipio` continua `422`.
+- **Alternativas descartadas:** `LEFT JOIN` com uma localidade sentinela "Sem cadastro", que inventaria uma localização que a Gold não afirma (e uma UC pode ter mudado de bairro); e manter essas ordens em todo recorte, o que faria o total do recorte não fechar com a soma das ordens que ele descreve.
+- **Consequências:** para achar uma ordem cuja UC saiu do cadastro, o gerente limpa o recorte; a tela não avisa quantas ordens ficaram de fora. A fila de suspeitas não tem esse caso: é recalculada pela Gold a cada carga e o recorte também é `INNER JOIN` com o cadastro. O comportamento está coberto por `test_filters_orders_by_segment_and_status_without_changing_them`, que apaga uma UC do cadastro e confere a lista com e sem recorte.
 
 ## DEC-060 · Filtros compartilhados entre as telas do portal
 
@@ -1786,49 +1881,24 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   - **Filtros locais ficam na sessão, não na URL compartilhada.** `efeito` da Receita, `criterio`, `visao`, `alimentador` e `serie` da Rede, `status`, `secao`, sinais da fila, paginação e ordenação de Perdas e `cod_uc` pertencem a cada tela: ficam numa memória do portal, por tela, e voltam quando ela é reaberta. Atualizar a página preserva só o que está na URL. Ao mudar o recorte, a página da fila é descartada; ao mudar o recorte ou o período, o alimentador e a série da Rede também.
   - **Período padrão.** Só entra na URL quando ela não traz período: primeiro o par mais recente válido do catálogo da decomposição (`GET /receita/decomposicao/periodos`); sem ele, o mês mais recente da série mensal contra o mesmo mês do ano anterior e, sem esse par na série, contra o mês anterior (`GET /receita/mensal`). Período atual sem base assume o mesmo trecho um ano antes; se durar mais de 12 meses, assume a janela imediatamente anterior com a mesma duração. Base sem período atual é descartada. A resolução mora na barra, não em cada tela.
   - **Um período, dois formatos.** A Rede o grava como duas pontas (`inicio` e `fim`) e as demais telas como par; o formato da outra tela é tratado como link antigo e sai da URL.
-- **Consultas:** o recorte e o período chegam às rotas que já os aceitavam (Receita, continuidade e indicadores) e o recorte estende a fila e as ordens: `GET /fila-suspeitas` filtra por município, bairro e classe antes dos sinais e da paginação, e `GET /ordens-inspecao` filtra por recorte e status. Três rotas são novas: `GET /indicadores/mensal` devolve a série mensal do recorte, e o mês continua na série mesmo sem fato no recorte: energia e receita vêm nulas quando o mês não tem fatura, com zero só onde ela foi emitida, e os chamados seguem contados (DEC-030); `GET /fila-suspeitas/distribuicao-queda` dá a distribuição por queda no recorte, antes dos sinais locais; e `GET /unidades-consumidoras/localidades` entrega os pares distintos de município e bairro do cadastro para a barra, sem dado pessoal.
+- **Consultas:** o recorte e o período chegam às rotas que já os aceitavam (Receita, continuidade e indicadores) e o recorte estende a fila e as ordens: `GET /fila-suspeitas` filtra por município, bairro e classe antes dos sinais e da paginação, e `GET /ordens-inspecao` filtra por recorte e status. Três rotas são novas: `GET /indicadores/mensal` devolve a série mensal do recorte, e o mês continua na série mesmo sem fato no recorte: energia e receita vêm nulas quando o mês não tem fatura, com zero só onde ela foi emitida, e os chamados seguem contados ([DEC-030](#dec-030--regras-aplicadas-na-gold-ucs-ocorrências-gd-e-fila-de-suspeitas)); `GET /fila-suspeitas/distribuicao-queda` dá a distribuição por queda no recorte, antes dos sinais locais; e `GET /unidades-consumidoras/localidades` entrega os pares distintos de município e bairro do cadastro para a barra, sem dado pessoal.
   O total de chamados fica nulo quando `gold_kpis_mensais` indica que não há atendimento carregado na competência; com atendimento disponível, vale a soma do recorte, inclusive zero.
 - **Alternativas descartadas:** guardar os filtros em `localStorage` (o link deixa de reproduzir a análise e um recorte antigo reaparece sem aviso); um store global de filtros fora da URL (a URL deixa de ser compartilhável e o botão voltar não desfaz a escolha); manter uma barra de filtros por tela, que foi o estado anterior.
 - **Consequências:** as regras estão testadas em `frontend/src/lib/__tests__/filtros.test.ts` e `frontend/src/features/filtros/__tests__/memoria.test.ts`; a API 0.13.0 traz as rotas novas e o client tipado é regerado (`contracts/openapi.json`). A tela nova entra em `DestinoPortal` e declara os campos locais em `CAMPOS_LOCAIS` para participar da memória. A normalização do padrão e dos valores inválidos usa `replace`, sem criar entrada no histórico do navegador; uma escolha do usuário navega normalmente, para o botão voltar desfazê-la.
-- **Numeração:** DEC-060 evita colisão com a DEC-056 da main, a DEC-057 da visão 360, as DEC-058 e DEC-059 deste PR e as decisões reservadas nos PRs #106, #108, #110 e #115.
-
-## DEC-058 · Período é contexto em Perdas e a consulta de UC não é limitada pelo recorte
-
-- **Data:** 30/10/2026 · **Área:** Portal · **Autor:** João Euclides
-- **Contexto:** com a DEC-060, recorte e período passaram a acompanhar o usuário entre as telas. Duas telas não são análise de período: a fila de suspeitas é um retrato da Gold, sem competência, e as ordens de inspeção são estado atual em `app`; a consulta individual de UC é o registro completo de uma unidade, aberta com o cliente na linha.
-- **Decisão:**
-  - **Perdas.** Município, bairro e classe filtram a fila e a lista de ordens (na fila, antes da paginação). O seletor de período não aparece, e nem `GET /fila-suspeitas` nem `GET /ordens-inspecao` têm parâmetro de período. O período que estiver na URL é preservado apenas como contexto para as outras telas, sem alterar a fila nem as ordens. Os sinais próprios da fila continuam locais (DEC-051).
-  - **Consulta de UC.** `/uc` aceita os campos compartilhados só para exibir o contexto da análise na faixa (`Contexto da análise: ...`). A visão 360 continua a da DEC-044: 12 meses até a última competência da Gold, faturas em aberto sem corte por período e históricos paginados somente na apresentação. Nenhum filtro da análise corta consumo, dívidas, interrupções, chamados ou inspeções.
-- **Alternativas descartadas:** filtrar as ordens pelo período de criação (a pergunta do gerente é o andamento, não a data em que a OI nasceu); e limitar a visão 360 ao período ou ao recorte da análise (esconderia contas antigas em aberto e interrupções fora da janela, e a referência da DEC-044 é a Gold inteira).
-- **Consequências:** os números de Perdas não mudam quando o período é trocado em outra tela, e o link `/uc?cod_uc=...&municipio=...&periodo_atual=...` mostra o mesmo histórico com ou sem recorte; o contexto muda só a faixa da tela. A barra informa na própria tela que a consulta individual não é limitada pelos filtros.
-
-## DEC-059 · Ordem de UC ausente do cadastro da Gold fica fora da lista quando há recorte
-
-- **Data:** 30/10/2026 · **Área:** Portal e dados · **Autor:** João Euclides
-- **Contexto:** `app.ordem_inspecao` não tem chave estrangeira para a Gold (DEC-009), para a carga não apagar as ordens. Uma recarga pode tirar do cadastro (`gold_dim_uc`) uma UC que já tem ordem, e a ordem continua válida e precisa aparecer para o gerente. A localização de uma ordem, porém, só existe no cadastro.
-- **Decisão:** sem recorte, `GET /ordens-inspecao` continua devolvendo todas as ordens, inclusive as de UCs que não estão no cadastro. Com `municipio`, `bairro` ou `classe`, a consulta junta `gold_dim_uc` e as ordens dessas UCs ficam fora da resposta. `bairro` sem `municipio` continua `422`.
-- **Alternativas descartadas:** `LEFT JOIN` com uma localidade sentinela "Sem cadastro", que inventaria uma localização que a Gold não afirma (e uma UC pode ter mudado de bairro); e manter essas ordens em todo recorte, o que faria o total do recorte não fechar com a soma das ordens que ele descreve.
-- **Consequências:** para achar uma ordem cuja UC saiu do cadastro, o gerente limpa o recorte; a tela não avisa quantas ordens ficaram de fora. A fila de suspeitas não tem esse caso: é recalculada pela Gold a cada carga e o recorte também é `INNER JOIN` com o cadastro. O comportamento está coberto por `test_filters_orders_by_segment_and_status_without_changing_them`, que apaga uma UC do cadastro e confere a lista com e sem recorte.
-
-## DEC-054 · Comparação de indicadores exige períodos completos e em ordem
-
-- **Data:** 30/10/2026
-- **Contexto:** a issue #66 pedia uma rota nova para comparar os indicadores entre dois períodos de vários meses, mas `GET /indicadores/comparacao` (DEC-041) já faz essa conta com os componentes somados (DEC-033). Faltavam duas regras: um período sem dado virava variação de -100%, e nada impedia base depois do atual ou sobreposta a ele.
-- **Decisão:** não criar outra rota, nem mudar os parâmetros `base_inicio`, `base_fim`, `atual_inicio` e `atual_fim`. A base precisa terminar antes do início do atual, ou a rota responde `422`. Se faltar algum mês em um dos períodos, a rota responde `200` com os valores e `n_meses`, e a variação fica nula.
-- **Consequências:** a tela consegue mostrar o que existe sem exibir uma variação enganosa. A regra vale só para esta rota: `GET /receita/comparacao` continua como está. O frontend ainda precisa aceitar trechos de vários meses no seletor.
+- **Numeração:** DEC-060 evita colisão com a [DEC-056](#dec-056--views-do-agente-no-schema-semantic-d1) da main, a [DEC-057](#dec-057--variação-da-conta-da-unidade-consumidora-dividida-por-motivo) da visão 360, as [DEC-058](#dec-058--período-é-contexto-em-perdas-e-a-consulta-de-uc-não-é-limitada-pelo-recorte) e [DEC-059](#dec-059--ordem-de-uc-ausente-do-cadastro-da-gold-fica-fora-da-lista-quando-há-recorte) deste PR e as decisões reservadas nos PRs #106, #108, #110 e #115.
 
 ## DEC-061 · Queda do provedor não pode prender a resposta do agente
 
-- **Data:** 31/10/2026 · **Área:** GenAI
+- **Data:** 31/10/2026 · **Área:** GenAI · **Autor:** Luis Felipe
 - **Contexto:** em 31/10/2026 o modelo principal respondeu `503` por cerca de 30 minutos. Cada `503` esperava as retentativas antes de passar ao próximo modelo, sem limite de tempo por chamada nem por pergunta. Uma resposta chegou a levar 61 s, e um travamento sem resposta prenderia a tela.
 - **Decisão:** cada chamada tem limite de 15 s. Depois de uma falha, o modelo é pulado por 60 s, exceto o último da cadeia, para a pergunta seguinte não pagar a espera de novo. A pergunta tem prazo de 30 s: estourado, responde `failed` com mensagem própria. Se o prazo vencer na narração, a resposta sai com o texto determinístico, sem perder o resultado. No Docker, cada modelo tem uma tentativa só; fora dele, continuam as 3.
-- **Consequências:** não muda prompt, modelo principal nem camada, então não exige rodada da DEC-016 para entrar. Numa rodada de avaliação com o provedor lento, itens podem sair `failed` por tempo. Os valores vêm de latências observadas e podem ser ajustados por variável de ambiente. A qualidade dos modelos de reserva não foi medida pelo golden, e a cadeia só protege de verdade com outro provedor configurado.
+- **Consequências:** não muda prompt, modelo principal nem camada, então não exige rodada da [DEC-016](#dec-016--exceção-de-versionamento-do-prompt-v1-proposta) para entrar. Numa rodada de avaliação com o provedor lento, itens podem sair `failed` por tempo. Os valores vêm de latências observadas e podem ser ajustados por variável de ambiente. A qualidade dos modelos de reserva não foi medida pelo golden, e a cadeia só protege de verdade com outro provedor configurado.
 
 ## DEC-062 · Planilha de campo: exportar as ordens em campo e subir o resultado
 
 - **Data:** 30/10/2026 · **Área:** Portal e backend · **Autor:** Felipe
 - **Contexto:** o case traz, como diferencial, "subir pelo portal a planilha que a equipe preenche em campo, para que os
-  resultados sejam registrados sem digitação manual" (V1-14). Até aqui cada ordem era concluída à mão, pelo modal (DEC-026). A
+  resultados sejam registrados sem digitação manual" (V1-14). Até aqui cada ordem era concluída à mão, pelo modal ([DEC-026](#dec-026--ações-das-ois-kanban-e-troca-de-visão-na-tela-de-perdas)). A
   planilha tem o formato de `inspecoes.xlsx` (`id_inspecao`, `id_uc`, `data`, `inspetor`, `resultado`, `tipo_irregularidade`,
   `kwh_recuperado`), não traz o número da ordem e chega com as sujeiras já catalogadas em `docs/qualidade-dados.md`
   (INSP-01 a INSP-07).
@@ -1845,12 +1915,12 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   - **Tela.** Na seção de inspeções de Perdas, só para o perfil `perdas`, o botão "Baixar planilha de campo" e o botão "Enviar
     planilha de campo", que abre um modal com o resumo (concluídas e rejeitadas) e a tabela das linhas rejeitadas com o motivo;
   - **Subir.** `POST /ordens-inspecao/planilha` (`multipart/form-data`, campo `arquivo`, só o perfil `perdas`):
-  - **Ligação por UC.** A linha vale para a ordem ativa da UC, que é única (índice `uq_ordem_inspecao_uc_ativa`, DEC-009).
+  - **Ligação por UC.** A linha vale para a ordem ativa da UC, que é única (índice `uq_ordem_inspecao_uc_ativa`, [DEC-009](#dec-009--modelo-das-ordens-de-inspeção)).
     A linha com `OI-<id>`, exportada pelo portal, só conclui essa ordem: uma planilha antiga é rejeitada se a UC tiver hoje
     outra ordem em campo. O `id_inspecao` do formato do case não aponta para ordem, então nesse caso valem só a UC e o status;
   - **Só conclui ordem em campo.** A ordem `GERADA` é rejeitada ("ainda não foi enviada a campo"): a máquina de estados não
     permite `GERADA → CONCLUIDA`, e o upload não inventa um envio a campo que ninguém fez. A mudança passa pela mesma função do
-    `PATCH` (`_mudar_status`), com o login de quem enviou o arquivo no histórico (DEC-050);
+    `PATCH` (`_mudar_status`), com o login de quem enviou o arquivo no histórico ([DEC-050](#dec-050--autoria-nos-eventos-das-ordens-de-inspeção));
   - **Aplica o válido e relata o resto.** A resposta traz `linhas_lidas`, as `concluidas` e as `rejeitadas` (aba, linha, UC e
     motivo). Arquivo que não é XLSX, corrompido, vazio, sem as colunas `id_uc` e `resultado`, maior que 5 MB, com mais de
     5.000 linhas ou com mais de 20.000 linhas em branco é `422` e não grava nada. O XML do arquivo é lido com `defusedxml`,
@@ -1896,25 +1966,25 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 ## DEC-063 · Ordens de inspeção em tempo real: aviso no commit e SSE
 
 - **Data:** 01/11/2026 · **Área:** Backend e portal · **Autor:** Felipe
-- **Contexto:** as ordens são a única escrita do sistema (DEC-049) e mais de um analista com o perfil `perdas` pode agir sobre a mesma ordem. Quem não recarregava a página via o status antigo, e a fila de suspeitas mostrava "sem ordem ativa" para uma unidade que já tinha uma (DEC-033).
+- **Contexto:** as ordens são a única escrita do sistema ([DEC-049](#dec-049--login-com-cookie-httponly-e-perfis-por-cargo)) e mais de um analista com o perfil `perdas` pode agir sobre a mesma ordem. Quem não recarregava a página via o status antigo, e a fila de suspeitas mostrava "sem ordem ativa" para uma unidade que já tinha uma ([DEC-033](#dec-033--dec-e-fec-por-período-e-recorte-e-a-fila-de-suspeitas-paginada)).
 - **Decisão:**
   - **Aviso no commit.** `POST /ordens-inspecao`, `PATCH /ordens-inspecao/{id}` e `POST /ordens-inspecao/planilha` chamam `pg_notify('ordens_inspecao', ...)` na mesma transação da mudança. O Postgres entrega o aviso no commit e o descarta no rollback: um 409 ou uma falha do índice único não avisa ninguém.
   - **Um aviso por transação.** O payload é `{"ordem_ids": [...]}`: um lote de 30 ordens ou uma planilha são um aviso só, e não 30 buscas por tela. Acima de 500 ids o aviso vai com `ordem_ids: null`, porque o payload de um NOTIFY tem no máximo 8000 bytes; a tela só precisa saber que algo mudou.
-  - **Rota SSE.** `GET /ordens-inspecao/eventos` mantém uma conexão `LISTEN` por tela aberta (identificada por `application_name = venergy-ordens-sse`) e emite o evento `ordens`, mais `: ping` a cada 15 s. O primeiro item sai depois do `LISTEN`, então nenhum aviso se perde entre abrir e ouvir. A formatação do SSE é a mesma de `POST /ai/ask/stream` (`sse.py`, DEC-055). A rota fica antes de `/{ordem_id}`, senão "eventos" seria lido como um id (422).
+  - **Rota SSE.** `GET /ordens-inspecao/eventos` mantém uma conexão `LISTEN` por tela aberta (identificada por `application_name = venergy-ordens-sse`) e emite o evento `ordens`, mais `: ping` a cada 15 s. O primeiro item sai depois do `LISTEN`, então nenhum aviso se perde entre abrir e ouvir. A formatação do SSE é a mesma de `POST /ai/ask/stream` (`sse.py`, [DEC-055](#dec-055--etapas-do-agente-por-sse-em-post-aiaskstream)). A rota fica antes de `/{ordem_id}`, senão "eventos" seria lido como um id (422).
   - **Tela.** `useOrdensAoVivo` abre um `EventSource` na página de Perdas e, ao abrir e a cada aviso, invalida as consultas de ordens (lista, detalhe e resumo) e a fila. O aviso não carrega dado: o `GET` segue sendo a fonte da verdade e passa pelas mesmas regras de acesso.
   - **Servidor sem suporte.** O psycopg assíncrono não roda no `ProactorEventLoop`, que o uvicorn usa no Windows sem `--reload`. Nesse caso a rota responde 503 antes de abrir o stream: o `EventSource` não reconecta depois de um status que não seja 200, e a tela segue funcionando sem o tempo real. Docker, CI e Windows com `--reload` usam o `SelectorEventLoop` e funcionam.
   - **Limite de telas (revisão do PR #122).** Cada tela prende uma conexão do Postgres fora do pool, e na revisão 105 fluxos abertos esgotaram as 100 conexões do banco (`too many clients already`), inclusive para o resto da API. A rota agora reserva uma vaga antes de abrir o stream: no máximo 3 telas por login e 50 no processo (`VENERGY_API_ORDENS_AVISOS_POR_USUARIO` e `VENERGY_API_ORDENS_AVISOS_TOTAL`); sem vaga, responde 429, e a tela segue sem o tempo real. 50 deixam metade das conexões para o pool do SQLAlchemy (até 15), o agente e a carga. A contagem é do processo, o que basta porque a API roda com um processo só (Dockerfile e compose).
   - **A rota abre o `LISTEN` antes de responder.** Ela lê o primeiro item do fluxo antes de devolver o 200. Um gerador que já começou sempre roda o `finally`, então a vaga volta mesmo que o cliente saia antes do primeiro byte; e um banco sem conexão livre vira 503, em vez de um stream quebrado que reconectaria em laço.
-  - **Sessão durante o fluxo.** O login é conferido só na abertura da requisição. A cada ping, o fluxo relê o token do cookie com que chegou e termina quando ele vence; o `EventSource` reconecta, leva 401 e para. O token não é guardado no servidor (DEC-049), então um logout feito por fora (um `curl` que guardou o cookie) não é detectado, como em qualquer outra rota até as 8 horas do token. No portal, sair navega para o login, desmonta a tela e fecha o fluxo.
+  - **Sessão durante o fluxo.** O login é conferido só na abertura da requisição. A cada ping, o fluxo relê o token do cookie com que chegou e termina quando ele vence; o `EventSource` reconecta, leva 401 e para. O token não é guardado no servidor ([DEC-049](#dec-049--login-com-cookie-httponly-e-perfis-por-cargo)), então um logout feito por fora (um `curl` que guardou o cookie) não é detectado, como em qualquer outra rota até as 8 horas do token. No portal, sair navega para o login, desmonta a tela e fecha o fluxo.
 - **Evidência:** 20 `PATCH` simultâneos na mesma ordem terminam com 1 resposta 200, 19 respostas 409 e um único aviso (`tests/test_ordens_avisos.py`; ao vivo, com `uv run python -m venergy_api.demo_concorrencia --uc <UC>`). Com a API real, um lote de 2 ordens gerou um aviso `{"ordem_ids": [1, 2]}`, e o 409 não gerou nenhum. Limite e sessão: `tests/test_ordens_eventos.py` (429 com a vaga do login ou do total ocupada, 503 e vaga devolvida com o banco recusando, vaga devolvida ao fechar, fluxo que termina no ping depois de a sessão vencer).
 - **Descartado:**
   - **WebSocket**, porque o fluxo é só do servidor para a tela. O SSE é HTTP comum, leva o cookie do login e o `EventSource` reconecta sozinho;
   - **fila em memória no processo**, que avisaria antes do commit e não funcionaria com mais de um processo da API;
-  - **gatilho (`trigger`) no banco**, que esconde a regra fora do código das rotas e acrescenta DDL fora do `garantir_estrutura_do_app` (DEC-050);
+  - **gatilho (`trigger`) no banco**, que esconde a regra fora do código das rotas e acrescenta DDL fora do `garantir_estrutura_do_app` ([DEC-050](#dec-050--autoria-nos-eventos-das-ordens-de-inspeção));
   - **mandar a ordem dentro do aviso**, que criaria uma segunda fonte da verdade;
   - **um aviso por ordem**, que faria cada tela refazer a consulta tantas vezes quantas ordens o lote tivesse;
   - **um único `LISTEN` por processo, repassando às telas**, por enquanto. Resolve a conexão por tela na raiz, mas o ouvinte compartilhado precisa se reconectar sozinho quando o banco cai e avisar todas as telas para refazerem a consulta, o que é mais código e mais modos de falha a três dias da entrega. É o caminho para escalar;
-  - **guardar a sessão no banco para detectar o logout no fluxo**, porque mudaria o login inteiro (DEC-049) para fechar um vazamento só de ids, sem dados.
+  - **guardar a sessão no banco para detectar o logout no fluxo**, porque mudaria o login inteiro ([DEC-049](#dec-049--login-com-cookie-httponly-e-perfis-por-cargo)) para fechar um vazamento só de ids, sem dados.
 - **Consequências:**
   - cada tela aberta ainda ocupa uma conexão do Postgres, agora com teto: a 4ª aba do mesmo login ou a 51ª tela do servidor ficam sem tempo real, e o resto do portal não é afetado;
   - o aviso não é durável: o que acontece com a tela desconectada só chega pela consulta que ela refaz ao reconectar;
@@ -1923,7 +1993,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 ## DEC-064 · Tempo das ordens no status e por etapa
 
 - **Data:** 01/11/2026 · **Área:** Backend e portal · **Autor:** Felipe
-- **Contexto:** a equipe de campo faz mais de 200 inspeções por mês (DEC-030), e uma ordem esquecida em campo não aparecia no Kanban: só abrir o histórico de cada uma mostrava há quanto tempo ela estava parada. O tempo vem do histórico das ordens (`app.ordem_evento`), que é dado do backend e não da Gold, então calcular aqui não contraria a regra de que a Gold é dona das métricas de negócio.
+- **Contexto:** a equipe de campo faz mais de 200 inspeções por mês ([DEC-030](#dec-030--regras-aplicadas-na-gold-ucs-ocorrências-gd-e-fila-de-suspeitas)), e uma ordem esquecida em campo não aparecia no Kanban: só abrir o histórico de cada uma mostrava há quanto tempo ela estava parada. O tempo vem do histórico das ordens (`app.ordem_evento`), que é dado do backend e não da Gold, então calcular aqui não contraria a regra de que a Gold é dona das métricas de negócio.
 - **Decisão:**
   - **Campos da ordem.** `OrdemSchema` ganha `no_status_desde` (o `ocorrido_em` do último evento gravado, de maior `id`; sem evento, `criada_em`), `segundos_no_status` (pelo relógio do banco, o mesmo que gravou o evento) e `atrasada`. Os dois primeiros saem na mesma consulta da ordem (`column_property`), sem uma busca por ordem.
   - **Atraso.** `esta_atrasada` é uma função pura em `ordens.py`: a ordem ativa que passa de 5 dias em `GERADA` ou de 10 em `EM_CAMPO` (estritamente mais que o limite). Ordem concluída ou cancelada nunca atrasa. Os prazos são **suposição do time**, porque o case não traz, e ficam em `VENERGY_API_ORDEM_ATRASO_GERADA_DIAS` e `VENERGY_API_ORDEM_ATRASO_EM_CAMPO_DIAS`. A regra mora no backend: o frontend só exibe.
@@ -1932,7 +2002,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Evidência:** teste com histórico montado à mão: três passagens por `GERADA` de 1 h, 3 h e 1 h dão mediana de 1 h e p90 de 2,6 h (interpolando 1 h e 3 h); duas por `EM_CAMPO`, de 1 h e 2 dias, dão mediana de 24 h 30 min.
 - **Descartado:**
   - **só a data, com o navegador calculando o tempo**: um relógio errado no computador de quem olha daria um contador negativo ou errado;
-  - **`atualizada_em` como entrada no status**: ela muda a cada gravação da ordem, e o evento é a trilha de cada mudança de status (DEC-050);
+  - **`atualizada_em` como entrada no status**: ela muda a cada gravação da ordem, e o evento é a trilha de cada mudança de status ([DEC-050](#dec-050--autoria-nos-eventos-das-ordens-de-inspeção));
   - **`max(ocorrido_em)` para achar o último evento**: o histórico é lido na ordem do `id` (é assim que o detalhe da ordem o mostra), e o status atual é o do último evento gravado mesmo que a data dele não seja a maior;
   - **média no resumo**: uma só ordem esquecida distorceria o número;
   - **um `setInterval` por cartão**, que seriam centenas de temporizadores;
@@ -1942,14 +2012,14 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 ## DEC-065 · Limite de tentativas de login por login e endereço
 
 - **Data:** 01/11/2026 · **Área:** Backend e portal · **Autor:** Felipe
-- **Contexto:** a DEC-049 entregou o login e deixou registrado que ele não tinha limite de tentativas. O portal é interno e tem cinco perfis de logins conhecidos (`henrique`, `camila`, `rafael`, `beatriz` e `patricia`), então o risco real é alguém testar senhas desses logins. O limite de perguntas da IA (DEC-046) já tinha o desenho: contar no banco, com o relógio do banco, e responder 429 com `Retry-After`.
+- **Contexto:** a [DEC-049](#dec-049--login-com-cookie-httponly-e-perfis-por-cargo) entregou o login e deixou registrado que ele não tinha limite de tentativas. O portal é interno e tem cinco perfis de logins conhecidos (`henrique`, `camila`, `rafael`, `beatriz` e `patricia`), então o risco real é alguém testar senhas desses logins. O limite de perguntas da IA ([DEC-046](#dec-046--memória-de-conversa-orçamento-de-tokens-e-limite-de-perguntas-por-usuário)) já tinha o desenho: contar no banco, com o relógio do banco, e responder 429 com `Retry-After`.
 - **Decisão:**
   - **Regra.** Depois de `VENERGY_API_LOGIN_MAX_FALHAS` (5) senhas erradas do mesmo login, a partir do mesmo endereço, dentro de `VENERGY_API_LOGIN_JANELA_SEGUNDOS` (900, ou 15 minutos), esse par fica bloqueado. `0` desliga o limite. Contam as falhas da janela posteriores ao último sucesso: entrar certo zera a contagem.
   - **Resposta.** `429` com `Retry-After` e o texto "Muitas tentativas de login. Tente de novo em N minutos." A espera vai até sair da janela a falha que deixa o total abaixo do limite, e o `Retry-After` está documentado no contrato OpenAPI. A checagem vem antes de conferir a senha: bloqueado, nem a senha certa entra, e a resposta é a mesma para um login que existe ou não, então o bloqueio não revela quais logins existem.
   - **A tentativa bloqueada não é gravada.** Do contrário, quem insiste renovaria o próprio bloqueio para sempre.
   - **O endereço é o da conexão** (`request.client.host`), nunca o `X-Forwarded-For`, que o próprio cliente escreve.
   - **Concorrência.** As tentativas do mesmo par passam uma de cada vez, por `pg_advisory_xact_lock(hashtext(login|endereço))`, solto no fim da transação. O `asyncio.Lock` do `/ai/ask` não serve aqui: a rota é síncrona, e o lock do banco vale também entre processos da API.
-  - **Tabela.** `app.tentativa_login` (login digitado, endereço, sucesso e instante), sem chave estrangeira para `usuarios`: o login digitado pode nem existir, e os dois casos são tratados igual. Nasce na carga e, para quem atualiza o código sem rodar a carga, na subida da API (`garantir_estrutura_do_app`, DEC-050). O instante é o da gravação (`clock_timestamp()`), e não o do início da transação: quem esperou a trava do par não fica com um instante anterior ao da tentativa que passou antes. Cada gravação apaga as linhas mais antigas que a janela (`FOR UPDATE SKIP LOCKED`, para dois pares diferentes não esperarem um pelo outro), então a tabela guarda só a janela. Apagar é seguro: uma linha fora da janela não entra na contagem, e um sucesso antigo só importaria para falhas mais velhas que ele, que também já saíram da janela.
+  - **Tabela.** `app.tentativa_login` (login digitado, endereço, sucesso e instante), sem chave estrangeira para `usuarios`: o login digitado pode nem existir, e os dois casos são tratados igual. Nasce na carga e, para quem atualiza o código sem rodar a carga, na subida da API (`garantir_estrutura_do_app`, [DEC-050](#dec-050--autoria-nos-eventos-das-ordens-de-inspeção)). O instante é o da gravação (`clock_timestamp()`), e não o do início da transação: quem esperou a trava do par não fica com um instante anterior ao da tentativa que passou antes. Cada gravação apaga as linhas mais antigas que a janela (`FOR UPDATE SKIP LOCKED`, para dois pares diferentes não esperarem um pelo outro), então a tabela guarda só a janela. Apagar é seguro: uma linha fora da janela não entra na contagem, e um sucesso antigo só importaria para falhas mais velhas que ele, que também já saíram da janela.
   - **Tela.** Com o 429, a tela de login mostra o aviso do backend, com o tempo de espera, e não marca os campos como inválidos: o problema não são os dados digitados.
 - **Evidência:** 18 testes em `tests/test_login_tentativas.py`: o bloqueio mesmo com a senha certa, o reset por sucesso, outro endereço e outro login livres, login inexistente com a mesma resposta, falhas fora da janela, `Retry-After` calculado (300 s com falhas de 600, 500 e 400 segundos atrás; 400 s com quatro falhas e limite 3), o cabeçalho `X-Forwarded-For` ignorado, a tentativa bloqueada não gravada, a limpeza das linhas fora da janela, o instante gravado na hora da gravação, o `Retry-After` no contrato e o limite desligado com `0`. Doze tentativas erradas simultâneas terminam com 3 respostas 401 e 9 respostas 429. Na tela, a sexta tentativa mostrou "Tente de novo em 15 minutos".
 - **Descartado:**
@@ -1965,19 +2035,19 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 
 ## DEC-066 · Insight da Receita dá a conclusão, não repete a tela
 
-- **Revisa:** DEC-069 (narração recusada ou falha do provedor agora mostram o texto da regra, identificado como "Leitura automática"; IA desligada também, sem `503`; "Insight indisponível" fica para erro da rota ou recorte sem dados).
+- **Data:** 01/11/2026 · **Área:** Portal e IA · **Autor:** Luis Felipe · **Revisa:** [DEC-069](#dec-069--insight-de-ia-ao-lado-da-leitura-que-ele-narra) (narração recusada ou falha do provedor agora mostram o texto da regra, identificado como "Leitura automática"; IA desligada também, sem `503`; "Insight indisponível" fica para erro da rota ou recorte sem dados).
 - **Contexto:** o insight da tela de Receita (prompt `insight/v2`) recitava os valores que a ponte da receita já mostra ao lado, com até oito números de R$ por texto.
-- **Decisão:** o prompt `insight/v3` passa a ser o padrão: no máximo duas frases, sem repetir a variação nem os efeitos, com a leitura que a tela não resume. O backend acrescenta ao JSON `fatores_a_favor`, `fatores_contra`, `maior_fator`, `n_segmentos_em_queda`, `maior_queda_participacao_pct`, `n_segmentos_quantidade_em_queda`, `n_segmentos_alta_so_por_preco` e `bandeira_no_preco_pct`. O cálculo fica no backend e o LLM continua só narrando, com todo número conferido contra o JSON (DEC-019). O backend escolhe a leitura mais forte por regra (`leitura_principal`), inclusive a comparação com o recorte de cima para recortes pequenos, e escreve o texto dela (`leitura_texto`). O modelo só redige: se ele falhar, ou se o texto trouxer outros números, jargão, outros sentidos ou uma conclusão a mais, a tela mostra o texto da regra, com `origem: regra`, fora do cache. Não há nova tentativa na hora, porque com temperatura 0 o modelo repetiria o texto. Com a IA desligada, vale o mesmo. O texto do modelo também precisa manter a sequência de altas e quedas da leitura. Percentuais dos efeitos sobre a base foram testados e retirados: levaram o texto a escrever "o preço subiu 12,3%".
+- **Decisão:** o prompt `insight/v3` passa a ser o padrão: no máximo duas frases, sem repetir a variação nem os efeitos, com a leitura que a tela não resume. O backend acrescenta ao JSON `fatores_a_favor`, `fatores_contra`, `maior_fator`, `n_segmentos_em_queda`, `maior_queda_participacao_pct`, `n_segmentos_quantidade_em_queda`, `n_segmentos_alta_so_por_preco` e `bandeira_no_preco_pct`. O cálculo fica no backend e o LLM continua só narrando, com todo número conferido contra o JSON ([DEC-019](#dec-019--verificação-numérica-da-narrativa)). O backend escolhe a leitura mais forte por regra (`leitura_principal`), inclusive a comparação com o recorte de cima para recortes pequenos, e escreve o texto dela (`leitura_texto`). O modelo só redige: se ele falhar, ou se o texto trouxer outros números, jargão, outros sentidos ou uma conclusão a mais, a tela mostra o texto da regra, com `origem: regra`, fora do cache. Não há nova tentativa na hora, porque com temperatura 0 o modelo repetiria o texto. Com a IA desligada, vale o mesmo. O texto do modelo também precisa manter a sequência de altas e quedas da leitura. Percentuais dos efeitos sobre a base foram testados e retirados: levaram o texto a escrever "o preço subiu 12,3%".
 - **Medição:** 11 recortes da Gold real, pela função da rota `GET /receita/insight`, sem login, com leitura de cada texto. A rodada fixa é `make eval-insights`, com dois casos sintéticos para o que a base não tem (perfil de consumo como maior fator e recorte sem receita base).
 
 ## DEC-067 · UCs de teste do cadastro ficam na Gold, documentadas
 
-- **Data:** 01/11/2026 · **Área:** Dados · **Autor:** Arthur · **Complementa:** UC-12 ([`qualidade-dados.md`](qualidade-dados.md)) e DEC-030
+- **Data:** 01/11/2026 · **Área:** Dados · **Autor:** Arthur · **Complementa:** UC-12 ([`qualidade-dados.md`](qualidade-dados.md)) e [DEC-030](#dec-030--regras-aplicadas-na-gold-ucs-ocorrências-gd-e-fila-de-suspeitas)
 - **Contexto:** no QA da Gold oficial (27/10), as UCs da UC-12 (documento de preenchimento repetido, sem medidor) se revelaram cadastro de teste do sistema de origem: o `cod_uc` tem prefixo `TESTE`. Conferido na Gold: são exatamente as UCs da UC-12 e não têm fatura, medidor, ocorrência, chamado nem inspeção, nem entram na fila de suspeitas.
 - **Decisão:** as UCs continuam na `gold_dim_uc` até depois da entrega, com o caso documentado no contrato, no dicionário, na UC-12 e no diagnóstico (H6 e Recomendação 3 deixam de tratá-las como receita a recuperar). A Silver também as mantém, marcadas por `flag_documento_repetido`.
 - **Motivo:** tirá-las exige mudar a Silver e a Gold e rodar o Workflow de novo perto do code freeze (03/11). O ganho não paga o risco agora.
 - **Consequências:**
-  - receita, energia, `n_uc` (UCs faturadas, DEC-030), DEC/FEC, recortes, decomposição e fila não mudam, porque essas UCs não têm fatura nem ocorrência;
+  - receita, energia, `n_uc` (UCs faturadas, [DEC-030](#dec-030--regras-aplicadas-na-gold-ucs-ocorrências-gd-e-fila-de-suspeitas)), DEC/FEC, recortes, decomposição e fila não mudam, porque essas UCs não têm fatura nem ocorrência;
   - contagens feitas direto na `gold_dim_uc` (ex.: quantas UCs há num bairro) incluem essas UCs, no agente e no portal. Ex.: o G001 do golden set ("Quantas UCs existem na base?") conta o cadastro de teste, enquanto o diagnóstico fala nas UCs válidas;
   - o diagnóstico da receita não trata mais essas UCs como vazamento: a H6 passa a parcialmente confirmada (só as faturas órfãs, `FAT-05`) e a Recomendação 3 deixa de estimar energia e receita recuperáveis nelas;
   - a consulta de UC consegue abrir uma delas, que aparece sem consumo, faturas, medidor ou chamados.
@@ -1994,17 +2064,17 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   - **Desligado por padrão.** Sem `VENERGY_API_RASTREAMENTO_ENDPOINT`, `configurar_rastreamento` (`backend/src/venergy_api/rastreamento.py`) não instala nada e a API responde como antes. Com o endpoint vazio, e não um padrão apontando para o Jaeger, porque sem coletor no ar o exportador encheria o log com falhas de envio.
   - **O que entra no trace.** A rota (instrumentação do FastAPI); cada consulta ao Postgres, pela instrumentação do psycopg, que cobre o backend (o SQLAlchemy usa o psycopg) e o agente (que conecta direto pelo psycopg), numa instrumentação só; e cada chamada ao modelo, emitida pelo próprio PydanticAI (`Agent.instrument_all`), com modelo, duração e tokens. O código do `ai-agent` não muda.
   - **Ponte com a auditoria.** Depois da resposta do agente, `POST /ai/ask` e `POST /ai/ask/stream` gravam no span da requisição `venergy.ai.request_id`, `venergy.ai.status`, `venergy.ai.row_count` e os tokens. O perfil `ti` lê o `request_id` em `GET /ai/audit/{id}` e acha o trace no Jaeger pela tag, sem coluna nova em `app.ai_auditoria`.
-  - **Sem o conteúdo dos prompts** (`include_content=False`). O prompt da narração leva a pergunta e as linhas da Gold, e a resposta do modelo repete números dela: nada disso sai do processo, nem para um Jaeger local. A consulta SQL do agente entra no span, porque só lê as views `sem_*`, sem coluna sensível (DEC-022), e as consultas do backend vão com os parâmetros de fora (o psycopg não grava os valores).
-  - **Só traces que começam numa requisição.** `/health` (chamada pelo healthcheck do compose a cada 5 segundos) e `/ordens-inspecao/eventos` (o tempo real das ordens, uma conexão aberta por minutos, DEC-063) ficam fora. Só tirar a rota não bastava: as consultas dela virariam traces soltos, sem pai. O sampler `SoTracesDeRequisicao` só começa um trace num span de servidor, e os spans de dentro seguem a decisão da requisição (`ParentBased`). O `/ai/ask/stream` continua rastreado, com os spans de envio de cada evento desligados (`exclude_spans`), para uma pergunta não gerar dezenas de spans vazios.
+  - **Sem o conteúdo dos prompts** (`include_content=False`). O prompt da narração leva a pergunta e as linhas da Gold, e a resposta do modelo repete números dela: nada disso sai do processo, nem para um Jaeger local. A consulta SQL do agente entra no span, porque só lê as views `sem_*`, sem coluna sensível ([DEC-022](#dec-022--regras-do-agente-sobre-a-gold-e-decisões-da-daily-de-2110)), e as consultas do backend vão com os parâmetros de fora (o psycopg não grava os valores).
+  - **Só traces que começam numa requisição.** `/health` (chamada pelo healthcheck do compose a cada 5 segundos) e `/ordens-inspecao/eventos` (o tempo real das ordens, uma conexão aberta por minutos, [DEC-063](#dec-063--ordens-de-inspeção-em-tempo-real-aviso-no-commit-e-sse)) ficam fora. Só tirar a rota não bastava: as consultas dela virariam traces soltos, sem pai. O sampler `SoTracesDeRequisicao` só começa um trace num span de servidor, e os spans de dentro seguem a decisão da requisição (`ParentBased`). O `/ai/ask/stream` continua rastreado, com os spans de envio de cada evento desligados (`exclude_spans`), para uma pergunta não gerar dezenas de spans vazios.
   - **Provider explícito, nunca o global.** O provider é entregue a cada instrumentação, e não definido com `trace.set_tracer_provider`, que só aceita um por processo: cada teste monta a API com o seu, em memória. É o mesmo motivo de as configurações chegarem ao `create_app`.
   - **Envio em lote** (`BatchSpanProcessor`, por OTLP sobre HTTP), numa thread à parte, para não atrasar as respostas. No fim do `lifespan`, o provider envia o último lote, esperando o coletor por **no máximo 2 segundos**. O padrão do exportador é 10 segundos, com novas tentativas dentro dele: com o Jaeger fora do ar, desligar a API levava 9 segundos, perto dos 10 em que o `docker compose stop` mata o processo (apontado na revisão do Lucas). Com o limite, leva 2. Um trace é diagnóstico: perder o último lote vale menos do que travar o desligamento.
   - **Jaeger no compose** (`jaegertracing/jaeger:2.22.0`), só com `--profile observabilidade`, com a interface em `127.0.0.1:16686` e o OTLP só na rede do compose. Para ligar: `RASTREAMENTO_ENDPOINT=http://jaeger:4318/v1/traces` no `.env`.
-- **Evidência:** 7 testes em `tests/test_rastreamento.py`: os atributos da resposta do agente no span da rota, em `POST /ai/ask` e em `POST /ai/ask/stream` (no stream, o span é lido de dentro do gerador da resposta); as consultas como filhas do span da rota, no mesmo trace; `/health` sem nenhum span, nem o da consulta; `/ordens-inspecao/eventos` sem nenhum span; os spans do modelo sem a pergunta, o prompt e a resposta (com o modelo de teste do PydanticAI); e nada instalado sem endpoint. Sem o sampler, o teste da saúde falha, e com `include_content=True`, o do conteúdo falha: os dois protegem uma escolha, e não a biblioteca. No compose, um login gerou um trace com a rota e as 8 consultas dela como filhas, e a saúde, nenhum. Uma pergunta ao agente com o Gemini de verdade (12 linhas, 19,7 s) mostrou a geração do SQL (7,4 s), as consultas ao Postgres (todas juntas abaixo de 50 ms), a narração (12,3 s) e os tokens de cada chamada, e as mensagens chegaram ao Jaeger só com o papel e o tipo, sem texto. O trace também mostrou a cadeia de modelos da DEC-061 funcionando: o modelo principal falhou em 2,2 s e o reserva respondeu; na narração, o principal foi pulado em 0,2 ms, porque tinha falhado havia menos de 60 s.
+- **Evidência:** 7 testes em `tests/test_rastreamento.py`: os atributos da resposta do agente no span da rota, em `POST /ai/ask` e em `POST /ai/ask/stream` (no stream, o span é lido de dentro do gerador da resposta); as consultas como filhas do span da rota, no mesmo trace; `/health` sem nenhum span, nem o da consulta; `/ordens-inspecao/eventos` sem nenhum span; os spans do modelo sem a pergunta, o prompt e a resposta (com o modelo de teste do PydanticAI); e nada instalado sem endpoint. Sem o sampler, o teste da saúde falha, e com `include_content=True`, o do conteúdo falha: os dois protegem uma escolha, e não a biblioteca. No compose, um login gerou um trace com a rota e as 8 consultas dela como filhas, e a saúde, nenhum. Uma pergunta ao agente com o Gemini de verdade (12 linhas, 19,7 s) mostrou a geração do SQL (7,4 s), as consultas ao Postgres (todas juntas abaixo de 50 ms), a narração (12,3 s) e os tokens de cada chamada, e as mensagens chegaram ao Jaeger só com o papel e o tipo, sem texto. O trace também mostrou a cadeia de modelos da [DEC-061](#dec-061--queda-do-provedor-não-pode-prender-a-resposta-do-agente) funcionando: o modelo principal falhou em 2,2 s e o reserva respondeu; na narração, o principal foi pulado em 0,2 ms, porque tinha falhado havia menos de 60 s.
 - **Descartado:**
   - **só logs com um ID por requisição:** dizem o que aconteceu, mas não a duração de cada etapa nem quem chamou quem;
   - **instrumentar o SQLAlchemy:** não veria as consultas do agente, que não passa por ele;
   - **spans dentro do agente (validação do SQL, conferência dos números):** exigiriam mudar o código do `ai-agent`, do time de GenAI, a três dias da entrega. Essas etapas aparecem como o intervalo entre a geração do SQL e a consulta. Fica como proposta: decorators nas portas, em `infrastructure/`, ligados no `bootstrap.build_agent`, sem o domínio saber do OpenTelemetry;
-  - **coluna `trace_id` em `app.ai_auditoria`:** exigiria acrescentar coluna (DEC-050) para o que a tag `venergy.ai.request_id` já resolve;
+  - **coluna `trace_id` em `app.ai_auditoria`:** exigiria acrescentar coluna ([DEC-050](#dec-050--autoria-nos-eventos-das-ordens-de-inspeção)) para o que a tag `venergy.ai.request_id` já resolve;
   - **OTLP sobre gRPC:** traria o `grpcio` para a imagem da API, sem ganho num coletor local;
   - **Datadog, New Relic ou Grafana Tempo:** serviço externo com chave e internet, ou mais containers (Tempo e Grafana), para o que um Jaeger resolve.
 - **Consequências:**
@@ -2014,12 +2084,12 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 
 ## DEC-069 · Insight de IA ao lado da leitura que ele narra
 
-- **Data:** 01/11/2026 · **Área:** Portal e IA · **Autor:** João Euclides · **Revisa:** DEC-040 (sem texto, a tela diz que o
+- **Data:** 01/11/2026 · **Área:** Portal e IA · **Autor:** João Euclides · **Revisa:** [DEC-040](#dec-040--insight-de-ia-na-tela-de-receita-métricas-montadas-no-backend-cache-pelo-conteúdo) (sem texto, a tela diz que o
   insight está indisponível, em vez de só ficar sem ele)
-- **Contexto:** a DEC-040 entregou `GET /receita/insight`, mas a tela de Receita não o exibia. O case (5.3) pede insight de IA em pelo menos uma tela, e outras telas devem ganhar o seu.
+- **Contexto:** a [DEC-040](#dec-040--insight-de-ia-na-tela-de-receita-métricas-montadas-no-backend-cache-pelo-conteúdo) entregou `GET /receita/insight`, mas a tela de Receita não o exibia. O case (5.3) pede insight de IA em pelo menos uma tela, e outras telas devem ganhar o seu.
 - **Decisão:**
   - **Lugar:** ao lado da frase de leitura do gráfico que o insight narra; na Receita, a ponte (`summaryAction` do `WaterfallChart`, que desce para baixo da frase quando o card é estreito). Componente `InsightIa` (`features/agente`), com a marca do VE-360 (`LogoMark`, o sinal de "feito pelo agente", como no chat).
-  - **Só sob pedido:** abrir a tela ou trocar de recorte não chama o modelo. O botão "Gerar insight" busca o texto do recorte atual (a query do TanStack fica com `enabled: false` e o clique faz o `refetch`); enquanto o modelo escreve, "Gerando insight…" com a marca pulsando. O texto chega aberto numa caixa ancorada no botão, com o título, o texto e uma nota de que todo número foi conferido com as métricas da tela (DEC-019); fecha pelo X, por Esc ou clicando fora, e o botão vira "Insight feito por IA" para reabrir. Voltar a um recorte já gerado na mesma sessão do portal mostra o texto sem nova chamada; depois de recarregar a página, o clique chega ao cache da API (DEC-040), que também não chama o modelo.
+  - **Só sob pedido:** abrir a tela ou trocar de recorte não chama o modelo. O botão "Gerar insight" busca o texto do recorte atual (a query do TanStack fica com `enabled: false` e o clique faz o `refetch`); enquanto o modelo escreve, "Gerando insight…" com a marca pulsando. O texto chega aberto numa caixa ancorada no botão, com o título, o texto e uma nota de que todo número foi conferido com as métricas da tela ([DEC-019](#dec-019--verificação-numérica-da-narrativa)); fecha pelo X, por Esc ou clicando fora, e o botão vira "Insight feito por IA" para reabrir. Voltar a um recorte já gerado na mesma sessão do portal mostra o texto sem nova chamada; depois de recarregar a página, o clique chega ao cache da API ([DEC-040](#dec-040--insight-de-ia-na-tela-de-receita-métricas-montadas-no-backend-cache-pelo-conteúdo)), que também não chama o modelo.
   - **Sem texto:** texto vazio (narração descartada ou falha do provedor) e erro (`503`, IA desligada) mostram "Insight indisponível." com "Tentar de novo"; a frase de leitura determinística continua, e a tela nunca fica sem leitura.
   - **Recorte:** o insight segue os filtros da tela (período, município, bairro, classe). Ao trocar de recorte, o texto anterior some na hora, sem `placeholderData`, porque citaria números que a tela não mostra. Sem retry automático.
 - **Alternativas descartadas:**
@@ -2028,11 +2098,11 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   - Um card de insight próprio no conteúdo: empurra a ponte para baixo e se repete em cada tela com outro formato.
   - Manter o texto anterior durante a troca de recorte.
   - Gerar o insight ao abrir a tela: cada recorte visitado custava uma chamada ao modelo, mesmo sem ninguém ler o texto.
-- **Consequências:** tela nova com insight põe `<InsightIa texto={...} carregando={...} indisponivel={...} onGerar={...} />` ao lado da frase de leitura do gráfico que ele narra, com um hook da própria feature que não busca sozinho (`enabled: false`). Na Visão geral, a DEC-036 continua: quando ela tiver insight, ele ocupa o lugar da frase de leitura.
+- **Consequências:** tela nova com insight põe `<InsightIa texto={...} carregando={...} indisponivel={...} onGerar={...} />` ao lado da frase de leitura do gráfico que ele narra, com um hook da própria feature que não busca sozinho (`enabled: false`). Na Visão geral, a [DEC-036](#dec-036--tela-da-diretoria-compara-mês-contra-mês-até-existir-a-rota-de-comparação) continua: quando ela tiver insight, ele ocupa o lugar da frase de leitura.
 
 ## DEC-070 · Checagem da narrativa sem descartar texto correto
 
-- **Data:** 02/11/2026 · **Área:** GenAI · **Autor:** Luis Felipe · **Revisa:** DEC-019 (arredondamento) e a regra de período (G1-05)
+- **Data:** 02/11/2026 · **Área:** GenAI · **Autor:** Luis Felipe · **Revisa:** [DEC-019](#dec-019--verificação-numérica-da-narrativa) (arredondamento) e a regra de período (G1-05)
 - **Contexto:** no teste do juiz na Gold real (PR #123), 9 de 10 respostas `answered` saíram no texto de reserva ("A consulta devolveu N linha(s)"), e o juiz reprovou todas por clareza. O log de cada etapa mostrou que o estouro de tempo explicava só 2 casos. Nos outros, o modelo escreveu uma narrativa e a checagem do agente a descartou:
   - **número arredondado:** "3,89" para 3,89368 e "2,42" para um `dec` gravado como 2,4199999…;
   - **período que o validador não lia:** `LIKE '2024-%'` e o par `'2022-07/2023-06'` da decomposição não entravam como período, e "2024" ou "julho de 2022" viravam número sem suporte;
@@ -2050,7 +2120,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   - Na primeira tentativa de medir, no mesmo dia, a cadeia inteira estava fora: o `gemini-3.1-flash-lite` respondeu 503 (sobrecarga), o `gemini-3.5-flash` atingiu o limite gratuito de 20 pedidos por dia (429) e os modelos gratuitos do OpenRouter responderam 429; 4 de 10 perguntas estouraram o prazo de 30 s.
 - **Fora desta decisão:**
   - **Provedor:** o texto de reserva também aparece quando nenhum modelo da cadeia responde a tempo. Para a demonstração, a chave precisa ter cota além do nível gratuito, e a cadeia não deve depender de modelos gratuitos.
-  - **Frase inventada:** no G017, uma narrativa aceita disse que novembro era o "único mês de 2025 com dados", quando a consulta só pedia o maior mês. A checagem de números não pega afirmação sem número; corrigir isso é mudança de prompt e passa pela regra da DEC-016.
+  - **Frase inventada:** no G017, uma narrativa aceita disse que novembro era o "único mês de 2025 com dados", quando a consulta só pedia o maior mês. A checagem de números não pega afirmação sem número; corrigir isso é mudança de prompt e passa pela regra da [DEC-016](#dec-016--exceção-de-versionamento-do-prompt-v1-proposta).
   - **Texto de reserva em português natural:** continua com o grupo (PR #123).
 
 ## DEC-071 · Tela de Rede: indicadores do recorte contra a base e histórico contra a empresa
@@ -2058,63 +2128,64 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Data:** 01/11/2026 · **Área:** Portal · **Autor:** João Euclides
 - **Contexto:** a Rede respondia "quem está pior" e não "quem piorou", "quanto pesa" nem "comparado a quê". A barra comum já gravava `periodo_base` na URL da Rede, sem uso. Ranking e recortes já devolviam `horas_interrompidas` e `n_interrupcoes`, que a tabela não mostrava. O painel do alimentador exibia uma métrica por vez (`serie`) e sem referência. O drill-down não dizia onde o usuário estava nem movia o foco.
 - **Decisão:**
-  - **Faixa de indicadores do recorte:** DEC, FEC, horas interrompidas, interrupções e UCs atendidas (média) no período atual, com a variação contra o período base, de `GET /indicadores/comparacao` com o mesmo recorte da tabela. A conta é a mesma do ranking e dos recortes (`indices`, DEC-033), então o total da faixa e as linhas da tabela não divergem. Sem base, os cards ficam vazios em vez de mostrar uma comparação inventada.
+  - **Faixa de indicadores do recorte:** DEC, FEC, horas interrompidas, interrupções e UCs atendidas (média) no período atual, com a variação contra o período base, de `GET /indicadores/comparacao` com o mesmo recorte da tabela. A conta é a mesma do ranking e dos recortes (`indices`, [DEC-033](#dec-033--dec-e-fec-por-período-e-recorte-e-a-fila-de-suspeitas-paginada)), então o total da faixa e as linhas da tabela não divergem. Sem base, os cards ficam vazios em vez de mostrar uma comparação inventada.
   - **Tabela:** colunas de horas interrompidas e interrupções; a posição na ordem da API ao lado do nome; ordenação local por qualquer coluna, que não muda a posição; busca pelo nome sem acento nem caixa; um (i) com a definição de cada coluna. Busca e ordenação são da sessão da tabela e reiniciam com o nível, o período, o critério ou o recorte.
   - **Trilha no Header:** `Municípios › município › bairro`, com links para subir sem perder classe, período e critério. Descer ou subir de nível leva o foco ao novo título.
-  - **Painel do alimentador:** DEC e FEC em dois gráficos, cada um com a empresa inteira no mesmo mês (`GET /indicadores/mensal` sem recorte) em cinza. A referência é a empresa, e não o recorte, porque o histórico do alimentador também ignora o recorte (DEC-045). O tooltip mostra as horas, as interrupções e as UCs do mês. O parâmetro `serie` deixa de existir; links antigos com ele são normalizados com `replace`.
+  - **Painel do alimentador:** DEC e FEC em dois gráficos, cada um com a empresa inteira no mesmo mês (`GET /indicadores/mensal` sem recorte) em cinza. A referência é a empresa, e não o recorte, porque o histórico do alimentador também ignora o recorte ([DEC-045](#dec-045--período-e-histórico-da-tela-de-rede)). O tooltip mostra as horas, as interrupções e as UCs do mês. O parâmetro `serie` deixa de existir; links antigos com ele são normalizados com `replace`.
 - **Alternativas descartadas:**
   - Somar as linhas da tabela na tela para o total: seria cálculo de negócio no frontend e daria outro número quando há busca ou página.
   - Uma rota nova de comparação por alimentador: fica para a próxima onda, com a variação calculada no backend; nesta, a variação existe só no total do recorte.
   - Referência do recorte no painel: misturaria um histórico global com um índice parcial.
   - Manter o seletor DEC/FEC no painel: escondia metade do histórico, e as duas séries já vinham na mesma resposta.
-- **Consequências:** a API de `/indicadores/mensal` e `/indicadores/comparacao`, os hooks (`useIndicadoresMensais`, `useComparacaoIndicadores`), `intervaloDoPar` e as definições dos indicadores (`DEFINICOES`) saem da Visão geral para uma feature própria, `features/indicadores`, que a Visão geral e a Rede importam pelo `index.ts`; nenhuma tela depende da outra, e as duas dividem o cache (chave `["indicadores", …]`). A Visão geral guarda só o que é dela, como as janelas da tesoura. `serie` sai da memória de sessão da Rede (DEC-060). Sem limite regulatório: o DEC/FEC do case é simplificado e a cor da variação só diz se melhorou ou piorou contra a base.
+- **Consequências:** a API de `/indicadores/mensal` e `/indicadores/comparacao`, os hooks (`useIndicadoresMensais`, `useComparacaoIndicadores`), `intervaloDoPar` e as definições dos indicadores (`DEFINICOES`) saem da Visão geral para uma feature própria, `features/indicadores`, que a Visão geral e a Rede importam pelo `index.ts`; nenhuma tela depende da outra, e as duas dividem o cache (chave `["indicadores", …]`). A Visão geral guarda só o que é dela, como as janelas da tesoura. `serie` sai da memória de sessão da Rede ([DEC-060](#dec-060--filtros-compartilhados-entre-as-telas-do-portal)). Sem limite regulatório: o DEC/FEC do case é simplificado e a cor da variação só diz se melhorou ou piorou contra a base.
 
 ## DEC-072 · Tela de Rede: quem piorou, onde atacar e por que cai
 
 - **Data:** 01/11/2026 · **Área:** Portal e backend · **Autor:** João Euclides
-- **Contexto:** depois da DEC-071, a Rede mostrava a variação só no total do recorte. O ranking de alimentadores era global e ficava desligado com recorte; não havia como ver todos os bairros de uma vez; o painel do alimentador mostrava o histórico do alimentador inteiro contra a empresa, mesmo com a tabela recortada (DEC-045), e não dizia por que a luz cai. `gold_interrupcoes_uc` já tinha causa, tipo, duração e UC de cada ocorrência, e só a UC 360 a usava.
+- **Contexto:** depois da [DEC-071](#dec-071--tela-de-rede-indicadores-do-recorte-contra-a-base-e-histórico-contra-a-empresa), a Rede mostrava a variação só no total do recorte. O ranking de alimentadores era global e ficava desligado com recorte; não havia como ver todos os bairros de uma vez; o painel do alimentador mostrava o histórico do alimentador inteiro contra a empresa, mesmo com a tabela recortada ([DEC-045](#dec-045--período-e-histórico-da-tela-de-rede)), e não dizia por que a luz cai. `gold_interrupcoes_uc` já tinha causa, tipo, duração e UC de cada ocorrência, e só a UC 360 a usava.
 - **Decisão:**
-  - **Variação em cada linha:** `GET /continuidade/alimentadores/ranking` e `GET /continuidade/recortes` aceitam `base_inicio` e `base_fim` (os dois ou nenhum; a base termina antes de `inicio`, senão `422`, como em `/indicadores/comparacao`). Com base, o envelope traz `base_inicio`, `base_fim` e `n_meses_base`, e cada linha traz `base` (os índices da linha na base, nula se a linha não existe nela ou se falta nela algum mês que a tabela tem na base, porque a média de UCs dividiria pelos meses da tabela e o índice sairia maior) e `variacao_pct` de DEC, FEC, horas e interrupções. A variação é nula com base zero ou nula e com mês faltando em qualquer dos períodos, na tabela ou na linha (DEC-054). Os dois períodos saem da mesma leitura com `indices()` filtrado por período (DEC-033); nenhuma fórmula nova. Linha que só existe na base não entra no ranking. Sem base, a resposta tem os mesmos números de antes, com esses campos nulos.
+  - **Variação em cada linha:** `GET /continuidade/alimentadores/ranking` e `GET /continuidade/recortes` aceitam `base_inicio` e `base_fim` (os dois ou nenhum; a base termina antes de `inicio`, senão `422`, como em `/indicadores/comparacao`). Com base, o envelope traz `base_inicio`, `base_fim` e `n_meses_base`, e cada linha traz `base` (os índices da linha na base, nula se a linha não existe nela ou se falta nela algum mês que a tabela tem na base, porque a média de UCs dividiria pelos meses da tabela e o índice sairia maior) e `variacao_pct` de DEC, FEC, horas e interrupções. A variação é nula com base zero ou nula e com mês faltando em qualquer dos períodos, na tabela ou na linha ([DEC-054](#dec-054--comparação-de-indicadores-exige-períodos-completos-e-em-ordem)). Os dois períodos saem da mesma leitura com `indices()` filtrado por período ([DEC-033](#dec-033--dec-e-fec-por-período-e-recorte-e-a-fila-de-suspeitas-paginada)); nenhuma fórmula nova. Linha que só existe na base não entra no ranking. Sem base, a resposta tem os mesmos números de antes, com esses campos nulos.
   - **Ranking com recorte:** o ranking aceita `municipio`, `bairro` (com o município) e `classe`. Sem recorte, continua lendo `gold_continuidade_alimentador_mensal`; com recorte, soma `gold_kpis_segmento_mensal` por alimentador com o filtro, na mesma conta. Na amostra e na Gold real, sem recorte, as duas fontes dão o mesmo DEC e FEC por alimentador (teste `test_both_sources_give_the_same_feeder_indexes_on_the_sample`).
   - **Ranking plano de bairros:** `/recortes` aceita `nivel` (`municipio`, `bairro` ou `alimentador`). Sem ele, continua o nível abaixo do filtro. `nivel=bairro` sem município lista todos os bairros de todos os municípios, e as linhas de bairro trazem `municipio`, porque o mesmo nome existe em municípios diferentes (Centro, COHAB, Curado na Gold real). Nível acima do filtro (`nivel=municipio` com bairro) é `422`.
-  - **Série do recorte:** `GET /continuidade/mensal` devolve DEC, FEC, horas, interrupções e UCs por competência de `gold_kpis_segmento_mensal`, com o recorte e, se pedido, só um alimentador dentro dele. O mês sem linha no recorte vem com tudo nulo, e não zero, como em `/indicadores/mensal` (DEC-030). Para um alimentador sem recorte, a série bate com `/continuidade/alimentadores/mensal`.
+  - **Série do recorte:** `GET /continuidade/mensal` devolve DEC, FEC, horas, interrupções e UCs por competência de `gold_kpis_segmento_mensal`, com o recorte e, se pedido, só um alimentador dentro dele. O mês sem linha no recorte vem com tudo nulo, e não zero, como em `/indicadores/mensal` ([DEC-030](#dec-030--regras-aplicadas-na-gold-ucs-ocorrências-gd-e-fila-de-suspeitas)). Para um alimentador sem recorte, a série bate com `/continuidade/alimentadores/mensal`.
   - **Por que cai:** `GET /continuidade/ocorrencias/resumo` lê `gold_interrupcoes_uc` e devolve o total (interrupções, horas, UCs atingidas e UCs reincidentes), horas e interrupções por causa e por tipo (das mais horas para as menos, com a causa nula como `nome: null`, mostrada como "Não informada") e a duração (mediana, P90, máxima e quantas ocorrências longas). `GET /continuidade/ocorrencias/ucs` pagina as UCs mais atingidas por horas (10 por página, no máximo 50), com município e bairro, sem titular nem documento. Para um alimentador e um período, o total do resumo bate com a linha do ranking: o contrato garante que a soma das ocorrências por alimentador e mês é a da tabela de continuidade.
   - **Tela:** a visão da tabela tem três opções. `Alimentadores` é o ranking com o recorte da barra comum (deixa de ficar desligada com recorte). `Bairros` é o ranking plano, com o rótulo "Bairro, Município"; clicar leva a `Alimentadores` com aquele município e bairro no recorte. `Localidades` é a descida de antes. A geografia passa a valer com qualquer visão, e a trilha do Header aparece sempre que há município. A tabela ganha a coluna de variação do critério ativo contra `periodo_base`, com a seta e a cor do `KpiDelta` (DEC e FEC: cair é melhorar), ordenável como as outras e oculta sem base.
   - **Painel do alimentador:** a série é a do alimentador dentro do recorte atual (`/continuidade/mensal` com `cod_alimentador` e o recorte), e a referência em cinza é o recorte inteiro (a mesma rota sem `cod_alimentador`), com o nome do recorte no rótulo; sem recorte, a referência é a empresa. O painel vira uma pilha de cards como os da Visão geral, na ordem da leitura: quanto o alimentador sofreu no período, DEC e FEC mês a mês, por que cai, quanto dura cada falta e, numa tabela como a da Rede, as UCs mais atingidas, cuja linha abre a consulta de UC mantendo o recorte. Textos soltos entre blocos saem: o contexto de cada número fica no título do card, na linha abaixo dele e no (i).
   - **Alimentador como página:** o botão ao lado do X do painel abre o alimentador como página da Rede, no lugar da faixa de indicadores e da tabela: a sidebar e o Header continuam, e o alimentador entra na trilha do Header depois do recorte (`Empresa inteira › Jaboatão dos Guararapes › Socorro › ALM-JAB-016`, com o mesmo `Breadcrumb` das outras telas). Os blocos do painel ficam em duas colunas. No topo da página, um botão volta ao painel lateral e o X fecha; o botão Voltar do navegador também volta ao painel, e cada nível da trilha volta à tabela naquele nível. O modo fica na URL (`painel=inteiro`, só com `alimentador`), então o link reproduz a página. Uma rota própria do alimentador foi descartada: duplicaria a página e perderia o recorte e o estado da tabela ao fechar.
-  - **Meses do calendário num lugar só:** a conta que diz se um período está completo (DEC-054) fica em `venergy_api.variacao.meses_no_calendario`, usada por `/indicadores/comparacao` e pelas rotas de continuidade.
+  - **Meses do calendário num lugar só:** a conta que diz se um período está completo ([DEC-054](#dec-054--comparação-de-indicadores-exige-períodos-completos-e-em-ordem)) fica em `venergy_api.variacao.meses_no_calendario`, usada por `/indicadores/comparacao` e pelas rotas de continuidade.
   - **Adendo de 01/11/2026, mapa de continuidade:** um único `RegionMap`, reaproveitando a geometria e a navegação da Receita, acompanha o seletor `DEC | FEC` que já existia na Rede. Os índices vêm de `/continuidade/recortes`, somados e divididos no backend, por município e pelos bairros do município escolhido, com período e classe. A tela não calcula média de índices. A escala visual vai de zero ao maior índice das regiões com geometria no nível exibido, de neutro a vermelho: maior é pior nas duas métricas, mas a cor não é limite regulatório nem pode ser comparada entre escalas de períodos, classes ou níveis diferentes. A legenda informa a unidade e o tooltip mostra ambos os índices, UCs médias e período. Ausência de índice fica hachurada e não habilita seleção; zero continua dado válido. O mapa mantém município e bairros vizinhos como contexto ao selecionar um bairro; os índices desses vizinhos continuam sendo os de cada região inteira dentro do período e classe, não os do bairro selecionado. Selecionar ou limpar uma região altera o recorte da Rede, preservando visão, critério e períodos. Regiões com dados que não casam com a malha são avisadas e continuam na tabela; não se inventa geometria de alimentador.
 - **Suposições:**
   - **Reincidência:** UC reincidente é a que teve 3 ou mais interrupções no período (`reincidencia_min`, padrão 3). **Ocorrência longa:** duração de 4 h ou mais (`longa_h`, padrão 4). Os dois limites incluem o valor (`>=`) e são suposições de produto, não limites regulatórios: o DEC/FEC do case é simplificado e não há DIC/FIC. Os dois são parâmetros da rota para a operação ajustar. Na Gold real, em 12 meses, 7.521 das 27.716 UCs atingidas são reincidentes com o padrão; no pior alimentador, todas as 20.
   - **Classe e geografia das ocorrências:** o recorte de `gold_interrupcoes_uc` usa `municipio`, `bairro` e `classe` (B1, B2, B3, A4) do cadastro da UC em `gold_dim_uc`. É a mesma `classe` que `/continuidade/recortes` filtra: em `gold_kpis_segmento_mensal` ela é "determinada pela classe do cadastro", e município, bairro e alimentador também vêm do cadastro. O alimentador do resumo é o `cod_alimentador` da própria ocorrência, que o contrato também tira do cadastro. A junção com o cadastro é `LEFT JOIN`: sem recorte, uma ocorrência de UC fora do cadastro (a chave estrangeira do contrato é lógica) não some das contagens; com recorte, fica fora.
   - **Contagem:** `n_interrupcoes` conta ocorrências por UC atingida, como na Gold, e não eventos físicos da rede.
-- **O que substitui:** o "histórico global" da DEC-045 (o painel consultava o alimentador inteiro, sem os filtros da tabela) e a referência da empresa da DEC-071 (o painel usava `GET /indicadores/mensal` sem recorte). O aviso "os índices do recorte podem diferir deste histórico" sai, porque o painel e a tabela passam a usar o mesmo recorte. O período padrão, o limite de 120 meses e a navegação da DEC-045 continuam valendo.
+- **O que substitui:** o "histórico global" da [DEC-045](#dec-045--período-e-histórico-da-tela-de-rede) (o painel consultava o alimentador inteiro, sem os filtros da tabela) e a referência da empresa da [DEC-071](#dec-071--tela-de-rede-indicadores-do-recorte-contra-a-base-e-histórico-contra-a-empresa) (o painel usava `GET /indicadores/mensal` sem recorte). O aviso "os índices do recorte podem diferir deste histórico" sai, porque o painel e a tabela passam a usar o mesmo recorte. O período padrão, o limite de 120 meses e a navegação da [DEC-045](#dec-045--período-e-histórico-da-tela-de-rede) continuam valendo.
 - **Alternativas descartadas:**
   - Calcular a variação na tela a partir de duas chamadas ao ranking: seria conta de negócio no frontend e erraria a regra de mês faltando.
   - Ranking com recorte só pela tabela de segmentos, também sem recorte: trocaria a fonte de uma tela que já bate com a Gold; o teste garante que as duas dão o mesmo índice.
   - Agrupar os bairros só pelo nome: somaria bairros homônimos de municípios diferentes.
   - Ligar as interrupções à perda de receita: a hipótese H7 foi refutada.
   - Limites da ANEEL (DIC, FIC, DMIC) para reincidência e duração: o DEC/FEC do case é simplificado (`docs/dicionario-de-dados.md`).
-- **Consequências:** `gold_interrupcoes_uc` passa a ter a tela DEC/FEC em `consumers` (DEC-014). No frontend saem `useSerieAlimentador`, `buscarSerieAlimentador`, o tipo `ReferenciaMensal`, o uso de `/indicadores/mensal` no painel, a opção desligada e a mensagem "Limpe o recorte…". `visao` aceita `alimentadores`, `bairros` e `localidades`, e a memória da Rede (DEC-060) guarda `criterio`, `visao`, `alimentador` e `painel`; mudar o recorte ou o período fecha o painel e esquece o tamanho. A `DataTable` ganha o ponto `xl` (36rem) para virar tabela em containers estreitos e alinha à esquerda o cabeçalho das colunas que não ordenam. A faixa de indicadores da DEC-071 não muda.
+- **Consequências:** `gold_interrupcoes_uc` passa a ter a tela DEC/FEC em `consumers` ([DEC-014](#dec-014--o-backend-espelha-o-contrato-da-gold)). No frontend saem `useSerieAlimentador`, `buscarSerieAlimentador`, o tipo `ReferenciaMensal`, o uso de `/indicadores/mensal` no painel, a opção desligada e a mensagem "Limpe o recorte…". `visao` aceita `alimentadores`, `bairros` e `localidades`, e a memória da Rede ([DEC-060](#dec-060--filtros-compartilhados-entre-as-telas-do-portal)) guarda `criterio`, `visao`, `alimentador` e `painel`; mudar o recorte ou o período fecha o painel e esquece o tamanho. A `DataTable` ganha o ponto `xl` (36rem) para virar tabela em containers estreitos e alinha à esquerda o cabeçalho das colunas que não ordenam. A faixa de indicadores da [DEC-071](#dec-071--tela-de-rede-indicadores-do-recorte-contra-a-base-e-histórico-contra-a-empresa) não muda.
+- **Limitação conhecida (issue #133, 04/11/2026):** o DEC e o FEC do período atual de uma linha do ranking e de `/recortes` dividem a soma de UCs pelos meses que a tabela inteira tem no período (`contar_meses`), e não pelos meses da própria linha. Uma linha a que falte algum desses meses (alimentador ligado ou desligado no meio do período, ou um buraco no dado) sai com DEC e FEC maiores e pode subir no ranking, que ordena do pior para o melhor. A variação e o `base` dessa linha já saem nulos. Conferido na Gold real carregada (export de 28/10, a mesma do Postgres local): em `gold_continuidade_alimentador_mensal`, os 122 alimentadores têm os 48 meses; em `gold_kpis_segmento_mensal`, nenhum grupo tem mês faltando, para qualquer combinação de recorte (município, bairro, classe, pela `classe` e pela `classe_cadastro`) e de nível de linha (município, bairro e alimentador). Com a Gold atual, o caso não chega à tela. A correção, dividir pelos meses da própria linha, fica para depois da entrega: `indices()` também calcula `/indicadores/comparacao` e as janelas ([DEC-041](#dec-041--redesign-da-tela-da-diretoria-a-tesoura-primeiro-e-indicadores-por-período-no-backend)), onde o mês sem linha no recorte conta como zero de propósito, e a mudança precisa de conferência nessas rotas. Uma Gold nova precisa da mesma conferência.
 
 ## DEC-073 · `receita_energia` confirmada como base do PVM e da tarifa média
 
-- **Data:** 01/11/2026 · **Área:** Dados · **Autor:** Arthur · **Revisa:** DEC-023 (base provisória) · **Número:** revisada no #126 como DEC-066 e renumerada, porque a DEC-066 ficou com o insight da Receita
-- **Contexto:** a DEC-023 deixou `receita_energia` (sem tributos) como base provisória do PVM e da `tarifa_media`, até um teste declarado: medir qual definição, com ou sem tributos, reproduz a variação citada pela diretoria, sem ajustar números.
+- **Data:** 01/11/2026 · **Área:** Dados · **Autor:** Arthur · **Revisa:** [DEC-023](#dec-023--medidas-de-receita-reconciliação-e-ajustes-de-colunas-da-gold) (base provisória) · **Número:** revisada no #126 como DEC-066 e renumerada, porque a [DEC-066](#dec-066--insight-da-receita-dá-a-conclusão-não-repete-a-tela) ficou com o insight da Receita
+- **Contexto:** a [DEC-023](#dec-023--medidas-de-receita-reconciliação-e-ajustes-de-colunas-da-gold) deixou `receita_energia` (sem tributos) como base provisória do PVM e da `tarifa_media`, até um teste declarado: medir qual definição, com ou sem tributos, reproduz a variação citada pela diretoria, sem ajustar números.
 - **Resultado do teste:** feito no diagnóstico ([`diagnostico-receita.md`](diagnostico-receita.md), seções 2 e 4). Entre o período base e o atual, a receita varia +8,00% tanto em `receita_energia` quanto em `receita_faturada` (com tributos): as duas definições reproduzem a variação da diretoria, e a diferença fica só nos valores absolutos. **O teste não distingue as duas:** no dataset, os tributos são uma proporção fixa da fatura em todos os meses, então qualquer variação percentual sai igual com e sem eles. A decomposição do período base para o atual fecha exatamente com a variação da `receita_energia`.
-- **Decisão:** `receita_energia` passa a ser a base oficial de `receita_base`, `receita_atual`, `tarifa_media` e `receita_energia_cadastro`. Nenhum número, coluna ou fórmula muda. "Receita" sem qualificador continua sendo `receita_faturada` (DEC-022).
-- **Motivo:** como o teste não distingue, a decisão se apoia no conceito: tributos não são receita da distribuidora. Sem eles, o efeito preço separa reajuste de tarifa e bandeira, e a variação dos impostos aparece à parte (como na conta da UC, DEC-057).
+- **Decisão:** `receita_energia` passa a ser a base oficial de `receita_base`, `receita_atual`, `tarifa_media` e `receita_energia_cadastro`. Nenhum número, coluna ou fórmula muda. "Receita" sem qualificador continua sendo `receita_faturada` ([DEC-022](#dec-022--regras-do-agente-sobre-a-gold-e-decisões-da-daily-de-2110)).
+- **Motivo:** como o teste não distingue, a decisão se apoia no conceito: tributos não são receita da distribuidora. Sem eles, o efeito preço separa reajuste de tarifa e bandeira, e a variação dos impostos aparece à parte (como na conta da UC, [DEC-057](#dec-057--variação-da-conta-da-unidade-consumidora-dividida-por-motivo)).
 - **Descartado:** `receita_faturada` como base do PVM. Daria a mesma variação percentual, mas misturaria a variação dos tributos com o efeito preço.
-- **Consequências:** saem as marcas de "provisória" do contrato, do dicionário e da DEC-057. O comentário de `backend/src/venergy_api/models.py` que cita a base provisória fica para um ajuste do Portal.
+- **Consequências:** saem as marcas de "provisória" do contrato, do dicionário e da [DEC-057](#dec-057--variação-da-conta-da-unidade-consumidora-dividida-por-motivo). O comentário de `backend/src/venergy_api/models.py` que cita a base provisória fica para um ajuste do Portal.
 
 ## DEC-074 · Testes de qualidade do export e da Gold
 
 - **Data:** 03/11/2026 · **Área:** Dados · **Autor:** Arthur · **Atende:** D1-10 (issue #101)
 - **Contexto:** as travas dos notebooks (mais de 50 só no `Silver_to_Gold`: `aplicar_contrato`, `exigir_chave_unica`, `exigir_sem_orfaos`, `exigir_mesma_contagem`, `exigir_zero`) já barram o Job antes do export quando uma camada sai inconsistente. O export dos 12 CSVs é o único passo do pipeline sem trava, e é o que chega ao portal (pela carga) e ao agente.
 - **Decisão:** uma 4ª task no Workflow, `testes_qualidade`, depois de `silver_to_gold_export`, que roda o notebook [`Testes_Qualidade_Gold`](../data-engineering/notebooks/Testes_Qualidade_Gold.ipynb). É somente leitura: lê `v_energy.gold` e os CSVs do Volume e grava só em `v_energy.qualidade`.
-  - **Críticos** (uma falha deixa o Job vermelho): CSV × Gold em cada tabela (contagem de linhas, colunas e ordem, soma de colunas numéricas escolhidas em cada tabela (1 a 3 por tabela, listadas em `SOMAS_CSV` no notebook) e encoding da UC-13); reconciliações entre tabelas (`gold_kpis_mensais` = soma de `gold_kpis_segmento_mensal`, receita total = cadastro + órfãs, preço + volume + mix = variação da receita); premissa da DEC-067 (nenhuma linha de UC de teste nas tabelas por UC).
+  - **Críticos** (uma falha deixa o Job vermelho): CSV × Gold em cada tabela (contagem de linhas, colunas e ordem, soma de colunas numéricas escolhidas em cada tabela (1 a 3 por tabela, listadas em `SOMAS_CSV` no notebook) e encoding da UC-13); reconciliações entre tabelas (`gold_kpis_mensais` = soma de `gold_kpis_segmento_mensal`, receita total = cadastro + órfãs, preço + volume + mix = variação da receita); premissa da [DEC-067](#dec-067--ucs-de-teste-do-cadastro-ficam-na-gold-documentadas) (nenhuma linha de UC de teste nas tabelas por UC).
   - **Alerta** (só registrado): variação de linhas de cada tabela acima de 5% contra a execução anterior. Na primeira execução não há base, e o status é `LINHA_DE_BASE`.
-  - **Histórico:** uma linha por teste e execução em `v_energy.qualidade.resultados_testes` (append). Os valores medidos ficam só no Databricks; o print mostra teste, tabela, tipo e status (DEC-024).
+  - **Histórico:** uma linha por teste e execução em `v_energy.qualidade.resultados_testes` (append). Os valores medidos ficam só no Databricks; o print mostra teste, tabela, tipo e status ([DEC-024](#dec-024--o-que-pode-subir-ao-repositório-público)).
   - As sugestões do Alisson na issue #101 foram incorporadas.
 - **Execução:** validada isoladamente contra a Gold atual em 03/11/2026: 80 testes, 68 críticos OK e 12 de variação de linhas como linha de base, sem falha nem alerta. O Job completo não foi rodado antes do code freeze de 03/11, para não regravar Silver, Gold e CSVs. Como o Job lê os notebooks da `main`, a task entra no Job do Databricks depois do merge.
 - **Limitação:** os testes rodam depois do export, então detectam um CSV ruim, mas não impedem que ele seja gravado no Volume. Regra: com o Job vermelho, ninguém baixa os CSVs.
@@ -2126,10 +2197,10 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 
 ## DEC-075 · Ordem de inspeção guarda o contexto da fila e o resultado de campo
 
-- **Data:** 02/11/2026 · **Área:** Portal e backend · **Autor:** João Euclides · **Número:** proposta no #136 como DEC-073 e renumerada, porque a DEC-073 e a DEC-074 entraram antes na `main`
-- **Contexto:** a ordem não tem chave estrangeira para a Gold (DEC-009), e `gold_fila_suspeitas` é recriada a cada carga. Depois de uma recarga, não se sabia com que posição, motivos e energia estimada a ordem foi gerada. A conclusão guardava só o resultado e a observação; a planilha de campo lia o tipo de irregularidade e o kWh recuperado e os colocava só no texto da observação. Com isso, o portal não media quanto as ordens recuperaram nem se a fila acerta, como a DEC-009 prometia.
+- **Data:** 02/11/2026 · **Área:** Portal e backend · **Autor:** João Euclides · **Número:** proposta no #136 como [DEC-073](#dec-073--receita_energia-confirmada-como-base-do-pvm-e-da-tarifa-média) e renumerada, porque a [DEC-073](#dec-073--receita_energia-confirmada-como-base-do-pvm-e-da-tarifa-média) e a [DEC-074](#dec-074--testes-de-qualidade-do-export-e-da-gold) entraram antes na `main`
+- **Contexto:** a ordem não tem chave estrangeira para a Gold ([DEC-009](#dec-009--modelo-das-ordens-de-inspeção)), e `gold_fila_suspeitas` é recriada a cada carga. Depois de uma recarga, não se sabia com que posição, motivos e energia estimada a ordem foi gerada. A conclusão guardava só o resultado e a observação; a planilha de campo lia o tipo de irregularidade e o kWh recuperado e os colocava só no texto da observação. Com isso, o portal não media quanto as ordens recuperaram nem se a fila acerta, como a [DEC-009](#dec-009--modelo-das-ordens-de-inspeção) prometia.
 - **Decisão:**
-  - `app.ordem_inspecao` ganha cinco colunas nulas: `fila_posicao`, `fila_motivos` (`text[]`), `fila_kwh_recuperavel_est` (kWh/mês), `tipo_irregularidade` e `kwh_recuperado` (kWh, como `gold_inspecoes_uc.kwh_recuperado`). Num banco antigo, `garantir_estrutura_do_app` as acrescenta com `ADD COLUMN IF NOT EXISTS` (DEC-050).
+  - `app.ordem_inspecao` ganha cinco colunas nulas: `fila_posicao`, `fila_motivos` (`text[]`), `fila_kwh_recuperavel_est` (kWh/mês), `tipo_irregularidade` e `kwh_recuperado` (kWh, como `gold_inspecoes_uc.kwh_recuperado`). Num banco antigo, `garantir_estrutura_do_app` as acrescenta com `ADD COLUMN IF NOT EXISTS` ([DEC-050](#dec-050--autoria-nos-eventos-das-ordens-de-inspeção)).
   - `POST /ordens-inspecao` copia `score_suspeita`, `motivos` e `kwh_recuperavel_est` da fila na mesma transação. Uma UC fora da fila (ordem gerada à mão) fica com as três vazias.
   - `PATCH /ordens-inspecao/{id}` aceita `tipo_irregularidade` (até 100 caracteres) e `kwh_recuperado`. Com `IRREGULAR_CONFIRMADA` os dois são obrigatórios, como na planilha de campo; com outro resultado, ou sem resultado, são proibidos (`422`). Aqui o PATCH é mais estrito que a planilha: ela aceita um "0" num resultado regular e o grava vazio, o PATCH recusa qualquer kWh. O upload passa a gravar as colunas, e a observação em texto continua igual.
   - O kWh recuperado vai de 0,001 a 9.999.999.999.999,999, com até três casas: é o que `numeric(16,3)` guarda sem arredondar. Fora disso, o PATCH devolve `422` e a planilha recusa a linha; antes, `0,0004` era gravado como 0 numa irregularidade confirmada e um valor acima do teto estourava o banco com `500`.
@@ -2141,29 +2212,29 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 
 ## DEC-076 · Tela de Perdas: indicadores, mapa, última inspeção e filtros novos da fila
 
-- **Data:** 02/11/2026 · **Área:** Portal e backend · **Autor:** João Euclides · **Número:** proposta no #136 como DEC-074 e renumerada
+- **Data:** 02/11/2026 · **Área:** Portal e backend · **Autor:** João Euclides · **Número:** proposta no #136 como [DEC-074](#dec-074--testes-de-qualidade-do-export-e-da-gold) e renumerada
 - **Contexto:** a tela mostrava a fila e as ordens, mas não dizia se a fila acerta, onde a perda se concentra nem quais UCs já foram vistoriadas. O contrato lista a tela de Perdas como consumidora de `gold_inspecoes_uc`, e só a UC 360 a lia. O filtro `sem_ordem_ativa` existia na API sem uso na tela.
 - **Decisão:**
   - **Indicadores:** `GET /fila-suspeitas/indicadores`, com o recorte, devolve suspeitas, suspeitas sem ordem ativa, kWh/mês estimado das suspeitas sem ordem, ordens geradas e em campo e, para o portal (ordens concluídas) e para a Gold (`gold_inspecoes_uc`), vistorias, irregulares, regulares, não realizadas, `taxa_irregularidade = irregulares / (irregulares + regulares)` (nula sem vistoria decidida) e kWh recuperado. A tela mostra a faixa no topo das duas seções, sem contas.
-  - **Mapa e ranking:** `GET /fila-suspeitas/recortes` agrupa as suspeitas por município ou pelos bairros do município (`nivel`, como em `/continuidade/recortes`; nível acima do filtro é `422`), com suspeitas, sem ordem ativa e kWh/mês estimado, do maior kWh para o menor. A tela reaproveita o `RegionMap` da Receita e da Rede; clicar aplica o recorte compartilhado (DEC-060).
+  - **Mapa e ranking:** `GET /fila-suspeitas/recortes` agrupa as suspeitas por município ou pelos bairros do município (`nivel`, como em `/continuidade/recortes`; nível acima do filtro é `422`), com suspeitas, sem ordem ativa e kWh/mês estimado, do maior kWh para o menor. A tela reaproveita o `RegionMap` da Receita e da Rede; clicar aplica o recorte compartilhado ([DEC-060](#dec-060--filtros-compartilhados-entre-as-telas-do-portal)).
   - **Última inspeção:** cada item da fila traz `ultima_inspecao` (data, resultado e origem). Vale a mais recente entre a Gold e as ordens concluídas no portal como irregular ou regular, com a data da conclusão no fuso `America/Recife`; no empate de datas vale o portal. `NAO_REALIZADA` não conta. `sem_inspecao_meses` (1 a 120) tira da fila, antes da paginação, as UCs com inspeção nos últimos N meses do relógio do banco; a tela oferece 6, 12, 24 e 36 meses.
   - **Filtro sem ordem ativa e seleção:** o painel de filtros envia `sem_ordem_ativa=true`; a barra da fila mostra a soma do kWh/mês estimado das UCs selecionadas na página, e quantas não têm estimativa. É a única soma feita na tela, e é apresentação: soma valores que a API já devolveu, nas linhas que só o navegador sabe que foram marcadas. Pedir o total ao backend exigiria uma chamada a cada clique na caixa de seleção, sem número novo.
-- **Suposições:** a taxa da Gold é a régua histórica das vistorias de antes do portal, e não da fila atual; as duas taxas aparecem lado a lado, sem conclusão automática. Ordens de UC fora do cadastro saem das contagens com recorte (DEC-059).
+- **Suposições:** a taxa da Gold é a régua histórica das vistorias de antes do portal, e não da fila atual; as duas taxas aparecem lado a lado, sem conclusão automática. Ordens de UC fora do cadastro saem das contagens com recorte ([DEC-059](#dec-059--ordem-de-uc-ausente-do-cadastro-da-gold-fica-fora-da-lista-quando-há-recorte)).
 - **Alternativas descartadas:** calcular taxas e somas do recorte na tela, contra a regra de cálculo no backend; uma rota que soma o kWh da seleção; contar a janela de meses a partir da última carga da Gold, que muda a cada carga sem o usuário ver.
-- **Consequências:** `sem_ordem_ativa` e `sem_inspecao_meses` entram na memória de filtros locais de Perdas (DEC-060). Os indicadores e o mapa são invalidados junto com as ordens.
+- **Consequências:** `sem_ordem_ativa` e `sem_inspecao_meses` entram na memória de filtros locais de Perdas ([DEC-060](#dec-060--filtros-compartilhados-entre-as-telas-do-portal)). Os indicadores e o mapa são invalidados junto com as ordens.
 
 ## DEC-077 · Insights de IA nas telas do dia a dia, com a IA escolhendo a leitura
 
-- **Data:** 03/11/2026 · **Área:** GenAI e backend · **Autor:** Luis Felipe · **Revisa:** DEC-066 (a regra deixa de escolher a leitura e passa a calcular as candidatas e a reserva)
-- **Contexto:** o case pede, no Módulo 3, insight "em pelo menos uma das telas", mas a user story da seção 5.3 pede insights "nas telas que uso no dia a dia". Só a Receita tinha. E nela a regra do backend escolhia a conclusão (DEC-066): a IA só reescrevia um texto pronto, e um padrão novo nos dados não aparecia, porque a regra só conhece as leituras que alguém escreveu.
+- **Data:** 03/11/2026 · **Área:** GenAI e backend · **Autor:** Luis Felipe · **Revisa:** [DEC-066](#dec-066--insight-da-receita-dá-a-conclusão-não-repete-a-tela) (a regra deixa de escolher a leitura e passa a calcular as candidatas e a reserva)
+- **Contexto:** o case pede, no Módulo 3, insight "em pelo menos uma das telas", mas a user story da seção 5.3 pede insights "nas telas que uso no dia a dia". Só a Receita tinha. E nela a regra do backend escolhia a conclusão ([DEC-066](#dec-066--insight-da-receita-dá-a-conclusão-não-repete-a-tela)): a IA só reescrevia um texto pronto, e um padrão novo nos dados não aparecia, porque a regra só conhece as leituras que alguém escreveu.
 - **Decisão:**
   - **Três telas novas**, cada uma com a pessoa que a usa no case:
     - Visão Geral (diretoria), `GET /indicadores/insight`;
     - Rede (operação), `GET /continuidade/insight`;
     - Unidade consumidora (atendimento), `GET /unidades-consumidoras/{cod_uc}/insight`.
-  - O botão "Gerar insight" (DEC-069) fica ao lado da leitura que o insight aprofunda: o título da Visão Geral, a legenda do ranking de alimentadores e o cartão "Por que a conta mudou".
+  - O botão "Gerar insight" ([DEC-069](#dec-069--insight-de-ia-ao-lado-da-leitura-que-ele-narra)) fica ao lado da leitura que o insight aprofunda: o título da Visão Geral, a legenda do ranking de alimentadores e o cartão "Por que a conta mudou".
   - **Leituras candidatas.** Em toda tela, o backend calcula as leituras do recorte, cada uma com um `id` e um texto com os números já calculados (`candidatas` no JSON). A IA escolhe uma ou duas, as que mais importam para quem usa a tela, e escreve o insight com as próprias palavras. Ela devolve o texto e os `id` escolhidos (`InsightDraft`, saída estruturada do `PydanticAiInsightWriter`). O prompt `insight/v4` diz quem usa cada tela e o que a tela já mostra, para a IA preferir o que ela não mostra.
-  - **Conferência.** O backend aceita o texto se a escolha vale (até duas leituras, sem repetir, todas entre as candidatas) e se o texto diz o que elas dizem. Nenhum número do texto fica fora das leituras escolhidas, que é o que impede a invenção, e nenhum número delas falta, exceto as contagens de uma leitura que cita nomes ("os 3 … de 13" fica redundante quando os três lugares são nomeados; em "73 dos 86 bairros", sem nomes, o 86 continua exigido, revisão do #141). Cada percentual ou valor em R$ sobe ou cai como na leitura, em qualquer ordem, e não há nome de chave nem termo proibido (`texto_aceito` em `insights.py`). Continua valendo a checagem do agente: todo número do texto existe no JSON (DEC-019). Se o texto falhar, a IA tem mais uma tentativa com o motivo da recusa, e não com o texto recusado (`redigir` em `insights.py`, parâmetro `feedback` do `InsightWriter.narrate`). Exemplos de motivo: "Use estes números, escritos exatamente assim, e nenhum outro: 3,9, 2,1." e "Escreva no máximo 169 caracteres […]". O agente faz o mesmo quando um número do texto não está no JSON: dá uma nova tentativa que nomeia o número. Erro do provedor não ganha nova tentativa, porque a cadeia de modelos reserva já tentou os outros. Se a segunda tentativa também falhar, a tela mostra a reserva (`leitura_texto`), com `origem: regra`, como na DEC-066. Isso revisa a DEC-066 só no ponto da nova tentativa: lá, repetir o mesmo pedido não adiantava com temperatura 0; com o motivo, o pedido é outro. Cada recusa fica no log, com o motivo e sem o texto.
+  - **Conferência.** O backend aceita o texto se a escolha vale (até duas leituras, sem repetir, todas entre as candidatas) e se o texto diz o que elas dizem. Nenhum número do texto fica fora das leituras escolhidas, que é o que impede a invenção, e nenhum número delas falta, exceto as contagens de uma leitura que cita nomes ("os 3 … de 13" fica redundante quando os três lugares são nomeados; em "73 dos 86 bairros", sem nomes, o 86 continua exigido, revisão do #141). Cada percentual ou valor em R$ sobe ou cai como na leitura, em qualquer ordem, e não há nome de chave nem termo proibido (`texto_aceito` em `insights.py`). Continua valendo a checagem do agente: todo número do texto existe no JSON ([DEC-019](#dec-019--verificação-numérica-da-narrativa)). Se o texto falhar, a IA tem mais uma tentativa com o motivo da recusa, e não com o texto recusado (`redigir` em `insights.py`, parâmetro `feedback` do `InsightWriter.narrate`). Exemplos de motivo: "Use estes números, escritos exatamente assim, e nenhum outro: 3,9, 2,1." e "Escreva no máximo 169 caracteres […]". O agente faz o mesmo quando um número do texto não está no JSON: dá uma nova tentativa que nomeia o número. Erro do provedor não ganha nova tentativa, porque a cadeia de modelos reserva já tentou os outros. Se a segunda tentativa também falhar, a tela mostra a reserva (`leitura_texto`), com `origem: regra`, como na [DEC-066](#dec-066--insight-da-receita-dá-a-conclusão-não-repete-a-tela). Isso revisa a [DEC-066](#dec-066--insight-da-receita-dá-a-conclusão-não-repete-a-tela) só no ponto da nova tentativa: lá, repetir o mesmo pedido não adiantava com temperatura 0; com o motivo, o pedido é outro. Cada recusa fica no log, com o motivo e sem o texto.
   - **O que cada tela traz que a tela não diz:**
 
     | Tela | Leituras candidatas |
@@ -2171,17 +2242,17 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
     | Visão Geral | a base de unidades crescendo com menos energia (a pergunta do diretor no case); a receita contra a energia e o ganho que veio do preço; o indicador de rede e atendimento que mais piorou |
     | Rede | quanto das horas de interrupção (DEC) ou das interrupções (FEC) se concentra no décimo pior dos alimentadores; quantas vezes o pior passa do índice do conjunto; com período base, em quantos o índice subiu e onde subiu mais |
     | Unidade consumidora | a conta subiu sem o cliente gastar mais energia; o mês fora do padrão contra a tendência dos 12 meses; leitura estimada |
-    | Receita | as leituras da DEC-066, agora todas como candidatas |
+    | Receita | as leituras da [DEC-066](#dec-066--insight-da-receita-dá-a-conclusão-não-repete-a-tela), agora todas como candidatas |
     | Perdas | quanto do kWh estimado da fila se concentra nos 3 lugares com mais energia a recuperar (com os nomes); a taxa de irregularidade das vistorias do portal contra o histórico da Gold; quantas suspeitas ainda não têm ordem e quanto estimam por mês |
 
   - Nenhum dado do titular vai ao modelo: o insight da UC leva só variações da conta e do consumo, sem o código da UC.
-  - **Perdas e a DEC-022.** A fila fica fora do agente por ser uma lista de suspeitos. O insight de Perdas (`GET /fila-suspeitas/insight`) não muda isso: o modelo recebe só os totais que a tela já mostra (indicadores e lugares do mapa), nunca o código de uma UC, e o texto não pode dizer "suspeitos" nem "fraudadores".
+  - **Perdas e a [DEC-022](#dec-022--regras-do-agente-sobre-a-gold-e-decisões-da-daily-de-2110).** A fila fica fora do agente por ser uma lista de suspeitos. O insight de Perdas (`GET /fila-suspeitas/insight`) não muda isso: o modelo recebe só os totais que a tela já mostra (indicadores e lugares do mapa), nunca o código de uma UC, e o texto não pode dizer "suspeitos" nem "fraudadores".
   - **Nomes exigidos.** Uma leitura que aponta lugares ou alimentadores leva os nomes em `nomes`, e a conferência exige que o texto os cite: "os 3 municípios" sem dizer quais não diz para onde ir. Vale para a concentração de Perdas, o alimentador da Rede e o lugar das quedas na Receita.
   - **Todos os motivos de uma vez.** A correção da nova tentativa lista todos os problemas do texto. Com um motivo por vez, a IA consertava os números e perdia os nomes na tentativa seguinte.
 - **Motivo:** a interpretação passa a ser da IA, como o case pede, sem abrir mão de "dado inventado é pior que nenhum dado". As regras não dependem da Gold de hoje: comparam sinais e proporções do recorte pedido. O cache usa o conteúdo das métricas como chave, então uma Gold recarregada gera um insight novo.
 - **Medição:** chamada às quatro rotas com o modelo padrão na Gold real, em 03/11, e conferência das telas no portal. Na UC, a IA juntou duas leituras que repetiam o mesmo percentual e citou o número uma vez; a primeira versão da conferência, que exigia as altas e quedas na mesma sequência, recusou o texto. Por isso a conferência passou a olhar o sentido de cada variação, e não a sequência. A rodada fixa (`make eval-insights`) passou a cobrir as quatro telas, com um caso para cada leitura que a Gold tem (32 casos: 15 da Receita, 5 da Visão Geral, 7 da Rede e 5 da UC). Na primeira rodada, 9 de 32 saíram com texto da IA: a folga fixa de 40 caracteres recusava textos que juntavam duas leituras, e "o ganho de receita foi de 14,3%" não contava como alta. Com folga de 30% do tamanho das leituras (mínimo de 40) e "ganho" como alta, foram 29 de 32, e a IA escolheu duas leituras em 28 casos. As três recusas restantes são esperadas: uma conclusão a mais num caso sintético, um número em formato inglês (barrado pela checagem do agente) e uma falha passageira do provedor. Com a nova tentativa com o motivo, foram 32 de 32: das 5 recusas da conferência, todas por tamanho, as 5 passaram na segunda tentativa. Os 2 números fora das métricas foram corrigidos pelo próprio agente. Com Perdas (03/11), a primeira rodada mostrou que "recuperar" era lido como queda ("energia a recuperar … 73,0%") e que a IA omitia os nomes dos lugares; os dois foram corrigidos. As rodadas seguintes esbarraram em falhas do provedor no plano gratuito (até 25 de 38 chamadas), e a rodada ganhou uma pausa de 4 s entre os casos. Nos casos de Perdas que o provedor respondeu, o texto da IA passou com os nomes: "Recife, Cabo de Santo Agostinho e Olinda são 3 dos 13 municípios que concentram 73,0% do kWh estimado da fila." Rodada final (04/11), com a reserva paga do OpenRouter na cadeia de modelos e sem nenhuma falha do provedor: **35 de 35 casos com texto da IA** nas cinco telas (Receita 15, Visão Geral 5, Rede 7, Unidade consumidora 5, Perdas 3). Antes, Perdas ficava em 1 de 3: a leitura de concentração trazia "os 3 municípios … de 13", e a IA, ao citar os nomes, tirava essas contagens redundantes, o que a conferência recusava. A leitura passou a dizer só os nomes e o percentual.
 - **Alternativas descartadas:**
-  - **a IA escolher livremente sobre as métricas:** foi o que fez o insight repetir a tela e afirmar o que os números não sustentam (DEC-066);
+  - **a IA escolher livremente sobre as métricas:** foi o que fez o insight repetir a tela e afirmar o que os números não sustentam ([DEC-066](#dec-066--insight-da-receita-dá-a-conclusão-não-repete-a-tela));
   - **a regra escolher a leitura:** a IA só redigia e a interpretação ficava presa ao que a regra conhece.
 - **Consequências:**
   - `make eval-insights` cobre as quatro telas (`TELAS=rede,receita` escolhe) e confere cada texto como a rota, contra as leituras que a IA escolheu;
@@ -2190,7 +2261,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 
 ## DEC-078 · Busca de UC pelo código como o atendente digita
 
-- **Data:** 04/11/2026 · **Área:** Portal e backend · **Autor:** João Euclides · **Revisa:** DEC-043 (busca)
+- **Data:** 04/11/2026 · **Área:** Portal e backend · **Autor:** João Euclides · **Revisa:** [DEC-043](#dec-043--palette-global-de-ucs-e-navegação-por-contexto) (busca)
 - **Contexto:** na Gold real o código é `UC` + 6 dígitos (`UC144997`), mas o cliente fala só o número. A palette tratava o texto digitado como código exato: `144997` ou `uc 144997` chamavam `/visao-360` e voltavam `404`, e a única opção do autocomplete era o próprio texto. Depois do erro, o texto antigo continuava no campo e o código novo era concatenado a ele.
 - **Decisão:**
   - **Resolução no backend:** as rotas `/{cod_uc}` e `/{cod_uc}/visao-360` tentam primeiro o código exato. Sem ele, comparam só letras e dígitos, sem caixa (`uc 144997` e `UC-144997` viram `UC144997`), e aceitam o número sem o prefixo de letras quando uma única UC tem esse número. Dois códigos com o mesmo número (`UC1024` e `TESTE1024`) continuam `404` para `1024`: o backend não escolhe entre duas UCs.
@@ -2199,3 +2270,31 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
   - **Erro:** UC não encontrada não oferece "Tentar de novo" (repetiria o mesmo `404`): o campo recebe o foco com o texto selecionado, e digitar substitui o código. Falha de rede ou do servidor mantém "Tentar de novo". Na página `/uc`, a UC inexistente oferece "Buscar outra UC", que abre a palette vazia. O placeholder é "Ex.: UC999999", e o (i) do campo lista os formatos aceitos.
 - **Alternativas descartadas:** acrescentar "UC" ao número só no frontend (o contrato não fixa o formato do código, e a amostra usa `0001`); preencher zeros à esquerda (`1` não é `0001`; a DEC-043 continua valendo nisso).
 - **Consequências:** a busca percorre `gold_dim_uc` com `regexp_replace` (cerca de 45 mil linhas na Gold real, sem índice próprio); se o cadastro crescer muito, entra um índice de expressão. Testes em `backend/tests/test_unidades.py` e `test_unidades_visao_360.py`.
+
+## Convenções do frontend (sem número)
+
+- **Data:** 19/10/2026 · **Área:** Portal · **Autor:** João Euclides
+
+- **Frontend com TanStack Start em modo SPA (React + TypeScript + Vite).** O gerador já integra Router, Query, Form, Table, devtools e React Compiler; SSR desligado porque o FastAPI é o único backend.
+- **Autenticação e perfis ficam no FastAPI; better-auth removido do frontend.** Pensei em usar BetterAuth, porém, permissão precisa ser checada onde estão os dados, melhor evitar um segundo backend em Node com sessões que o FastAPI não valida.
+- **Em dev, o Vite encaminha `/api/*` para o FastAPI removendo o prefixo; base da API configurável por `VITE_API_URL`.** Evita CORS no desenvolvimento e não exige prefixo `/api` nas rotas do backend; endereço do backend ainda não definido.
+- **Frontend em camadas por feature (`features/<feature>` com `api.ts`, `hooks`, `pages`; `routes/` só define rotas).** Times e agentes seguem a mesma organização; regras em `frontend/README.md` e `frontend/CLAUDE.md`.
+- **Cálculos de negócio (DEC/FEC, efeito-preço × efeito-volume) ficam na camada Gold/backend; o frontend só exibe.** Uma única fonte dos números para portal e agente de IA.
+- **Valores exibidos (R$, kWh, %, competência, datas) formatados só por `frontend/src/lib/format.ts`.** Mesmo número com o mesmo formato em todas as telas.
+
+## Como registrar uma decisão
+
+1. Pegue o próximo número livre depois do maior desta página e confira os PRs abertos, que podem já ter reservado números.
+2. Acrescente a seção no fim da lista numérica, com o título `## DEC-NNN · Título curto`, e a linha no tema certo do índice.
+3. Uma decisão que muda outra não a reescreve: registra **Revisa:** com o número antigo, e o índice marca a antiga como revisada.
+
+```markdown
+## DEC-NNN · Título curto
+
+- **Data:** DD/MM/AAAA · **Área:** Portal | Dados | GenAI | Backend · **Autor:** Nome · **Revisa:** DEC-XXX (o que muda)
+- **Contexto:** o problema e o que o case não diz.
+- **Decisão:** o que foi escolhido, com as regras.
+- **Suposições:** o que o time supôs onde o case não é explícito.
+- **Alternativas descartadas:** cada uma com o motivo.
+- **Consequências:** o que muda para as outras frentes.
+```

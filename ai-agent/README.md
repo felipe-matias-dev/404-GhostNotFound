@@ -1,8 +1,102 @@
 # Agente de IA
 
-Agente Text-to-SQL em Python, integrado ao backend FastAPI, consultando o banco local alimentado pelas tabelas Gold. Também gera os insights exibidos nas telas do portal.
+A parte de GenAI do V-Energy Grid 360 tem duas funções:
 
-Já existem os contratos de domínio, as portas, a configuração, o validador SQL, o executor somente leitura e o gerador de SQL. A camada semântica e a orquestração da pergunta (`ask()`) entram em seguida. O spec completo está em [docs/specs/2026-10-19-architecture-design.md](docs/specs/2026-10-19-architecture-design.md), e o guia de boas práticas em [docs/contexto-agente-text-to-sql.md](docs/contexto-agente-text-to-sql.md).
+- **o agente Text-to-SQL**, que responde em português perguntas sobre consumo, faturamento, interrupções e atendimento, consultando a Gold no banco local (`POST /ai/ask` e a tela **Agente** do portal);
+- **os insights das telas**, que dizem em uma ou duas frases o que os números da tela significam, sem a pessoa precisar perguntar (Visão Geral, Receita, Rede, Unidade consumidora e Perdas).
+
+As duas seguem a mesma regra, que vem do case: **se não souber, a IA diz que não sabe, e nenhum número vem da cabeça do modelo.** Todo número que chega ao usuário saiu do banco e foi conferido.
+
+Este arquivo explica como cada fluxo funciona e por que foi desenhado assim. A especificação completa está em [docs/specs/2026-10-19-architecture-design.md](docs/specs/2026-10-19-architecture-design.md), o estado atual em [docs/architecture.md](docs/architecture.md), e o guia de boas práticas em [docs/contexto-agente-text-to-sql.md](docs/contexto-agente-text-to-sql.md).
+
+## Como o agente responde uma pergunta
+
+```mermaid
+flowchart TD
+    P["Pergunta em português"] --> O{"Orçamento de tokens<br/>da sessão esgotado?"}
+    O -- sim --> R1["refused, sem chamar o modelo"]
+    O -- não --> H["Últimos turnos da conversa<br/>(memória, vinda da auditoria)"]
+    H --> G["Modelo gera um único SELECT<br/>sobre as views sem_*"]
+    G -- "não dá para responder" --> U["unknown / clarify / refused<br/>com texto fixo, sem SQL"]
+    G --> V{"Validador sqlglot:<br/>um SELECT, só views permitidas,<br/>funções conhecidas, LIMIT"}
+    V -- reprovado --> C["Modelo corrige com o motivo<br/>(até 3 tentativas)"]
+    C --> V
+    V -- aprovado --> E["Executa como venergy_agent:<br/>somente leitura, com timeout"]
+    E -- "erro corrigível" --> C
+    E --> N["Modelo narra as linhas"]
+    N --> K{"Todo número do texto está<br/>nas linhas? Período citado?"}
+    K -- sim --> A["answered: texto, SQL, linhas,<br/>fontes e confiança"]
+    K -- não --> D["Texto determinístico com os<br/>valores das linhas"]
+    D --> A
+    A --> AU["Backend grava a auditoria<br/>(GET /ai/audit/{id})"]
+```
+
+1. **Pergunta e memória.** O backend entrega a pergunta e os últimos três turnos da sessão, lidos da auditoria (DEC-046). O agente não guarda estado. Uma pergunta de continuação ("e em Olinda?") sem pergunta anterior volta pedindo esclarecimento, sem chamar o modelo (DEC-052).
+2. **Geração.** O modelo recebe a camada semântica: as views `sem_*`, as colunas com descrição e unidade, o glossário ("conta de luz" → faturamento, "falta de luz" → interrupções) e exemplos. Ele devolve um rascunho estruturado: um `SELECT` ou a decisão de não responder (`unknown`, `clarify`, `refuse`).
+3. **Validação.** O `SqlglotValidator` lê o SQL como árvore, não como texto: um único `SELECT`, só views da allowlist, só funções conhecidas, `LIMIT` imposto. Se reprovar, o modelo recebe o motivo e tenta de novo, até 3 vezes.
+4. **Execução.** Roda com o usuário `venergy_agent`, que só lê o schema `semantic`, em transação `READ ONLY` e com `statement_timeout`. Erros do banco viram categorias, e as corrigíveis voltam ao modelo.
+5. **Narração.** O modelo escreve a resposta a partir das linhas, que entram no prompt como dado delimitado, nunca como instrução. Se o texto citar um número que não está nas linhas, ou não citar o período, a resposta vira um texto montado pelo sistema com os valores das linhas (DEC-019).
+6. **Auditoria.** O `AgentAnswer` traz o texto, o status, o SQL, uma amostra das linhas, as premissas, a confiança, o modelo, a versão do prompt, a latência e os tokens. O backend grava tudo, e o perfil TI consulta em `GET /ai/audit/{id}`.
+
+### Por que assim, e não de outro jeito
+
+| Escolha | Por quê | O que descartamos |
+|---|---|---|
+| **Camada semântica** (views `sem_*` escolhidas num YAML do GenAI, validado contra o contrato da Gold) | O modelo vê só colunas com nome, descrição e unidade claros, e nunca as sensíveis (DEC-022). Os nomes e tipos são conferidos com o contrato a cada subida. | **Dar ao modelo as tabelas cruas**: colunas ambíguas (`kwh_leitura` × `kwh_faturado`) levavam à energia errada, e as colunas sensíveis ficariam a um `SELECT` de distância. |
+| **Um único `SELECT`, validado por árvore (sqlglot)** | A segurança fica no código e no banco, onde não dá para convencer ninguém com texto. | **Segurança no prompt** ("não faça DELETE"): uma injeção de prompt contorna. **Validar com regex**: não entende comentários, aspas nem subconsultas. **Agente com várias ferramentas**, que explora o banco em vários passos: mais caro, mais lento e mais difícil de auditar, sem ganho medido para estas perguntas. |
+| **Defesa em camadas no banco** (usuário só leitura, schema próprio, timeout) | Mesmo que tudo antes falhe, o banco recusa escrita e corta consulta pesada. O red team confere isso a cada rodada. | Confiar só no validador. |
+| **O modelo não faz conta** (números conferidos com as linhas, texto de reserva) | Resposta inventada é falha crítica, pior que nenhuma resposta (case, seção 7). Se a narração falha, o usuário ainda recebe os valores certos. | Aceitar o texto do modelo como veio. |
+| **Status explícito** (`answered`, `unknown`, `clarify`, `refused`, `failed`) | "Não sei", "seja mais específico", "não posso" e "deu erro" são coisas diferentes para quem pergunta e para a avaliação. | Uma resposta só em texto, em que "não sei" e erro técnico se confundem. |
+| **PydanticAI atrás de portas próprias** (arquitetura hexagonal) | Saída tipada com nova tentativa quando a validação falha, Gemini e OpenRouter nativos e testes sem custo (`FunctionModel`). Trocar de framework mexe num adapter só. | **LangChain / LangGraph**: mais camadas do que este fluxo de uma consulta precisa, e o código fica preso ao framework. |
+| **Memória pela auditoria do backend** | O agente continua sem estado e sem escrever nada. O histórico é o mesmo registro que o analista audita. | Memória dentro do agente, que exigiria escrita e acesso ao schema `app`. |
+| **Gemini 3.1 Flash-Lite, com cadeia de reserva** | É o modelo recomendado pelo case, barato e rápido. Quando ele falha, a cadeia tenta outro modelo sozinha, e o modelo que respondeu fica na resposta. | Um modelo só, que deixa o portal sem agente quando o provedor cai. |
+
+## Como o insight de uma tela é gerado
+
+```mermaid
+flowchart TD
+    B["Botão Gerar insight"] --> M["Backend calcula as métricas da tela<br/>e as leituras candidatas, com os números prontos"]
+    M --> CA{"Já está no cache?"}
+    CA -- sim --> T["Mostra o texto"]
+    CA -- não --> IA["A IA escolhe 1 ou 2 leituras<br/>e escreve o insight"]
+    IA --> CF{"Conferência do backend"}
+    CF -- passa --> SV["Guarda no cache"] --> T
+    CF -- recusa --> NT["Nova tentativa, com o motivo<br/>da recusa"]
+    NT --> CF2{"Conferência"}
+    CF2 -- passa --> SV
+    CF2 -- recusa --> RG["Leitura automática:<br/>o texto da regra, mesmos números"]
+```
+
+1. **O backend calcula, a IA interpreta.** Cada tela tem as suas leituras candidatas, todas calculadas pelo backend: a base cresceu e a energia caiu, os alimentadores que concentram as interrupções, a conta subiu sem o consumo subir, os lugares com mais energia a recuperar. A IA escolhe as que mais importam para quem usa a tela e escreve com as próprias palavras. O prompt diz quem é essa pessoa e o que a tela já mostra (`prompts/insight/v4`).
+2. **A conferência.** O texto só vale se:
+   - nenhum número estiver fora das leituras escolhidas;
+   - nenhum número delas faltar, exceto contagens quando os lugares são citados pelo nome;
+   - cada percentual subir ou cair como na leitura;
+   - os nomes de lugares e alimentadores aparecerem;
+   - não houver termo técnico.
+3. **Nova tentativa e reserva.** Se a conferência recusa, a IA tenta de novo recebendo o motivo, por exemplo "use só estes números" ou "cite estes nomes". Se falhar outra vez, a tela mostra a "Leitura automática", que é o texto da regra, com os mesmos números e o rótulo diferente.
+4. **Cache e custo.** O texto aceito fica em cache pelo conteúdo das métricas: o mesmo recorte não paga o modelo duas vezes, e uma Gold recarregada gera um insight novo. O modelo só é chamado quando alguém clica (DEC-069), com 1 a 3 chamadas por clique.
+
+### Por que assim, e não de outro jeito
+
+| Escolha | Por quê | O que descartamos |
+|---|---|---|
+| **Leituras candidatas calculadas pelo backend** | Os números vêm do mesmo cálculo da tela, então insight e gráfico nunca divergem. A regra do projeto é que cálculo de negócio fica no backend. | **Mandar as métricas cruas e deixar a IA concluir sozinha**: foi a primeira versão, e o insight repetia a tela e chegou a afirmar o que os números não sustentavam ("o preço subiu 12,3%") (DEC-066). |
+| **A IA escolhe a leitura e escreve** | A interpretação é dela: o que importa naquele recorte, para aquela pessoa. É o que o case pede como "insight gerado por IA". | **A regra escolher a conclusão e a IA só reescrever**: a interpretação ficava presa às leituras que alguém previu, e a IA virava revisora de texto (DEC-077). |
+| **Conferência no backend com nova tentativa** | Garante que o texto diz o que os números dizem, e a nova tentativa com o motivo recupera os textos recusados: 35 de 35 casos na Gold real, contra 9 de 32 antes dos ajustes. | **Repetir o mesmo pedido**: com temperatura 0, o modelo escreveria o mesmo texto. **Confiar no texto sem conferir**. |
+| **Reserva da regra, rotulada** | A tela nunca fica vazia nem mostra texto errado. O rótulo diz quando o texto não é da IA. | Esconder o insight quando a IA falha, ou mostrar o texto recusado. |
+| **Só totais em Perdas; nada do titular na UC** | A fila é uma lista de suspeitos e fica fora da IA (DEC-022). O insight usa só os totais que a tela já mostra. | Mandar a lista de UCs suspeitas ao modelo. |
+| **Gerar sob demanda, com cache** | Cada clique custa tokens. Gerar ao abrir a tela pagaria por recortes que ninguém leu (DEC-069). | Gerar todos os insights ao abrir as telas. |
+
+## Como medimos a qualidade
+
+- **Golden set** (`eval/golden_set.yaml`): 105 perguntas com SQL de referência, revisadas por Dados. Mede o acerto do SQL, o status certo e a fidelidade dos números.
+- **Red team** (`eval/red_team.yaml`): 17 ataques (injeção, vazamento de prompt, tentativa de escrita). Mede o bloqueio e confere no banco que nada mudou.
+- **Juiz** (DEC-047): um segundo modelo dá nota de 1 a 5 em clareza e fidelidade. Calibrado em 14 de 15 casos.
+- **`make eval-insights`**: um caso para cada leitura de cada tela, com a mesma conferência da rota.
+- **Regra de entrada (DEC-016)**: mudança de prompt, modelo ou camada semântica só entra se o golden set não piorar (`make eval-compare`).
+
+Os detalhes de cada comando estão em [Avaliação](#avaliação), abaixo.
 
 ## Arquitetura
 
@@ -150,7 +244,7 @@ Cada integrante usa a própria chave, no próprio `ai-agent/.env` (fora do Git):
 
 1. Entre em https://aistudio.google.com com a sua conta Google, vá em **Get API key** e crie uma chave.
 2. Preencha `VENERGY_AGENT_GOOGLE_API_KEY` no `ai-agent/.env`. O modelo padrão já é `google-gla:gemini-3.1-flash-lite`.
-3. Mantenha o projeto no Free Tier, sem ativar cobrança. Os limites aparecem em *Rate limit*, no AI Studio.
+3. A chave do Gemini pode ficar no Free Tier. Os limites aparecem em *Rate limit*, no AI Studio. Para não depender dele no dia, configure a reserva paga pelo OpenRouter ([Modelo reserva](#modelo-reserva)).
 
 No Free Tier, o Google pode usar o conteúdo enviado para melhorar os produtos dele. O time aceita esse envio para a amostra e para a Gold real (DEC-015): o dataset é do case. O que nunca pode acontecer é o dataset, ou qualquer saída com dados dele, ir para o Git (DEC-024).
 
@@ -160,13 +254,22 @@ O OpenRouter continua disponível pelo prefixo `openrouter:` (veja `.env.example
 
 Na API do `docker compose`, o agente sobe com um modelo reserva: `VENERGY_AGENT_FALLBACK_MODEL`, padrão `google-gla:gemini-3.5-flash` (troque por `GEMINI_FALLBACK_MODEL` no `.env` da raiz). Se o modelo principal falhar com 429 (cota) ou 503 (sobrecarga) depois das retentativas, a mesma pergunta vai para o reserva. No plano gratuito a cota é contada por modelo, então o reserva tem cota própria.
 
-A variável aceita uma **cadeia**, separada por vírgula, tentada em ordem. Com a chave do OpenRouter (`OPENROUTER_API_KEY` no `.env` da raiz), a cadeia pode seguir para outro provedor e cobrir uma queda do Gemini inteiro:
+A variável aceita uma **cadeia**, separada por vírgula, tentada em ordem. A cadeia recomendada usa créditos pagos do OpenRouter (`OPENROUTER_API_KEY` no `.env` da raiz) e cobre, nessa ordem, a cota do plano gratuito e uma queda do Google inteiro:
 
 ```
-GEMINI_FALLBACK_MODEL=google-gla:gemini-3.5-flash,openrouter:nvidia/nemotron-3.5-super-vl:free,openrouter:google/gemma-4-31b-it:free
+GEMINI_FALLBACK_MODEL=google-gla:gemini-3.5-flash,openrouter:google/gemini-3.1-flash-lite,openrouter:anthropic/claude-haiku-5.5
 ```
 
-- Os modelos `:free` do OpenRouter têm limite de 50 chamadas por dia por conta e são instáveis (no teste de 29/10, `gemma-4-31b` deu 429 e outros deram 503); por isso a cadeia tem mais de um. O `nemotron-3.5-super-vl` acertou o SQL das perguntas de teste, mas leva cerca de 40 s por chamada: serve de última linha, não de reserva do dia a dia.
+| Ordem | Modelo | Cobre |
+|---|---|---|
+| principal | `google-gla:gemini-3.1-flash-lite`, gratuito | o dia a dia |
+| 1 | `google-gla:gemini-3.5-flash`, gratuito | cota esgotada só no modelo principal |
+| 2 | `openrouter:google/gemini-3.1-flash-lite`, pago (US$ 0,25 / 1,50 por milhão de tokens de entrada / saída) | cota e limite por minuto do plano gratuito: é o mesmo modelo do principal, então responde igual ao que foi avaliado |
+| 3 | `openrouter:anthropic/claude-haiku-5.5`, pago (US$ 0,10 / 0,50) | queda do Google inteiro, que derruba também o Gemini do OpenRouter |
+
+- Só se paga quando o Gemini gratuito falha. Cada modelo tem 15 s de tempo limite e, depois de uma falha, fica 60 s fora da cadeia: numa queda, só a primeira pergunta paga a espera.
+- O Haiku foi testado como único modelo em 13 perguntas do golden set na Gold real (04/11/2026), uma ou duas de cada tipo: SQL certo em 10 de 13 e status certo em 13 de 13, contra 9 e 12 do Gemini na rodada final, com latência mediana de 4,3 s. É um teste curto, suficiente para a última linha da cadeia, não uma rodada completa.
+- Sem créditos no OpenRouter, a alternativa são os modelos `:free` (`openrouter:nvidia/nemotron-3.5-super-vl:free`, `openrouter:google/gemma-4-31b-it:free`): limite de 50 chamadas por dia por conta, instáveis (no teste de 29/10, `gemma-4-31b` deu 429 e outros deram 503), e o `nemotron` leva cerca de 40 s por chamada.
 - Só entram modelos com *tool calling* (o agente devolve saída estruturada).
 - Um modelo `openrouter:` na cadeia exige a chave do OpenRouter: sem ela, o agente não sobe (o `/ai` responde 503). O padrão do compose é só Gemini por isso.
 - Nenhum modelo da cadeia pode ser igual ao do juiz (`VENERGY_AGENT_JUDGE_MODEL`, padrão `gemini-3.5-flash-lite`).
@@ -174,6 +277,8 @@ GEMINI_FALLBACK_MODEL=google-gla:gemini-3.5-flash,openrouter:nvidia/nemotron-3.5
 
 ### Dia da apresentação
 
-- Use a chave de quem não rodou nada no dia; a cota renova por volta das 4h (horário de Brasília). Leve a chave de outro integrante como segunda opção: trocar o `GOOGLE_API_KEY` no `.env` da raiz e reiniciar a API leva menos de um minuto.
-- Não rode avaliação no dia: uma rodada completa do golden set na Gold real (95 dos 105 itens; os outros 10 valem só para a amostra, pelo campo `datasets`, com juiz) gasta cerca de 130 chamadas ao gerador e de 35 a 60 ao juiz, mais as novas tentativas quando há 503. Uma pergunta ao agente gasta cerca de 2 (SQL e narração), e um insight de tela, 1 por combinação de filtros (fica em cache).
-- Antes de começar, faça uma pergunta de teste pelo portal ou pelo `POST /ai/ask`. A resposta mostra o `model` que respondeu: se for o reserva, o principal está sem cota.
+- Confira no `.env` da raiz a cadeia paga acima e a `OPENROUTER_API_KEY`, com crédito na conta. Com ela, a cota do Gemini gratuito deixa de ser um risco.
+- Use a chave do Gemini de quem não rodou nada no dia; a cota renova por volta das 4h (horário de Brasília). Leve a chave de outro integrante como segunda opção: trocar o `GOOGLE_API_KEY` no `.env` da raiz e reiniciar a API leva menos de um minuto.
+- Não rode avaliação no dia: uma rodada completa do golden set na Gold real (95 dos 105 itens; os outros 10 valem só para a amostra, pelo campo `datasets`, com juiz) gasta cerca de 130 chamadas ao gerador e de 35 a 60 ao juiz, mais as novas tentativas quando há 503. Uma pergunta ao agente gasta cerca de 2 (SQL e narração), e um insight de tela, de 1 a 3 por clique (o texto aceito fica em cache).
+- Antes de começar, faça uma pergunta de teste pelo portal ou pelo `POST /ai/ask`. A resposta mostra o `model` que respondeu: se for o reserva, o principal está sem cota. As chamadas pagas aparecem em openrouter.ai/activity.
+- Clique em **Gerar insight** nas telas da demonstração antes de começar, sem reiniciar a API depois: o clique ao vivo vem do cache, sem chamar o modelo.
