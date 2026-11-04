@@ -16,7 +16,7 @@ from pydantic import (
 )
 from venergy_agent.domain.answer import AnswerStatus, Confidence
 
-from venergy_api.ordens import ResultadoOrdem, StatusOrdem
+from venergy_api.ordens import KWH_CASAS, KWH_DIGITOS, ResultadoOrdem, StatusOrdem
 
 RequiredText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 
@@ -275,11 +275,11 @@ class DecomposicaoLinhaSchema(BaseModel):
     efeito_mix: ExactNumber
 
 
-class InsightReceitaSchema(BaseModel):
-    """O insight de IA da tela de Receita e as métricas que sustentam cada número do texto."""
+class InsightSchema(BaseModel):
+    """O insight de IA de uma tela e as métricas que sustentam cada número do texto."""
 
     # Se o redator falha ou o texto dele não serve, vem a leitura escrita pela regra do backend,
-    # e `origem` diz qual dos dois é. Vazio só se o recorte não tem segmentos, sem chamar o modelo.
+    # e `origem` diz qual dos dois é. Vazio só se não há o que narrar, sem chamar o modelo.
     texto: str | None
     origem: Literal["ia", "regra"] | None = None
     metricas: dict[str, Any] | None
@@ -759,6 +759,8 @@ class FilaFiltroSchema(RecorteFiltroSchema):
     medidor_eletromecanico: bool = False
     leituras_estimadas_min: Annotated[int | None, Field(ge=25, le=100)] = None
     leituras_estimadas_max: Annotated[int | None, Field(ge=25, le=100)] = None
+    # Esconde as UCs inspecionadas nos últimos N meses (relógio do banco), na Gold ou no portal.
+    sem_inspecao_meses: Annotated[int | None, Field(ge=1, le=120)] = None
 
     @model_validator(mode="after")
     def limites_validos(self) -> "FilaFiltroSchema":
@@ -798,11 +800,20 @@ class OrdemAtivaSchema(BaseModel):
     status: StatusOrdem
 
 
+class UltimaInspecaoSchema(BaseModel):
+    """A inspeção de campo mais recente da UC, da Gold ou concluída no portal."""
+
+    data: date
+    resultado: ResultadoInspecao
+    origem: Literal["gold", "portal"]
+
+
 class FilaItemSchema(FilaSuspeitaSchema):
     """Uma UC da fila e a ordem ativa dela, para a tela não oferecer o que daria 409."""
 
     ordem_ativa: OrdemAtivaSchema | None
     queda_percentual: int | None
+    ultima_inspecao: UltimaInspecaoSchema | None
 
 
 class FilaPaginaSchema(BaseModel):
@@ -812,6 +823,65 @@ class FilaPaginaSchema(BaseModel):
     total: int
     pagina: int
     tamanho: int
+
+
+class AcertoInspecoesSchema(BaseModel):
+    """Inspeções de uma origem (portal ou Gold) e o quanto acertaram."""
+
+    # Portal: OIs concluídas, com qualquer resultado. Gold: linhas de gold_inspecoes_uc.
+    inspecoes: int
+    irregulares: int
+    regulares: int
+    # A Gold não registra visita sem inspeção: lá é sempre 0.
+    nao_realizadas: int
+    # irregulares / (irregulares + regulares); vazio sem nenhuma das duas.
+    taxa_irregularidade: float | None
+    # Soma ignorando nulos: OI concluída antes da coluna não tem o valor.
+    kwh_recuperado: ExactNumber
+
+
+class IndicadoresPerdasSchema(BaseModel):
+    """Os números do alto da tela de Perdas, no recorte pedido."""
+
+    suspeitas: int
+    suspeitas_sem_ordem_ativa: int
+    kwh_recuperavel_est_sem_ordem: ExactNumber | None
+    ordens_geradas: int
+    ordens_em_campo: int
+    portal: AcertoInspecoesSchema
+    gold: AcertoInspecoesSchema
+
+
+class RecortesFilaFiltroSchema(RecorteFiltroSchema):
+    """Recorte da fila e o nível da resposta: bairro se há município, senão município."""
+
+    nivel: Literal["municipio", "bairro"] | None = None
+
+    @model_validator(mode="after")
+    def nivel_abaixo_do_filtro(self) -> "RecortesFilaFiltroSchema":
+        if self.nivel == "municipio" and self.municipio:
+            raise ValueError("O nível municipio fica acima do filtro de município")
+        return self
+
+    @property
+    def nivel_da_resposta(self) -> Literal["municipio", "bairro"]:
+        return self.nivel or ("bairro" if self.municipio else "municipio")
+
+
+class RecorteFilaSchema(BaseModel):
+    segmento: RequiredText
+    # Só nas linhas de bairro: o mesmo nome de bairro existe em municípios diferentes.
+    municipio: RequiredText | None = None
+    suspeitas: int
+    suspeitas_sem_ordem_ativa: int
+    kwh_recuperavel_est: ExactNumber | None
+
+
+class RecortesFilaSchema(BaseModel):
+    """Suspeitas por município ou bairro, das que mais valem inspecionar para as que menos."""
+
+    nivel: Literal["municipio", "bairro"]
+    recortes: list[RecorteFilaSchema]
 
 
 class CriarOrdensSchema(BaseModel):
@@ -840,6 +910,15 @@ class AtualizarOrdemSchema(BaseModel):
         Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=1000)]
         | None
     ) = None
+    # O par da Gold (gold_inspecoes_uc): obrigatório ao confirmar irregularidade, proibido nos
+    # demais. O kWh tem o mesmo limite da coluna (KWH_DIGITOS, KWH_CASAS).
+    tipo_irregularidade: (
+        Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
+        | None
+    ) = None
+    kwh_recuperado: (
+        Annotated[ExactNumber, Field(gt=0, max_digits=KWH_DIGITOS, decimal_places=KWH_CASAS)] | None
+    ) = None
 
     @model_validator(mode="after")
     def resultado_so_ao_concluir(self) -> "AtualizarOrdemSchema":
@@ -848,6 +927,15 @@ class AtualizarOrdemSchema(BaseModel):
             raise ValueError("Informe o resultado da inspeção para concluir a ordem")
         if self.status != StatusOrdem.CONCLUIDA and self.resultado is not None:
             raise ValueError("O resultado só é registrado ao concluir a ordem")
+        # Com irregularidade, a regra da planilha de campo (planilha_campo._ler_linha). Nos demais
+        # resultados o PATCH é mais estrito: a planilha aceita um kWh 0 e o grava vazio.
+        if self.resultado == ResultadoOrdem.IRREGULAR_CONFIRMADA:
+            if self.tipo_irregularidade is None or self.kwh_recuperado is None:
+                raise ValueError("Irregularidade confirmada precisa do tipo e do kWh recuperado")
+        elif self.tipo_irregularidade is not None or self.kwh_recuperado is not None:
+            raise ValueError(
+                "Tipo de irregularidade e kWh recuperado só valem para irregularidade confirmada"
+            )
         return self
 
 
@@ -859,6 +947,13 @@ class OrdemSchema(BaseModel):
     status: StatusOrdem
     resultado: ResultadoOrdem | None
     observacao: str | None
+    # Resultado de campo estruturado, só em OI concluída como irregular.
+    tipo_irregularidade: str | None
+    kwh_recuperado: ExactNumber | None
+    # Contexto da fila na geração (cópia): vazio na OI gerada à mão, para UC fora da fila.
+    fila_posicao: int | None
+    fila_motivos: list[str] | None
+    fila_kwh_recuperavel_est: ExactNumber | None
     criada_em: datetime
     atualizada_em: datetime
     # Entrada no status atual (último evento) e há quantos segundos, pelo relógio do banco: a tela

@@ -2,7 +2,7 @@ import { ArrowsClockwiseIcon, CircleNotchIcon } from "@phosphor-icons/react";
 import { type DragEvent, useMemo, useState } from "react";
 import { Badge } from "#/components/ui/badge";
 import { Button } from "#/components/ui/button";
-import { formatDataHora } from "#/lib/format";
+import { formatDataHora, formatKWh } from "#/lib/format";
 import { cn } from "#/lib/utils";
 import {
 	ACAO_ORDEM_ROTULO,
@@ -366,9 +366,19 @@ function CartaoKanban({
 			)}
 
 			{ordem.status === "CONCLUIDA" && ordem.resultado && (
-				<Badge className="self-start">
-					{RESULTADO_ORDEM_ROTULO[ordem.resultado]}
-				</Badge>
+				<div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+					<Badge>{RESULTADO_ORDEM_ROTULO[ordem.resultado]}</Badge>
+					{ordem.tipo_irregularidade && (
+						<span className="text-small text-text">
+							{ordem.tipo_irregularidade}
+						</span>
+					)}
+					{ordem.kwh_recuperado != null && (
+						<span className="text-small text-text-muted tabular-nums">
+							{formatKWh(ordem.kwh_recuperado)}
+						</span>
+					)}
+				</div>
 			)}
 
 			{ordem.observacao && (

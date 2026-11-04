@@ -1,5 +1,5 @@
 import { WaterfallChart } from "#/components/ui/waterfall-chart";
-import { InsightIa } from "#/features/agente";
+import { InsightIa, indisponivelDoInsight } from "#/features/agente";
 import { CLASSE_ROTULO } from "#/features/filtros";
 import type { ParPeriodos, Recorte } from "#/lib/filtros";
 import { formatBRL, formatPct, formatPeriodoCurto } from "#/lib/format";
@@ -78,10 +78,7 @@ export function PonteWaterfall({
 					texto={insight.data?.texto}
 					origem={insight.data?.origem}
 					carregando={insight.isFetching}
-					indisponivel={
-						insight.isError ||
-						(insight.data !== undefined && !insight.data.texto)
-					}
+					indisponivel={indisponivelDoInsight(insight)}
 					onGerar={() => {
 						void insight.refetch();
 					}}

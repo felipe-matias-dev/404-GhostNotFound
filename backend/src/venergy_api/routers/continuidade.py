@@ -3,6 +3,7 @@
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Query
+from fastapi.concurrency import run_in_threadpool
 from sqlalchemy import (
     ColumnElement,
     Double,
@@ -15,8 +16,11 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import InstrumentedAttribute, Session
 
+from venergy_api.agente import RedatorInsightsDep
 from venergy_api.database import SessionDep
 from venergy_api.indices import indices
+from venergy_api.insight_continuidade import metricas_da_continuidade, motivo_da_recusa
+from venergy_api.insights import CacheInsightsDep, narrar
 from venergy_api.models import (
     ContinuidadeAlimentadorMensal,
     DimUc,
@@ -31,6 +35,7 @@ from venergy_api.schemas import (
     DuracaoOcorrenciasSchema,
     GrupoOcorrenciasSchema,
     IndicesContinuidadeSchema,
+    InsightSchema,
     OcorrenciasFiltroSchema,
     RankingAlimentadorSchema,
     RankingContinuidadeSchema,
@@ -221,6 +226,28 @@ def get_ranking_alimentadores(
         criterio=filtro.criterio,
         **envelope,
         alimentadores=[RankingAlimentadorSchema(**linha) for linha in linhas],
+    )
+
+
+@router.get("/insight")
+async def get_insight(
+    filtro: Annotated[RankingFiltroSchema, Query()],
+    session: SessionDep,
+    redator: RedatorInsightsDep,
+    cache: CacheInsightsDep,
+) -> InsightSchema:
+    """Um insight de IA sobre o ranking de alimentadores que a tela de Rede mostra."""
+    # O mesmo ranking da tela, fora do laço de eventos: a sessão do backend é síncrona.
+    ranking = await run_in_threadpool(get_ranking_alimentadores, filtro, session)
+    metricas = metricas_da_continuidade(filtro, ranking)
+    if metricas is None:
+        return InsightSchema(texto=None, metricas=None)
+    return await narrar(
+        "rede",
+        metricas,
+        redator,
+        cache,
+        lambda texto, escolhidas: motivo_da_recusa(texto, metricas, escolhidas),
     )
 
 

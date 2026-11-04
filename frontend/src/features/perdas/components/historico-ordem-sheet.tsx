@@ -8,7 +8,7 @@ import {
 	SheetTitle,
 } from "#/components/ui/sheet";
 import { ApiError } from "#/lib/api";
-import { formatDataHora } from "#/lib/format";
+import { formatDataHora, formatKWh, formatNumero } from "#/lib/format";
 import {
 	autorEvento,
 	RESULTADO_ORDEM_ROTULO,
@@ -46,6 +46,55 @@ function ResumoOrdem({
 				)}
 			</div>
 			{observacao && <p className="text-body text-text-muted">{observacao}</p>}
+		</div>
+	);
+}
+
+function ContextoDaOrdem({ ordem }: { ordem: Ordem }) {
+	const daFila = ordem.fila_posicao != null;
+	const irregular =
+		ordem.tipo_irregularidade != null || ordem.kwh_recuperado != null;
+	return (
+		<div className="flex flex-col gap-3">
+			<section aria-label="Origem na fila" className="flex flex-col gap-1">
+				<h3 className="text-small text-text-muted">Origem na fila</h3>
+				{daFila ? (
+					<>
+						<p className="text-body text-text">
+							{formatNumero(ordem.fila_posicao)}º na fila de suspeitas
+							{ordem.fila_kwh_recuperavel_est != null &&
+								` · ${formatKWh(ordem.fila_kwh_recuperavel_est)}/mês estimado`}
+						</p>
+						{ordem.fila_motivos && ordem.fila_motivos.length > 0 && (
+							<ul className="list-disc pl-5 text-body text-text-muted">
+								{ordem.fila_motivos.map((motivo) => (
+									<li key={motivo}>{motivo}</li>
+								))}
+							</ul>
+						)}
+					</>
+				) : (
+					<p className="text-body text-text-muted">Gerada fora da fila</p>
+				)}
+			</section>
+			{irregular && (
+				<section
+					aria-label="Irregularidade encontrada"
+					className="flex flex-col gap-1"
+				>
+					<h3 className="text-small text-text-muted">
+						Irregularidade encontrada
+					</h3>
+					{ordem.tipo_irregularidade && (
+						<p className="text-body text-text">{ordem.tipo_irregularidade}</p>
+					)}
+					{ordem.kwh_recuperado != null && (
+						<p className="text-body text-text">
+							{formatKWh(ordem.kwh_recuperado)} recuperados
+						</p>
+					)}
+				</section>
+			)}
 		</div>
 	);
 }
@@ -111,6 +160,7 @@ export function HistoricoOrdemSheet({
 								resultado={data.resultado}
 								observacao={data.observacao}
 							/>
+							<ContextoDaOrdem ordem={data} />
 							<ol
 								aria-label={`Histórico da OI ${data.id}`}
 								className="flex flex-col"

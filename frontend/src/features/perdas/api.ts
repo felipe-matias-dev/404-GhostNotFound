@@ -37,6 +37,35 @@ export function distribuicaoQueda(recorte: Recorte) {
 	);
 }
 
+// Sob `filaKey`: toda invalidação que renova a fila (ordem criada, atualizada, planilha, aviso ao vivo) renova também estes números.
+export const indicadoresPerdasKey = (recorte: Recorte) =>
+	[...filaKey, "indicadores", recorte] as const;
+export const recortesFilaKey = (
+	recorte: Recorte,
+	nivel: "municipio" | "bairro",
+) => [...filaKey, "recortes", nivel, recorte] as const;
+
+/** O insight de IA da tela: só totais da fila e das vistorias, nunca uma UC (DEC-022). */
+export function insightPerdas(recorte: Recorte) {
+	return unwrap(
+		api.GET("/fila-suspeitas/insight", { params: { query: recorte } }),
+	);
+}
+
+export function indicadoresPerdas(recorte: Recorte) {
+	return unwrap(
+		api.GET("/fila-suspeitas/indicadores", { params: { query: recorte } }),
+	);
+}
+
+export function recortesFila(recorte: Recorte, nivel: "municipio" | "bairro") {
+	return unwrap(
+		api.GET("/fila-suspeitas/recortes", {
+			params: { query: { ...recorte, nivel } },
+		}),
+	);
+}
+
 export function listarFila(
 	pagina: number,
 	sort: SortState | null,
@@ -55,6 +84,8 @@ export function listarFila(
 					medidor_eletromecanico: filtros.medidorEletromecanico,
 					leituras_estimadas_min: filtros.leiturasEstimadas?.[0],
 					leituras_estimadas_max: filtros.leiturasEstimadas?.[1],
+					sem_ordem_ativa: filtros.semOrdemAtiva,
+					sem_inspecao_meses: filtros.semInspecaoMeses,
 					ordenar_por: ordenacaoDaColuna(sort?.columnId),
 					direcao: sort?.direction ?? "asc",
 				},

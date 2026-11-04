@@ -3,6 +3,7 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Query
+from fastapi.concurrency import run_in_threadpool
 from sqlalchemy import (
     ColumnElement,
     Double,
@@ -17,8 +18,11 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import InstrumentedAttribute
 
+from venergy_api.agente import RedatorInsightsDep
 from venergy_api.database import SessionDep
 from venergy_api.indices import indices
+from venergy_api.insight_indicadores import metricas_dos_indicadores, motivo_da_recusa
+from venergy_api.insights import CacheInsightsDep, narrar
 from venergy_api.models import KpisMensais
 from venergy_api.models import KpisSegmentoMensal as Segmento
 from venergy_api.schemas import (
@@ -29,6 +33,7 @@ from venergy_api.schemas import (
     IndicadoresMensaisFiltroSchema,
     IndicadoresMensalSchema,
     IndicadoresPeriodoSchema,
+    InsightSchema,
     VariacaoIndicadoresSchema,
 )
 from venergy_api.variacao import meses_no_calendario
@@ -206,6 +211,28 @@ def get_comparacao(
                 if k.startswith("variacao_")
             }
         ),
+    )
+
+
+@router.get("/insight")
+async def get_insight(
+    filtro: Annotated[IndicadoresComparacaoFiltroSchema, Query()],
+    session: SessionDep,
+    redator: RedatorInsightsDep,
+    cache: CacheInsightsDep,
+) -> InsightSchema:
+    """Um insight de IA sobre a comparação de indicadores que a Visão Geral mostra."""
+    # A mesma comparação da tela, fora do laço de eventos: a sessão do backend é síncrona.
+    comparacao = await run_in_threadpool(get_comparacao, filtro, session)
+    metricas = metricas_dos_indicadores(filtro, comparacao)
+    if metricas is None:
+        return InsightSchema(texto=None, metricas=None)
+    return await narrar(
+        "visao_geral",
+        metricas,
+        redator,
+        cache,
+        lambda texto, escolhidas: motivo_da_recusa(texto, metricas, escolhidas),
     )
 
 

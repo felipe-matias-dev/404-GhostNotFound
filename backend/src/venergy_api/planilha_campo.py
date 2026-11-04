@@ -19,7 +19,7 @@ from openpyxl import Workbook, load_workbook
 from openpyxl.utils.exceptions import InvalidFileException
 from openpyxl.worksheet.datavalidation import DataValidation
 
-from venergy_api.ordens import ResultadoOrdem
+from venergy_api.ordens import ResultadoOrdem, kwh_cabe_na_coluna
 
 MAX_BYTES = 5 * 1024 * 1024
 # O arquivo do case tem cerca de 1.400 linhas no ano todo; o teto só barra arquivo errado.
@@ -63,6 +63,8 @@ class LinhaCampo:
     cod_uc: str
     resultado: ResultadoOrdem
     observacao: str
+    tipo_irregularidade: str | None
+    kwh_recuperado: Decimal | None
     # Só na planilha exportada pelo portal (OI-<id>): a linha vale para esta ordem, e não para
     # outra que a UC tenha hoje. O id_inspecao do formato do case não aponta para ordem nenhuma.
     ordem_id: int | None = None
@@ -175,6 +177,11 @@ def _ler_linha(aba: str, numero: int, cod_uc: str, celula: dict[str, object]) ->
             raise _LinhaInvalida(
                 "Irregularidade confirmada precisa de kWh recuperado maior que zero"
             )
+        if not kwh_cabe_na_coluna(kwh):
+            raise _LinhaInvalida(
+                "kWh recuperado precisa de até três casas decimais e menos de 10 trilhões: "
+                + _texto(celula.get("kwh_recuperado"))
+            )
     else:
         if tipo is not None:
             raise _LinhaInvalida("Sem irregularidade com tipo de irregularidade preenchido")
@@ -198,6 +205,8 @@ def _ler_linha(aba: str, numero: int, cod_uc: str, celula: dict[str, object]) ->
         cod_uc,
         resultado,
         observacao[:MAX_OBSERVACAO],
+        tipo,
+        kwh if resultado is ResultadoOrdem.IRREGULAR_CONFIRMADA else None,
         int(exportada.group(1)) if exportada else None,
     )
 

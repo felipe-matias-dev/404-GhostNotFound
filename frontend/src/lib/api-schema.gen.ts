@@ -132,6 +132,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/unidades-consumidoras/{cod_uc}/insight": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Insight
+         * @description Um insight de IA para o atendente: se o consumo da UC subiu mesmo, e se é de um mês só.
+         */
+        get: operations["get_insight_unidades_consumidoras__cod_uc__insight_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/receita/mensal": {
         parameters: {
             query?: never;
@@ -274,6 +294,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/continuidade/insight": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Insight
+         * @description Um insight de IA sobre o ranking de alimentadores que a tela de Rede mostra.
+         */
+        get: operations["get_insight_continuidade_insight_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/continuidade/recortes": {
         parameters: {
             query?: never;
@@ -394,6 +434,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/indicadores/insight": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Insight
+         * @description Um insight de IA sobre a comparação de indicadores que a Visão Geral mostra.
+         */
+        get: operations["get_insight_indicadores_insight_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/indicadores/janelas": {
         parameters: {
             query?: never;
@@ -406,6 +466,66 @@ export interface paths {
          * @description Janelas corridas de `meses` competências, da mais antiga para a mais recente.
          */
         get: operations["get_janelas_indicadores_janelas_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/fila-suspeitas/indicadores": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Indicadores
+         * @description Suspeitas, ordens e o acerto das inspeções (portal e Gold) no recorte pedido.
+         */
+        get: operations["get_indicadores_fila_suspeitas_indicadores_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/fila-suspeitas/recortes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Recortes
+         * @description Suspeitas por município ou bairro, para o mapa; o bairro leva o município junto.
+         */
+        get: operations["get_recortes_fila_suspeitas_recortes_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/fila-suspeitas/insight": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Insight
+         * @description Um insight de IA sobre os indicadores e o mapa da tela de Perdas, só com totais.
+         */
+        get: operations["get_insight_fila_suspeitas_insight_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -688,6 +808,24 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         /**
+         * AcertoInspecoesSchema
+         * @description Inspeções de uma origem (portal ou Gold) e o quanto acertaram.
+         */
+        AcertoInspecoesSchema: {
+            /** Inspecoes */
+            inspecoes: number;
+            /** Irregulares */
+            irregulares: number;
+            /** Regulares */
+            regulares: number;
+            /** Nao Realizadas */
+            nao_realizadas: number;
+            /** Taxa Irregularidade */
+            taxa_irregularidade: number | null;
+            /** Kwh Recuperado */
+            kwh_recuperado: number;
+        };
+        /**
          * AlteracaoSessaoIaSchema
          * @description Novo título, estrela ou os dois. Nenhum deles pode vir nulo, e ao menos um é obrigatório.
          */
@@ -741,6 +879,10 @@ export interface components {
             resultado?: components["schemas"]["ResultadoOrdem"] | null;
             /** Observacao */
             observacao?: string | null;
+            /** Tipo Irregularidade */
+            tipo_irregularidade?: string | null;
+            /** Kwh Recuperado */
+            kwh_recuperado?: number | string | null;
         };
         /**
          * AuditoriaIaSchema
@@ -1086,6 +1228,7 @@ export interface components {
             ordem_ativa: components["schemas"]["OrdemAtivaSchema"] | null;
             /** Queda Percentual */
             queda_percentual: number | null;
+            ultima_inspecao: components["schemas"]["UltimaInspecaoSchema"] | null;
         };
         /**
          * FilaPaginaSchema
@@ -1163,6 +1306,24 @@ export interface components {
             satisfacao_media: number | null;
         };
         /**
+         * IndicadoresPerdasSchema
+         * @description Os números do alto da tela de Perdas, no recorte pedido.
+         */
+        IndicadoresPerdasSchema: {
+            /** Suspeitas */
+            suspeitas: number;
+            /** Suspeitas Sem Ordem Ativa */
+            suspeitas_sem_ordem_ativa: number;
+            /** Kwh Recuperavel Est Sem Ordem */
+            kwh_recuperavel_est_sem_ordem: number | null;
+            /** Ordens Geradas */
+            ordens_geradas: number;
+            /** Ordens Em Campo */
+            ordens_em_campo: number;
+            portal: components["schemas"]["AcertoInspecoesSchema"];
+            gold: components["schemas"]["AcertoInspecoesSchema"];
+        };
+        /**
          * IndicadoresPeriodoSchema
          * @description Os indicadores da diretoria somados num período, todos calculados no banco.
          */
@@ -1221,10 +1382,10 @@ export interface components {
             n_uc_medio: number | null;
         };
         /**
-         * InsightReceitaSchema
-         * @description O insight de IA da tela de Receita e as métricas que sustentam cada número do texto.
+         * InsightSchema
+         * @description O insight de IA de uma tela e as métricas que sustentam cada número do texto.
          */
-        InsightReceitaSchema: {
+        InsightSchema: {
             /** Texto */
             texto: string | null;
             /** Origem */
@@ -1402,6 +1563,16 @@ export interface components {
             resultado: components["schemas"]["ResultadoOrdem"] | null;
             /** Observacao */
             observacao: string | null;
+            /** Tipo Irregularidade */
+            tipo_irregularidade: string | null;
+            /** Kwh Recuperado */
+            kwh_recuperado: number | null;
+            /** Fila Posicao */
+            fila_posicao: number | null;
+            /** Fila Motivos */
+            fila_motivos: string[] | null;
+            /** Fila Kwh Recuperavel Est */
+            fila_kwh_recuperavel_est: number | null;
             /**
              * Criada Em
              * Format: date-time
@@ -1437,6 +1608,16 @@ export interface components {
             resultado: components["schemas"]["ResultadoOrdem"] | null;
             /** Observacao */
             observacao: string | null;
+            /** Tipo Irregularidade */
+            tipo_irregularidade: string | null;
+            /** Kwh Recuperado */
+            kwh_recuperado: number | null;
+            /** Fila Posicao */
+            fila_posicao: number | null;
+            /** Fila Motivos */
+            fila_motivos: string[] | null;
+            /** Fila Kwh Recuperavel Est */
+            fila_kwh_recuperavel_est: number | null;
             /**
              * Criada Em
              * Format: date-time
@@ -1546,6 +1727,19 @@ export interface components {
             /** Municipio */
             municipio?: string | null;
         };
+        /** RecorteFilaSchema */
+        RecorteFilaSchema: {
+            /** Segmento */
+            segmento: string;
+            /** Municipio */
+            municipio?: string | null;
+            /** Suspeitas */
+            suspeitas: number;
+            /** Suspeitas Sem Ordem Ativa */
+            suspeitas_sem_ordem_ativa: number;
+            /** Kwh Recuperavel Est */
+            kwh_recuperavel_est: number | null;
+        };
         /**
          * RecortesContinuidadeSchema
          * @description DEC e FEC de um nível do recorte, do pior para o melhor.
@@ -1575,6 +1769,19 @@ export interface components {
             n_meses: number;
             /** Recortes */
             recortes: components["schemas"]["RecorteContinuidadeSchema"][];
+        };
+        /**
+         * RecortesFilaSchema
+         * @description Suspeitas por município ou bairro, das que mais valem inspecionar para as que menos.
+         */
+        RecortesFilaSchema: {
+            /**
+             * Nivel
+             * @enum {string}
+             */
+            nivel: "municipio" | "bairro";
+            /** Recortes */
+            recortes: components["schemas"]["RecorteFilaSchema"][];
         };
         /**
          * RespostaIaSchema
@@ -1773,6 +1980,27 @@ export interface components {
             total: number;
             /** Ucs */
             ucs: components["schemas"]["UcAtingidaSchema"][];
+        };
+        /**
+         * UltimaInspecaoSchema
+         * @description A inspeção de campo mais recente da UC, da Gold ou concluída no portal.
+         */
+        UltimaInspecaoSchema: {
+            /**
+             * Data
+             * Format: date
+             */
+            data: string;
+            /**
+             * Resultado
+             * @enum {string}
+             */
+            resultado: "irregularidade_confirmada" | "sem_irregularidade";
+            /**
+             * Origem
+             * @enum {string}
+             */
+            origem: "gold" | "portal";
         };
         /** UsuarioLogado */
         UsuarioLogado: {
@@ -2112,6 +2340,46 @@ export interface operations {
             };
         };
     };
+    get_insight_unidades_consumidoras__cod_uc__insight_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cod_uc: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InsightSchema"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErroSchema"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_receita_mensal_receita_mensal_get: {
         parameters: {
             query?: {
@@ -2257,7 +2525,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["InsightReceitaSchema"];
+                    "application/json": components["schemas"]["InsightSchema"];
                 };
             };
             /** @description Validation Error */
@@ -2329,6 +2597,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RankingContinuidadeSchema"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_insight_continuidade_insight_get: {
+        parameters: {
+            query: {
+                inicio: string;
+                fim: string;
+                municipio?: string | null;
+                bairro?: string | null;
+                classe?: ("B1" | "B2" | "B3" | "A4") | null;
+                criterio?: "dec" | "fec";
+                base_inicio?: string | null;
+                base_fim?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InsightSchema"];
                 };
             };
             /** @description Validation Error */
@@ -2565,6 +2871,43 @@ export interface operations {
             };
         };
     };
+    get_insight_indicadores_insight_get: {
+        parameters: {
+            query: {
+                base_inicio: string;
+                base_fim: string;
+                atual_inicio: string;
+                atual_fim: string;
+                municipio?: string | null;
+                bairro?: string | null;
+                classe?: ("B1" | "B2" | "B3" | "A4") | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InsightSchema"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_janelas_indicadores_janelas_get: {
         parameters: {
             query?: {
@@ -2586,6 +2929,106 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["IndicadoresJanelaSchema"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_indicadores_fila_suspeitas_indicadores_get: {
+        parameters: {
+            query?: {
+                municipio?: string | null;
+                bairro?: string | null;
+                classe?: ("B1" | "B2" | "B3" | "A4") | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IndicadoresPerdasSchema"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_recortes_fila_suspeitas_recortes_get: {
+        parameters: {
+            query?: {
+                municipio?: string | null;
+                bairro?: string | null;
+                classe?: ("B1" | "B2" | "B3" | "A4") | null;
+                nivel?: ("municipio" | "bairro") | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecortesFilaSchema"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_insight_fila_suspeitas_insight_get: {
+        parameters: {
+            query?: {
+                municipio?: string | null;
+                bairro?: string | null;
+                classe?: ("B1" | "B2" | "B3" | "A4") | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InsightSchema"];
                 };
             };
             /** @description Validation Error */
@@ -2648,6 +3091,7 @@ export interface operations {
                 medidor_eletromecanico?: boolean;
                 leituras_estimadas_min?: number | null;
                 leituras_estimadas_max?: number | null;
+                sem_inspecao_meses?: number | null;
             };
             header?: never;
             path?: never;

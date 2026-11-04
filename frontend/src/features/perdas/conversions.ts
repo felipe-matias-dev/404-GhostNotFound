@@ -201,3 +201,34 @@ export function segundosNoStatus(ordem: OrdemDaTela, agora: number): number {
 	const decorrido = Math.max(0, agora - ordem.recebida_em);
 	return ordem.segundos_no_status + Math.floor(decorrido / 1000);
 }
+
+/** Tipos de irregularidade mais comuns da planilha de campo; o campo aceita qualquer outro texto. */
+export const TIPOS_IRREGULARIDADE = [
+	"DESVIO DIRETO",
+	"BY-PASS",
+	"MEDIDOR ADULTERADO",
+	"LIGAÇÃO CLANDESTINA",
+] as const;
+
+/** Ponto de milhar sem vírgula, como `MILHAR` em `backend/src/venergy_api/planilha_campo.py`. */
+const MILHAR = /^\d{1,3}(\.\d{3})+$/;
+
+/**
+ * kWh digitado com a mesma regra da planilha de campo (DEC-075): com vírgula, ela é a decimal e o
+ * ponto é milhar ("1.234,5"); sem vírgula, ponto seguido de grupos de três dígitos é milhar
+ * ("1.234" é 1234) e outro ponto é decimal ("1234.5"). Devolve `null` para texto que não é um
+ * número e para o que a coluna `numeric(16,3)` não guarda sem arredondar: zero, mais de três casas
+ * ou mais de 13 dígitos inteiros.
+ */
+export function lerKwhRecuperado(texto: string): number | null {
+	const limpo = texto.trim().replace(/\s/g, "");
+	const normalizado = limpo.includes(",")
+		? limpo.replace(/\./g, "").replace(",", ".")
+		: MILHAR.test(limpo)
+			? limpo.replace(/\./g, "")
+			: limpo;
+	const partes = /^(\d+)(?:\.(\d{1,3}))?$/.exec(normalizado);
+	if (!partes || partes[1].replace(/^0+/, "").length > 13) return null;
+	const valor = Number(normalizado);
+	return valor > 0 ? valor : null;
+}

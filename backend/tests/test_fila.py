@@ -1,12 +1,16 @@
+from datetime import date, datetime, timedelta
+from decimal import Decimal
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine, update
+from sqlalchemy.orm import Session
 
 from venergy_api.amostra import SAMPLE_FILA, write_sample
 from venergy_api.carga import load_gold
-from venergy_api.models import FilaSuspeita
+from venergy_api.models import FilaSuspeita, InspecaoUc
 
 URL = "/fila-suspeitas"
 
@@ -334,3 +338,207 @@ def test_distribution_uses_segment_and_includes_unidentified_drop(
 @pytest.mark.parametrize("url", [URL, f"{URL}/distribuicao-queda"])
 def test_segment_requires_municipality_for_neighborhood(client: TestClient, url: str) -> None:
     assert client.get(url, params={"bairro": "Janga"}).status_code == 422
+
+
+def inspect_uc(engine: Engine, cod_uc: str, day: date, result: str, kwh: str = "0") -> None:
+    with Session(engine) as session, session.begin():
+        session.add(
+            InspecaoUc(
+                cod_inspecao=f"T-{cod_uc}-{day}",
+                cod_uc=cod_uc,
+                data_inspecao=day,
+                competencia=day.strftime("%Y-%m"),
+                resultado=result,
+                tipo_irregularidade="DESVIO" if kwh != "0" else None,
+                kwh_recuperado=Decimal(kwh),
+            )
+        )
+
+
+def conclude(client: TestClient, cod_uc: str, **result: object) -> int:
+    order_id = client.post("/ordens-inspecao", json={"cod_ucs": [cod_uc]}).json()[0]["id"]
+    client.patch(f"/ordens-inspecao/{order_id}", json={"status": "EM_CAMPO"})
+    response = client.patch(f"/ordens-inspecao/{order_id}", json={"status": "CONCLUIDA", **result})
+    assert response.status_code == 200, response.text
+    return order_id
+
+
+def last_inspection(client: TestClient, cod_uc: str) -> dict | None:
+    item = next(i for i in queue(client)["itens"] if i["cod_uc"] == cod_uc)
+    return item["ultima_inspecao"]
+
+
+def today_in_recife() -> date:
+    return datetime.now(ZoneInfo("America/Recife")).date()
+
+
+def test_last_inspection_is_the_most_recent_of_gold_and_portal(
+    client: TestClient, engine: Engine
+) -> None:
+    inspect_uc(engine, "0007", date(2020, 1, 10), "sem_irregularidade")
+    inspect_uc(engine, "0007", date(2021, 3, 5), "irregularidade_confirmada", "100")
+    assert last_inspection(client, "0007") == {
+        "data": "2021-03-05",
+        "resultado": "irregularidade_confirmada",
+        "origem": "gold",
+    }
+    assert last_inspection(client, "0005") is None
+
+    conclude(client, "0007", resultado="REGULAR")
+
+    assert last_inspection(client, "0007") == {
+        "data": today_in_recife().isoformat(),
+        "resultado": "sem_irregularidade",
+        "origem": "portal",
+    }
+
+
+def test_a_tie_between_sources_goes_to_the_portal(client: TestClient, engine: Engine) -> None:
+    inspect_uc(engine, "0007", today_in_recife(), "irregularidade_confirmada", "100")
+
+    conclude(client, "0007", resultado="REGULAR")
+
+    assert last_inspection(client, "0007")["origem"] == "portal"
+
+
+def test_an_unperformed_order_is_not_an_inspection(client: TestClient, engine: Engine) -> None:
+    inspect_uc(engine, "0007", date(2021, 3, 5), "sem_irregularidade")
+
+    conclude(client, "0007", resultado="NAO_REALIZADA")
+
+    assert last_inspection(client, "0007")["origem"] == "gold"
+
+
+def test_recently_inspected_units_leave_the_items_and_the_total(
+    client: TestClient, engine: Engine
+) -> None:
+    inspect_uc(engine, "0007", today_in_recife() - timedelta(days=30), "sem_irregularidade")
+    inspect_uc(engine, "0004", date(2020, 1, 1), "sem_irregularidade")
+
+    page = queue(client, sem_inspecao_meses=12)
+
+    assert (codes(page), page["total"]) == (["0005", "0004"], 2)
+    assert queue(client)["total"] == 3
+    assert codes(queue(client, sem_inspecao_meses=12, tamanho=1, pagina=2)) == ["0004"]
+    assert client.get(URL, params={"sem_inspecao_meses": 0}).status_code == 422
+
+
+def test_indicators_count_suspects_orders_and_inspection_results(client: TestClient) -> None:
+    client.post("/ordens-inspecao", json={"cod_ucs": ["0007"]})
+    conclude(
+        client,
+        "0005",
+        resultado="IRREGULAR_CONFIRMADA",
+        tipo_irregularidade="DESVIO",
+        kwh_recuperado=300,
+    )
+    conclude(client, "0004", resultado="REGULAR")
+    conclude(client, "0001", resultado="NAO_REALIZADA")
+
+    body = client.get(f"{URL}/indicadores").json()
+
+    assert body["suspeitas"] == 3
+    assert body["suspeitas_sem_ordem_ativa"] == 2
+    assert body["kwh_recuperavel_est_sem_ordem"] == 105.35 + 310
+    assert (body["ordens_geradas"], body["ordens_em_campo"]) == (1, 0)
+    assert body["portal"] == {
+        "inspecoes": 3,
+        "irregulares": 1,
+        "regulares": 1,
+        "nao_realizadas": 1,
+        "taxa_irregularidade": 0.5,
+        "kwh_recuperado": 300.0,
+    }
+    assert body["gold"]["nao_realizadas"] == 0
+    assert (body["gold"]["inspecoes"], body["gold"]["irregulares"]) == (2, 1)
+    assert body["gold"]["taxa_irregularidade"] == 0.5
+    assert body["gold"]["kwh_recuperado"] == 1200.0
+
+
+def test_indicators_rate_is_empty_without_decided_inspections(
+    client: TestClient, engine: Engine
+) -> None:
+    conclude(client, "0005", resultado="NAO_REALIZADA")
+
+    portal = client.get(f"{URL}/indicadores", params={"municipio": "Paulista"}).json()["portal"]
+
+    assert (portal["inspecoes"], portal["taxa_irregularidade"]) == (1, None)
+    other = client.get(f"{URL}/indicadores", params={"municipio": "Recife"}).json()
+    assert (other["suspeitas"], other["portal"]["inspecoes"]) == (1, 0)
+
+
+def test_indicators_have_no_recoverable_energy_when_none_is_known(
+    client: TestClient, engine: Engine
+) -> None:
+    with engine.begin() as connection:
+        connection.execute(update(FilaSuspeita).values(kwh_recuperavel_est=None))
+
+    assert client.get(f"{URL}/indicadores").json()["kwh_recuperavel_est_sem_ordem"] is None
+
+
+def test_recortes_group_by_municipality_by_default_and_by_neighborhood_inside_one(
+    client: TestClient, engine: Engine
+) -> None:
+    with engine.begin() as connection:
+        connection.execute(
+            update(FilaSuspeita)
+            .where(FilaSuspeita.cod_uc == "0005")
+            .values(kwh_recuperavel_est=None)
+        )
+    client.post("/ordens-inspecao", json={"cod_ucs": ["0007"]})
+
+    body = client.get(f"{URL}/recortes").json()
+
+    assert body["nivel"] == "municipio"
+    assert body["recortes"] == [
+        {
+            "segmento": "Recife",
+            "municipio": None,
+            "suspeitas": 1,
+            "suspeitas_sem_ordem_ativa": 0,
+            "kwh_recuperavel_est": 1425.0,
+        },
+        {
+            "segmento": "Jaboatão dos Guararapes",
+            "municipio": None,
+            "suspeitas": 1,
+            "suspeitas_sem_ordem_ativa": 1,
+            "kwh_recuperavel_est": 310.0,
+        },
+        {
+            "segmento": "Paulista",
+            "municipio": None,
+            "suspeitas": 1,
+            "suspeitas_sem_ordem_ativa": 1,
+            "kwh_recuperavel_est": None,
+        },
+    ]
+    inside = client.get(f"{URL}/recortes", params={"municipio": "Recife"}).json()
+    assert inside["nivel"] == "bairro"
+    assert [(r["segmento"], r["municipio"]) for r in inside["recortes"]] == [
+        ("Santo Amaro", "Recife")
+    ]
+
+
+def test_recortes_reject_a_level_above_the_filter(client: TestClient) -> None:
+    response = client.get(f"{URL}/recortes", params={"municipio": "Recife", "nivel": "municipio"})
+
+    assert response.status_code == 422
+
+
+def test_insight_narrates_only_totals_of_the_queue(client_with_writer) -> None:
+    client, redator = client_with_writer()
+
+    corpo = client.get(f"{URL}/insight").json()
+
+    assert corpo["origem"] == "ia"
+    ((tela, metricas),) = redator.chamadas
+    assert tela == "perdas"
+    codigos = codes(queue(client))
+    assert not any(codigo in str(metricas) for codigo in codigos)
+
+
+def test_insight_of_a_cut_without_suspicions_is_empty(client: TestClient) -> None:
+    corpo = client.get(f"{URL}/insight", params={"municipio": "Município Inexistente"}).json()
+
+    assert corpo == {"texto": None, "origem": None, "metricas": None}

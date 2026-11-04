@@ -47,6 +47,12 @@ describe("perdasSearchSchema", () => {
 			perdasSearchSchema.parse({ leituras_estimadas_min: "24" })
 				.leituras_estimadas_min,
 		).toBeUndefined();
+		expect(
+			perdasSearchSchema.parse({ sem_inspecao_meses: "7" }).sem_inspecao_meses,
+		).toBeUndefined();
+		expect(
+			perdasSearchSchema.parse({ sem_inspecao_meses: "12" }).sem_inspecao_meses,
+		).toBe(12);
 	});
 });
 
@@ -70,6 +76,8 @@ describe("filtrosDaBusca", () => {
 			queda: null,
 			medidorEletromecanico: false,
 			leiturasEstimadas: null,
+			semOrdemAtiva: false,
+			semInspecaoMeses: null,
 		});
 	});
 
@@ -134,6 +142,8 @@ describe("normalizacaoLocal", () => {
 			queda: null,
 			medidorEletromecanico: false,
 			leiturasEstimadas: null,
+			semOrdemAtiva: false,
+			semInspecaoMeses: null,
 		});
 	});
 
@@ -154,7 +164,20 @@ describe("normalizacaoLocal", () => {
 			queda: null,
 			medidorEletromecanico: false,
 			leiturasEstimadas: null,
+			semOrdemAtiva: false,
+			semInspecaoMeses: null,
 		});
+	});
+
+	it("avisa e descarta meses de inspeção fora das opções", () => {
+		const bruto = { sem_inspecao_meses: 7 };
+		const resultado = normalizacaoLocal(bruto, buscar(bruto));
+		expect(resultado.altera).toBe(true);
+		expect(resultado.canonico.sem_inspecao_meses).toBeUndefined();
+		expect(resultado.avisos).toEqual([
+			"Valores inválidos na URL foram ignorados: sem inspeção recente.",
+		]);
+		expect(filtrosDaBusca(buscar(bruto)).semInspecaoMeses).toBeNull();
 	});
 
 	it("omite defaults e campos redundantes sem aviso", () => {
@@ -233,6 +256,8 @@ describe("patchDosFiltros", () => {
 				queda: [20, 80],
 				medidorEletromecanico: true,
 				leiturasEstimadas: null,
+				semOrdemAtiva: true,
+				semInspecaoMeses: 12,
 			}),
 		).toEqual({
 			queda_min: 20,
@@ -240,6 +265,8 @@ describe("patchDosFiltros", () => {
 			medidor_eletromecanico: true,
 			leituras_estimadas_min: undefined,
 			leituras_estimadas_max: undefined,
+			sem_ordem_ativa: true,
+			sem_inspecao_meses: 12,
 			pagina: undefined,
 		});
 		expect(
@@ -247,6 +274,8 @@ describe("patchDosFiltros", () => {
 				queda: null,
 				medidorEletromecanico: false,
 				leiturasEstimadas: [25, 100],
+				semOrdemAtiva: false,
+				semInspecaoMeses: null,
 			}),
 		).toEqual({
 			queda_min: undefined,
@@ -254,6 +283,8 @@ describe("patchDosFiltros", () => {
 			medidor_eletromecanico: undefined,
 			leituras_estimadas_min: 25,
 			leituras_estimadas_max: 100,
+			sem_ordem_ativa: undefined,
+			sem_inspecao_meses: undefined,
 			pagina: undefined,
 		});
 	});

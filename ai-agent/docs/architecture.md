@@ -2,7 +2,7 @@
 
 Resumo para orientar quem chega ao `ai-agent/` (pessoa ou sessão de IA). A fonte da verdade continua sendo a [spec](specs/2026-10-19-architecture-design.md); este arquivo só diz o que existe hoje, onde está e o que falta. Atualize-o no mesmo PR que mudar o estado.
 
-- **Atualizado em:** 30/10/2026: camada semântica 0.4.1 (contagens como `numeric` nas views, percentual, FEC do alimentador por média mensal de UCs e receita de energia sem bandeiras) com o contrato da Gold v0.3 (tabelas por UC). O que está em revisão está na spec §1.
+- **Atualizado em:** 03/11/2026: insights de IA em cinco telas, com a IA escolhendo entre as leituras candidatas (prompt `insight/v4`, DEC-077); calibração e rodada final do juiz registradas (DEC-047) e Gold real carregada no banco local. Camada semântica 0.4.1 (contagens como `numeric` nas views, percentual, FEC do alimentador por média mensal de UCs e receita de energia sem bandeiras) com o contrato da Gold v0.3 (tabelas por UC). O que está em revisão está na spec §1.
 
 ## 1. O que o agente faz
 
@@ -54,7 +54,7 @@ Período (G1-05): quando as linhas têm `competencia`, o texto determinístico c
 
 `stream()` percorre o mesmo fluxo do `ask()` e emite as etapas (`domain/events.py`) até um `AnswerEvent` final; fechar o iterador cancela a execução (DEC-055).
 
-`InsightWriter` (item 9, `infrastructure/insight_writer.py`, prompt em `prompts/insight/v3/`, que redige a leitura escolhida pelo backend, DEC-066): narra o JSON de métricas de uma tela e devolve `None` se algum número do texto não estiver no JSON. O backend monta o JSON, guarda o insight em cache e liga o redator (D9): feito para a tela de Receita (`GET /receita/insight`, DEC-040), com `build_insight_writer` em `bootstrap.py`; o portal só chama a rota quando o usuário clica em "Gerar insight", ao lado da frase de leitura da ponte (DEC-069). O golden set está em `eval/golden_set.yaml` (versão 0.18.0, 105 itens, alinhado à camada 0.4.0). Todos os itens têm `revisado_por` preenchido por Dados (issue #90).
+`InsightWriter` (item 9, `infrastructure/insight_writer.py`, prompt em `prompts/insight/v4/`, DEC-077): recebe o JSON de métricas de uma tela com as leituras candidatas que o backend calculou, escolhe uma ou duas e escreve o insight. Devolve o texto e os `id` escolhidos (`InsightDraft`, saída estruturada), ou `None` se algum número do texto não estiver no JSON. O backend confere o texto contra as leituras escolhidas e guarda o insight em cache. Se o texto não passar, o backend pede uma nova tentativa com o motivo da recusa (`feedback`); o redator faz o mesmo quando um número não está no JSON. Se a segunda tentativa também falhar, a tela mostra a reserva da regra (DEC-066, DEC-077). Telas com insight: Receita (`GET /receita/insight`, DEC-040), Visão Geral (`GET /indicadores/insight`), Rede (`GET /continuidade/insight`) Unidade consumidora (`GET /unidades-consumidoras/{cod_uc}/insight`) e Perdas (`GET /fila-suspeitas/insight`, só totais, DEC-022), com `build_insight_writer` em `bootstrap.py`. O portal só chama a rota quando o usuário clica em "Gerar insight" (DEC-069). O golden set está em `eval/golden_set.yaml` (versão 0.18.0, 105 itens, alinhado à camada 0.4.0). Todos os itens têm `revisado_por` preenchido por Dados (issue #90).
 
 **Queda do provedor (DEC-061):** `GuardedModel` limita cada chamada a 15 s e, depois de uma falha, pula o modelo por 60 s, exceto o último da cadeia. A pergunta tem prazo de 30 s: estourado, volta `failed`; se a demora for na narração, a resposta sai com o texto determinístico.
 
@@ -64,7 +64,7 @@ Período (G1-05): quando as linhas têm `competencia`, o texto determinístico c
 - `history_turns=3` e `session_token_budget=200000` (0 desliga cada um). O orçamento é conferido antes da pergunta; leitura do consumo que falha → `failed` sem chamar o modelo; leitura do histórico que falha → segue sem ele.
 - `AgentAnswer.input_tokens` e `output_tokens` somam o gerador de SQL e o redator.
 - O backend limita as perguntas por usuário numa janela (`429`), soma o orçamento de tokens por usuário e só deixa o dono usar a sessão (`403`), com o login da DEC-049.
-- Estado: a rodada do golden que libera o `prompts/v3` como padrão (DEC-016) está pendente. A avaliação já exercita a memória nos follow-ups: o `evaluation/__main__.py` monta o agente com `InMemoryConversationHistory` (sem orçamento) e a entrega ao runner como `recorder`, de modo que G046, G099, G100, G102 e G103 usam o histórico da própria sessão. A memória vale nas duas bases (DEC-015, aceita em 29/10/2026). A rodada pendente compara v2 e v3: sem regressão nos itens comuns e ao menos 4 dos 5 follow-ups certos, inclusive o G046.
+- Estado: o `prompts/v3` é o padrão desde a DEC-046; a rodada do golden que compara v2 e v3 (DEC-016) segue como pendência. A avaliação já exercita a memória nos follow-ups: o `evaluation/__main__.py` monta o agente com `InMemoryConversationHistory` (sem orçamento) e a entrega ao runner como `recorder`, de modo que G046, G099, G100, G102 e G103 usam o histórico da própria sessão. A memória vale nas duas bases (DEC-015, aceita em 29/10/2026). A rodada pendente compara v2 e v3: sem regressão nos itens comuns e ao menos 4 dos 5 follow-ups certos, inclusive o G046.
 
 ## 4. Camada semântica hoje
 
@@ -107,7 +107,7 @@ Regras do contrato para o agente (`conventions.agent`, DEC-022), conferidas no c
 | `gold_inspecoes_uc` | **não** | não | fora do agente por decisão de produto, como a fila de suspeitas |
 | `gold_fila_suspeitas` | **não** | não | fora do agente por decisão de produto (DEC-022) |
 
-O banco local só tem a amostra sintética do backend (`venergy_api.amostra`). A Gold real ainda não foi entregue: os nomes e regras vêm do contrato, os números do golden set só se fixam com ela.
+O banco local carrega a Gold real pela carga (`venergy_api.carga`, a partir de `data/gold`). A amostra sintética (`venergy_api.amostra`) serve para testes e para gerar dados fora da Gold. O golden set 0.18.0 roda sobre a Gold real.
 
 ## 6. Lacunas conhecidas
 

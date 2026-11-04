@@ -615,3 +615,58 @@ def test_monthly_validates_filters_and_handles_empty_calendar(
         {"classe": "invalida"},
     ):
         assert client.get(MONTHLY, params=params).status_code == 422
+
+
+INSIGHT = "/indicadores/insight"
+ONE_MONTH_EACH = {
+    "base_inicio": "2024-01",
+    "base_fim": "2024-01",
+    "atual_inicio": "2025-01",
+    "atual_fim": "2025-01",
+}
+
+
+def revenue_up_energy_down(engine: Engine) -> None:
+    store(
+        engine,
+        segment("2024-01", receita_faturada=Decimal("1000.00"), kwh_faturado=Decimal("1000")),
+        segment("2025-01", receita_faturada=Decimal("1080.00"), kwh_faturado=Decimal("960")),
+    )
+
+
+def test_insight_without_the_writer_is_the_rule_reading(engine: Engine, client: TestClient) -> None:
+    revenue_up_energy_down(engine)
+
+    corpo = client.get(INSIGHT, params=ONE_MONTH_EACH).json()
+
+    assert corpo["origem"] == "regra"
+    assert corpo["texto"] == (
+        "A receita cresceu 8,0%, mas a energia faturada recuou 4,0%: "
+        "o ganho veio do preço, não do consumo."
+    )
+
+
+def test_insight_narrates_the_same_comparison_the_screen_shows(
+    engine: Engine, client_with_writer
+) -> None:
+    revenue_up_energy_down(engine)
+    client, redator = client_with_writer()
+
+    corpo = client.get(INSIGHT, params=ONE_MONTH_EACH).json()
+    tela = client.get(COMPARE, params=ONE_MONTH_EACH).json()
+
+    assert corpo["origem"] == "ia"
+    assert corpo["metricas"]["variacao_receita_pct"] == round(
+        tela["variacao_pct"]["receita_faturada"], 1
+    )
+    assert redator.chamadas == [("visao_geral", corpo["metricas"])]
+
+
+def test_insight_of_a_period_without_data_is_empty(engine: Engine, client_with_writer) -> None:
+    store(engine)
+    client, redator = client_with_writer()
+
+    corpo = client.get(INSIGHT, params=ONE_MONTH_EACH).json()
+
+    assert corpo == {"texto": None, "origem": None, "metricas": None}
+    assert redator.chamadas == []

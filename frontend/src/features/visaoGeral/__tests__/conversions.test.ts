@@ -4,6 +4,7 @@ import {
 	janelasDoIntervalo,
 	leitura,
 	mesesDoPeriodo,
+	periodosDoInsight,
 	tesoura,
 } from "../conversions";
 import type { JanelaIndicadores } from "../types";
@@ -167,5 +168,30 @@ describe("efeitosDaReceita", () => {
 			{ id: "tarifa", label: "Preço · tarifa", value: 5, kind: "delta" },
 		]);
 		expect(efeito?.pct).toBeNull();
+	});
+});
+
+describe("periodosDoInsight", () => {
+	it("separa o par 'AAAA-MM/AAAA-MM' nos quatro limites do insight", () => {
+		expect(
+			periodosDoInsight({
+				periodo_base: "2022-07/2022-12",
+				periodo_atual: "2024-01/2024-06",
+			}),
+		).toEqual({
+			base_inicio: "2022-07",
+			base_fim: "2022-12",
+			atual_inicio: "2024-01",
+			atual_fim: "2024-06",
+		});
+	});
+
+	it("não quebra com um período sem o fim: o limite vai vazio", () => {
+		expect(
+			periodosDoInsight({
+				periodo_base: "2022-07",
+				periodo_atual: "2024-01/2024-06",
+			}),
+		).toMatchObject({ base_inicio: "2022-07", base_fim: "" });
 	});
 });

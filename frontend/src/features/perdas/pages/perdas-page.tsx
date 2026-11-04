@@ -1,17 +1,21 @@
 import { getRouteApi } from "@tanstack/react-router";
 import { Pagina } from "#/components/layout/pagina";
+import { InsightIa, indisponivelDoInsight } from "#/features/agente";
 import { useSession } from "#/features/auth";
 import type { Recorte } from "#/lib/filtros";
 import { useMediaQuery } from "#/lib/use-media-query";
 import { AcoesOrdemProvider, useAcoesOrdem } from "../components/acoes-ordem";
 import { FilaSuspeitas } from "../components/fila-suspeitas";
 import { GerarOrdens } from "../components/gerar-ordens";
+import { IndicadoresPerdas } from "../components/indicadores-perdas";
+import { MapaSuspeitas } from "../components/mapa-suspeitas";
 import { OrdensKanban } from "../components/ordens-kanban";
 import { OrdensTable } from "../components/ordens-table";
 import { PlanilhaCampo } from "../components/planilha-campo";
 import { ResumoTempos } from "../components/resumo-tempos";
 import { StatusFilter } from "../components/status-filter";
 import { VisaoToggle } from "../components/visao-toggle";
+import { useInsightPerdas } from "../hooks/use-insight-perdas";
 import { useOrdens } from "../hooks/use-ordens";
 import { useOrdensAoVivo } from "../hooks/use-ordens-ao-vivo";
 import { useVisaoOrdens } from "../hooks/use-visao-ordens";
@@ -44,10 +48,23 @@ function OrdensSecao() {
 	const largo = useMediaQuery("(min-width: 48rem)");
 	const visaoEfetiva = largo && canEdit ? visao : "tabela";
 
+	// Sai da página atual: a fila do novo recorte começa na primeira.
+	const escolherRecorte = (proximo: Recorte) =>
+		navigate({
+			search: (prev) => ({
+				...prev,
+				municipio: proximo.municipio,
+				bairro: proximo.bairro,
+				pagina: undefined,
+			}),
+			resetScroll: false,
+		});
+
 	const filtrar = (next: StatusOrdem | undefined) =>
 		navigate({ search: (prev) => ({ ...prev, status: next }) });
 
 	const kanban = visaoEfetiva === "kanban";
+	const insight = useInsightPerdas(recorte);
 
 	return (
 		<Pagina className="min-h-full max-w-none">
@@ -72,8 +89,25 @@ function OrdensSecao() {
 						{item === "fila" ? "Suspeitas" : "Inspeções"}
 					</button>
 				))}
+				{/* O insight lê os indicadores e o mapa, que valem para as duas seções. */}
+				<InsightIa
+					className="ml-auto"
+					texto={insight.data?.texto}
+					origem={insight.data?.origem}
+					carregando={insight.isFetching}
+					indisponivel={indisponivelDoInsight(insight)}
+					onGerar={() => {
+						void insight.refetch();
+					}}
+				/>
 			</nav>
-			<div id="perdas-fila" hidden={secao !== "fila"}>
+			<IndicadoresPerdas recorte={recorte} />
+			<div
+				id="perdas-fila"
+				hidden={secao !== "fila"}
+				className={secao === "fila" ? "flex flex-col gap-5" : undefined}
+			>
+				<MapaSuspeitas recorte={recorte} onChange={escolherRecorte} />
 				<FilaSuspeitas onVerOrdens={() => setSecao("ordens")} />
 			</div>
 			<div

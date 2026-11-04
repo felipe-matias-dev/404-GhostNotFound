@@ -10,15 +10,15 @@ from sqlalchemy.orm import InstrumentedAttribute, Session
 
 from venergy_api.agente import RedatorInsightsDep
 from venergy_api.database import SessionDep
-from venergy_api.insight_receita import filtro_acima, metricas_da_receita, texto_aceito
-from venergy_api.insights import CacheInsightsDep, chave_do_cache
+from venergy_api.insight_receita import filtro_acima, metricas_da_receita, motivo_da_recusa
+from venergy_api.insights import CacheInsightsDep, narrar
 from venergy_api.models import DimUc, FatoFaturamentoMensal, KpisMensais, ReceitaDecomposicao
 from venergy_api.schemas import (
     ComparacaoFiltroSchema,
     ComparacaoReceitaSchema,
     DecomposicaoFiltroSchema,
     DecomposicaoLinhaSchema,
-    InsightReceitaSchema,
+    InsightSchema,
     KpisMensaisSchema,
     ParPeriodosSchema,
     PeriodoSchema,
@@ -194,7 +194,7 @@ async def get_insight(
     session: SessionDep,
     redator: RedatorInsightsDep,
     cache: CacheInsightsDep,
-) -> InsightReceitaSchema:
+) -> InsightSchema:
     """Um insight de IA sobre a ponte de receita do recorte que a tela está mostrando."""
     # A sessão do backend é síncrona: a consulta sai do laço de eventos para não travar as
     # outras requisições, como na gravação da auditoria.
@@ -203,19 +203,12 @@ async def get_insight(
     linhas_acima = await run_in_threadpool(consultar_decomposicao, acima, session) if acima else []
     metricas = metricas_da_receita(filtro, linhas, linhas_acima)
     if metricas is None:
-        return InsightReceitaSchema(texto=None, metricas=None)
+        return InsightSchema(texto=None, metricas=None)
 
-    chave = chave_do_cache("receita", metricas)
-    texto = cache.obter(chave)
-    if texto is None:
-        insight = await redator.narrate("receita", metricas) if redator else None
-        if insight is None or not texto_aceito(insight.text, metricas):
-            # IA desligada, provedor fora ou texto recusado: a tela mostra a leitura da regra.
-            # Ela não entra no cache, e o próximo pedido tenta o modelo de novo. Repetir agora
-            # não adianta: com temperatura 0, o modelo escreveria o mesmo texto.
-            return InsightReceitaSchema(
-                texto=metricas["leitura_texto"], origem="regra", metricas=metricas
-            )
-        texto = insight.text
-        cache.guardar(chave, texto)
-    return InsightReceitaSchema(texto=texto, origem="ia", metricas=metricas)
+    return await narrar(
+        "receita",
+        metricas,
+        redator,
+        cache,
+        lambda texto, escolhidas: motivo_da_recusa(texto, metricas, escolhidas),
+    )

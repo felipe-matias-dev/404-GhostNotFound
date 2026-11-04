@@ -359,6 +359,15 @@ class OrdemInspecao(Base):
         _enum_como_texto(ResultadoOrdem, "ck_ordem_inspecao_resultado")
     )
     observacao: Mapped[str | None]
+    # Resultado de campo estruturado: o mesmo par que a Gold guarda em gold_inspecoes_uc. Só vem
+    # preenchido em OI concluída como irregular; antes dessas colunas, ficava só na observação.
+    tipo_irregularidade: Mapped[str | None]
+    kwh_recuperado: Mapped[Decimal | None] = mapped_column(_ENERGY)
+    # Cópia do contexto da fila no momento da geração: a fila é recarregada pela Gold e a UC
+    # pode sair dela, mas a OI precisa lembrar por que foi gerada. Nulos para a OI feita à mão.
+    fila_posicao: Mapped[int | None]
+    fila_motivos: Mapped[list[str] | None] = mapped_column(ARRAY(Text))
+    fila_kwh_recuperavel_est: Mapped[Decimal | None] = mapped_column(_ENERGY)
     criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     atualizada_em: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
