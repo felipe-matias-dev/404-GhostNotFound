@@ -30,12 +30,18 @@ class PydanticAiAnswerWriter:
         self._temperature = temperature
         self._units = dict(units or {})
 
-    async def write(self, question: Question, draft: SqlDraft, result: QueryResult) -> Narration:
+    async def write(
+        self,
+        question: Question,
+        draft: SqlDraft,
+        result: QueryResult,
+        feedback: str | None = None,
+    ) -> Narration:
         agent = Agent(self._model, output_type=str, system_prompt=self._system)
         usage = RunUsage()
         try:
             run = await agent.run(
-                render_answer_user(question, draft, result, self._nonce, self._units),
+                render_answer_user(question, draft, result, self._nonce, self._units, feedback),
                 model_settings={"temperature": self._temperature},
                 usage=usage,
             )

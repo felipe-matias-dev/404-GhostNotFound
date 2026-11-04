@@ -123,8 +123,9 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | [DEC-056](#dec-056--views-do-agente-no-schema-semantic-d1) | Views do agente no schema `semantic` (D1) | 30/10/2026 | Luis Felipe | adotada |
 | [DEC-061](#dec-061--queda-do-provedor-não-pode-prender-a-resposta-do-agente) | Queda do provedor não pode prender a resposta do agente | 31/10/2026 | Luis Felipe | adotada |
 | [DEC-066](#dec-066--insight-da-receita-dá-a-conclusão-não-repete-a-tela) | Insight da Receita dá a conclusão, não repete a tela | 01/11/2026 | Luis Felipe | adotada, revisada pela [DEC-077](#dec-077--insights-de-ia-nas-telas-do-dia-a-dia-com-a-ia-escolhendo-a-leitura) |
-| [DEC-070](#dec-070--checagem-da-narrativa-sem-descartar-texto-correto) | Checagem da narrativa sem descartar texto correto | 02/11/2026 | Luis Felipe | adotada |
+| [DEC-070](#dec-070--checagem-da-narrativa-sem-descartar-texto-correto) | Checagem da narrativa sem descartar texto correto | 02/11/2026 | Luis Felipe | adotada, revisada pela [DEC-079](#dec-079--narrativa-recusada-tem-uma-segunda-chance-e-chega-arredondada) |
 | [DEC-077](#dec-077--insights-de-ia-nas-telas-do-dia-a-dia-com-a-ia-escolhendo-a-leitura) | Insights de IA nas telas do dia a dia, com a IA escolhendo a leitura | 03/11/2026 | Luis Felipe | adotada |
+| [DEC-079](#dec-079--narrativa-recusada-tem-uma-segunda-chance-e-chega-arredondada) | Narrativa recusada tem uma segunda chance e chega arredondada | 04/11/2026 | Luis Felipe | adotada |
 
 ### Convenções sem número
 
@@ -2270,6 +2271,30 @@ Decisões de 19/10/2026, anteriores à numeração: [convenções do frontend](#
   - **Erro:** UC não encontrada não oferece "Tentar de novo" (repetiria o mesmo `404`): o campo recebe o foco com o texto selecionado, e digitar substitui o código. Falha de rede ou do servidor mantém "Tentar de novo". Na página `/uc`, a UC inexistente oferece "Buscar outra UC", que abre a palette vazia. O placeholder é "Ex.: UC999999", e o (i) do campo lista os formatos aceitos.
 - **Alternativas descartadas:** acrescentar "UC" ao número só no frontend (o contrato não fixa o formato do código, e a amostra usa `0001`); preencher zeros à esquerda (`1` não é `0001`; a DEC-043 continua valendo nisso).
 - **Consequências:** a busca percorre `gold_dim_uc` com `regexp_replace` (cerca de 45 mil linhas na Gold real, sem índice próprio); se o cadastro crescer muito, entra um índice de expressão. Testes em `backend/tests/test_unidades.py` e `test_unidades_visao_360.py`.
+
+## DEC-079 · Narrativa recusada tem uma segunda chance e chega arredondada
+
+- **Data:** 04/11/2026 · **Área:** GenAI · **Autor:** Luis Felipe · **Revisa:** [DEC-019](#dec-019--verificação-numérica-da-narrativa) (durações da pergunta) e [DEC-070](#dec-070--checagem-da-narrativa-sem-descartar-texto-correto) (texto de reserva)
+- **Contexto:** na rodada final de 03/11 na Gold real, o SQL acertou 94,1%, mas só 86,2% das narrativas passaram na checagem: 7 caíram por número sem suporte e 3 por período ausente. Num teste ao vivo com 10 perguntas de tipos diferentes na Gold real (04/11), 2 de 10 respostas saíram no texto de reserva:
+  - "Por que a receita de energia subiu menos que a tarifa entre o primeiro ano da base e os últimos 12 meses?" caiu 3 vezes em 3, porque a narrativa escrevia "12 meses", e o 12 só estava na pergunta e nas suposições. O texto de reserva saiu sem valores, porque o resultado tinha 5 colunas e o limite era 4;
+  - "Quais são os 3 alimentadores com maior DEC em março de 2025?" caiu uma vez por período ausente, e o texto de reserva mostrou "dec = 1,913596";
+  - em "Quanto a receita comercial de Recife cresceu entre 2024 e 2025?", a narrativa saiu sem R$ e sem %, porque os aliases `receita_2024` e `variacao_percentual` não estão na camada semântica e chegavam ao redator sem unidade.
+- **Decisão:**
+  - **Segunda chance:** uma narrativa recusada é escrita de novo uma vez, com o motivo da recusa na mensagem (os números sem suporte, o período por extenso ou o pedido de escrever as colunas em palavras), como no insight (DEC-077). A segunda narrativa passa pela mesma checagem; recusada de novo, a resposta sai no texto de reserva. O prazo da pergunta continua valendo para as duas.
+  - **Durações do período:** o número de uma duração dita na pergunta ou nas suposições ("nos últimos 12 meses", "as 12 primeiras competências") vale na checagem só quando a narrativa o escreve também como duração do período (primeiros ou últimos N meses, anos, trimestres, semestres ou competências). "Há 12 UCs" ou "a idade média é de 10 anos" continuam recusados, e "acima de 300 kWh" da pergunta continua não valendo.
+  - **Arredondamento:** valores com mais de 2 casas decimais chegam ao redator e ao texto de reserva com 2 casas (ou 3 algarismos significativos abaixo de 1). A checagem continua usando o valor exato da linha, com o arredondamento da DEC-070.
+  - **Unidade dos aliases:** a coluna do resultado que não está na camada ganha a unidade quando é o radical de colunas da camada com uma só unidade mais um ano ou um qualificador (`receita_2024`, `receita_base` → R$), e `%` quando o nome diz percentual (`variacao_percentual`, `_pct`).
+  - **Texto de reserva:** mostra os valores até 5 linhas e 6 colunas (antes 4), para caber a decomposição da receita.
+  - Prompt da narração em `prompts/answer/v4` (padrão), que aceita a duração da pergunta, pede `%` e manda corrigir o que a recusa aponta.
+- **Alternativas descartadas:**
+  - aceitar qualquer número da pergunta: a pergunta pode trazer uma premissa falsa ("se a tarifa subiu 10,5%…"), e a narrativa a repetiria como fato;
+  - mais de uma nova tentativa: cada uma é uma chamada ao modelo dentro do prazo de 30 s;
+  - formatar o texto final só no código: a narração deixaria de ser do modelo, e o requisito pede resposta em linguagem natural.
+- **Evidência:**
+  - Testes unitários para cada regra: segunda chance com o motivo (números, período por extenso, nome técnico), recusa dupla no texto de reserva, tokens das duas narrações, durações aceitas só quando escritas como duração ("Há 12 UCs" e "10 anos" de idade continuam recusados), arredondamento, unidade dos aliases e texto de reserva com 6 colunas.
+  - Rodada completa na Gold real, narrada e com o juiz (04/11/2026, 95 itens do golden set e 17 do red team), contra a de 03/11 nos mesmos 95 itens: execution accuracy 94,1% → 98,5%, status 95,8% → 100%, `failed` 3,2% → 0%, juiz 64,6% → 89,7% (nota média 4,11 → 4,74), fidelidade numérica 86,2% → 88,2%, red team sem violação. Nenhum item piorou no SQL ou no status, que é a regra da [DEC-016](#dec-016--exceção-de-versionamento-do-prompt-v1-proposta) para a troca do prompt. Pelos logs da etapa `resposta`, 11 narrativas foram recusadas na primeira tentativa (7 por número, 4 por período); 9 passaram na segunda, e 1 foi recusada de novo e saiu no texto de reserva.
+  - Latência p50 de 3,3 s e p95 de 27,4 s (antes 2,8 s e 16,6 s): a segunda narração e, nessa rodada, a cota esgotada do primeiro modelo de reserva (429), que levou parte das perguntas ao modelo pago do OpenRouter. A melhora do SQL e do `failed` também reflete o provedor mais estável no dia, não só esta decisão.
+- **Consequências:** uma narrativa recusada custa uma chamada a mais ao modelo, e os tokens das duas narrações entram em `input_tokens` e `output_tokens` da resposta e no orçamento da sessão. O log da etapa `resposta` passa a trazer `attempt`. A porta `AnswerWriter.write` ganha o parâmetro opcional `feedback`.
 
 ## Convenções do frontend (sem número)
 

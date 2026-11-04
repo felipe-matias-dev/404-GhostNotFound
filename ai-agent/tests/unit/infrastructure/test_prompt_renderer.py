@@ -332,6 +332,34 @@ def test_answer_user_prompt_labels_the_columns_that_have_a_unit():
     assert "colunas: competencia, receita_faturada (R$)" in prompt
 
 
+def test_answer_user_prompt_rounds_long_decimals_and_labels_aliases():
+    question = Question(text="receita?", session_id="s1")
+    draft = SqlDraft(status=DraftStatus.OK, sql="SELECT 1")
+    result = QueryResult(
+        columns=("receita_2024", "variacao_percentual", "dec"),
+        rows=({"receita_2024": 10, "variacao_percentual": 0.8912, "dec": 1.9135965},),
+        row_count=1,
+        truncated=False,
+    )
+
+    prompt = render_answer_user(question, draft, result, NONCE, {"receita_faturada": "R$"})
+
+    assert "colunas: receita_2024 (R$), variacao_percentual (%), dec" in prompt
+    assert '"dec": 1.91' in prompt and '"variacao_percentual": 0.891' in prompt
+
+
+def test_answer_user_prompt_carries_the_reason_of_a_refused_narrative():
+    question = Question(text="receita?", session_id="s1")
+    draft = SqlDraft(status=DraftStatus.OK, sql="SELECT 1")
+    result = QueryResult(columns=("total",), rows=({"total": 3},), row_count=1, truncated=False)
+
+    prompt = render_answer_user(question, draft, result, NONCE, feedback="Cite o período.")
+
+    assert prompt.endswith(
+        "Seu texto anterior foi recusado na conferência. Cite o período. Escreva de novo."
+    )
+
+
 def judged_answer(**overrides):
     fields = {
         "answer": "Existem 3 UCs em Olinda.",
