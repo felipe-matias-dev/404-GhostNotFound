@@ -3,10 +3,14 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Query
+from fastapi.concurrency import run_in_threadpool
 from sqlalchemy import Date, Integer, and_, any_, case, cast, func, literal, or_, select, union_all
 from sqlalchemy.dialects.postgresql import distinct_on
 
+from venergy_api.agente import RedatorInsightsDep
 from venergy_api.database import SessionDep
+from venergy_api.insight_perdas import metricas_de_perdas, motivo_da_recusa
+from venergy_api.insights import CacheInsightsDep, narrar
 from venergy_api.models import DimUc, FilaSuspeita, InspecaoUc, OrdemEvento, OrdemInspecao
 from venergy_api.ordens import STATUS_ATIVOS, ResultadoOrdem, StatusOrdem
 from venergy_api.schemas import (
@@ -17,6 +21,7 @@ from venergy_api.schemas import (
     FilaItemSchema,
     FilaPaginaSchema,
     IndicadoresPerdasSchema,
+    InsightSchema,
     OrdemAtivaSchema,
     RecorteFilaSchema,
     RecorteFiltroSchema,
@@ -223,6 +228,31 @@ def get_recortes(
             )
             for linha in session.execute(consulta)
         ],
+    )
+
+
+@router.get("/insight")
+async def get_insight(
+    filtro: Annotated[RecorteFiltroSchema, Query()],
+    session: SessionDep,
+    redator: RedatorInsightsDep,
+    cache: CacheInsightsDep,
+) -> InsightSchema:
+    """Um insight de IA sobre os indicadores e o mapa da tela de Perdas, só com totais."""
+    # Os mesmos números da tela, fora do laço de eventos: a sessão do backend é síncrona.
+    indicadores = await run_in_threadpool(get_indicadores, filtro, session)
+    recortes = await run_in_threadpool(
+        get_recortes, RecortesFilaFiltroSchema(**filtro.model_dump()), session
+    )
+    metricas = metricas_de_perdas(filtro, indicadores, recortes)
+    if metricas is None:
+        return InsightSchema(texto=None, metricas=None)
+    return await narrar(
+        "perdas",
+        metricas,
+        redator,
+        cache,
+        lambda texto, escolhidas: motivo_da_recusa(texto, metricas, escolhidas),
     )
 
 

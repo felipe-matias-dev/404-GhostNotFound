@@ -2602,6 +2602,101 @@
         }
       }
     },
+    "/fila-suspeitas/insight": {
+      "get": {
+        "tags": [
+          "fila de suspeitas"
+        ],
+        "summary": "Get Insight",
+        "description": "Um insight de IA sobre os indicadores e o mapa da tela de Perdas, só com totais.",
+        "operationId": "get_insight_fila_suspeitas_insight_get",
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "municipio",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Municipio"
+            }
+          },
+          {
+            "name": "bairro",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Bairro"
+            }
+          },
+          {
+            "name": "classe",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "B1",
+                    "B2",
+                    "B3",
+                    "A4"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Classe"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InsightSchema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/fila-suspeitas/distribuicao-queda": {
       "get": {
         "tags": [

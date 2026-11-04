@@ -514,6 +514,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/fila-suspeitas/insight": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Insight
+         * @description Um insight de IA sobre os indicadores e o mapa da tela de Perdas, só com totais.
+         */
+        get: operations["get_insight_fila_suspeitas_insight_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/fila-suspeitas/distribuicao-queda": {
         parameters: {
             query?: never;
@@ -2976,6 +2996,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RecortesFilaSchema"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_insight_fila_suspeitas_insight_get: {
+        parameters: {
+            query?: {
+                municipio?: string | null;
+                bairro?: string | null;
+                classe?: ("B1" | "B2" | "B3" | "A4") | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InsightSchema"];
                 };
             };
             /** @description Validation Error */

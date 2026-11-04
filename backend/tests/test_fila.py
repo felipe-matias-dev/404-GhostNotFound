@@ -524,3 +524,21 @@ def test_recortes_reject_a_level_above_the_filter(client: TestClient) -> None:
     response = client.get(f"{URL}/recortes", params={"municipio": "Recife", "nivel": "municipio"})
 
     assert response.status_code == 422
+
+
+def test_insight_narrates_only_totals_of_the_queue(client_with_writer) -> None:
+    client, redator = client_with_writer()
+
+    corpo = client.get(f"{URL}/insight").json()
+
+    assert corpo["origem"] == "ia"
+    ((tela, metricas),) = redator.chamadas
+    assert tela == "perdas"
+    codigos = codes(queue(client))
+    assert not any(codigo in str(metricas) for codigo in codigos)
+
+
+def test_insight_of_a_cut_without_suspicions_is_empty(client: TestClient) -> None:
+    corpo = client.get(f"{URL}/insight", params={"municipio": "Município Inexistente"}).json()
+
+    assert corpo == {"texto": None, "origem": None, "metricas": None}

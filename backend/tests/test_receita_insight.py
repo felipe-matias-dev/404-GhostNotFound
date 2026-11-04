@@ -230,7 +230,8 @@ def test_a_refused_text_gets_one_more_try_with_the_reason(client_with_writer) ->
 
     assert corpo["origem"] == "ia"
     assert corpo["texto"] == corpo["metricas"]["leitura_texto"]
-    assert redator.correcoes == [None, 'Não use "desempenho".']
+    assert redator.correcoes[0] is None
+    assert redator.correcoes[1].startswith('Não use "desempenho".')
 
 
 @pytest.mark.usefixtures("bridge")

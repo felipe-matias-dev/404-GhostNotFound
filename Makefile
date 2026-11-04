@@ -14,7 +14,7 @@ help:
 	@echo make test-backend - testes do backend
 	@echo make test-agent - testes do agente de IA
 	@echo make eval - avalia o agente e grava eval/runs/, usa o modelo: DATASET ONLY JUDGE SQL_ONLY
-	@echo make eval-insights - rodada fixa dos insights das quatro telas na Gold (TELAS=rede,receita para escolher), usa o modelo
+	@echo make eval-insights - rodada fixa dos insights das cinco telas na Gold (TELAS=rede,receita para escolher), usa o modelo
 	@echo make eval-compare - compara duas rodadas, sem modelo: A=eval/runs/x.json B=eval/runs/y.json, caminhos relativos a ai-agent/
 	@echo make lint - hooks do pre-commit em todos os arquivos, igual ao CI, requer make setup
 	@echo make frontend-check - checagem de tipos e build do frontend

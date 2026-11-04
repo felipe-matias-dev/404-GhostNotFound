@@ -100,3 +100,50 @@ def test_the_reason_points_a_flipped_direction() -> None:
     assert motivo_da_recusa("A receita caiu 8,0%.", METRICAS, ("receita",), NADA) == (
         "Mantenha o sentido de cada número: o que sobe nas leituras sobe no texto."
     )
+
+
+def test_energy_to_recover_is_not_a_drop() -> None:
+    metricas = com_candidatas(
+        [("concentracao", "Os 3 lugares com mais energia a recuperar concentram 73,0% do kWh.")],
+        {},
+    )
+
+    assert texto_aceito(
+        "Três lugares concentram 73,0% do kWh a recuperar: 3 deles.", metricas, (), NADA
+    )
+
+
+def test_a_text_without_the_names_of_the_chosen_reading_is_refused() -> None:
+    metricas = com_candidatas(
+        [("concentracao", "Os 2 municípios com mais energia concentram 70,0%: Olinda e Recife.")],
+        {},
+        {"concentracao": ["Olinda", "Recife"]},
+    )
+
+    assert (
+        motivo_da_recusa(
+            "Os 2 municípios com mais energia concentram 70,0%.", metricas, ("concentracao",), NADA
+        )
+        == "Cite estes nomes como estão: Olinda, Recife."
+    )
+    assert texto_aceito(
+        "Olinda e Recife, 2 municípios, concentram 70,0% da energia.",
+        metricas,
+        ("concentracao",),
+        NADA,
+    )
+
+
+def test_every_reason_goes_back_at_once() -> None:
+    metricas = com_candidatas(
+        [("concentracao", "Os 2 municípios concentram 70,0%: Olinda e Recife.")],
+        {},
+        {"concentracao": ["Olinda", "Recife"]},
+    )
+
+    assert motivo_da_recusa(
+        "Os municípios concentram 71,0%.", metricas, ("concentracao",), NADA
+    ) == (
+        "Use estes números, escritos exatamente assim, e nenhum outro: 2, 70,0. "
+        "Cite estes nomes como estão: Olinda, Recife."
+    )

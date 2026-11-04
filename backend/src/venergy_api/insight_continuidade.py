@@ -66,6 +66,7 @@ def metricas_da_continuidade(
         "indice_do_pior": round(getattr(pior, criterio), 2),
     }
     leituras: list[tuple[str, str]] = []
+    nomes = {"pior_alimentador": [pior.cod_alimentador]}
 
     if len(linhas) >= MIN_ALIMENTADORES_PARA_CONCENTRAR and total > 0:
         n_piores = max(1, math.ceil(len(linhas) * FRACAO_DOS_PIORES))
@@ -113,6 +114,7 @@ def metricas_da_continuidade(
         if em_alta:
             cod, pct = max(em_alta, key=lambda par: par[1])
             metricas |= {"maior_alta": cod, "maior_alta_pct": round(pct, 1)}
+            nomes["maior_alta"] = [cod]
             leituras.append(
                 (
                     "maior_alta",
@@ -125,4 +127,4 @@ def metricas_da_continuidade(
         leituras.append(
             ("pior_alimentador", f"O {pior.cod_alimentador} tem o pior {indice} {lugar}.")
         )
-    return com_candidatas(leituras, metricas)
+    return com_candidatas(leituras, metricas, nomes)

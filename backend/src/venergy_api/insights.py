@@ -29,10 +29,12 @@ MAX_ESCOLHIDAS = 2
 # menos 40 caracteres, e 30% do tamanho quando ele junta duas leituras numa frase.
 FOLGA_DO_TEXTO = 40
 FOLGA_PROPORCIONAL = 0.3
-# Sentido de cada afirmação. "Ganho" é alta: "o ganho de receita foi de 14,3%".
+# Sentido de cada afirmação. "Ganho" é alta: "o ganho de receita foi de 14,3%". "Acima" e
+# "abaixo" comparam com outra taxa: "45,0%, abaixo dos 52,0% do histórico". "Recuperar" não é
+# queda: "energia a recuperar" vem antes de percentuais em Perdas.
 _SENTIDO = re.compile(
-    r"\b(?:(?P<alta>cresc\w*|sub\w*|alta|aument\w*|ganh\w*)"
-    r"|(?P<queda>recu\w*|ca[ií]\w*|qued\w*|perd\w*|redu\w*|derrub\w*))\b",
+    r"\b(?:(?P<alta>cresc\w*|sub\w*|alta|aument\w*|ganh\w*|acima)"
+    r"|(?P<queda>recu(?!per)\w*|ca[ií]\w*|qued\w*|perd\w*|redu\w*|derrub\w*|abaixo))\b",
     re.IGNORECASE,
 )
 _NUMERO = re.compile(r"\d+(?:\.\d{3})*(?:,\d+)?")
@@ -73,15 +75,35 @@ def _sentidos(texto: str) -> set[tuple[Decimal, str]]:
 
 
 def com_candidatas(
-    candidatas: list[tuple[str, str]], metricas: dict[str, object]
+    candidatas: Sequence[tuple[str, str]],
+    metricas: dict[str, object],
+    nomes: Mapping[str, Sequence[str]] | None = None,
 ) -> dict[str, object]:
-    """As métricas com as leituras candidatas e a reserva: a primeira, na ordem da regra."""
+    """As métricas com as leituras candidatas e a reserva: a primeira, na ordem da regra.
+
+    `nomes` traz, por leitura, os lugares ou alimentadores que o texto precisa citar: sem eles,
+    "os 3 municípios" não diz para onde ir.
+    """
+    nomes = nomes or {}
     return {
         **metricas,
-        "candidatas": [{"id": chave, "texto": texto} for chave, texto in candidatas],
+        "candidatas": [
+            {
+                "id": chave,
+                "texto": texto,
+                **({"nomes": list(nomes[chave])} if nomes.get(chave) else {}),
+            }
+            for chave, texto in candidatas
+        ],
         "leitura_principal": candidatas[0][0],
         "leitura_texto": candidatas[0][1],
     }
+
+
+def _nomes_exigidos(metricas: dict[str, object], escolhidas: Sequence[str]) -> list[str]:
+    chaves = escolhidas or str(metricas.get("leitura_principal", "")).split("+")
+    por_leitura = {c["id"]: c.get("nomes", []) for c in metricas.get("candidatas", [])}
+    return [nome for chave in chaves for nome in por_leitura.get(chave, [])]
 
 
 def leitura_escolhida(metricas: dict[str, object], escolhidas: Sequence[str]) -> str | None:
@@ -114,20 +136,26 @@ def motivo_da_recusa(
     leitura = leitura_escolhida(metricas, escolhidas)
     if leitura is None:
         return f"Escolha uma ou até {MAX_ESCOLHIDAS} leituras diferentes, pelos id de candidatas."
+    # Todos os motivos de uma vez: corrigir um por tentativa trocava um erro pelo seguinte.
+    motivos = []
     if termo := proibidos.search(texto):
-        return f'Não use "{termo.group(0)}".'
+        motivos.append(f'Não use "{termo.group(0)}".')
     limite = int(len(leitura) + max(FOLGA_DO_TEXTO, len(leitura) * FOLGA_PROPORCIONAL))
     if len(texto) > limite:
-        return (
+        motivos.append(
             f"Escreva no máximo {limite} caracteres e diga só o que as leituras escolhidas "
             "dizem, sem outra conclusão."
         )
     if _numeros(texto) != _numeros(leitura):
         esperados = ", ".join(dict.fromkeys(_NUMERO.findall(leitura)))
-        return f"Use estes números, escritos exatamente assim, e nenhum outro: {esperados}."
-    if not _sentidos(leitura) <= _sentidos(texto):
-        return "Mantenha o sentido de cada número: o que sobe nas leituras sobe no texto."
-    return None
+        motivos.append(
+            f"Use estes números, escritos exatamente assim, e nenhum outro: {esperados}."
+        )
+    elif not _sentidos(leitura) <= _sentidos(texto):
+        motivos.append("Mantenha o sentido de cada número: o que sobe nas leituras sobe no texto.")
+    if faltando := [nome for nome in _nomes_exigidos(metricas, escolhidas) if nome not in texto]:
+        motivos.append(f"Cite estes nomes como estão: {', '.join(faltando)}.")
+    return " ".join(motivos) or None
 
 
 def texto_aceito(

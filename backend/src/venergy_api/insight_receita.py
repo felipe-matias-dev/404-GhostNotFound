@@ -282,4 +282,10 @@ def metricas_da_receita(
             linhas_acima
         ) >= MIN_SEGMENTOS_PARA_CONTAR and vizinhos_em_queda == [nome]
 
-    return com_candidatas(_leituras(metricas, filtro), metricas)
+    # O texto precisa citar o lugar que a leitura aponta: é ele que diz onde está a queda.
+    nomes: dict[str, list[str]] = {}
+    if metricas["maiores_quedas"]:
+        nomes["quedas_concentradas"] = [str(metricas["maiores_quedas"][0]["segmento"])]
+    if nome := filtro.bairro or filtro.municipio:
+        nomes["unico_em_queda"] = [nome]
+    return com_candidatas(_leituras(metricas, filtro), metricas, nomes)

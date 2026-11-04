@@ -1,4 +1,4 @@
-"""Rodada fixa dos insights das quatro telas: `make eval-insights` (DEC-066, DEC-077).
+"""Rodada fixa dos insights das cinco telas: `make eval-insights` (DEC-066, DEC-077).
 
 Para cada tela, escolhe na Gold carregada um recorte para cada caso que as leituras distinguem
 e chama o modelo em todos; na Receita, soma dois casos sintéticos que a base pode não ter. Cada
@@ -20,7 +20,13 @@ from sqlalchemy.orm import Session
 from venergy_agent.bootstrap import build_insight_writer
 from venergy_agent.config import AgentSettings
 
-from venergy_api import insight_continuidade, insight_indicadores, insight_receita, insight_uc
+from venergy_api import (
+    insight_continuidade,
+    insight_indicadores,
+    insight_perdas,
+    insight_receita,
+    insight_uc,
+)
 from venergy_api.agente import configurar_logs_do_agente
 from venergy_api.config import get_settings
 from venergy_api.database import create_db_engine
@@ -28,6 +34,7 @@ from venergy_api.insight_receita import filtro_acima, metricas_da_receita
 from venergy_api.insights import redigir
 from venergy_api.models import DimUc, FatoFaturamentoMensal, ReceitaDecomposicao
 from venergy_api.routers.continuidade import get_ranking_alimentadores
+from venergy_api.routers.fila import get_indicadores, get_recortes
 from venergy_api.routers.indicadores import get_comparacao
 from venergy_api.routers.receita import consultar_decomposicao
 from venergy_api.routers.unidades import consultar_metricas_da_uc
@@ -36,6 +43,8 @@ from venergy_api.schemas import (
     DecomposicaoLinhaSchema,
     IndicadoresComparacaoFiltroSchema,
     RankingFiltroSchema,
+    RecorteFiltroSchema,
+    RecortesFilaFiltroSchema,
 )
 
 Metricas = dict[str, object]
@@ -49,9 +58,13 @@ MOTIVOS: dict[str, Motivo] = {
     "visao_geral": insight_indicadores.motivo_da_recusa,
     "rede": insight_continuidade.motivo_da_recusa,
     "unidade_consumidora": insight_uc.motivo_da_recusa,
+    "perdas": insight_perdas.motivo_da_recusa,
 }
 # UCs lidas para achar um caso de cada leitura: o bastante para a base real, sem ler todas.
 AMOSTRA_DE_UCS = 400
+# Pausa entre os casos: em sequência, a rodada passava do limite por minuto do plano gratuito do
+# Gemini, e a falha do provedor aparecia como insight recusado.
+PAUSA_ENTRE_CASOS = 4.0
 
 RELATORIOS = Path(__file__).parents[3] / "ai-agent" / "eval" / "runs_gold"
 
@@ -220,6 +233,23 @@ def casos_da_uc(session: Session) -> list[Caso]:
     return [(caso, "uma UC", metricas) for caso, _, metricas in casos_por_leitura(lidos, leituras)]
 
 
+def casos_de_perdas(session: Session) -> list[Caso]:
+    """A empresa e um município para cada leitura; só totais, como a rota manda ao modelo."""
+    recortes = [{}] + [{"municipio": municipio} for municipio in _municipios(session)]
+    lidos = []
+    for recorte in recortes:
+        filtro = RecorteFiltroSchema(**recorte)
+        metricas = insight_perdas.metricas_de_perdas(
+            filtro,
+            get_indicadores(filtro, session),
+            get_recortes(RecortesFilaFiltroSchema(**recorte), session),
+        )
+        if metricas:
+            lidos.append((str(metricas["recorte"]), metricas))
+    leituras = ("concentracao", "acerto_das_inspecoes", "fila_parada")
+    return [("empresa", *lidos[0]), *casos_por_leitura(lidos[1:], leituras)] if lidos else []
+
+
 def casos_da_receita(session: Session, par: tuple[str, str]) -> tuple[list[Caso], list[str]]:
     escolhidos = escolher_recortes(_candidatos(session, *par))
     casos = [
@@ -305,10 +335,15 @@ async def rodar(telas: Sequence[str]) -> int:
             casos["rede"] = casos_da_rede(session, par)
         if "unidade_consumidora" in telas:
             casos["unidade_consumidora"] = casos_da_uc(session)
+        if "perdas" in telas:
+            casos["perdas"] = casos_de_perdas(session)
 
-    resultados = [
-        await _narrar(redator, tela, caso) for tela, da_tela in casos.items() for caso in da_tela
-    ]
+    resultados = []
+    for tela, da_tela in casos.items():
+        for caso in da_tela:
+            if resultados:
+                await asyncio.sleep(PAUSA_ENTRE_CASOS)
+            resultados.append(await _narrar(redator, tela, caso))
     RELATORIOS.mkdir(parents=True, exist_ok=True)
     instante = datetime.now(UTC).strftime("%Y-%m-%dT%H%M%SZ")
     relatorio = RELATORIOS / f"insights-{instante}.json"
