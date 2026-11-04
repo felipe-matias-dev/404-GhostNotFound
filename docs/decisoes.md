@@ -2172,3 +2172,4 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 - **Consequências:**
   - `make eval-insights` cobre as quatro telas (`TELAS=rede,receita` escolhe) e confere cada texto como a rota, contra as leituras que a IA escolheu;
   - o prompt `insight/v3` continua no repositório. Sem `readings`, a conferência volta a comparar o texto com a reserva.
+  - **Custo por insight.** Cada clique em "Gerar insight" pode chamar o modelo até três vezes: a nova tentativa do redator quando um número do texto não está nas métricas (`PydanticAiInsightWriter.narrate`), a nova tentativa do backend com o motivo da recusa (`redigir`), e o próximo clique, porque um texto recusado ou um erro do provedor não entra no cache. A cota gratuita conta cada uma. Por isso o insight é sempre um clique do usuário, e não é carregado junto com a tela.
