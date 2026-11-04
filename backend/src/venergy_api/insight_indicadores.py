@@ -10,7 +10,7 @@ import re
 from collections.abc import Sequence
 
 from venergy_api.insights import com_candidatas, variou
-from venergy_api.insights import texto_aceito as conferir
+from venergy_api.insights import motivo_da_recusa as recusar
 from venergy_api.schemas import ComparacaoIndicadoresSchema, IndicadoresComparacaoFiltroSchema
 
 # Ordem de desempate da maior piora, e como o texto chama cada indicador. O sinal diz o que é
@@ -73,9 +73,15 @@ def _leitura_do_servico(variacoes: dict[str, float]) -> tuple[str, str] | None:
     )
 
 
+def motivo_da_recusa(
+    texto: str, metricas: dict[str, object], escolhidas: Sequence[str] = ()
+) -> str | None:
+    """Por que o texto da IA não diz as leituras que ela escolheu, ou None se diz."""
+    return recusar(texto, metricas, escolhidas, _TERMOS_PROIBIDOS)
+
+
 def texto_aceito(texto: str, metricas: dict[str, object], escolhidas: Sequence[str] = ()) -> bool:
-    """Se o texto da IA diz as leituras que ela escolheu, sem nomes de chaves."""
-    return conferir(texto, metricas, escolhidas, _TERMOS_PROIBIDOS)
+    return motivo_da_recusa(texto, metricas, escolhidas) is None
 
 
 def metricas_dos_indicadores(

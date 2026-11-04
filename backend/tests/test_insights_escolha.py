@@ -1,6 +1,6 @@
 import re
 
-from venergy_api.insights import com_candidatas, leitura_escolhida, texto_aceito
+from venergy_api.insights import com_candidatas, leitura_escolhida, motivo_da_recusa, texto_aceito
 
 NADA = re.compile(r"(?!)")
 METRICAS = com_candidatas(
@@ -77,3 +77,26 @@ def test_a_gain_counts_as_a_rise() -> None:
     metricas = com_candidatas([("classe", "Na classe A4, a receita cresceu 14,3%.")], {})
 
     assert texto_aceito("O ganho de receita da classe A4 foi de 14,3%.", metricas, (), NADA)
+
+
+def test_the_reason_tells_the_ai_which_numbers_to_use() -> None:
+    motivo = motivo_da_recusa("A receita cresceu 8,5%.", METRICAS, ("receita",), NADA)
+
+    assert motivo == "Use estes números, escritos exatamente assim, e nenhum outro: 8,0."
+
+
+def test_the_reason_names_the_forbidden_term_and_the_size_limit() -> None:
+    proibidos = re.compile(r"\bvolume\b")
+
+    assert motivo_da_recusa("O volume cresceu 8,0%.", METRICAS, (), proibidos) == (
+        'Não use "volume".'
+    )
+    assert "no máximo 63 caracteres" in motivo_da_recusa(
+        "A receita cresceu 8,0%" + ", e isso diz muito sobre o ano." * 3, METRICAS, (), NADA
+    )
+
+
+def test_the_reason_points_a_flipped_direction() -> None:
+    assert motivo_da_recusa("A receita caiu 8,0%.", METRICAS, ("receita",), NADA) == (
+        "Mantenha o sentido de cada número: o que sobe nas leituras sobe no texto."
+    )

@@ -6,6 +6,7 @@ que as leituras escolhidas dizem; senão, a tela mostra `leitura_texto`, a reser
 """
 
 import json
+import logging
 import re
 from collections import OrderedDict
 from collections.abc import Callable, Mapping, Sequence
@@ -14,8 +15,12 @@ from typing import Annotated
 
 from fastapi import Depends, Request
 from venergy_agent.application.ports import InsightWriter
+from venergy_agent.domain.answer import Insight
 
 from venergy_api.schemas import InsightSchema
+
+# O logger do agente: o mesmo handler mostra o motivo do descarte do agente e o da conferência.
+logger = logging.getLogger("venergy_agent.insight")
 
 CAPACIDADE_PADRAO = 256
 # Uma ou duas leituras: mais que isso vira a lista que a tela já mostra.
@@ -93,17 +98,36 @@ def leitura_escolhida(metricas: dict[str, object], escolhidas: Sequence[str]) ->
     return " ".join(textos[chave] for chave in escolhidas)
 
 
-def texto_fiel(texto: str, leitura: str, proibidos: re.Pattern[str]) -> bool:
-    """Se o texto do modelo diz a leitura: mesmos números e sentidos, sem os termos proibidos.
+def motivo_da_recusa(
+    texto: str,
+    metricas: dict[str, object],
+    escolhidas: Sequence[str],
+    proibidos: re.Pattern[str],
+) -> str | None:
+    """Por que o texto da IA não diz o que as leituras escolhidas dizem, ou None se diz.
 
+    O motivo é escrito para a IA: volta para ela na nova tentativa, sem o texto recusado.
     Cada variação que a leitura diz que subiu ou caiu precisa subir ou cair no texto também,
     em qualquer ordem: juntar duas leituras que repetem um número continua valendo, e trocar
-    uma alta por uma queda nunca vale. Na dúvida, o custo é mostrar o texto da regra.
+    uma alta por uma queda nunca vale.
     """
-    folga = max(FOLGA_DO_TEXTO, len(leitura) * FOLGA_PROPORCIONAL)
-    if proibidos.search(texto) or len(texto) > len(leitura) + folga:
-        return False
-    return _numeros(texto) == _numeros(leitura) and _sentidos(leitura) <= _sentidos(texto)
+    leitura = leitura_escolhida(metricas, escolhidas)
+    if leitura is None:
+        return f"Escolha uma ou até {MAX_ESCOLHIDAS} leituras diferentes, pelos id de candidatas."
+    if termo := proibidos.search(texto):
+        return f'Não use "{termo.group(0)}".'
+    limite = int(len(leitura) + max(FOLGA_DO_TEXTO, len(leitura) * FOLGA_PROPORCIONAL))
+    if len(texto) > limite:
+        return (
+            f"Escreva no máximo {limite} caracteres e diga só o que as leituras escolhidas "
+            "dizem, sem outra conclusão."
+        )
+    if _numeros(texto) != _numeros(leitura):
+        esperados = ", ".join(dict.fromkeys(_NUMERO.findall(leitura)))
+        return f"Use estes números, escritos exatamente assim, e nenhum outro: {esperados}."
+    if not _sentidos(leitura) <= _sentidos(texto):
+        return "Mantenha o sentido de cada número: o que sobe nas leituras sobe no texto."
+    return None
 
 
 def texto_aceito(
@@ -113,8 +137,7 @@ def texto_aceito(
     proibidos: re.Pattern[str],
 ) -> bool:
     """Se a escolha da IA vale e o texto diz o que as leituras escolhidas dizem."""
-    leitura = leitura_escolhida(metricas, escolhidas)
-    return leitura is not None and texto_fiel(texto, leitura, proibidos)
+    return motivo_da_recusa(texto, metricas, escolhidas, proibidos) is None
 
 
 def chave_do_cache(tela: str, metricas: Mapping[str, object]) -> str:
@@ -156,22 +179,58 @@ def get_cache_insights(request: Request) -> CacheInsights:
 CacheInsightsDep = Annotated[CacheInsights, Depends(get_cache_insights)]
 
 
+async def redigir(
+    tela: str,
+    metricas: dict[str, object],
+    redator: InsightWriter,
+    motivo: Callable[[str, tuple[str, ...]], str | None],
+) -> Insight | None:
+    """O texto da IA que passa na conferência, com uma nova tentativa se o primeiro não passar.
+
+    A nova tentativa leva o motivo da recusa, e não o texto recusado: com o mesmo pedido, a
+    temperatura 0 repetiria o texto (DEC-066). Erro do provedor não ganha nova tentativa aqui:
+    a cadeia de modelos reserva já tentou os outros.
+    """
+    insight = await redator.narrate(tela, metricas)
+    if insight is None:
+        return None
+    recusa = motivo(insight.text, insight.readings)
+    if recusa is None:
+        return insight
+    _log(tela, "recusado", recusa)
+    insight = await redator.narrate(tela, metricas, feedback=recusa)
+    if insight is None:
+        return None
+    recusa = motivo(insight.text, insight.readings)
+    if recusa is None:
+        _log(tela, "aceito_na_nova_tentativa")
+        return insight
+    _log(tela, "recusado_de_novo", recusa)
+    return None
+
+
+def _log(tela: str, status: str, motivo: str | None = None) -> None:
+    linha = {"step": "insight_backend", "screen": tela, "status": status}
+    if motivo:
+        linha["motivo"] = motivo
+    logger.info(json.dumps(linha, ensure_ascii=False))
+
+
 async def narrar(
     tela: str,
     metricas: dict[str, object],
     redator: InsightWriter | None,
     cache: CacheInsights,
-    aceito: Callable[[str, tuple[str, ...]], bool],
+    motivo: Callable[[str, tuple[str, ...]], str | None],
 ) -> InsightSchema:
-    """O texto da IA, se `aceito` o confirma com as leituras dela, ou a reserva da regra."""
+    """O texto da IA, se a conferência o aceita (`motivo` None), ou a reserva da regra."""
     chave = chave_do_cache(tela, metricas)
     texto = cache.obter(chave)
     if texto is None:
-        insight = await redator.narrate(tela, metricas) if redator else None
-        if insight is None or not aceito(insight.text, insight.readings):
-            # IA desligada, provedor fora ou texto recusado: a tela mostra a leitura da regra.
-            # Ela não entra no cache, e o próximo pedido tenta o modelo de novo. Repetir agora
-            # não adianta: com temperatura 0, o modelo escreveria o mesmo texto.
+        insight = await redigir(tela, metricas, redator, motivo) if redator else None
+        if insight is None:
+            # IA desligada, provedor fora ou texto recusado duas vezes: a tela mostra a leitura
+            # da regra. Ela não entra no cache, e o próximo pedido tenta o modelo de novo.
             leitura = str(metricas["leitura_texto"])
             return InsightSchema(texto=leitura, origem="regra", metricas=metricas)
         texto = insight.text

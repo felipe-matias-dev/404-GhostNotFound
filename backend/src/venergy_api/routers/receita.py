@@ -10,7 +10,7 @@ from sqlalchemy.orm import InstrumentedAttribute, Session
 
 from venergy_api.agente import RedatorInsightsDep
 from venergy_api.database import SessionDep
-from venergy_api.insight_receita import filtro_acima, metricas_da_receita, texto_aceito
+from venergy_api.insight_receita import filtro_acima, metricas_da_receita, motivo_da_recusa
 from venergy_api.insights import CacheInsightsDep, narrar
 from venergy_api.models import DimUc, FatoFaturamentoMensal, KpisMensais, ReceitaDecomposicao
 from venergy_api.schemas import (
@@ -210,5 +210,5 @@ async def get_insight(
         metricas,
         redator,
         cache,
-        lambda texto, escolhidas: texto_aceito(texto, metricas, escolhidas),
+        lambda texto, escolhidas: motivo_da_recusa(texto, metricas, escolhidas),
     )

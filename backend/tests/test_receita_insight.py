@@ -220,3 +220,34 @@ def test_the_ai_can_choose_a_reading_other_than_the_rule_one(client_with_writer)
 
     assert corpo["origem"] == "ia"
     assert corpo["texto"] == corpo["metricas"]["candidatas"][-1]["texto"]
+
+
+@pytest.mark.usefixtures("bridge")
+def test_a_refused_text_gets_one_more_try_with_the_reason(client_with_writer) -> None:
+    client, redator = client_with_writer("O desempenho foi ruim.", ECO)
+
+    corpo = client.get("/receita/insight", params=FILTRO).json()
+
+    assert corpo["origem"] == "ia"
+    assert corpo["texto"] == corpo["metricas"]["leitura_texto"]
+    assert redator.correcoes == [None, 'Não use "desempenho".']
+
+
+@pytest.mark.usefixtures("bridge")
+def test_a_text_refused_twice_shows_the_rule_text(client_with_writer) -> None:
+    client, redator = client_with_writer("O desempenho foi ruim.")
+
+    corpo = client.get("/receita/insight", params=FILTRO).json()
+
+    assert corpo["origem"] == "regra"
+    assert len(redator.chamadas) == 2
+
+
+@pytest.mark.usefixtures("bridge")
+def test_a_provider_failure_gets_no_retry_from_the_backend(client_with_writer) -> None:
+    client, redator = client_with_writer(None, ECO)
+
+    corpo = client.get("/receita/insight", params=FILTRO).json()
+
+    assert corpo["origem"] == "regra"
+    assert redator.correcoes == [None]

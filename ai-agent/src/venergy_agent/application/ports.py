@@ -60,7 +60,9 @@ class AnswerWriter(Protocol):
 
 
 class InsightWriter(Protocol):
-    async def narrate(self, screen: str, metrics: Mapping[str, object]) -> Insight | None: ...
+    async def narrate(
+        self, screen: str, metrics: Mapping[str, object], feedback: str | None = None
+    ) -> Insight | None: ...
 
 
 class AnswerJudge(Protocol):

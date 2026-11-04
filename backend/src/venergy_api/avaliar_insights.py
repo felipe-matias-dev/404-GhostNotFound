@@ -25,6 +25,7 @@ from venergy_api.agente import configurar_logs_do_agente
 from venergy_api.config import get_settings
 from venergy_api.database import create_db_engine
 from venergy_api.insight_receita import filtro_acima, metricas_da_receita
+from venergy_api.insights import redigir
 from venergy_api.models import DimUc, FatoFaturamentoMensal, ReceitaDecomposicao
 from venergy_api.routers.continuidade import get_ranking_alimentadores
 from venergy_api.routers.indicadores import get_comparacao
@@ -41,13 +42,13 @@ Metricas = dict[str, object]
 Candidato = tuple[DecomposicaoFiltroSchema, Metricas]
 # Um caso de uma tela: o nome, o recorte em palavras e as métricas que vão ao modelo.
 Caso = tuple[str, str, Metricas]
-Aceito = Callable[[str, Metricas, Sequence[str]], bool]
+Motivo = Callable[[str, Metricas, Sequence[str]], str | None]
 
-ACEITOS: dict[str, Aceito] = {
-    "receita": insight_receita.texto_aceito,
-    "visao_geral": insight_indicadores.texto_aceito,
-    "rede": insight_continuidade.texto_aceito,
-    "unidade_consumidora": insight_uc.texto_aceito,
+MOTIVOS: dict[str, Motivo] = {
+    "receita": insight_receita.motivo_da_recusa,
+    "visao_geral": insight_indicadores.motivo_da_recusa,
+    "rede": insight_continuidade.motivo_da_recusa,
+    "unidade_consumidora": insight_uc.motivo_da_recusa,
 }
 # UCs lidas para achar um caso de cada leitura: o bastante para a base real, sem ler todas.
 AMOSTRA_DE_UCS = 400
@@ -259,8 +260,14 @@ def _candidatos(session: Session, base: str, atual: str) -> list[Candidato]:
 
 async def _narrar(redator, tela: str, caso: Caso) -> dict[str, object]:
     nome, recorte, metricas = caso
-    insight = await redator.narrate(tela, metricas)
-    aceito = insight is not None and ACEITOS[tela](insight.text, metricas, insight.readings)
+    # O mesmo caminho da rota, com a nova tentativa quando a conferência recusa.
+    insight = await redigir(
+        tela,
+        metricas,
+        redator,
+        lambda texto, escolhidas: MOTIVOS[tela](texto, metricas, escolhidas),
+    )
+    aceito = insight is not None
     return {
         "tela": tela,
         "caso": nome,
@@ -323,10 +330,10 @@ async def rodar(telas: Sequence[str]) -> int:
 
 
 if __name__ == "__main__":
-    pedidas = sys.argv[1].split(",") if len(sys.argv) > 1 and sys.argv[1] else list(ACEITOS)
-    desconhecidas = set(pedidas) - set(ACEITOS)
+    pedidas = sys.argv[1].split(",") if len(sys.argv) > 1 and sys.argv[1] else list(MOTIVOS)
+    desconhecidas = set(pedidas) - set(MOTIVOS)
     if desconhecidas:
         sys.exit(
-            f"Telas desconhecidas: {', '.join(sorted(desconhecidas))}. Use {', '.join(ACEITOS)}."
+            f"Telas desconhecidas: {', '.join(sorted(desconhecidas))}. Use {', '.join(MOTIVOS)}."
         )
     sys.exit(asyncio.run(rodar(pedidas)))

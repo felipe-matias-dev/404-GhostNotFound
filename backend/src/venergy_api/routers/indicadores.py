@@ -21,7 +21,7 @@ from sqlalchemy.orm import InstrumentedAttribute
 from venergy_api.agente import RedatorInsightsDep
 from venergy_api.database import SessionDep
 from venergy_api.indices import indices
-from venergy_api.insight_indicadores import metricas_dos_indicadores, texto_aceito
+from venergy_api.insight_indicadores import metricas_dos_indicadores, motivo_da_recusa
 from venergy_api.insights import CacheInsightsDep, narrar
 from venergy_api.models import KpisMensais
 from venergy_api.models import KpisSegmentoMensal as Segmento
@@ -232,7 +232,7 @@ async def get_insight(
         metricas,
         redator,
         cache,
-        lambda texto, escolhidas: texto_aceito(texto, metricas, escolhidas),
+        lambda texto, escolhidas: motivo_da_recusa(texto, metricas, escolhidas),
     )
 
 

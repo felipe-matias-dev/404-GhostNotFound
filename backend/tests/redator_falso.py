@@ -21,9 +21,13 @@ class RedatorFalso:
     def __init__(self, *textos: object) -> None:
         self.textos = list(textos) or [ECO]
         self.chamadas: list[tuple[str, dict]] = []
+        self.correcoes: list[str | None] = []
 
-    async def narrate(self, screen: str, metrics: dict) -> Insight | None:
+    async def narrate(
+        self, screen: str, metrics: dict, feedback: str | None = None
+    ) -> Insight | None:
         self.chamadas.append((screen, metrics))
+        self.correcoes.append(feedback)
         texto = self.textos[min(len(self.chamadas), len(self.textos)) - 1]
         if texto is ECO:
             texto = metrics["leitura_texto"]

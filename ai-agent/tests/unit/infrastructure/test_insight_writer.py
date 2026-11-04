@@ -12,12 +12,13 @@ NONCE = "n0nce42"
 METRICS = {"receita_faturada": 1234.5, "variacao_percentual": -4.0}
 
 
-def narrating_model(text, readings=()):
+def narrating_model(text, readings=(), *more):
     calls = []
+    texts = [text, *more]
 
     def respond(messages, info):
         calls.append(messages)
-        args = {"text": text, "readings": list(readings)}
+        args = {"text": texts[min(len(calls), len(texts)) - 1], "readings": list(readings)}
         return ModelResponse(parts=[ToolCallPart(tool_name=info.output_tools[0].name, args=args)])
 
     return FunctionModel(respond), calls
@@ -107,13 +108,14 @@ async def test_rejected_numbers_are_logged_without_the_text(caplog):
 
     await writer(model).narrate("Receita", METRICS)
 
-    (line,) = logged(caplog)
-    assert line == {
-        "step": "insight",
-        "screen": "Receita",
-        "status": "numeros_sem_suporte",
-        "numbers": ["999"],
-    }
+    assert logged(caplog) == 2 * [
+        {
+            "step": "insight",
+            "screen": "Receita",
+            "status": "numeros_sem_suporte",
+            "numbers": ["999"],
+        }
+    ]
     assert "Segredo" not in caplog.text
 
 
@@ -180,3 +182,29 @@ async def test_shipped_v4_prompt_asks_the_model_to_choose_among_the_candidates()
     template = (SHIPPED_PROMPTS / "v4" / "insight.md").read_text(encoding="utf-8")
 
     assert "candidatas" in template and "readings" in template
+
+
+def user_prompt(call):
+    return next(part.content for part in call[0].parts if part.part_kind == "user-prompt")
+
+
+async def test_a_number_outside_the_metrics_gets_one_retry_that_names_it():
+    model, calls = narrating_model("A receita caiu 4.0%.", (), "A receita caiu 4,0%.")
+
+    insight = await writer(model).narrate("Receita", METRICS)
+
+    assert insight is not None and insight.text == "A receita caiu 4,0%."
+    assert len(calls) == 2
+    assert "Os números 4.0 não estão nas métricas" in user_prompt(calls[1])
+
+
+async def test_the_correction_from_the_caller_reaches_the_model_without_another_retry():
+    model, calls = narrating_model("A receita caiu 999%.")
+
+    insight = await writer(model).narrate("Receita", METRICS, feedback="Não use jargão.")
+
+    assert insight is None
+    assert len(calls) == 1
+    assert "Seu texto anterior foi recusado na conferência. Não use jargão." in user_prompt(
+        calls[0]
+    )

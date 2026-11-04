@@ -10,7 +10,7 @@ import re
 from collections.abc import Sequence
 
 from venergy_api.insights import com_candidatas, numero_br, variou
-from venergy_api.insights import texto_aceito as conferir
+from venergy_api.insights import motivo_da_recusa as recusar
 from venergy_api.schemas import RankingContinuidadeSchema, RankingFiltroSchema
 
 MIN_ALIMENTADORES_PARA_CONCENTRAR = 5
@@ -31,9 +31,15 @@ def _lugar(filtro: RankingFiltroSchema) -> str:
     return f"{lugar} (classe {filtro.classe})" if filtro.classe else lugar
 
 
+def motivo_da_recusa(
+    texto: str, metricas: dict[str, object], escolhidas: Sequence[str] = ()
+) -> str | None:
+    """Por que o texto da IA não diz as leituras que ela escolheu, ou None se diz."""
+    return recusar(texto, metricas, escolhidas, _TERMOS_PROIBIDOS)
+
+
 def texto_aceito(texto: str, metricas: dict[str, object], escolhidas: Sequence[str] = ()) -> bool:
-    """Se o texto da IA diz as leituras que ela escolheu, sem nomes de chaves."""
-    return conferir(texto, metricas, escolhidas, _TERMOS_PROIBIDOS)
+    return motivo_da_recusa(texto, metricas, escolhidas) is None
 
 
 def metricas_da_continuidade(

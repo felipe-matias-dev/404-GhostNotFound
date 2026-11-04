@@ -10,7 +10,7 @@ from collections.abc import Sequence
 from decimal import ROUND_HALF_UP, Decimal
 
 from venergy_api.insights import com_candidatas, numero_br, variou
-from venergy_api.insights import texto_aceito as conferir
+from venergy_api.insights import motivo_da_recusa as recusar
 from venergy_api.schemas import ConsumoUcSchema, VariacaoContaSchema
 
 _TERMOS_PROIBIDOS = re.compile(
@@ -27,9 +27,15 @@ def _reais(valor: Decimal) -> float:
     return float(valor.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
 
 
+def motivo_da_recusa(
+    texto: str, metricas: dict[str, object], escolhidas: Sequence[str] = ()
+) -> str | None:
+    """Por que o texto da IA não diz as leituras que ela escolheu, ou None se diz."""
+    return recusar(texto, metricas, escolhidas, _TERMOS_PROIBIDOS)
+
+
 def texto_aceito(texto: str, metricas: dict[str, object], escolhidas: Sequence[str] = ()) -> bool:
-    """Se o texto da IA diz as leituras que ela escolheu, sem nomes de chaves."""
-    return conferir(texto, metricas, escolhidas, _TERMOS_PROIBIDOS)
+    return motivo_da_recusa(texto, metricas, escolhidas) is None
 
 
 def _leituras_do_consumo(mes: float | None, ano: float | None) -> list[tuple[str, str]]:

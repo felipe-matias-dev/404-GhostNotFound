@@ -12,7 +12,7 @@ from venergy_api.agente import RedatorInsightsDep
 from venergy_api.consumo_uc import inicio_da_consulta, montar_consumo
 from venergy_api.conta_uc import montar_variacao_conta
 from venergy_api.database import SessionDep
-from venergy_api.insight_uc import metricas_da_uc, texto_aceito
+from venergy_api.insight_uc import metricas_da_uc, motivo_da_recusa
 from venergy_api.insights import CacheInsightsDep, narrar
 from venergy_api.models import (
     AtendimentoUc,
@@ -171,5 +171,5 @@ async def get_insight(
         metricas,
         redator,
         cache,
-        lambda texto, escolhidas: texto_aceito(texto, metricas, escolhidas),
+        lambda texto, escolhidas: motivo_da_recusa(texto, metricas, escolhidas),
     )
