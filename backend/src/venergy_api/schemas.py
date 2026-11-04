@@ -80,6 +80,15 @@ class LocalidadeSchema(BaseModel):
     bairro: str
 
 
+class UcEncontradaSchema(BaseModel):
+    """Opção do autocomplete da busca de UC: o código e onde a UC fica."""
+
+    cod_uc: str
+    municipio: str
+    bairro: str
+    classe_cadastro: str
+
+
 class FaturamentoMensalSchema(BaseModel):
     """Faturamento de uma UC numa competência."""
 
