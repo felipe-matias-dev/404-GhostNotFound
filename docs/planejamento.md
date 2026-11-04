@@ -6,10 +6,10 @@ Organização do time, cronograma, processo de trabalho e riscos do V-Energy Gri
 
 ## Estado em 04/11/2026
 
-Dia da entrega. Todas as entregas obrigatórias das três sprints estão na `main`, em 122 PRs mergeados desde 19/10. Cada tabela abaixo ganhou a coluna **Estado**, com os PRs que entregaram o item.
+Dia do code freeze e da entrega. Todas as entregas obrigatórias das três sprints estão na `main`, em 123 PRs mergeados desde 19/10, contando o #139 (README e documentação reorganizados). A versão entregue é a tag `v1.0-entrega`. Cada tabela abaixo ganhou a coluna **Estado**, com os PRs que entregaram o item.
 
 - **Feito além do plano:** ordens de inspeção em tempo real ([DEC-063](decisoes.md#dec-063--ordens-de-inspeção-em-tempo-real-aviso-no-commit-e-sse)), rastreamento com OpenTelemetry ([DEC-068](decisoes.md#dec-068--rastreamento-das-requisições-com-opentelemetry)), etapas do agente por SSE ([DEC-055](decisoes.md#dec-055--etapas-do-agente-por-sse-em-post-aiaskstream)), conversas do agente salvas no banco ([DEC-053](decisoes.md#dec-053--conversas-do-agente-por-usuário-no-banco)) e limite de tentativas de login ([DEC-065](decisoes.md#dec-065--limite-de-tentativas-de-login-por-login-e-endereço)).
-- **Em aberto para a entrega (04/11):** mergear o PR #139 (README e documentação reorganizados); as issues #133 (DEC/FEC inflado em alimentador com mês faltando) e #100 (percentuais numéricos na fila); a tag `v1.0-entrega`, ainda não criada. Os PRs #136 (indicadores e mapa de Perdas) e #137 (pipeline do Databricks do zero) entraram antes do freeze, e as correções #140 (planilha de campo) e #142 (busca de UC e mapa de Perdas) em 04/11.
+- **Em aberto depois da entrega:** as issues #133 (DEC/FEC inflado em alimentador com mês faltando) e #100 (percentuais numéricos na fila). Os PRs #136 (indicadores e mapa de Perdas), #137 (pipeline do Databricks do zero), #138 (documentação do agente) e #141 (insights nas telas) entraram em 03/11, e as correções #140 (planilha de campo) e #142 (busca de UC e mapa de Perdas) e o #139 em 04/11, antes do freeze.
 - **Processo:** a daily aconteceu em todos os dias úteis desde 19/10, às 19h. Todas as conversas do time, técnicas inclusive, ficaram no grupo e na daily, e os pedidos de revisão de PR saíam no grupo ([§4.1](#41-cerimônias)).
 - **Fora do repositório:** status report, slides e ensaios não têm registro aqui; o estado deles está com o time.
 
@@ -72,7 +72,7 @@ gantt
   Status report (estimado)            :crit, milestone, 2026-10-28, 0d
   Fim da S2 (feature complete)        :done, milestone, 2026-10-30, 0d
   Finados (feriado)                   :done, 2026-11-02, 1d
-  Code freeze                         :crit, milestone, 2026-11-03, 0d
+  Code freeze                         :crit, milestone, 2026-11-04, 0d
   Entrega do repositório              :crit, milestone, 2026-11-04, 0d
   Prévia                              :milestone, 2026-11-05, 0d
   Banca                               :crit, milestone, 2026-11-10, 0d
@@ -134,7 +134,7 @@ Sprint curta por causa do feriado de 02/11. **Objetivo:** nenhuma funcionalidade
 | [Dicionário de dados](dicionario-de-dados.md) da Gold | Toda métrica com definição e as decisões de limpeza que a afetam | Feito (#23, #126) |
 | [Diagnóstico da receita](diagnostico-receita.md) | Causas com evidência, recomendações e ordem de grandeza do impacto em R$ | Feito (#19, #80) |
 | README completo | Uma pessoa de fora consegue executar tudo seguindo o passo a passo | Feito (#78, #137); reorganizado com os guias em [`docs/`](README.md) no #139 |
-| **Code freeze em 03/11, 20h** | Em 04/11 entram apenas correções de bug e documentação | O #136 e o #137 entraram antes do freeze; o #138 (documentação do agente) e o #141 (insights nas telas) entraram na noite de 03/11; as correções #140 (planilha de campo) e #142 (busca de UC e mapa de Perdas) em 04/11. Em revisão: o #139 (documentação) |
+| **Code freeze em 04/11** | Depois do freeze, só correções de bug e documentação | Oficializado em 04/11, dia da entrega. O #136, o #137, o #138 e o #141 entraram em 03/11; as correções #140 e #142 e o #139 (documentação), em 04/11. A versão entregue é a tag `v1.0-entrega` |
 
 ### 2.5 Após a entrega (05/11 a 10/11)
 
@@ -263,7 +263,7 @@ Nenhum item Should começa antes de todos os Must da mesma frente estarem em `Do
 | Risco | Probabilidade | Impacto | Mitigação | Responsável | Desfecho |
 |---|---|---|---|---|---|
 | Atraso da Gold bloqueia Portal e IA | Alta | Alto | Contrato e mock no primeiro dia; Gold publicada tabela a tabela | D3 | Mitigado: portal e agente rodaram na amostra até a Gold oficial (#49, 27/10) |
-| Feriado de 02/11 encurta a última sprint | Certa | Médio | Sprint 2 termina com todas as funcionalidades; Sprint 3 só estabiliza | Scrum Master | Ocorreu: diferenciais seguiram até 03/11 (#131, #134, #136, #141), e o freeze ficou para 03/11 |
+| Feriado de 02/11 encurta a última sprint | Certa | Médio | Sprint 2 termina com todas as funcionalidades; Sprint 3 só estabiliza | Scrum Master | Ocorreu: diferenciais seguiram até 03/11 (#131, #134, #136, #141), e o freeze oficial ficou para 04/11, dia da entrega |
 | Limites do workspace Databricks | Média | Alto | Testar o Job inteiro na S1 com amostra; leituras particionadas por ano | D1 | Não ocorreu: Job serverless completo em ~15 min |
 | Agente alucina ou é manipulado | Média | Crítico | ADR-03, golden set com perguntas sem resposta e de injection, role somente leitura | G1 | Mitigado: red team com 0 escritas aceitas e 0 vazamentos de prompt; números da resposta conferidos com as linhas ([DEC-019](decisoes.md#dec-019--verificação-numérica-da-narrativa)) |
 | Frontend com uma pessoa vira gargalo (5 telas) | Alta | Alto | Componentes reutilizáveis; V1 assume as telas de Perdas e das OIs e o export da fila; G2 faz o widget de chat | V2 | Mitigado com outra divisão: V2 fez as telas, inclusive a fila de Perdas (#96) e o chat (#99); V1 ficou com o backend das ordens |
