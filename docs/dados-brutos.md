@@ -108,8 +108,11 @@ compute serverless, em cerca de 15 minutos, e as 4 tasks devem terminar em verde
 execução, os testes de variação de linhas só gravam a linha de base, porque não há execução
 anterior para comparar.
 
-Cada notebook também roda sozinho, com **Run all**: com `gravar = nao` (o padrão dos widgets),
-ele lê e valida tudo sem gravar nada.
+Os três primeiros notebooks também rodam sozinhos, com **Run all**: com `gravar = nao` (o
+padrão dos widgets), eles leem e validam tudo sem gravar nada. O `Testes_Qualidade_Gold` não
+tem esse widget: só lê a Gold e os CSVs, mas toda execução grava o resultado em
+`v_energy.qualidade.resultados_testes` (criando o schema se faltar), e a contagem gravada passa
+a ser a base da variação de linhas na execução seguinte.
 
 - Cada notebook confere a camada antes de gravar. Uma trava que falha para o Job ali: nenhuma
   camada seguinte é gravada e os CSVs não são exportados.
@@ -131,8 +134,8 @@ Travas de cada camada e os testes de qualidade:
 Os 12 arquivos vão para `data/gold/`, na raiz do repositório, com o nome da tabela
 (`gold_dim_uc.csv`, `gold_fato_faturamento_mensal.csv` e os demais).
 
-**Pela interface:** **Catalog → v_energy → gold → csv**, selecione os arquivos e
-**Download**.
+**Pela interface:** **Catalog → v_energy → gold → Volumes → csv**, selecione os 12 arquivos
+`gold_*.csv` e **Download**. Eles substituem os arquivos da amostra.
 
 **Pela CLI:**
 
@@ -159,6 +162,19 @@ docker compose run --rm api python -m venergy_api.carga      # ou: make load
   uma view não bater com a Gold nova, a carga falha e desfaz tudo.
 - **Aguenta a Gold real.** São ~4 milhões de linhas em lotes de 10 mil, com pico de ~110 MB de
   memória, em ~7 minutos ([DEC-038](decisoes.md#dec-038--carga-da-gold-em-lotes-com-uma-rodada-de-conferência-antes-de-gravar)).
+
+### Voltar à amostra
+
+Gere a amostra por cima dos CSVs reais e rode a carga:
+
+```bash
+docker compose run --rm api python -m venergy_api.amostra --force
+docker compose run --rm api python -m venergy_api.carga
+```
+
+Sem o `--force`, o gerador para, porque a pasta já tem CSVs que podem ser a Gold real. Com
+ele, os CSVs reais de `data/gold/` são sobrescritos: para voltar à Gold real, é preciso
+baixá-los de novo do volume. Para não baixar de novo, mantenha as duas lado a lado.
 
 ### Manter a amostra e a Gold real lado a lado
 
