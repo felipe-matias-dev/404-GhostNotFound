@@ -3,7 +3,7 @@ from decimal import Decimal
 
 import pytest
 
-from venergy_agent.domain.numbers import unsupported_numbers
+from venergy_agent.domain.numbers import durations, rounded_for_display, unsupported_numbers
 
 
 @pytest.mark.parametrize(
@@ -93,3 +93,47 @@ def test_a_value_rounded_the_wrong_way_is_reported():
 
 def test_an_integer_must_match_a_value_exactly():
     assert unsupported_numbers("3 canais", [2.6]) == ("3",)
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("nos últimos 12 meses", {Decimal(12)}),
+        ("as 12 primeiras competências e os primeiros 2 anos", {Decimal(12), Decimal(2)}),
+        ("medidores com mais de 10 anos", set()),
+        ("atraso de 30 dias", set()),
+        ("acima de 300 kWh em 2025", set()),
+    ],
+)
+def test_durations_are_the_first_or_last_months_or_years_of_a_period(text, expected):
+    assert durations(text) == expected
+
+
+def test_a_duration_given_elsewhere_is_supported_when_written_as_a_duration():
+    assert unsupported_numbers("Nos últimos 12 meses, 3 UCs", [3], {Decimal(12)}) == ()
+
+
+def test_a_duration_given_elsewhere_is_not_a_source_for_a_count():
+    assert unsupported_numbers("Foram 12 UCs", [3], {Decimal(12)}) == ("12",)
+
+
+def test_a_duration_given_elsewhere_is_not_a_source_for_a_measure_in_years():
+    assert unsupported_numbers("A idade média é de 10 anos", [3], {Decimal(10)}) == ("10",)
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        (Decimal("1.9135965"), Decimal("1.91")),
+        (Decimal("2.4200001"), Decimal("2.42")),
+        (Decimal("4.5000000"), Decimal("4.5")),
+        (Decimal("35482.70"), Decimal("35482.70")),
+        (Decimal("0.05612345"), Decimal("0.0561")),
+        (Decimal("1200"), Decimal("1200")),
+        (Decimal("-4656505.19"), Decimal("-4656505.19")),
+        (Decimal("100.0000001"), Decimal("100")),
+    ],
+)
+def test_long_decimals_are_rounded_for_display(value, expected):
+    assert rounded_for_display(value) == expected
+    assert str(rounded_for_display(value)) == str(expected)

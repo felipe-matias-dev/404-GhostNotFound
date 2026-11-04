@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from venergy_agent.domain.semantic import ColumnSpec, Relation, SemanticLayer, ViewSpec
+from venergy_agent.domain.semantic import ColumnSpec, Relation, SemanticLayer, ViewSpec, unit_of
 
 
 @pytest.fixture
@@ -72,3 +72,29 @@ def test_column_units_map_each_column_to_its_unit_and_drop_ambiguous_names():
     )
 
     assert layer.column_units == {"receita_faturada": "R$"}
+
+
+UNITS = {
+    "receita_faturada": "R$",
+    "receita_energia": "R$",
+    "kwh_faturado": "kWh",
+    "dias_em_atraso": "dias",
+}
+
+
+@pytest.mark.parametrize(
+    ("column", "expected"),
+    [
+        ("receita_faturada", "R$"),
+        ("receita_2024", "R$"),
+        ("receita_base", "R$"),
+        ("kwh_2025_06", "kWh"),
+        ("variacao_percentual", "%"),
+        ("participacao_pct", "%"),
+        ("dias_sem_unidade", None),
+        ("variacao", None),
+        ("total", None),
+    ],
+)
+def test_unit_of_a_result_column_comes_from_the_layer_or_its_alias(column, expected):
+    assert unit_of(column, UNITS) == expected

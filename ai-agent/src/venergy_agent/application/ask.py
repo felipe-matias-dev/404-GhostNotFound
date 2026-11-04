@@ -28,9 +28,9 @@ from venergy_agent.domain.errors import (
 )
 from venergy_agent.domain.events import AgentEvent, AnswerEvent, Stage, StageEvent
 from venergy_agent.domain.followup import depends_on_previous_turn
-from venergy_agent.domain.numbers import unsupported_numbers
+from venergy_agent.domain.numbers import durations, rounded_for_display, unsupported_numbers
 from venergy_agent.domain.question import Question
-from venergy_agent.domain.semantic import SemanticLayer
+from venergy_agent.domain.semantic import SemanticLayer, unit_of
 from venergy_agent.domain.sql import (
     AttemptFeedback,
     DraftStatus,
@@ -43,6 +43,15 @@ from venergy_agent.domain.sql import (
 logger = logging.getLogger("venergy_agent.ask")
 
 NARRATION_MARGIN_SECONDS = 1.0
+NARRATION_ATTEMPTS = 2
+TECHNICAL_NAME_FEEDBACK = (
+    "Não use nomes técnicos com sublinhado: escreva as colunas em palavras, como na pergunta."
+)
+PERIOD_FEEDBACK = "Cite o período das linhas, {period}."
+NUMBERS_FEEDBACK = (
+    "Estes números não estão nas linhas: {numbers}. Use só os números das linhas, escritos "
+    "como estão ou arredondados."
+)
 
 TECHNICAL_NAME = re.compile(r"\b[a-zA-Z]+_\w+")
 WRITE_STATEMENT = re.compile(
@@ -101,9 +110,8 @@ MONTH_DATE = re.compile(
     r"|\b\d{1,2}/\d{4}\b|\b\d{4}-\d{2}\b"
 )
 FALLBACK_MAX_ROWS = 5
-FALLBACK_MAX_COLUMNS = 4
+FALLBACK_MAX_COLUMNS = 6
 MISSING_VALUE = "sem valor"
-MAX_DECIMAL_PLACES = 6
 TEXT_VALUE_MAX_CHARS = 120
 EMPTY_RESULT = (
     "Nenhum registro atende à consulta. O agente não distingue zero de dado ausente, "
@@ -557,60 +565,85 @@ class AskUseCase:
     ) -> str:
         if self._answer_writer is None:
             return fallback
-        remaining = (
-            self._answer_deadline_seconds
-            - NARRATION_MARGIN_SECONDS
-            - (time.perf_counter() - started)
-        )
-        if remaining <= 0:
-            return fallback
-        try:
-            async with asyncio.timeout(remaining):
-                narration = await self._answer_writer.write(question, draft, visible)
-        except ModelCallFailed as error:
-            spent.input_tokens += error.input_tokens
-            spent.output_tokens += error.output_tokens
-            self._log(
-                question.request_id,
-                question.session_id,
-                step="resposta",
-                status="narrativa_falhou",
-                error="ModelCallFailed",
-                input_tokens=error.input_tokens,
-                output_tokens=error.output_tokens,
+        allowed = durations(question.text).union(*(durations(item) for item in draft.assumptions))
+        feedback: str | None = None
+        for attempt in range(1, NARRATION_ATTEMPTS + 1):
+            remaining = (
+                self._answer_deadline_seconds
+                - NARRATION_MARGIN_SECONDS
+                - (time.perf_counter() - started)
             )
-            return fallback
-        except Exception as error:
-            self._log(
-                question.request_id,
-                question.session_id,
-                step="resposta",
-                status="narrativa_falhou",
-                error=type(error).__name__,
-            )
-            return fallback
+            if remaining <= 0:
+                return fallback
+            try:
+                async with asyncio.timeout(remaining):
+                    narration = await self._answer_writer.write(
+                        question, draft, visible, feedback=feedback
+                    )
+            except ModelCallFailed as error:
+                spent.input_tokens += error.input_tokens
+                spent.output_tokens += error.output_tokens
+                self._log(
+                    question.request_id,
+                    question.session_id,
+                    step="resposta",
+                    status="narrativa_falhou",
+                    error="ModelCallFailed",
+                    input_tokens=error.input_tokens,
+                    output_tokens=error.output_tokens,
+                )
+                return fallback
+            except Exception as error:
+                self._log(
+                    question.request_id,
+                    question.session_id,
+                    step="resposta",
+                    status="narrativa_falhou",
+                    error=type(error).__name__,
+                )
+                return fallback
 
-        spent.input_tokens += narration.input_tokens
-        spent.output_tokens += narration.output_tokens
-        narrative = narration.text
-        if TECHNICAL_NAME.search(narrative):
+            spent.input_tokens += narration.input_tokens
+            spent.output_tokens += narration.output_tokens
+            rejection = self._rejection(narration.text, visible, period, validated, allowed)
+            if rejection is None:
+                self._log(
+                    question.request_id,
+                    question.session_id,
+                    step="resposta",
+                    status="narrativa_ok",
+                    attempt=attempt,
+                )
+                return narration.text
+            status, feedback, details = rejection
             self._log(
                 question.request_id,
                 question.session_id,
                 step="resposta",
-                status="nome_tecnico_na_resposta",
+                status=status,
+                attempt=attempt,
+                **details,
             )
-            return fallback
+        return fallback
+
+    def _rejection(
+        self,
+        narrative: str,
+        visible: QueryResult,
+        period: tuple[str, str] | None,
+        validated: ValidatedQuery,
+        allowed: set[Decimal],
+    ) -> tuple[str, str, dict[str, object]] | None:
+        if TECHNICAL_NAME.search(narrative):
+            return "nome_tecnico_na_resposta", TECHNICAL_NAME_FEEDBACK, {}
 
         required = period if period is not None else _endpoints(validated.periods)
         if required is not None and not _names_period(narrative, required):
-            self._log(
-                question.request_id,
-                question.session_id,
-                step="resposta",
-                status="periodo_ausente_na_resposta",
+            return (
+                "periodo_ausente_na_resposta",
+                PERIOD_FEEDBACK.format(period=_period_in_words(required)),
+                {},
             )
-            return fallback
 
         values = [
             visible.row_count,
@@ -618,18 +651,14 @@ class AskUseCase:
             *validated.years,
             *(value for row in visible.rows for value in row.values()),
         ]
-        unsupported = unsupported_numbers(narrative, values)
+        unsupported = unsupported_numbers(narrative, values, allowed)
         if unsupported:
-            self._log(
-                question.request_id,
-                question.session_id,
-                step="resposta",
-                status="verificacao_numerica_falhou",
-                unsupported=list(unsupported),
+            return (
+                "verificacao_numerica_falhou",
+                NUMBERS_FEEDBACK.format(numbers=", ".join(unsupported)),
+                {"unsupported": list(unsupported)},
             )
-            return fallback
-        self._log(question.request_id, question.session_id, step="resposta", status="narrativa_ok")
-        return narrative
+        return None
 
     def _deterministic_text(
         self,
@@ -756,7 +785,7 @@ def _stage_event(stage: Stage, attempt: int, spent: _Spent) -> StageEvent:
 
 def _row_text(columns: tuple[str, ...], row: dict[str, object], units: Mapping[str, str]) -> str:
     return ", ".join(
-        f"{column.replace('_', ' ')} = {_with_unit(row.get(column), units.get(column))}"
+        f"{column.replace('_', ' ')} = {_with_unit(row.get(column), unit_of(column, units))}"
         for column in columns
     )
 
@@ -765,7 +794,9 @@ def _with_unit(value: object, unit: str | None) -> str:
     text = _pt_br(value)
     if value is None or unit is None or unit in UNITS_WITHOUT_SUFFIX:
         return text
-    return f"R$ {text}" if unit == "R$" else f"{text} {unit}"
+    if unit == "R$":
+        return f"R$ {text}"
+    return f"{text}%" if unit == "%" else f"{text} {unit}"
 
 
 def _pt_br(value: object) -> str:
@@ -774,10 +805,7 @@ def _pt_br(value: object) -> str:
     if isinstance(value, bool):
         return "sim" if value else "não"
     if isinstance(value, int | float | Decimal):
-        number = Decimal(str(value))
-        exponent = number.as_tuple().exponent
-        if isinstance(exponent, int) and exponent < -MAX_DECIMAL_PLACES:
-            number = number.quantize(Decimal(1).scaleb(-MAX_DECIMAL_PLACES)).normalize()
+        number = rounded_for_display(Decimal(str(value)))
         grouped = format(number, ",f")
         return grouped.replace(",", "_").replace(".", ",").replace("_", ".")
     return _shorten(str(value))
@@ -836,3 +864,13 @@ def _mentions(text: str, competencia: str) -> bool:
     if any(form in lowered for form in (competencia, f"{month}/{year}", f"{name[:3]}/{year}")):
         return True
     return re.search(rf"\b{name}(?:/|\b[^.;]{{0,40}}?\b){year}\b", lowered) is not None
+
+
+def _period_in_words(period: tuple[str, str]) -> str:
+    first, last = (_month_in_words(value) for value in period)
+    return f"em {first}" if first == last else f"de {first} a {last}"
+
+
+def _month_in_words(competencia: str) -> str:
+    year, month = competencia.split("-")
+    return f"{MONTH_NAMES[int(month) - 1]} de {year}"

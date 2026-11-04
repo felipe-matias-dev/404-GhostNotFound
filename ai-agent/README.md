@@ -177,20 +177,21 @@ Os itens de follow-up (`follow_up_of`) rodam logo depois da pergunta de origem, 
 
 `make eval-compare` não chama o modelo. Rodadas anteriores à medição de tokens gravam esses totais como 0, então a diferença de tokens só vale entre rodadas novas. Imprime em markdown a configuração das duas rodadas (modelo, `prompt_version`, camada semântica, versões dos conjuntos, base, narrada e juiz), as métricas lado a lado com a diferença (taxas em pontos percentuais, contagens e latência em valor absoluto) e os itens em comum que mudaram de `matched`, `status`, `numeric_fidelity` ou `judge_passed`. As métricas são recalculadas só sobre os itens em comum, para que uma versão nova do golden set não distorça a comparação; a tabela diz quantos itens existem só em A e só em B. Se uma rodada tem mais de 5% de itens `failed`, a saída avisa que a comparação provavelmente não vale (erro do provedor, abaixo).
 
-Última rodada válida, comparada com a linha de base (nenhuma das duas teve `failed`):
+Última rodada, na Gold real, narrada e com o juiz, comparada com a anterior nos 95 itens em comum (nenhuma das duas acima de 5% de `failed`):
 
-| Métrica (82 itens em comum) | 24/10/2026 (linha de base) | 28/10/2026 | Diferença |
+| Métrica (95 itens em comum) | 03/11/2026 | 04/11/2026 | Diferença |
 |---|---|---|---|
-| execution_accuracy | 72.2% | 100.0% | +27.8 pp |
-| status_accuracy | 86.2% | 95.4% | +9.2 pp |
-| status_accuracy_unknown | 72.7% | 100.0% | +27.3 pp |
-| refusal_accuracy | 92.0% | 88.0% | -4.0 pp |
-| manipulation_block_rate | 100.0% | 100.0% | +0.0 pp |
-| numeric_fidelity | 66.7% | 69.0% | +2.4 pp |
-| latency_p50_ms | 1014 | 2935 | +1921 |
-| latency_p95_ms | 9585 | 11392 | +1807 |
+| execution_accuracy | 94.1% | 98.5% | +4.4 pp |
+| status_accuracy | 95.8% | 100.0% | +4.2 pp |
+| failed_rate | 3.2% | 0.0% | -3.2 pp |
+| refusal_accuracy | 100.0% | 100.0% | +0.0 pp |
+| numeric_fidelity | 86.2% | 88.2% | +2.1 pp |
+| judge_pass_rate | 64.6% | 89.7% | +25.1 pp |
+| judge_mean_score | 4.11 | 4.74 | +0.63 |
+| latency_p50_ms | 2816 | 3847 | +1031 |
+| latency_p95_ms | 16611 | 27895 | +11284 |
 
-Configuração: `google-gla:gemini-3.1-flash-lite`, `prompt_version` v2, narrada, base `amostra`. A linha de base usou a camada 0.2.0 e a de 28/10, a 0.4.0 e o golden set 0.9.0 (a de 24/10 não registrou a versão do golden set).
+Configuração: `google-gla:gemini-3.1-flash-lite` com a cadeia de reserva, prompt de SQL `v3`, camada 0.4.1, golden set 0.18.0. A rodada de 04/11 usa o prompt da narração `v4` e a segunda chance da narrativa ([DEC-079](../docs/decisoes.md#dec-079--narrativa-recusada-tem-uma-segunda-chance-e-chega-arredondada)). Os valores de cada item ficam em `eval/runs_gold/`, fora do Git (DEC-024).
 
 ### Juiz (`--judge`)
 
@@ -244,7 +245,7 @@ Cada integrante usa a própria chave, no próprio `ai-agent/.env` (fora do Git):
 
 1. Entre em https://aistudio.google.com com a sua conta Google, vá em **Get API key** e crie uma chave.
 2. Preencha `VENERGY_AGENT_GOOGLE_API_KEY` no `ai-agent/.env`. O modelo padrão já é `google-gla:gemini-3.1-flash-lite`.
-3. A chave do Gemini pode ficar no Free Tier. Os limites aparecem em *Rate limit*, no AI Studio. Para não depender dele no dia, configure a reserva paga pelo OpenRouter ([Modelo reserva](#modelo-reserva)).
+3. A chave do Gemini pode ficar no Free Tier. Os limites aparecem em *Rate limit*, no AI Studio. Quando a cota gratuita acaba ou o modelo fica sobrecarregado, a pergunta segue para a reserva paga pelo OpenRouter ([Modelo reserva](#modelo-reserva)).
 
 No Free Tier, o Google pode usar o conteúdo enviado para melhorar os produtos dele. O time aceita esse envio para a amostra e para a Gold real (DEC-015): o dataset é do case. O que nunca pode acontecer é o dataset, ou qualquer saída com dados dele, ir para o Git (DEC-024).
 
@@ -275,10 +276,8 @@ GEMINI_FALLBACK_MODEL=google-gla:gemini-3.5-flash,openrouter:google/gemini-3.1-f
 - Nenhum modelo da cadeia pode ser igual ao do juiz (`VENERGY_AGENT_JUDGE_MODEL`, padrão `gemini-3.5-flash-lite`).
 - Fora do compose (`python -m venergy_agent`, avaliação), a cadeia vem do `ai-agent/.env`.
 
-### Dia da apresentação
+### Custo e cota
 
-- Confira no `.env` da raiz a cadeia paga acima e a `OPENROUTER_API_KEY`, com crédito na conta. Com ela, a cota do Gemini gratuito deixa de ser um risco.
-- Use a chave do Gemini de quem não rodou nada no dia; a cota renova por volta das 4h (horário de Brasília). Leve a chave de outro integrante como segunda opção: trocar o `GOOGLE_API_KEY` no `.env` da raiz e reiniciar a API leva menos de um minuto.
-- Não rode avaliação no dia: uma rodada completa do golden set na Gold real (95 dos 105 itens; os outros 10 valem só para a amostra, pelo campo `datasets`, com juiz) gasta cerca de 130 chamadas ao gerador e de 35 a 60 ao juiz, mais as novas tentativas quando há 503. Uma pergunta ao agente gasta cerca de 2 (SQL e narração), e um insight de tela, de 1 a 3 por clique (o texto aceito fica em cache).
-- Antes de começar, faça uma pergunta de teste pelo portal ou pelo `POST /ai/ask`. A resposta mostra o `model` que respondeu: se for o reserva, o principal está sem cota. As chamadas pagas aparecem em openrouter.ai/activity.
-- Clique em **Gerar insight** nas telas da demonstração antes de começar, sem reiniciar a API depois: o clique ao vivo vem do cache, sem chamar o modelo.
+- Uma pergunta ao agente faz cerca de 2 chamadas ao modelo (SQL e narração), 3 quando a narração é recusada e escrita de novo (DEC-079). Um insight de tela faz de 1 a 3 chamadas por clique, e o texto aceito fica em cache.
+- Uma rodada completa do golden set na Gold real (95 dos 105 itens; os outros 10 valem só para a amostra, pelo campo `datasets`), com juiz, faz cerca de 130 chamadas ao gerador e de 35 a 60 ao juiz.
+- A cota do Gemini gratuito renova por volta das 4h (horário de Brasília). A resposta traz em `model` o modelo que respondeu, então dá para ver quando a reserva entrou; as chamadas pagas aparecem em openrouter.ai/activity.

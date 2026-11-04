@@ -55,7 +55,11 @@ class QueryExecutor(Protocol):
 
 class AnswerWriter(Protocol):
     async def write(
-        self, question: Question, draft: SqlDraft, result: QueryResult
+        self,
+        question: Question,
+        draft: SqlDraft,
+        result: QueryResult,
+        feedback: str | None = None,
     ) -> Narration: ...
 
 

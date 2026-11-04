@@ -84,17 +84,20 @@ class ScriptedExecutor:
 
 
 class FixedWriter:
-    def __init__(self, text=None, error=None, input_tokens=0):
-        self._text = text
+    def __init__(self, text=None, error=None, input_tokens=0, texts=()):
+        self._texts = tuple(texts) or (text,)
         self._error = error
         self._input_tokens = input_tokens
         self.calls = 0
+        self.feedbacks = []
 
-    async def write(self, question, draft, result):
+    async def write(self, question, draft, result, feedback=None):
         self.calls += 1
+        self.feedbacks.append(feedback)
         if self._error:
             raise self._error
-        return Narration(text=self._text, input_tokens=self._input_tokens)
+        text = self._texts[min(self.calls, len(self._texts)) - 1]
+        return Narration(text=text, input_tokens=self._input_tokens)
 
 
 class FakeHistory:
@@ -751,7 +754,15 @@ async def test_fallback_text_trims_long_division_decimals_but_keeps_money_cents(
 
     text = await fallback_text(layer, query_result)
 
-    assert text.endswith("Resultado: fec = 4,5, taxa = 0,056123, receita = 35.482,70.")
+    assert text.endswith("Resultado: fec = 4,5, taxa = 0,0561, receita = 35.482,70.")
+
+
+async def test_fallback_text_rounds_long_decimals_to_two_places(layer):
+    query_result = table(("cod_alimentador", "dec"), ("ALM-JAB-008", 1.9135965))
+
+    text = await fallback_text(layer, query_result)
+
+    assert text.endswith("Resultado: cod alimentador = ALM-JAB-008, dec = 1,91.")
 
 
 async def test_fallback_text_omits_the_values_of_a_large_result(layer):
@@ -823,6 +834,120 @@ async def test_number_from_the_question_does_not_make_a_narrative_faithful(layer
 
     assert "300" not in answer.answer
     assert answer.answer.startswith("A consulta devolveu 1 linha(s).")
+
+
+async def test_a_duration_from_the_question_keeps_the_narrative(layer):
+    writer = FixedWriter(text="Nos últimos 12 meses, há 3 UCs.")
+
+    answer = await use_case(layer, ScriptedGenerator(generation()), writer=writer).ask(
+        "Quantas UCs faturaram nos últimos 12 meses?", "s1"
+    )
+
+    assert answer.answer == "Nos últimos 12 meses, há 3 UCs."
+
+
+async def test_a_duration_from_the_assumptions_keeps_the_narrative(layer):
+    writer = FixedWriter(text="Considerando as 12 últimas competências da base, há 3 UCs.")
+    draft = generation(assumptions=("O período são as 12 últimas competências da base.",))
+
+    answer = await use_case(layer, ScriptedGenerator(draft), writer=writer).ask(
+        "Quantas UCs faturaram no último ano?", "s1"
+    )
+
+    assert answer.answer == "Considerando as 12 últimas competências da base, há 3 UCs."
+
+
+async def test_a_duration_from_the_question_used_as_a_count_drops_the_narrative(layer):
+    writer = FixedWriter(text="Há 12 UCs.")
+
+    answer = await use_case(layer, ScriptedGenerator(generation()), writer=writer).ask(
+        "Quantas UCs faturaram nos últimos 12 meses?", "s1"
+    )
+
+    assert answer.answer.startswith("A consulta devolveu 1 linha(s).")
+
+
+async def test_a_refused_narrative_is_written_again_with_the_reason(layer):
+    writer = FixedWriter(texts=("Há 999 UCs.", "Há 3 UCs."))
+
+    answer = await use_case(layer, ScriptedGenerator(generation()), writer=writer).ask(
+        "quantas?", "s1"
+    )
+
+    assert answer.answer == "Há 3 UCs."
+    assert writer.feedbacks[0] is None
+    assert "999" in writer.feedbacks[1]
+
+
+async def test_a_narrative_refused_twice_falls_back_to_the_deterministic_text(layer):
+    writer = FixedWriter(texts=("Há 999 UCs.", "Há 998 UCs."))
+
+    answer = await use_case(layer, ScriptedGenerator(generation()), writer=writer).ask(
+        "quantas?", "s1"
+    )
+
+    assert answer.answer.startswith("A consulta devolveu 1 linha(s).")
+    assert writer.calls == 2
+
+
+async def test_the_reason_for_a_missing_period_names_the_months(layer):
+    writer = FixedWriter(texts=("Há 3 UCs.", "Em março de 2025, há 3 UCs."))
+    executor = ScriptedExecutor(table(("competencia", "total"), ("2025-03", 3)))
+
+    answer = await use_case(layer, ScriptedGenerator(generation()), executor, writer).ask(
+        "quantas?", "s1"
+    )
+
+    assert answer.answer == "Em março de 2025, há 3 UCs."
+    assert "março de 2025" in writer.feedbacks[1]
+
+
+async def test_the_reason_for_a_technical_name_asks_for_plain_words(layer):
+    writer = FixedWriter(texts=("O total_ucs é 3.", "Há 3 UCs."))
+
+    answer = await use_case(layer, ScriptedGenerator(generation()), writer=writer).ask(
+        "quantas?", "s1"
+    )
+
+    assert answer.answer == "Há 3 UCs."
+    assert "nomes técnicos" in writer.feedbacks[1]
+
+
+async def test_both_narrations_count_toward_the_answer_usage(layer):
+    writer = FixedWriter(texts=("Há 999 UCs.", "Há 3 UCs."), input_tokens=7)
+
+    answer = await use_case(layer, ScriptedGenerator(generation()), writer=writer).ask(
+        "quantas?", "s1"
+    )
+
+    assert answer.input_tokens == 10 + 7 + 7
+
+
+async def test_fallback_text_shows_the_values_of_a_result_with_six_columns(layer):
+    columns = ("efeito_tarifa", "efeito_bandeira", "efeito_volume", "efeito_mix", "a", "b")
+    query_result = table(columns, (1, 2, 3, 4, 5, 6))
+
+    text = await fallback_text(layer, query_result)
+
+    assert "Resultado: " in text and "b = 6" in text
+
+
+async def test_fallback_text_omits_the_values_of_a_result_with_seven_columns(layer):
+    columns = ("a", "b", "c", "d", "e", "f", "g")
+
+    text = await fallback_text(layer, table(columns, (1, 2, 3, 4, 5, 6, 7)))
+
+    assert "Resultado" not in text
+
+
+async def test_fallback_text_gives_a_unit_to_a_period_alias_and_a_percentage(layer):
+    query_result = table(
+        ("receita_2024", "variacao_percentual"), (Decimal("16778217.14"), Decimal("0.89"))
+    )
+
+    text = await fallback_text(layer, query_result)
+
+    assert text.endswith("Resultado: receita 2024 = R$ 16.778.217,14, variacao percentual = 0,89%.")
 
 
 async def test_long_text_values_are_shortened_in_the_fallback_answer(layer):
@@ -1217,7 +1342,7 @@ async def test_stage_events_carry_the_tokens_spent_so_far_outside_the_serialized
 
 
 class HangingWriter:
-    async def write(self, question, draft, result):
+    async def write(self, question, draft, result, feedback=None):
         await asyncio.Event().wait()
 
 

@@ -1,8 +1,10 @@
 import json
 import re
 from collections.abc import Mapping
+from decimal import Decimal
 
 from venergy_agent.domain.answer import AgentAnswer
+from venergy_agent.domain.numbers import rounded_for_display
 from venergy_agent.domain.question import Question
 from venergy_agent.domain.semantic import (
     ColumnSpec,
@@ -10,6 +12,7 @@ from venergy_agent.domain.semantic import (
     GlossaryTerm,
     SemanticLayer,
     ViewSpec,
+    unit_of,
 )
 from venergy_agent.domain.sql import AttemptFeedback, QueryResult, SqlDraft
 
@@ -134,13 +137,22 @@ def render_answer_user(
     result: QueryResult,
     nonce: str,
     units: Mapping[str, str] | None = None,
+    feedback: str | None = None,
 ) -> str:
     _require(nonce)
     units = units or {}
     columns = ", ".join(
-        f"{column} ({units[column]})" if column in units else column for column in result.columns
+        f"{column} ({unit})" if (unit := unit_of(column, units)) else column
+        for column in result.columns
     )
-    rows = "\n".join(json.dumps(row, ensure_ascii=False, default=str) for row in result.rows)
+    rows = "\n".join(
+        json.dumps(
+            {key: _for_display(value) for key, value in row.items()},
+            ensure_ascii=False,
+            default=str,
+        )
+        for row in result.rows
+    )
     assumptions = "\n".join(f"- {_in_words(item)}" for item in draft.assumptions) or "(nenhuma)"
     data = "\n".join(
         [
@@ -152,9 +164,20 @@ def render_answer_user(
             rows,
         ]
     )
-    return "\n\n".join(
-        [delimited("pergunta", question.text, nonce), delimited("dados", data, nonce)]
-    )
+    parts = [delimited("pergunta", question.text, nonce), delimited("dados", data, nonce)]
+    if feedback:
+        parts.append(f"Seu texto anterior foi recusado na conferência. {feedback} Escreva de novo.")
+    return "\n\n".join(parts)
+
+
+def _for_display(value: object) -> object:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, float):
+        return float(rounded_for_display(Decimal(str(value))))
+    if isinstance(value, Decimal):
+        return rounded_for_display(value)
+    return value
 
 
 def _in_words(text: str) -> str:
