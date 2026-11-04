@@ -24,7 +24,7 @@ O agente transforma uma pergunta em português numa consulta SQL somente leitura
 
 **Na `main` (G1-10, DEC-046, aceita em 30/10/2026):** follow-up com memória, orçamento de tokens por sessão e `prompts/v3`, que é o padrão. A rodada do golden set que compara v2 e v3 segue como pendência registrada (§11).
 
-**Em revisão:** red team, runner de métricas e linha de base (item 7, PR #41, §9.6); avaliação comparativa e juiz (branch `feat/ai-agent-avaliacao-comparativa-juiz`, §9.4 e §9.5, DEC-047).
+**Também na `main`:** red team, runner de métricas e linha de base (item 7, PR #41, §9.6); avaliação comparativa e juiz (PR #85, §9.4 e §9.5, DEC-047), com a calibração e a rodada final na Gold real em 03/11/2026 (PR #135, issue #116).
 
 **Falta:** as decisões da §9.6. Os eventos de progresso para SSE (issue #38), adiados em 24/10/2026, foram retomados em 30/10/2026 (DEC-055).
 
