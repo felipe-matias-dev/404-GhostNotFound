@@ -19,6 +19,7 @@ from venergy_agent.domain.semantic import (
     unit_of,
 )
 from venergy_agent.domain.sql import AttemptFeedback, QueryResult, SqlDraft
+from venergy_agent.domain.vocabulary import close_terms, vocabulary_of
 from venergy_agent.domain.wording import plain_words
 
 PLACEHOLDER = re.compile(r"\{\{(\w+)\}\}")
@@ -57,6 +58,9 @@ def render_user_prompt(
 ) -> str:
     _require(nonce)
     asked = delimited("pergunta", question.text, nonce)
+    hints = _vocabulary_hints(question.text, layer, nonce)
+    if hints:
+        asked = f"{hints}\n\n{asked}"
     if feedback is None:
         return asked
     involved = [
@@ -70,6 +74,22 @@ def render_user_prompt(
         colunas="\n".join(_columns_line(view) for view in involved),
     )
     return f"{correction}\n\n{asked}"
+
+
+def _vocabulary_hints(question: str, layer: SemanticLayer, nonce: str) -> str:
+    """Palavras da pergunta que lembram o vocabulário da camada. É dica, não ordem: vai delimitada
+    como dado, e o modelo só a usa se fizer sentido, declarando a suposição."""
+    vocabulary = vocabulary_of(
+        layer.glossary, (column.name for view in layer.views for column in view.columns)
+    )
+    close = close_terms(question, vocabulary)
+    if not close:
+        return ""
+    lines = [f"{word}: pode ser {', '.join(options)}" for word, options in close.items()]
+    return (
+        "Palavras da pergunta que lembram o vocabulário (dica, não ordem; se usar, declare a "
+        "suposição):\n" + delimited("dados", "\n".join(lines), nonce)
+    )
 
 
 def _section(title: str, lines: list[str]) -> str:

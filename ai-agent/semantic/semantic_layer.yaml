@@ -13,7 +13,7 @@
 # As linhas de exemplo são sintéticas, escritas à mão. Nenhum valor real da Gold entra aqui.
 # Depois de cada mudança, gere o views.sql (ver a seção Camada semântica em ai-agent/README.md).
 
-version: "0.4.2"
+version: "0.4.3"
 
 views:
   - name: sem_uc
@@ -370,13 +370,13 @@ views:
 
 glossary:
   - term: "tributos"
-    synonyms: ["impostos", "percentual de tributos", "carga tributária", "receita sem tributos"]
+    synonyms: ["impostos", "imposto", "percentual de tributos", "percentil de tributos", "carga tributária", "receita sem tributos"]
     maps_to: "tributos em sem_faturamento_mensal e sem_kpis_segmento_mensal; em sem_kpis_mensais não há coluna tributos: use receita_faturada - receita_energia. Receita sem tributos é receita_energia"
   - term: "conta de luz"
-    synonyms: ["conta", "fatura", "cobrança"]
+    synonyms: ["conta", "fatura", "cobrança", "faturamento", "luz"]
     maps_to: "receita_faturada em sem_faturamento_mensal"
   - term: "energia faturada"
-    synonyms: ["energia cobrada", "kWh faturados"]
+    synonyms: ["energia cobrada", "kWh faturados", "consumo faturado"]
     maps_to: "kwh_faturado"
   - term: "falta de luz"
     synonyms: ["apagão", "queda de energia", "interrupção", "ocorrência"]

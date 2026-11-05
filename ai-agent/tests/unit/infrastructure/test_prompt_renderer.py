@@ -425,3 +425,36 @@ def test_column_line_shows_the_type_the_view_exposes():
 
     assert count.view_type == "numeric"
     assert days.view_type == "integer"
+
+
+def test_a_misspelled_term_gets_a_delimited_hint_and_no_hint_when_nothing_is_close():
+    import asyncio
+
+    from venergy_agent.config import AGENT_ROOT, REPO_ROOT
+    from venergy_agent.infrastructure.semantic_source import YamlSemanticLayerSource
+
+    real = asyncio.run(
+        YamlSemanticLayerSource(
+            AGENT_ROOT / "semantic" / "semantic_layer.yaml",
+            REPO_ROOT / "contracts" / "gold_schema.yaml",
+        ).load()
+    )
+    hinted = render_user_prompt(
+        Question(text="inadiplencia em Olinda", session_id="s1"),
+        None,
+        CORRECTION,
+        real,
+        NONCE,
+    )
+    plain = render_user_prompt(
+        Question(text="receita?", session_id="s1"), None, CORRECTION, real, NONCE
+    )
+
+    assert "inadiplencia: pode ser inadimplência" in hinted
+    assert f"<dados-{NONCE}>" in hinted
+    assert hinted.index("pode ser") < hinted.index(f"<pergunta-{NONCE}>")
+    assert "pode ser" not in plain
+    known = render_user_prompt(
+        Question(text="percentil de tributos", session_id="s1"), None, CORRECTION, real, NONCE
+    )
+    assert "pode ser" not in known
