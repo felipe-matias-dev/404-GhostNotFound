@@ -18,6 +18,109 @@ E isso vale para os 5 usuários de demonstração. **Só conta como validado o q
 - DEC-019, DEC-070, DEC-079 e DEC-080 (checagem da narrativa);
 - DEC-024 (nenhum número da Gold real vai para o Git).
 
+## Como trabalhar neste plano (passo a passo)
+
+### 1. Preparar a máquina (uma vez)
+
+1. **Clonar e instalar.** Na raiz do repositório:
+   ```bash
+   make setup
+   ```
+   Isso instala o workspace do uv, o frontend e os hooks de pre-commit.
+2. **`.env` da raiz:** `cp .env.example .env` e preencher:
+   - `POSTGRES_PASSWORD`, `AGENT_DB_PASSWORD`, `JWT_SECRET` e `SENHA_DEMO` (a senha dos 5 logins de demonstração);
+   - `GOOGLE_API_KEY`: a sua chave do Gemini (aistudio.google.com);
+   - `LLM_MODEL=openrouter:google/gemini-3.1-flash-lite`, `GEMINI_FALLBACK_MODEL=google-gla:gemini-3.1-flash-lite,openrouter:anthropic/claude-haiku-5.5` e `OPENROUTER_API_KEY`, a chave paga do grupo. O Luis Felipe passa a chave por mensagem, nunca pelo Git;
+   - `AGENT_SESSION_TOKEN_BUDGET=0`, para o orçamento de tokens não travar a validação.
+3. **`ai-agent/.env`:** `cp ai-agent/.env.example ai-agent/.env`, com as mesmas chaves e os mesmos modelos (`VENERGY_AGENT_LLM_MODEL`, `VENERGY_AGENT_FALLBACK_MODEL`, `VENERGY_AGENT_OPENROUTER_API_KEY`). É o arquivo que a avaliação usa.
+4. **Gold real.** Copiar os CSVs para `data/gold/`. Eles ficam fora do Git (DEC-024) e o Luis Felipe passa por fora. Depois:
+   ```bash
+   make up
+   ```
+   ```bash
+   make load
+   ```
+   ```bash
+   make users
+   ```
+   A carga recria as views do agente; `make users` cria os 5 logins.
+5. **Conferir.**
+   - Em `http://localhost:3000`, entrar com `henrique` e a `SENHA_DEMO`.
+   - Na página Agente, "Quantas UCs existem?" responde algo da ordem de 45 mil. Na amostra sintética o número é bem menor, e isso indica que a Gold real não foi carregada.
+
+### 2. Começar uma tarefa
+
+1. Branch nova a partir da `main` atualizada, com um nome por tarefa, por exemplo `feat/ai-agent-e2e-portal` para a T3:
+   ```bash
+   git switch main && git pull && git switch -c feat/ai-agent-e2e-portal
+   ```
+2. Ler, nesta página, a tarefa e a "Definição de validado". Se a tarefa mexer no agente, ler também `ai-agent/CLAUDE.md`.
+3. Escrever o teste antes do código, nas regras do projeto. Os testes nunca chamam o modelo.
+
+### 3. Rodar os testes de cada parte
+
+| Parte | Comando | Observação |
+|---|---|---|
+| Agente | `cd ai-agent && uv run pytest -q tests/unit && uv run ruff check . && uv run ruff format --check .` | os testes de integração rodam no CI |
+| Backend | `cd backend && uv run pytest -q && uv run ruff check` | exporte `VENERGY_API_TEST_DATABASE_URL` e `VENERGY_API_TEST_AGENT_DATABASE_URL` apontando para o banco **`venergy_test`**, nunca o `venergy` |
+| Frontend | `cd frontend && npm test && npx tsc -p . --noEmit && npx biome check src` | — |
+| Contrato | `make openapi` | sempre que um schema do backend mudar; regera `contracts/openapi.json` e os tipos do portal |
+
+### 4. Subir o portal com o código da branch
+
+Escolha uma das duas formas:
+
+- **Docker (mais simples):** `docker compose up -d --build`. O `--build` é obrigatório, porque sem ele a API continua com o código antigo da imagem.
+- **Local (recarrega mais rápido):**
+  - API:
+    ```bash
+    set -a; . ./.env; set +a; VENERGY_API_DATABASE_URL=postgresql+psycopg://venergy:$POSTGRES_PASSWORD@localhost:5433/venergy VENERGY_AGENT_DATABASE_URL=postgresql://venergy_agent:$AGENT_DB_PASSWORD@localhost:5433/venergy VENERGY_API_JWT_SECRET=$JWT_SECRET VENERGY_API_SENHA_DEMO=$SENHA_DEMO VENERGY_AGENT_GOOGLE_API_KEY=$GOOGLE_API_KEY VENERGY_AGENT_OPENROUTER_API_KEY=$OPENROUTER_API_KEY VENERGY_AGENT_LLM_MODEL=$LLM_MODEL VENERGY_AGENT_FALLBACK_MODEL=$GEMINI_FALLBACK_MODEL VENERGY_AGENT_SESSION_TOKEN_BUDGET=0 VENERGY_API_AI_LIMITE_PERGUNTAS=0 uv --directory backend run uvicorn venergy_api.main:create_app --factory --port 8001
+    ```
+  - Portal: `cd frontend && API_PROXY_TARGET=http://localhost:8001 npm run dev`.
+
+O limite de 20 perguntas a cada 10 min ainda não passa pelo compose. A T3 acrescenta `AI_LIMITE_PERGUNTAS` ao `docker-compose.yml`, como já foi feito com o orçamento. Até lá, use a forma local para validar muitas perguntas seguidas.
+
+### 5. Validar no portal (obrigatório em toda tarefa)
+
+1. Para cada um dos 5 logins (henrique, camila, rafael, beatriz, patricia):
+   - abrir a página Agente e o widget numa tela comum do perfil;
+   - fazer as perguntas da tarefa e as do conjunto de fumaça (seção 6).
+2. Para cada resposta, conferir os 8 itens da "Definição de validado".
+3. Recarregar a página e conferir que a próxima pergunta entra numa conversa nova.
+4. Registrar no PR uma tabela "pergunta × usuário × ok", com o que falhou. Depois da T3, o `make e2e-agente` faz isso sozinho e grava o relatório em `ai-agent/eval/runs_gold/`.
+5. Se algo sair diferente entre usuários, é defeito: anotar e corrigir antes do merge.
+
+### 6. Rodar a avaliação no nível certo
+
+| Quando | Comando | Tempo e custo |
+|---|---|---|
+| Durante a tarefa | `make eval DATASET=gold_real IDS=G106,G107,... JUDGE=1`, com os itens novos ou afetados mais o conjunto de fumaça | 2 a 4 min, centavos |
+| Mudança que só mexe no SQL | `make eval DATASET=gold_real SQL_ONLY=1` | cerca de 10 min |
+| Antes do merge de mudança de prompt, few-shot, glossário ou camada (DEC-016) | `make eval DATASET=gold_real JUDGE=1` (completo) | 25 a 30 min, cerca de US$ 0,40 |
+| Comparar com a rodada anterior | `make eval-compare A=ai-agent/eval/runs_gold/<anterior>.json B=ai-agent/eval/runs_gold/<nova>.json` | sem modelo |
+
+- **Conjunto de fumaça** (até a T11 marcar no golden): G001, G005, G099, G015, G036, G033, G047, G056, G063, G065, G071, G104, G105, G106, G107, G108, G109.
+- **Critério para o PR:** nenhum item piora em `matched` ou `status` no `eval-compare`, e o `fallback_rate` não sobe.
+- **Relatórios:** ficam em `eval/runs_gold/`, fora do Git. No PR vão só as métricas.
+
+### 7. Mudar prompt, glossário ou camada
+
+- **Prompt:** nunca editar uma versão que já existe. Criar `prompts/vN+1/` (SQL) ou `prompts/answer/vN+1/` (narração) e trocar o padrão em `ai-agent/src/venergy_agent/config.py`.
+- **Camada:** subir a `version` de `semantic/semantic_layer.yaml`; se as views mudarem, rodar `uv run python -m venergy_agent.infrastructure.views_sql`.
+- **Golden:** item novo ou gabarito mudado entra com `revisado_por: null` e a versão do golden sobe.
+- **Regra de entrada:** rodada completa antes do merge (DEC-016).
+
+### 8. Entregar
+
+- **Antes do commit:**
+  - todos os testes da seção 3 passando;
+  - a validação da seção 5 registrada;
+  - a avaliação da seção 6 no nível da mudança;
+  - a DEC nova ou atualizada em `docs/decisoes.md`, quando houver decisão;
+  - este plano atualizado: marcar a tarefa como feita e o que ficou de fora.
+- **Commit:** Conventional Commits.
+- **PR:** com o resultado do `eval-compare` e a tabela da validação no portal, revisado pelo Luis Felipe.
+
 ## Por que este plano
 
 Na apresentação de 04/11/2026, o agente acertou o SQL e mesmo assim falhou para quem usava o portal:
@@ -252,6 +355,19 @@ Quatro camadas, da mais barata para a mais cara:
 
 **Fora:** dicionário externo ou embeddings. O vocabulário do domínio é pequeno (glossário mais cerca de 90 colunas), e a correspondência aproximada sobre ele resolve sem dependência nova.
 
+### T11. Avaliação mais rápida (Lucas)
+
+- **Conjunto de fumaça no golden:**
+  - campo `smoke: true` nos itens da seção 6;
+  - opção `--smoke` no `evaluation/__main__.py` (e `SMOKE=1` no `make eval`), que roda só eles e os turnos de que dependem.
+- **Itens em paralelo:**
+  - o runner (`evaluation/runner.py`) roda até `--concurrency N` cadeias ao mesmo tempo, mantendo a ordem dentro de cada cadeia de follow-up;
+  - a pausa entre chamadas, por limite do provedor, continua valendo por modelo.
+  - **Meta:** a rodada completa em cerca de 8 minutos.
+- **Testes:**
+  - a ordem dos turnos de uma cadeia se mantém com concorrência;
+  - o `--smoke` inclui os turnos anteriores.
+
 ## Critério de aceite
 
 | Métrica | Meta |
@@ -280,6 +396,7 @@ Quatro camadas, da mais barata para a mais cara:
 | 7 | T7 | Luis Felipe | T3 para o resumo |
 | 6b | T9 (resposta a esclarecimento) | Luis Felipe | — |
 | 6c | T10 (termos fora do vocabulário) | Luis Felipe e Lucas | T5 para as opções |
+| 2b | T11 (avaliação mais rápida) | Lucas | — |
 | 8 | T8 | os dois | todas |
 
 ## Regras para quem implementar
