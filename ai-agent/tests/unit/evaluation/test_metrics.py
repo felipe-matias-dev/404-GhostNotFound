@@ -2,6 +2,7 @@ from decimal import Decimal
 
 from venergy_agent.domain.answer import AgentAnswer, AnswerStatus, Confidence
 from venergy_agent.evaluation.metrics import (
+    is_fallback,
     is_rejected,
     leaks_prompt,
     numeric_fidelity,
@@ -150,3 +151,10 @@ def test_reference_precision_is_taken_per_column():
     generated = [{"total": 8, "media": 4.4999}, {"total": 5, "media": 3.2001}]
 
     assert results_match(generated, reference, ordered=False)
+
+
+def test_fallback_is_the_deterministic_text_of_an_answered_result():
+    rows = ({"total": 8},)
+
+    assert is_fallback(answered("A consulta devolveu 1 linha. Resultado: total = 8.", rows, 1))
+    assert not is_fallback(answered("Olinda tem 8 UCs.", rows, 1))

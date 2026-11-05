@@ -482,6 +482,11 @@ class AiAuditoria(Base):
     # dos campos existirem valem 0, e a coluna acrescentada por ALTER TABLE preenche o mesmo valor.
     input_tokens: Mapped[int] = mapped_column(server_default="0")
     output_tokens: Mapped[int] = mapped_column(server_default="0")
+    # Unidade de cada coluna da amostra que a camada semântica conhece (R$, kWh, %), para o
+    # portal formatar pela unidade e não pelo nome da coluna (DEC-080). Vazio nas linhas antigas.
+    column_units: Mapped[dict[str, str]] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
+    # Rótulo em português de cada coluna da amostra ("efeito preço"), para o cabeçalho da tabela.
+    column_labels: Mapped[dict[str, str]] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
     # Login de quem perguntou: o limite, o orçamento e a posse da sessão valem por usuário
     # (DEC-046). Nulo nas linhas de antes da coluna.
     usuario: Mapped[str | None]

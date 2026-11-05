@@ -1074,6 +1074,11 @@ class RespostaIaBaseSchema(BaseModel):
     # modelo não rodou.
     input_tokens: int
     output_tokens: int
+    # Unidade de cada coluna da amostra que o agente conhece ("R$", "kWh", "%", "h"); a coluna
+    # que não aparece aqui não tem unidade conhecida (DEC-080).
+    column_units: dict[str, str] = {}
+    # Rótulo em português de cada coluna da amostra, para o cabeçalho da tabela.
+    column_labels: dict[str, str] = {}
 
 
 class RespostaIaSchema(RespostaIaBaseSchema):

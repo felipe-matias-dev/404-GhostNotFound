@@ -28,6 +28,8 @@ const resposta: RespostaIa = {
 	latency_ms: 100,
 	input_tokens: 0,
 	output_tokens: 0,
+	column_units: {},
+	column_labels: {},
 	session_id: "session-1",
 };
 

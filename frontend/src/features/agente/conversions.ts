@@ -158,9 +158,25 @@ export function nomeAmigavelView(view: string): string {
 	return NOMES_DAS_VIEWS[view] ?? view;
 }
 
+const UNIDADES_SEM_SUFIXO = new Set(["contagem", "nota"]);
+
+function formatarPelaUnidade(valor: number, unidade: string): string {
+	if (unidade === "R$") return formatBRL(valor);
+	if (unidade === "kWh") return formatKWh(valor);
+	if (unidade === "h") return formatHoras(valor);
+	if (unidade === "%") return `${formatNumero(valor)}%`;
+	if (UNIDADES_SEM_SUFIXO.has(unidade)) return formatNumero(valor);
+	return `${formatNumero(valor)} ${unidade}`;
+}
+
+/**
+ * A unidade vem do agente (`column_units`, pela camada semântica). Sem ela, a coluna é
+ * reconhecida pelo nome, como nas respostas gravadas antes do campo existir.
+ */
 export function formatarCelulaResultado(
 	coluna: string,
 	valor: unknown,
+	unidade?: string,
 ): string {
 	if (valor === null || valor === undefined) return "—";
 	if (typeof valor === "boolean") return valor ? "Sim" : "Não";
@@ -175,12 +191,15 @@ export function formatarCelulaResultado(
 		) {
 			const numero = Number(valor);
 			if (Number.isFinite(numero))
-				return formatarCelulaResultado(coluna, numero);
+				return formatarCelulaResultado(coluna, numero, unidade);
 		}
 		return valor;
 	}
 	if (typeof valor === "number") {
+		if (unidade) return formatarPelaUnidade(valor, unidade);
 		const col = coluna.toLowerCase();
+		if (col.includes("pct") || col.includes("percentual"))
+			return `${formatNumero(valor)}%`;
 		if (
 			col.includes("receita") ||
 			col.includes("tributo") ||
@@ -191,8 +210,6 @@ export function formatarCelulaResultado(
 		if (col.includes("kwh")) return formatKWh(valor);
 		if (col === "dec" || col.includes("horas")) return formatHoras(valor);
 		if (col === "fec" || col.includes("satisfacao")) return formatIndice(valor);
-		if (col.includes("pct") || col.includes("percentual"))
-			return `${formatNumero(valor)}%`;
 		return formatNumero(valor);
 	}
 	return String(valor);
@@ -239,12 +256,15 @@ export type CamposSessao = Partial<Pick<SessaoConversa, "titulo" | "favorita">>;
 
 /**
  * Junta as conversas da tela com as do servidor. A de mesmo id fica com a versão que tem
- * mais turnos: uma pergunta feita antes de a lista chegar não some. A conversa vazia sai.
+ * mais turnos: uma pergunta feita antes de a lista chegar não some. A conversa nova e vazia
+ * fica em primeiro: é nela que a próxima pergunta entra. Se ela saísse, a pergunta cairia na
+ * última conversa salva, e o agente leria o histórico de outra conversa.
  */
 export function mesclarSessoes(
 	locais: SessaoConversa[],
 	doServidor: SessaoConversa[],
 ): SessaoConversa[] {
+	const vazia = locais.find((sessao) => sessao.turnos.length === 0);
 	const comTurnos = new Map(
 		locais
 			.filter((sessao) => sessao.turnos.length > 0)
@@ -255,7 +275,7 @@ export function mesclarSessoes(
 		comTurnos.delete(salva.sessionId);
 		return local && local.turnos.length >= salva.turnos.length ? local : salva;
 	});
-	return [...comTurnos.values(), ...salvas];
+	return [...(vazia ? [vazia] : []), ...comTurnos.values(), ...salvas];
 }
 
 /**
@@ -306,7 +326,13 @@ export function formatarSessaoComoMarkdown(sessao: SessaoConversa): string {
 					const linhas = turno.resposta.rows.map(
 						(linha) =>
 							`| ${cols
-								.map((col) => formatarCelulaResultado(col, linha[col]))
+								.map((col) =>
+									formatarCelulaResultado(
+										col,
+										linha[col],
+										turno.resposta?.column_units?.[col],
+									),
+								)
 								.join(" | ")} |`,
 					);
 					blocos.push([cabecalho, divisor, ...linhas].join("\n"));

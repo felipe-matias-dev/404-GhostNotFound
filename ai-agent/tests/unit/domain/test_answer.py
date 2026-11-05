@@ -121,6 +121,14 @@ def test_answered_truncated_with_rows_is_accepted():
     + [
         pytest.param(status, {"truncated": True}, id=f"{status.value}-truncated")
         for status in NON_ANSWERED
+    ]
+    + [
+        pytest.param(status, {"column_units": {"a": "R$"}}, id=f"{status.value}-with-units")
+        for status in NON_ANSWERED
+    ]
+    + [
+        pytest.param(status, {"column_labels": {"a": "a"}}, id=f"{status.value}-with-labels")
+        for status in NON_ANSWERED
     ],
 )
 def test_status_invariants_reject_each_violation(status, overrides):
@@ -165,3 +173,8 @@ def test_row_count_cannot_be_negative():
 def test_row_count_below_sample_size_is_rejected():
     with pytest.raises(ValidationError, match="row_count"):
         answer(AnswerStatus.ANSWERED, rows=({"a": 1}, {"a": 2}), row_count=1)
+
+
+def test_units_must_name_columns_of_the_rows():
+    with pytest.raises(ValidationError):
+        answer(AnswerStatus.ANSWERED, column_units={"outra": "R$"})

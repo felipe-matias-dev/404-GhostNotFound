@@ -85,6 +85,17 @@ def garantir_colunas_de_tokens(connection: Connection) -> None:
     )
 
 
+def garantir_colunas_das_colunas(connection: Connection) -> None:
+    """Acrescenta a unidade e o rótulo das colunas (DEC-080) a uma auditoria criada antes deles."""
+    connection.execute(
+        text(
+            "ALTER TABLE IF EXISTS app.ai_auditoria "
+            "ADD COLUMN IF NOT EXISTS column_units jsonb NOT NULL DEFAULT '{}'::jsonb, "
+            "ADD COLUMN IF NOT EXISTS column_labels jsonb NOT NULL DEFAULT '{}'::jsonb"
+        )
+    )
+
+
 def garantir_indice_da_sessao(connection: Connection) -> None:
     """Acrescenta o índice (session_id, id) à auditoria de um banco criado antes dele.
 
@@ -123,6 +134,7 @@ def garantir_estrutura_da_auditoria(connection: Connection) -> None:
     if connection.scalar(text("SELECT to_regclass('app.ai_auditoria')")) is None:
         return
     garantir_colunas_de_tokens(connection)
+    garantir_colunas_das_colunas(connection)
     garantir_coluna_do_usuario(connection)
     garantir_indice_da_sessao(connection)
     # Tabela nova: quem atualiza o código sem rodar a carga também precisa dela.

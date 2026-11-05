@@ -41,6 +41,8 @@ class AgentAnswer(BaseModel):
     latency_ms: int = Field(ge=0)
     input_tokens: int = Field(0, ge=0)
     output_tokens: int = Field(0, ge=0)
+    column_units: dict[str, str] = Field(default_factory=dict)
+    column_labels: dict[str, str] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def check_status_invariants(self) -> Self:
@@ -50,6 +52,9 @@ class AgentAnswer(BaseModel):
             raise ValueError("only an answered result can be truncated")
         if self.truncated and self.row_count == 0:
             raise ValueError("a truncated result must have rows")
+        named = set(self.column_units) | set(self.column_labels)
+        if self.rows and not named <= set(self.rows[0]):
+            raise ValueError("column_units and column_labels can only name columns of the rows")
 
         if self.status is AnswerStatus.ANSWERED:
             if self.sql is None:
@@ -62,7 +67,7 @@ class AgentAnswer(BaseModel):
 
         if self.confidence is not Confidence.UNKNOWN:
             raise ValueError(f"{self.status} requires unknown confidence")
-        if self.rows or self.row_count != 0:
+        if self.rows or self.row_count != 0 or self.column_units or self.column_labels:
             raise ValueError(f"{self.status} cannot carry result rows")
 
         if self.status is AnswerStatus.CLARIFY:

@@ -10,6 +10,9 @@ DURATION = re.compile(
     rf"|(?<![\d.,])(\d+)\s+(?:primeir|últim)[oa]s\s+{PERIOD_UNIT}",
     re.IGNORECASE,
 )
+WRITTEN_DURATION = re.compile(
+    rf"(?<![\d.,])(\d+)\s+(?:(?:primeir|últim)[oa]s\b|{PERIOD_UNIT})", re.IGNORECASE
+)
 DISPLAY_DECIMALS = 2
 DISPLAY_SIGNIFICANT = 3
 
@@ -47,8 +50,27 @@ def _supported(token: str, known: set[Decimal]) -> bool:
         return True
     _, comma, decimals = token.rpartition(",")
     if not comma:
-        return False
+        return any(rounded_for_display(value) == number for value in known)
     return any(_rounds_to(value, number, len(decimals)) for value in known)
+
+
+UNIT_BEFORE = re.compile(r"R\$\s*-?(\d+(?:[.,]\d+)*)")
+UNIT_AFTER = re.compile(r"(?<![\d.,])(\d+(?:[.,]\d+)*)\s*(kWh|%|h\b)")
+
+
+def written_units(text: str) -> tuple[tuple[str, str], ...]:
+    before = ((match.group(1), "R$") for match in UNIT_BEFORE.finditer(text))
+    after = ((match.group(1), match.group(2)) for match in UNIT_AFTER.finditer(text))
+    return (*before, *after)
+
+
+def supports(token: str, value: object) -> bool:
+    return _supported(token, _numbers_in_value(value))
+
+
+def pt_br_numbers(text: str) -> set[Decimal]:
+    found = (_from_pt_br(token) for token in PT_BR_NUMBER.findall(text))
+    return {number for number in found if number is not None}
 
 
 def durations(text: str) -> set[Decimal]:
@@ -64,7 +86,7 @@ def unsupported_numbers(
     allowed = set(allowed_durations)
     written_as_duration = {
         match.start(1) if match.group(1) else match.start(2) for match in DURATION.finditer(text)
-    }
+    } | {match.start(1) for match in WRITTEN_DURATION.finditer(text)}
     return tuple(
         match.group()
         for match in PT_BR_NUMBER.finditer(text)

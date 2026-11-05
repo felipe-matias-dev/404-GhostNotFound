@@ -35,20 +35,20 @@ A segurança mora no banco e no validador, nunca no prompt:
 5. **Os números do texto são conferidos com as linhas.** Se a narrativa citar um número que não está no resultado, a resposta volta a um texto determinístico com os valores ([spec §5.1](../ai-agent/docs/specs/2026-10-19-architecture-design.md)).
 6. **Toda resposta é auditada.** Fica gravada em `app.ai_auditoria` (pergunta, SQL, linhas, modelo, versão do prompt, latência) e pode ser lida em `GET /ai/audit/{id}` ([DEC-034](decisoes.md#dec-034--auditoria-do-agente-de-ia-gravação-leitura-e-subida-sem-a-chave)).
 
-**Avaliação.** Usamos um golden set de 105 perguntas (versão 0.18.0, todas revisadas por Dados na issue #90; 95 valem na Gold real e 10 só na amostra) e 17 ataques de red team. Toda mudança de prompt, modelo ou camada semântica só entra se o golden set não regredir ([DEC-016](decisoes.md#dec-016--exceção-de-versionamento-do-prompt-v1-proposta)). Rodada final, na Gold real, narrada e com o juiz (04/11/2026, camada 0.4.1, prompt de SQL `v3`, prompt da narração `v4` da [DEC-079](decisoes.md#dec-079--narrativa-recusada-tem-uma-segunda-chance-e-chega-arredondada), `gemini-3.1-flash-lite` com a cadeia de reserva), comparada com a de 03/11 nos mesmos 95 itens:
+**Avaliação.** Usamos um golden set de 105 perguntas (versão 0.18.0, todas revisadas por Dados na issue #90; 95 valem na Gold real e 10 só na amostra) e 17 ataques de red team. Toda mudança de prompt, modelo ou camada semântica só entra se o golden set não regredir ([DEC-016](decisoes.md#dec-016--exceção-de-versionamento-do-prompt-v1-proposta)). Rodada final, na Gold real, narrada e com o juiz (04/11/2026, camada 0.4.2, prompt de SQL `v4`, narração `answer/v5`, [DEC-080](decisoes.md#dec-080--agente-confiável-no-portal-depois-da-apresentação), Gemini Flash-Lite pago como principal), comparada com a de 03/11 nos mesmos 95 itens:
 
 | Métrica | 03/11 | 04/11 |
 |---|---|---|
-| SQL com o resultado certo (execution accuracy) | 94,1% | 98,5% |
+| SQL com o resultado certo (execution accuracy) | 94,1% | 100% |
 | Status certo (respondeu, não sei, esclarecer, recusar) | 95,8% | 100% |
 | Recusa certa | 100% | 100% |
-| Fidelidade numérica do texto | 86,2% | 88,2% |
-| Juiz: respostas `answered` aprovadas, inclusive o texto de reserva | 64,6% de 65, nota média 4,11 | 89,7% de 68, nota média 4,74 |
+| Texto de reserva no lugar da narrativa | — | 1,4% |
+| Juiz: respostas `answered` aprovadas, inclusive o texto de reserva | 64,6% de 65, nota média 4,11 | 97,1% de 68, nota média 4,91 |
 | Vazamentos de prompt | 0 | 0 |
 | `failed` (a rodada vale abaixo de 5%) | 3,2% | 0% |
-| Latência p50 / p95 | 2,8 s / 16,6 s | 3,3 s / 27,4 s |
+| Latência p50 / p95 | 2,8 s / 16,6 s | 4,2 s / 6,4 s |
 
-Nenhum item piorou no SQL ou no status. A latência p95 subiu por dois motivos: a segunda narração quando a primeira é recusada e, nessa rodada, a cota esgotada do primeiro modelo de reserva, que levou parte das perguntas para o modelo pago do OpenRouter.
+Nenhum item piorou no SQL ou no status. Com o modelo pago como principal, a espera deixou de depender da cota gratuita: o p95 caiu de 16,6 s para 6,4 s. As perguntas da apresentação e outras perguntas complexas também foram conferidas na tela do portal (DEC-080). O próximo passo é o [plano de robustez](../ai-agent/docs/plans/2026-11-05-robustez-do-agente.md), que valida tudo pela tela nos 5 usuários.
 
 O red team, com os 17 ataques, terminou com 0 escritas aceitas, 0 views alteradas e 0 vazamentos de prompt (rodadas de 28/10 e 04/11). A meta do case para o agente sobre os dados reais (G1-05, pelo menos 80%) está cumprida. O juiz é outro modelo (`gemini-3.5-flash-lite`), calibrado contra notas humanas em 14 de 15 itens ([DEC-047](decisoes.md#dec-047--avaliação-comparativa-e-llm-as-a-judge)). Os relatórios da Gold real ficam fora do Git ([DEC-024](decisoes.md#dec-024--o-que-pode-subir-ao-repositório-público)). Detalhes e rodadas anteriores: [spec §9.6](../ai-agent/docs/specs/2026-10-19-architecture-design.md) e [DEC-047](decisoes.md#dec-047--avaliação-comparativa-e-llm-as-a-judge).
 

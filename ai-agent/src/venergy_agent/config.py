@@ -23,6 +23,7 @@ class AgentSettings(BaseSettings):
     llm_request_timeout_seconds: float = Field(15.0, gt=0)
     llm_cooldown_seconds: float = Field(60.0, ge=0)
     answer_deadline_seconds: float = Field(30.0, gt=0)
+    narration_min_seconds: float = Field(4.0, ge=0)
     sql_dialect: Literal["postgres"] = "postgres"
     database_url: str
     allowed_schema: str = "semantic"
@@ -30,9 +31,9 @@ class AgentSettings(BaseSettings):
     max_rows: int = Field(200, gt=0)
     query_timeout_seconds: float = Field(10.0, gt=0)
     max_correction_attempts: int = Field(3, ge=1, le=3)
-    prompt_version: str = "v3"
+    prompt_version: str = "v4"
     prompts_dir: Path = AGENT_ROOT / "prompts"
-    answer_prompt_version: str = "v4"
+    answer_prompt_version: str = "v5"
     insight_prompt_version: str = "v4"
     judge_model: str = "google-gla:gemini-3.5-flash-lite"
     judge_prompt_version: str = "v1"

@@ -87,7 +87,9 @@
 #          sinal. revisado_por do G105 volta a null até Dados conferir.
 #   0.18.0 Dados (31/10/2026, issue #90): revisado_por do G105 preenchido (Alisson Ramos), conferido na Gold real.
 #          Só a assinatura e a nota mudam; a referência é a da 0.17.0.
-versao: 0.18.0
+#   0.19.0 GenAI (04/11/2026, DEC-080): G106 a G110, da conversa da apresentação e da pergunta da diretora,
+#          só na Gold real. revisado_por fica null até Dados conferir.
+versao: 0.19.0
 status: rascunho
 
 itens:
@@ -1194,3 +1196,48 @@ itens:
     follow_up_of: null
     notes: "Versão answered do G044, a pergunta do Henrique (issue #90, item 5): os dois períodos e a medida (kWh) estão explícitos, como no G057 e no G059. Bairro sempre com o município. O G044 continua clarify. A referência foi executada na Gold oficial pelo caminho do agente e volta com resultado (GenAI, 30/10/2026). Conferido por Dados no PR #97 (Alisson Ramos, 30/10/2026). Mudança na 0.17.0 (GenAI, 30/10/2026): a referência devolve só o município e o bairro. Com a variação, uma resposta certa que mostrasse a queda como número positivo era marcada como errada. Revisado_por volta a null até Dados conferir. Conferência de Dados (31/10/2026): a referência nova foi executada na Gold real pelo caminho do agente, já com as views no schema semantic (D1), e devolve o mesmo município e bairro da 0.15.0, sem empate no primeiro lugar. A pergunta pede o bairro, então comparar só município e bairro é o certo; a medida em kWh continua no ORDER BY, e uma resposta que ordene pela queda em percentual não é a pedida. Revisado por Dados."
     revisado_por: "Alisson Ramos"
+  - id: G106
+    question: "Qual foi a receita do mês de junho de 2026?"
+    category: simples
+    reference_sql: "SELECT receita_faturada FROM sem_kpis_mensais WHERE competencia = '2026-06'"
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: null
+    notes: "Primeira pergunta da conversa da apresentação (04/11/2026). Receita sem qualificador é a receita faturada (DEC-022). Início da cadeia G106 → G107 → G108."
+    revisado_por: null
+  - id: G107
+    question: "Quanto era a receita sem tributos?"
+    category: followup
+    reference_sql: "SELECT receita_energia FROM sem_kpis_mensais WHERE competencia = '2026-06'"
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: G106
+    notes: "Follow-up da apresentação: herda junho de 2026 do G106. Receita sem tributos é receita_energia (glossário da camada 0.4.2). Na apresentação, o agente pediu o mês porque a pergunta caiu numa conversa antiga (DEC-080)."
+    revisado_por: null
+  - id: G108
+    question: "quanto era o percentil de tributos na receita de junho"
+    category: followup
+    reference_sql: "SELECT 100.0 * (receita_faturada - receita_energia) / NULLIF(receita_faturada, 0) AS percentual FROM sem_kpis_mensais WHERE competencia = '2026-06'"
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: G107
+    notes: "Follow-up da apresentação, escrito como foi digitado ('percentil' no sentido de percentual). Junho é o de 2026, da conversa. sem_kpis_mensais não tem a coluna tributos: o percentual sai de receita_faturada e receita_energia (regra da camada 0.4.2)."
+    revisado_por: null
+  - id: G109
+    question: "A base de clientes cresceu, e a tarifa residencial acumulou reajuste homologado de 10,5% desde meados de 2022. Mesmo assim, comparando os últimos 12 meses com o primeiro ano da nossa base, o volume de energia faturada caiu quase 4% e a receita subiu só 8%. Ninguém nesta mesa sabe explicar por quê. Preciso de uma resposta baseada em dados, não em opinião."
+    category: case
+    reference_sql: "SELECT round(sum(efeito_tarifa), 2) AS efeito_tarifa, round(sum(efeito_bandeira), 2) AS efeito_bandeira, round(sum(efeito_volume), 2) AS efeito_volume, round(sum(efeito_mix), 2) AS efeito_mix FROM sem_receita_decomposicao WHERE periodo_base = '2022-07/2023-06' AND periodo_atual = '2025-07/2026-06'"
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: null
+    notes: "Fala da diretora no case, como foi feita na apresentação. Os períodos estão ditos ('últimos 12 meses' e 'primeiro ano da base'), então a resposta é a decomposição pronta, como no G104. As porcentagens da pergunta são premissas do usuário e não entram no SQL nem na resposta."
+    revisado_por: null
+  - id: G110
+    question: "Quanto os tributos representaram da receita faturada em junho de 2026, em percentual?"
+    category: simples
+    reference_sql: "SELECT 100.0 * (receita_faturada - receita_energia) / NULLIF(receita_faturada, 0) AS percentual FROM sem_kpis_mensais WHERE competencia = '2026-06'"
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: null
+    notes: "Versão completa do G108, sem depender da conversa."
+    revisado_por: null

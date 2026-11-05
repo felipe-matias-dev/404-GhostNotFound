@@ -28,7 +28,14 @@ from venergy_agent.domain.errors import (
 )
 from venergy_agent.domain.events import AgentEvent, AnswerEvent, Stage, StageEvent
 from venergy_agent.domain.followup import depends_on_previous_turn
-from venergy_agent.domain.numbers import durations, rounded_for_display, unsupported_numbers
+from venergy_agent.domain.numbers import (
+    durations,
+    pt_br_numbers,
+    rounded_for_display,
+    supports,
+    unsupported_numbers,
+    written_units,
+)
 from venergy_agent.domain.question import Question
 from venergy_agent.domain.semantic import SemanticLayer, unit_of
 from venergy_agent.domain.sql import (
@@ -39,6 +46,7 @@ from venergy_agent.domain.sql import (
     SqlDraft,
     ValidatedQuery,
 )
+from venergy_agent.domain.wording import label, plain_words
 
 logger = logging.getLogger("venergy_agent.ask")
 
@@ -48,6 +56,15 @@ TECHNICAL_NAME_FEEDBACK = (
     "Não use nomes técnicos com sublinhado: escreva as colunas em palavras, como na pergunta."
 )
 PERIOD_FEEDBACK = "Cite o período das linhas, {period}."
+UNIT_FEEDBACK = (
+    "{number} não é {unit}: escreva o que a coluna mede, pela pergunta (por exemplo UCs, "
+    "faturas ou chamados), e só use R$, kWh, % ou h quando a coluna tiver essa unidade."
+)
+COUNT_UNITS = frozenset({"R$", "kWh"})
+QUESTION_NUMBERS_FEEDBACK = (
+    "{numbers} está só na pergunta, não nas linhas: não cite, a não ser como a duração do "
+    'período ("nos últimos 12 meses").'
+)
 NUMBERS_FEEDBACK = (
     "Estes números não estão nas linhas: {numbers}. Use só os números das linhas, escritos "
     "como estão ou arredondados."
@@ -86,6 +103,12 @@ ATTEMPTS_FAILED = "Não consegui montar uma consulta válida depois de {attempts
 DATABASE_FAILED = "Não consegui consultar o banco agora. Tente de novo em instantes."
 CLARIFY_PREFIX = "Preciso de um esclarecimento antes de consultar: "
 UNITS_WITHOUT_SUFFIX = frozenset({"contagem", "nota"})
+PERIOD_NOT_GIVEN = (
+    'Qual período você quer consultar? Diga o mês ou o ano, por exemplo "em 2025" ou '
+    '"de janeiro a março de 2025".'
+)
+YEAR = re.compile(r"\b(?:19|20)\d{2}\b")
+BASE_RELATIVE = re.compile(r"\b(?:primeiro|último)\s+ano\s+da\s+(?:nossa\s+)?base\b", re.IGNORECASE)
 GENERIC_CLARIFICATION = (
     "Pode dizer o período e o recorte (município, bairro ou classe) que você quer consultar?"
 )
@@ -109,10 +132,14 @@ MONTH_DATE = re.compile(
     rf"|\b(?:{'|'.join(name[:3] for name in MONTH_NAMES)})/\d{{4}}\b"
     r"|\b\d{1,2}/\d{4}\b|\b\d{4}-\d{2}\b"
 )
+SQL_STRING = re.compile(r"'[^']*'")
+SQL_NUMBER = re.compile(r"(?<![\w.])\d+(?:\.\d+)?(?![\w.])")
+MAX_RANGE_MONTHS = 240
 FALLBACK_MAX_ROWS = 5
 FALLBACK_MAX_COLUMNS = 6
 MISSING_VALUE = "sem valor"
 TEXT_VALUE_MAX_CHARS = 120
+FALLBACK_PREFIX = "A consulta devolveu"
 EMPTY_RESULT = (
     "Nenhum registro atende à consulta. O agente não distingue zero de dado ausente, "
     "então confira os filtros."
@@ -148,6 +175,7 @@ class AskUseCase:
         usage: SessionUsage | None = None,
         session_token_budget: int = 0,
         answer_deadline_seconds: float = 30.0,
+        narration_min_seconds: float = 4.0,
     ) -> None:
         self._layer = layer
         self._generator = generator
@@ -164,6 +192,7 @@ class AskUseCase:
         self._usage = usage
         self._session_token_budget = session_token_budget
         self._answer_deadline_seconds = answer_deadline_seconds
+        self._narration_min_seconds = narration_min_seconds
 
     async def ask(self, question: str, session_id: str) -> AgentAnswer:
         return await self._run(question, session_id, lambda _: None)
@@ -363,6 +392,18 @@ class AskUseCase:
                 sql=validated.sql,
                 latency_ms=_elapsed_ms(began),
             )
+            invented = _invented_years(question.text, history, validated)
+            if invented:
+                self._log(
+                    request_id,
+                    session_id,
+                    step="resposta",
+                    status="periodo_nao_informado",
+                    years=list(invented),
+                )
+                return self._clarify(
+                    PERIOD_NOT_GIVEN, request_id, started, model=generation.model, spent=spent
+                )
             began = time.perf_counter()
 
             try:
@@ -541,7 +582,13 @@ class AskUseCase:
             truncated=result.truncated,
             confidence=self._confidence(result, draft, attempt),
             sources=tuple(sorted(validated.views)),
-            assumptions=draft.assumptions,
+            assumptions=tuple(plain_words(item) for item in draft.assumptions),
+            column_units={
+                column: unit
+                for column in result.columns
+                if (unit := unit_of(column, self._layer.column_units))
+            },
+            column_labels={column: label(column) for column in result.columns},
             clarification=None,
             refused_reason=None,
             request_id=question.request_id,
@@ -573,7 +620,14 @@ class AskUseCase:
                 - NARRATION_MARGIN_SECONDS
                 - (time.perf_counter() - started)
             )
-            if remaining <= 0:
+            if remaining < self._narration_min_seconds:
+                self._log(
+                    question.request_id,
+                    question.session_id,
+                    step="resposta",
+                    status="sem_tempo_para_narrar",
+                    attempt=attempt,
+                )
                 return fallback
             try:
                 async with asyncio.timeout(remaining):
@@ -605,7 +659,9 @@ class AskUseCase:
 
             spent.input_tokens += narration.input_tokens
             spent.output_tokens += narration.output_tokens
-            rejection = self._rejection(narration.text, visible, period, validated, allowed)
+            rejection = self._rejection(
+                narration.text, question.text, visible, period, validated, allowed
+            )
             if rejection is None:
                 self._log(
                     question.request_id,
@@ -629,6 +685,7 @@ class AskUseCase:
     def _rejection(
         self,
         narrative: str,
+        question_text: str,
         visible: QueryResult,
         period: tuple[str, str] | None,
         validated: ValidatedQuery,
@@ -648,17 +705,44 @@ class AskUseCase:
         values = [
             visible.row_count,
             *validated.periods,
+            *_months_between(validated.periods),
             *validated.years,
+            *(pt_br_numbers(question_text) & _sql_numbers(validated.sql)),
             *(value for row in visible.rows for value in row.values()),
         ]
         unsupported = unsupported_numbers(narrative, values, allowed)
         if unsupported:
+            feedback = NUMBERS_FEEDBACK.format(numbers=", ".join(unsupported))
+            from_question = [token for token in unsupported if _in_text(token, question_text)]
+            if from_question:
+                feedback += " " + QUESTION_NUMBERS_FEEDBACK.format(numbers=", ".join(from_question))
             return (
                 "verificacao_numerica_falhou",
-                NUMBERS_FEEDBACK.format(numbers=", ".join(unsupported)),
+                feedback,
                 {"unsupported": list(unsupported)},
             )
+        for token, unit in written_units(narrative):
+            if self._wrong_unit(token, unit, visible):
+                return (
+                    "unidade_errada_na_resposta",
+                    UNIT_FEEDBACK.format(number=token, unit=unit),
+                    {"unit": unit},
+                )
         return None
+
+    def _wrong_unit(self, token: str, unit: str, visible: QueryResult) -> bool:
+        matches = [
+            (column, value)
+            for row in visible.rows
+            for column, value in row.items()
+            if supports(token, value)
+        ]
+        if not matches:
+            return False
+        return all(
+            _conflicts(unit_of(column, self._layer.column_units), unit, value)
+            for column, value in matches
+        )
 
     def _deterministic_text(
         self,
@@ -670,7 +754,8 @@ class AskUseCase:
         if result.row_count == 0:
             text = EMPTY_RESULT
         else:
-            text = f"A consulta devolveu {result.row_count} linha(s)."
+            noun = "linha" if result.row_count == 1 else "linhas"
+            text = f"{FALLBACK_PREFIX} {result.row_count} {noun}."
             if period is not None:
                 text += _period_sentence(period)
             if (
@@ -690,7 +775,7 @@ class AskUseCase:
                 f" O resultado foi limitado a {validated.applied_limit} linhas, "
                 "então o total pode ser maior."
             )
-        assumptions = [item for item in draft.assumptions if not TECHNICAL_NAME.search(item)]
+        assumptions = [plain_words(item).rstrip(" .") for item in draft.assumptions]
         if assumptions:
             text += " Suposições: " + "; ".join(assumptions) + "."
         return text
@@ -785,7 +870,7 @@ def _stage_event(stage: Stage, attempt: int, spent: _Spent) -> StageEvent:
 
 def _row_text(columns: tuple[str, ...], row: dict[str, object], units: Mapping[str, str]) -> str:
     return ", ".join(
-        f"{column.replace('_', ' ')} = {_with_unit(row.get(column), unit_of(column, units))}"
+        f"{label(column)} = {_with_unit(row.get(column), unit_of(column, units))}"
         for column in columns
     )
 
@@ -795,7 +880,7 @@ def _with_unit(value: object, unit: str | None) -> str:
     if value is None or unit is None or unit in UNITS_WITHOUT_SUFFIX:
         return text
     if unit == "R$":
-        return f"R$ {text}"
+        return f"-R$ {text[1:]}" if text.startswith("-") else f"R$ {text}"
     return f"{text}%" if unit == "%" else f"{text} {unit}"
 
 
@@ -874,3 +959,43 @@ def _period_in_words(period: tuple[str, str]) -> str:
 def _month_in_words(competencia: str) -> str:
     year, month = competencia.split("-")
     return f"{MONTH_NAMES[int(month) - 1]} de {year}"
+
+
+def _in_text(token: str, text: str) -> bool:
+    return re.search(rf"(?<![\d.,]){re.escape(token)}(?![\d]|,\d)", text) is not None
+
+
+def _sql_numbers(sql: str) -> set[Decimal]:
+    return {Decimal(token) for token in SQL_NUMBER.findall(SQL_STRING.sub(" ", sql))}
+
+
+def _months_between(periods: tuple[str, ...]) -> tuple[str, ...]:
+    if not periods:
+        return ()
+    first, last = min(periods), max(periods)
+    year, month = (int(part) for part in first.split("-"))
+    months: list[str] = []
+    while f"{year:04d}-{month:02d}" <= last and len(months) < MAX_RANGE_MONTHS:
+        months.append(f"{year:04d}-{month:02d}")
+        year, month = (year + 1, 1) if month == 12 else (year, month + 1)
+    return tuple(months)
+
+
+def _invented_years(
+    question: str, history: tuple[ConversationTurn, ...], validated: ValidatedQuery
+) -> tuple[str, ...]:
+    used = {period[:4] for period in validated.periods} | set(validated.years)
+    if not used or durations(question) or BASE_RELATIVE.search(question):
+        return ()
+    context = " ".join([question, *(f"{turn.question} {turn.sql or ''}" for turn in history)])
+    named = {int(year) for year in YEAR.findall(context)}
+    allowed = {str(year + delta) for year in named for delta in (-1, 0, 1)}
+    return tuple(sorted(used - allowed))
+
+
+def _conflicts(column_unit: str | None, written: str, value: object) -> bool:
+    if column_unit is None:
+        return written in COUNT_UNITS and isinstance(value, int) and not isinstance(value, bool)
+    if written == "h":
+        return "h" not in column_unit or column_unit.startswith("kWh")
+    return not column_unit.startswith(written)

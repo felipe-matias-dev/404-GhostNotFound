@@ -117,8 +117,8 @@ def test_a_duration_given_elsewhere_is_not_a_source_for_a_count():
     assert unsupported_numbers("Foram 12 UCs", [3], {Decimal(12)}) == ("12",)
 
 
-def test_a_duration_given_elsewhere_is_not_a_source_for_a_measure_in_years():
-    assert unsupported_numbers("A idade média é de 10 anos", [3], {Decimal(10)}) == ("10",)
+def test_a_duration_given_elsewhere_does_not_support_another_number_of_years():
+    assert unsupported_numbers("A idade média é de 10 anos", [3], {Decimal(12)}) == ("10",)
 
 
 @pytest.mark.parametrize(
@@ -137,3 +137,31 @@ def test_a_duration_given_elsewhere_is_not_a_source_for_a_measure_in_years():
 def test_long_decimals_are_rounded_for_display(value, expected):
     assert rounded_for_display(value) == expected
     assert str(rounded_for_display(value)) == str(expected)
+
+
+@pytest.mark.parametrize(
+    ("text", "value"),
+    [
+        ("O percentual foi de 25%", Decimal("24.99999999")),
+        ("Foram 100 kWh", Decimal("100.0000001")),
+    ],
+)
+def test_an_integer_is_supported_when_it_is_the_value_rounded_for_display(text, value):
+    assert unsupported_numbers(text, [value]) == ()
+
+
+def test_an_integer_is_still_not_a_rounded_short_decimal():
+    assert unsupported_numbers("Foram 3 UCs", [Decimal("2.6")]) == ("3",)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Comparando períodos de 12 meses, há 3 UCs.",
+        "Nos 12 meses mais recentes, há 3 UCs.",
+        "Nas 12 competências da base, há 3 UCs.",
+        "Entre as 12 primeiras e as 12 últimas competências, há 3 UCs.",
+    ],
+)
+def test_a_duration_from_the_question_is_supported_with_its_period_unit(text):
+    assert unsupported_numbers(text, [3], {Decimal(12)}) == ()

@@ -55,6 +55,7 @@ async def build_agent(
         usage=usage,
         session_token_budget=settings.session_token_budget,
         answer_deadline_seconds=settings.answer_deadline_seconds,
+        narration_min_seconds=settings.narration_min_seconds,
     )
 
 

@@ -13,7 +13,7 @@
 # As linhas de exemplo são sintéticas, escritas à mão. Nenhum valor real da Gold entra aqui.
 # Depois de cada mudança, gere o views.sql (ver a seção Camada semântica em ai-agent/README.md).
 
-version: "0.4.1"
+version: "0.4.2"
 
 views:
   - name: sem_uc
@@ -369,6 +369,9 @@ views:
       - {cod_uc: "0002", cod_medidor: "MD-0002", tipo_medidor: "smart", modelo: "Modelo exemplo Y", data_instalacao: "2024-02-01", idade_anos: 1.9, n_trocas: 0, data_ultima_troca: null}
 
 glossary:
+  - term: "tributos"
+    synonyms: ["impostos", "percentual de tributos", "carga tributária", "receita sem tributos"]
+    maps_to: "tributos em sem_faturamento_mensal e sem_kpis_segmento_mensal; em sem_kpis_mensais não há coluna tributos: use receita_faturada - receita_energia. Receita sem tributos é receita_energia"
   - term: "conta de luz"
     synonyms: ["conta", "fatura", "cobrança"]
     maps_to: "receita_faturada em sem_faturamento_mensal"
@@ -442,6 +445,8 @@ rules:
   - text: "Por UC: interrupções em sem_interrupcoes_uc, chamados em sem_atendimentos_uc e medidor em sem_medidor_uc, todas ligadas a sem_uc por cod_uc. sem_faturamento_mensal, sem_interrupcoes_uc e sem_atendimentos_uc têm várias linhas por UC: nunca junte duas delas direto, porque a junção multiplica as somas. Agregue cada uma por cod_uc numa CTE antes de juntar."
   - text: "Falta de luz na rua ou na região de uma UC: responda com as interrupções da própria UC em sem_interrupcoes_uc. O DEC e o FEC do alimentador dela, em sem_continuidade_alimentador_mensal, complementam, mas não dizem se a UC foi afetada."
   - text: "Percentual de faturas não pagas de um recorte = 100.0 * sum(n_faturas_nao_pagas) / NULLIF(sum(n_faturas), 0); percentual do valor faturado sem pagamento = 100.0 * sum(valor_nao_pago) / NULLIF(sum(receita_faturada), 0); percentual de leituras estimadas = 100.0 * sum(n_leituras_estimadas) / NULLIF(sum(n_leituras), 0). Some os componentes antes de dividir."
+  - text: "Percentual de tributos na receita, da empresa num mês ou período: em sem_kpis_mensais, 100.0 * sum(receita_faturada - receita_energia) / NULLIF(sum(receita_faturada), 0). sem_kpis_mensais não tem a coluna tributos; por recorte, use tributos de sem_kpis_segmento_mensal."
+  - text: "Pergunta que pede o porquê da receita (por que subiu menos que a tarifa, o que explica a variação, se a energia caiu e a receita subiu): responda com a decomposição de sem_receita_decomposicao, devolvendo efeito_tarifa, efeito_bandeira, efeito_volume e efeito_mix separados, além de receita_base e receita_atual. Não devolva só efeito_preco: ele junta tarifa e bandeira. Porcentagens e premissas escritas na pergunta são do usuário: não as use como filtro nem como resposta."
   - text: "Quando a pergunta pede percentual, devolva o valor em pontos percentuais: multiplique por 100.0 no SQL (5,6 e não 0,056)."
   - text: "Divisão entre contagens inteiras (n_interrupcoes, n_uc, n_faturas, n_leituras, count(*)) é divisão inteira no Postgres e devolve 0: multiplique o numerador por 1.0 ou 100.0 antes de dividir, e escreva o número de meses do denominador como decimal (sum(n_uc) / 3.0, nunca / 3)."
   - text: "Para ligar uma UC ao alimentador use sem_uc.cod_alimentador = sem_continuidade_alimentador_mensal.cod_alimentador."
@@ -490,6 +495,12 @@ examples:
     expected_status: ok
   - question: "Qual foi o efeito volume da classe B1 entre o primeiro ano da base e os últimos 12 meses?"
     sql: "WITH meses AS (SELECT competencia, row_number() OVER (ORDER BY competencia) AS ordem_inicio, row_number() OVER (ORDER BY competencia DESC) AS ordem_fim FROM sem_kpis_mensais), faixas AS (SELECT (SELECT min(competencia) || '/' || max(competencia) FROM meses WHERE ordem_inicio <= 12) AS base, (SELECT min(competencia) || '/' || max(competencia) FROM meses WHERE ordem_fim <= 12) AS atual) SELECT sum(d.efeito_volume) AS efeito_volume FROM sem_receita_decomposicao d, faixas f WHERE d.classe = 'B1' AND d.periodo_base = f.base AND d.periodo_atual = f.atual"
+    expected_status: ok
+  - question: "A energia caiu e a tarifa subiu entre o primeiro ano da base e os últimos 12 meses. O que explica a receita ter subido menos que a tarifa?"
+    sql: "WITH meses AS (SELECT competencia, row_number() OVER (ORDER BY competencia) AS ordem_inicio, row_number() OVER (ORDER BY competencia DESC) AS ordem_fim FROM sem_kpis_mensais), faixas AS (SELECT (SELECT min(competencia) || '/' || max(competencia) FROM meses WHERE ordem_inicio <= 12) AS base, (SELECT min(competencia) || '/' || max(competencia) FROM meses WHERE ordem_fim <= 12) AS atual) SELECT sum(d.receita_base) AS receita_base, sum(d.receita_atual) AS receita_atual, sum(d.efeito_tarifa) AS efeito_tarifa, sum(d.efeito_bandeira) AS efeito_bandeira, sum(d.efeito_volume) AS efeito_volume, sum(d.efeito_mix) AS efeito_mix FROM sem_receita_decomposicao d, faixas f WHERE d.periodo_base = f.base AND d.periodo_atual = f.atual"
+    expected_status: ok
+  - question: "Quanto os tributos representaram da receita faturada em março de 2025, em percentual?"
+    sql: "SELECT 100.0 * sum(receita_faturada - receita_energia) / NULLIF(sum(receita_faturada), 0) AS percentual_tributos FROM sem_kpis_mensais WHERE competencia = '2025-03'"
     expected_status: ok
   - question: "Por que a receita caiu?"
     sql: null
