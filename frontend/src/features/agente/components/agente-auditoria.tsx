@@ -11,6 +11,7 @@ export function AgenteAuditoria({ auditId }: { auditId: number }) {
 
 	useEffect(() => {
 		if (!aberta || registro) return;
+		setErro(false);
 		const controller = new AbortController();
 		buscarAuditoriaIa(auditId, controller.signal)
 			.then(setRegistro)
