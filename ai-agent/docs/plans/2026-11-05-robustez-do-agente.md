@@ -368,6 +368,85 @@ Quatro camadas, da mais barata para a mais cara:
   - a ordem dos turnos de uma cadeia se mantém com concorrência;
   - o `--smoke` inclui os turnos anteriores.
 
+### T12. Vocabulário e robustez a variações (Luis Felipe; Lucas no frontend)
+
+Complementa a T10. Prioridade alta para 12.1, 12.4 e 12.5; os outros são refinamentos.
+
+- **12.1 Valores escritos de outro jeito:**
+  - **Problema:** "jaboatao", "casa caiada", "residencial" no lugar de B1, "poder publico" sem acento; hoje o modelo precisa acertar o valor exato.
+  - **Solução:** no código, comparar as palavras da pergunta, sem acento e por distância de edição, com os valores que existem nas colunas de texto: município, bairro, classe, `classe_cadastro`, canal, assunto, tipo de medidor, status de pagamento.
+  - **Fonte dos valores:**
+    - os `allowed` do contrato (`contracts/gold_schema.yaml`), quando houver;
+    - senão, uma leitura única do banco pelo usuário do agente, guardada em memória no processo. Município, bairro e canal não são dado sensível.
+  - **No prompt:** o valor encontrado entra como dica delimitada ("valores da base parecidos: Jaboatão dos Guararapes"). O modelo usa a igualdade com o valor certo.
+  - **Onde:** `domain/vocabulary.py` (o mesmo da T10) e uma porta nova `CategoricalValues` em `application/ports.py`, com adapter em `infrastructure/`.
+  - **Testes:** os pares acima; e um bairro inexistente não casa com nada.
+- **12.2 Siglas e abreviações** no glossário da camada: DEC, FEC, GD, UC, AT/BT, "kwh", "mês ref", "fat.", "conta". Cada sigla ganha um item no golden.
+- **12.3 Cobertura do vocabulário testada:**
+  - **Regra:** toda coluna das views precisa ter rótulo em português (`COLUMN_LABELS` ou `ACCENTED` em `domain/wording.py`) e pelo menos um sinônimo no glossário, ou uma justificativa de por que não tem.
+  - **Teste:** `tests/unit/test_semantic_vocabulary.py` falha quando uma coluna nova entra sem isso.
+- **12.4 Variações automáticas:**
+  - **Script:** `evaluation/variants.py` gera, para cada pergunta `answered` do golden, 4 variações:
+    - sem acento;
+    - com um erro de digitação;
+    - com sinônimo do glossário;
+    - coloquial, com uma lista fixa de trocas como "quanto deu", "me diz" e "tá".
+  - **Execução:** as variações rodam pelo mesmo runner, sem juiz.
+  - **Métrica nova:** `variant_consistency`, a parte das variações que dá o mesmo resultado que a pergunta original.
+  - **Onde:** `make eval-variants` e o relatório em `eval/runs_gold/`.
+  - **Teste:** as variações são determinísticas (semente fixa) e nunca mudam número nem período da pergunta.
+- **12.5 "Entendi X como Y" visível e corrigível:**
+  - **Contrato:** o `AgentAnswer` passa a separar as interpretações de termo das outras suposições, num campo `interpretations` (termo, como foi lido, alternativas). É mudança de contrato e precisa de DEC.
+  - **Portal:** mostra "Entendi 'percentil' como percentual" com o botão "não era isso". O botão reabre a pergunta com as alternativas como opções (as mesmas de `clarification_options`, T5).
+  - **Ciclo de aprendizado:** cada "não era isso" fica registrado na auditoria e alimenta o script da T10.
+
+### T13. Perguntas complexas (Luis Felipe; Lucas no frontend e na avaliação)
+
+Prioridade alta para 13.2, 13.5 e 13.6. A 13.1 e a 13.3 mudam o fluxo e o contrato, e entram depois das medições da 13.6.
+
+- **13.1 Várias consultas por pergunta:**
+  - **Problema:** hoje o agente faz um único `SELECT`. A pergunta da diretora pede quatro fatos: a base cresceu, a tarifa subiu, a energia caiu e o porquê da receita.
+  - **Fluxo novo:**
+    - o gerador devolve um plano curto (`QueryPlan`, de 1 a 4 sub-perguntas, cada uma com o seu SQL);
+    - cada SQL passa pelo `SqlglotValidator` e pelo `PostgresQueryExecutor`, com o mesmo usuário somente leitura e o mesmo prazo total;
+    - a narração recebe os resultados separados, e a checagem de números vale sobre a união das linhas.
+  - **Contrato:** o `AgentAnswer` passa a ter `steps` (pergunta, SQL, linhas, total de linhas) e mantém `sql`, `rows` e `row_count` do passo principal. Fica compatível com o portal atual e precisa de DEC.
+  - **Portal:** mostra os passos, recolhidos, com o SQL de cada um.
+  - **Limite:** pergunta simples continua com um passo só. O plano com mais de um passo só vale quando a pergunta pede mais de um fato.
+  - **Testes:**
+    - um passo inválido derruba só ele e a resposta diz o que faltou;
+    - o prazo total vale para a soma dos passos.
+- **13.2 Conferir as premissas do usuário:**
+  - **Problema:** a pergunta pode trazer números ("tarifa +10,5%, energia −4%, receita +8%"), e o agente não pode repeti-los como fato.
+  - **Regra:**
+    - quando a pergunta traz números sobre métricas que existem nas views, o agente confere cada um nos dados (um passo da 13.1 ou, antes dela, colunas a mais no mesmo SQL);
+    - a resposta diz se os dados confirmam ou divergem: "os dados confirmam a queda de 4,0% da energia; a tarifa média residencial subiu 13,0%, e não 10,5%";
+    - premissa sem métrica correspondente vira suposição declarada ("não tenho o dado de reajuste homologado; usei a tarifa média faturada").
+  - **Prompts:** versão nova do de SQL e do de narração.
+  - **Golden:** G109 e itens novos com premissas certas e erradas.
+- **13.3 Análises prontas:**
+  - **Análises:** "por que a receita mudou", "comparar dois períodos", "pior alimentador ou bairro" e "evolução mês a mês".
+  - **Formato:** cada uma vira um modelo de SQL com parâmetros (período e recorte), na camada semântica (`analyses:` no `semantic_layer.yaml`) e validado contra as views como os exemplos.
+  - **Uso:** o gerador pode devolver `analysis: <nome>` com os parâmetros, em vez de escrever o SQL; o agente monta o SQL pelo modelo e o valida normalmente.
+  - **Efeito:** o resultado das perguntas recorrentes fica determinístico.
+  - **Testes:**
+    - cada modelo com os parâmetros de exemplo passa no validador e executa no banco de teste;
+    - parâmetro fora dos valores permitidos é recusado.
+- **13.4 Resposta estruturada e pergunta longa:**
+  - **Narração:** para pergunta com várias partes, um parágrafo de conclusão mais uma lista curta de fatos, cada um com o número do banco (prompt de narração novo). A checagem de números e de unidade vale do mesmo jeito.
+  - **Limite da pergunta:** sobe de 500 para 1.000 caracteres (`max_question_chars` em `ai-agent/src/venergy_agent/config.py`; o backend já aceita 2.000), com teste do limite.
+- **13.5 Completude no juiz:**
+  - **Rubrica:** `prompts/judge/v2/` acrescenta o critério "respondeu todas as partes da pergunta, inclusive filtros e premissas?".
+  - **Calibração:** nova contra notas humanas, como na DEC-047, antes de valer como meta.
+  - **Por quê:** hoje o juiz aprova uma resposta fiel que ignora parte do pedido; o G057, por exemplo, omitiu o "acima de 30%".
+- **13.6 Categoria "complexas" no golden:**
+  - **Itens:** cerca de 20, tirados das falas das lideranças no material do case, por exemplo diretoria, operação e atendimento.
+  - **Formato:** cada item com várias referências (`reference_sql` vira lista, uma por parte da pergunta).
+  - **Avaliação:**
+    - aceita várias referências por item e mede `parts_matched` (partes respondidas ÷ partes do item);
+    - `execution_accuracy` continua contando o item como certo só com todas as partes.
+  - **Testes:** o runner com várias referências e as métricas novas.
+
 ## Critério de aceite
 
 | Métrica | Meta |
@@ -382,6 +461,10 @@ Quatro camadas, da mais barata para a mais cara:
 | conjunto da apresentação | 3 execuções seguidas sem falha |
 | cadeias esclarecimento → resposta (T9) | 100% respondem a pergunta original, pela tela |
 | termos trocados ou com erro (T10) | 100% entendidos ou com esclarecimento que cita o candidato |
+| valores escritos de outro jeito (T12.1) | 100% dos casos do golden com o valor certo no SQL |
+| `variant_consistency` (T12.4) | ≥ 95% |
+| perguntas complexas (T13.6) | `parts_matched` ≥ 95% e juiz v2 com completude ≥ 90% |
+| premissas da pergunta (T13.2) | 100% conferidas ou declaradas como suposição; nenhuma repetida como fato |
 
 ## Ordem
 
@@ -397,6 +480,10 @@ Quatro camadas, da mais barata para a mais cara:
 | 6b | T9 (resposta a esclarecimento) | Luis Felipe | — |
 | 6c | T10 (termos fora do vocabulário) | Luis Felipe e Lucas | T5 para as opções |
 | 2b | T11 (avaliação mais rápida) | Lucas | — |
+| 7b | T12.1, T12.4 e T12.5 (vocabulário e variações) | Luis Felipe; Lucas no 12.5 | T10 |
+| 7c | T13.2, T13.5 e T13.6 (premissas, completude, golden complexas) | Luis Felipe; Lucas na avaliação | T2 |
+| 7d | T13.1 e T13.3 (várias consultas, análises prontas), depois das medições da 7c | Luis Felipe; Lucas no portal | 7c |
+| 7e | T12.2, T12.3 e T13.4 (refinamentos) | os dois | — |
 | 8 | T8 | os dois | todas |
 
 ## Regras para quem implementar
