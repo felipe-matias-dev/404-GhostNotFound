@@ -89,7 +89,7 @@
 #          Só a assinatura e a nota mudam; a referência é a da 0.17.0.
 #   0.19.0 GenAI (04/11/2026, DEC-080): G106 a G110, da conversa da apresentação e da pergunta da diretora,
 #          só na Gold real. revisado_por fica null até Dados conferir.
-versao: 0.20.0
+versao: 0.21.0
 status: rascunho
 
 itens:
@@ -1451,4 +1451,61 @@ itens:
     datasets: [gold_real]
     follow_up_of: null
     notes: "Pergunta sem recorte, sem período e sem dizer se é consumo faturado, médio ou por UC. Pede esclarecimento."
+    revisado_por: null
+
+  # 0.21.0 (T2, T9 e T10): itens de sinônimos do glossário 0.4.3, de esclarecimento seguido de
+  # resposta (T9) e de pergunta nova depois de esclarecimento. revisado_por fica null.
+  - id: G132
+    question: "Qual foi a receita?"
+    category: ambigua
+    reference_sql: null
+    expected_status: clarify
+    datasets: [gold_real]
+    follow_up_of: null
+    notes: "Receita sem recorte nem período. Pede o período, e a resposta de esclarecimento traz opções (T5, DEC-082). Início da cadeia G132 -> G133 e G132 -> G134."
+    revisado_por: null
+  - id: G133
+    question: "em junho de 2026"
+    category: followup
+    reference_sql: "SELECT receita_faturada FROM sem_kpis_mensais WHERE competencia = '2026-06'"
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: G132
+    notes: "Resposta ao esclarecimento de G132: completa a pergunta original (T9). Receita sem qualificador é a receita faturada (DEC-022)."
+    revisado_por: null
+  - id: G134
+    question: "Mostre a receita de junho de 2026"
+    category: followup
+    reference_sql: "SELECT receita_faturada FROM sem_kpis_mensais WHERE competencia = '2026-06'"
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: G132
+    notes: "Pergunta nova depois de esclarecimento: não deve ser fundida com a pergunta de G132 (correção do item 1 da revisão do PR 145)."
+    revisado_por: null
+  - id: G135
+    question: "qual a conta de luz de março de 2025?"
+    category: sinonimo
+    reference_sql: "SELECT receita_faturada FROM sem_kpis_mensais WHERE competencia = '2025-03'"
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: null
+    notes: "Sinônimo 'conta de luz' (glossário 0.4.3) = receita faturada. Mesma intenção de G111."
+    revisado_por: null
+  - id: G136
+    question: "quanto de consumo faturado teve março de 2025?"
+    category: sinonimo
+    reference_sql: "SELECT kwh_faturado FROM sem_kpis_mensais WHERE competencia = '2025-03'"
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: null
+    notes: "Sinônimo 'consumo faturado' (glossário 0.4.3) = energia faturada, em kWh, inteira."
+    revisado_por: null
+  - id: G137
+    question: "quanto foi o imposto de junho de 2026?"
+    category: sinonimo
+    reference_sql: "SELECT receita_faturada - receita_energia AS tributos FROM sem_kpis_mensais WHERE competencia = '2026-06'"
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: null
+    notes: "Sinônimo 'imposto' (glossário 0.4.3) de tributos. Em sem_kpis_mensais não há coluna tributos: a referência usa receita_faturada - receita_energia, como manda o glossário."
     revisado_por: null
