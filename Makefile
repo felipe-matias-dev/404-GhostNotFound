@@ -56,7 +56,7 @@ test-agent: db
 	uv --directory ai-agent run --frozen pytest
 
 eval: db
-	uv --directory ai-agent run --frozen python -m venergy_agent.evaluation --dataset $(or $(DATASET),amostra) $(if $(ONLY),--only $(ONLY)) $(if $(IDS),--ids $(IDS)) $(if $(JUDGE),--judge) $(if $(SQL_ONLY),--sql-only)
+	uv --directory ai-agent run --frozen python -m venergy_agent.evaluation --dataset $(or $(DATASET),amostra) $(if $(ONLY),--only $(ONLY)) $(if $(IDS),--ids $(IDS)) $(if $(JUDGE),--judge) $(if $(SQL_ONLY),--sql-only) $(if $(SMOKE),--smoke) $(if $(CONCURRENCY),--concurrency $(CONCURRENCY))
 
 eval-compare:
 	uv --directory ai-agent run --frozen python -m venergy_agent.evaluation.compare $(A) $(B) $(if $(SKIP),--skip $(SKIP))

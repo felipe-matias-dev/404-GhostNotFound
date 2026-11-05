@@ -75,6 +75,20 @@ def select_items(items: list[dict[str, Any]], ids: set[str]) -> list[dict[str, A
     return [item for item in items if item["id"] in selected]
 
 
+def smoke_ids(items: list[dict[str, Any]]) -> set[str]:
+    marked = {item["id"] for item in items if item.get("smoke")}
+    if not marked:
+        raise UnknownItems("nenhum item do golden está marcado com smoke: true")
+    return marked
+
+
+def positive_int(text: str) -> int:
+    value = int(text)
+    if value < 1:
+        raise argparse.ArgumentTypeError("precisa ser 1 ou mais")
+    return value
+
+
 def check_dataset(dataset: str, uc_count: int) -> None:
     looks_like_sample = uc_count <= SAMPLE_MAX_UCS
     if looks_like_sample != (dataset == "amostra"):
@@ -119,11 +133,25 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--sql-only", action="store_true")
     parser.add_argument("--judge", action="store_true")
     parser.add_argument("--ids", default=None, metavar="G001,G002")
+    parser.add_argument(
+        "--smoke",
+        action="store_true",
+        help="só os itens marcados com smoke: true no golden, com as cadeias de follow-up",
+    )
+    parser.add_argument(
+        "--concurrency",
+        type=positive_int,
+        default=1,
+        metavar="N",
+        help="cadeias rodando ao mesmo tempo; a pausa entre chamadas continua valendo",
+    )
     args = parser.parse_args(argv)
     if args.only == "references" and (args.sql_only or args.judge):
         parser.error("--only references não chama o modelo: não use com --sql-only nem --judge")
     if args.ids and args.only in ("red_team", "references"):
         parser.error("--ids escolhe itens do golden: não use com --only red_team nem references")
+    if args.smoke and (args.ids or args.only in ("red_team", "references")):
+        parser.error("--smoke escolhe itens do golden: não use com --ids, red_team nem references")
     return args
 
 
@@ -149,9 +177,13 @@ async def _evaluate(
     sql_only: bool,
     judge: bool,
     ids: set[str] | None = None,
+    smoke: bool = False,
+    concurrency: int = 1,
 ) -> tuple[Path, list[str]]:
     with_judge = judges(judge, sql_only)
     golden_version, golden = load_set(EVAL_DIR / "golden_set.yaml")
+    if smoke:
+        ids = smoke_ids(golden)
     if ids:
         golden = select_items(golden, ids)
         only = "golden"
@@ -182,6 +214,7 @@ async def _evaluate(
         pause_seconds=pause_seconds,
         judge=answer_judge,
         recorder=memory,
+        concurrency=concurrency,
     )
     red_team_version, red_team = load_set(EVAL_DIR / "red_team.yaml")
     report = await runner.run(
@@ -236,6 +269,8 @@ def main(argv: list[str]) -> int:
                 args.sql_only,
                 args.judge,
                 set(args.ids.split(",")) if args.ids else None,
+                smoke=args.smoke,
+                concurrency=args.concurrency,
             )
         )
     except ValidationError as error:

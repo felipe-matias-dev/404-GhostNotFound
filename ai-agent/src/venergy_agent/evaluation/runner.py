@@ -35,6 +35,25 @@ class TurnRecorder(Protocol):
     async def record(self, session_id: str, question: str, answer: AgentAnswer) -> None: ...
 
 
+class _Pacer:
+    """Espaça o início das chamadas ao modelo, de todos os workers, pelo mesmo intervalo."""
+
+    def __init__(self, pause_seconds: float) -> None:
+        self._pause = pause_seconds
+        self._next_start = 0.0
+        self._lock = asyncio.Lock()
+
+    async def wait(self) -> None:
+        if not self._pause:
+            return
+        async with self._lock:
+            now = asyncio.get_running_loop().time()
+            start = max(now, self._next_start)
+            self._next_start = start + self._pause
+        if start > now:
+            await asyncio.sleep(start - now)
+
+
 class EvaluationRunner:
     def __init__(
         self,
@@ -46,6 +65,7 @@ class EvaluationRunner:
         pause_seconds: float = 0.0,
         recorder: TurnRecorder | None = None,
         judge: AnswerJudge | None = None,
+        concurrency: int = 1,
     ) -> None:
         self._agent = agent
         self._validator = validator
@@ -56,6 +76,7 @@ class EvaluationRunner:
         self._recorder = recorder
         self._judge = judge
         self._narrated = True
+        self._concurrency = concurrency
 
     async def run(
         self,
@@ -87,11 +108,7 @@ class EvaluationRunner:
             *(("red_team", item, f"eval-{run_id}-{item['id']}") for item in red_team),
         ]
         before = await self._guard.snapshot()
-        items: list[ItemResult] = []
-        for index, (kind, item, session_id) in enumerate(plan):
-            if index and self._pause_seconds:
-                await asyncio.sleep(self._pause_seconds)
-            items.append(await self._evaluate(kind, item, session_id))
+        items = await self._run_plan(plan)
         writes_accepted = await self._guard.accepted_writes()
         after = await self._guard.snapshot()
         views_changed = sum(after.get(view) != fingerprint for view, fingerprint in before.items())
@@ -116,6 +133,29 @@ class EvaluationRunner:
                 "other_dataset_skipped": len(golden) - len(in_dataset),
             },
         )
+
+    async def _run_plan(
+        self, plan: Sequence[tuple[Kind, Mapping[str, Any], str]]
+    ) -> list[ItemResult]:
+        """Uma cadeia de follow-up roda em sequência, numa sessão; cadeias diferentes rodam
+        em paralelo, até o limite de `concurrency`. O relatório volta na ordem do plano."""
+        pacer = _Pacer(self._pause_seconds)
+        slots = asyncio.Semaphore(self._concurrency)
+        units: dict[str, list[int]] = {}
+        for index, (_, _, session_id) in enumerate(plan):
+            units.setdefault(session_id, []).append(index)
+
+        async def unit(indexes: list[int]) -> list[tuple[int, ItemResult]]:
+            done = []
+            async with slots:
+                for index in indexes:
+                    kind, item, session_id = plan[index]
+                    await pacer.wait()
+                    done.append((index, await self._evaluate(kind, item, session_id)))
+            return done
+
+        results = await asyncio.gather(*(unit(indexes) for indexes in units.values()))
+        return [item for _, item in sorted(pair for group in results for pair in group)]
 
     async def _evaluate(self, kind: Kind, item: Mapping[str, Any], session_id: str) -> ItemResult:
         golden = kind == "golden"

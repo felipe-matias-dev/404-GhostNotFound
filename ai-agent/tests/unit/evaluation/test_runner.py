@@ -1,3 +1,4 @@
+import asyncio
 import json
 
 from venergy_agent.domain.answer import AgentAnswer, AnswerStatus, Confidence
@@ -779,3 +780,91 @@ async def test_pause_also_follows_each_judge_call(monkeypatch):
     await run(evaluation, [golden("G001", "Q1", COUNT_SQL)])
 
     assert sleeps == [2.0]
+
+
+class SlowAgent(ScriptedAgent):
+    def __init__(self, script, delay=0.05):
+        super().__init__(script)
+        self.delay = delay
+        self.in_flight = 0
+        self.peak = 0
+        self.starts = []
+
+    async def ask(self, question, session_id):
+        self.in_flight += 1
+        self.peak = max(self.peak, self.in_flight)
+        self.starts.append(asyncio.get_running_loop().time())
+        try:
+            await asyncio.sleep(self.delay)
+            return await super().ask(question, session_id)
+        finally:
+            self.in_flight -= 1
+
+
+def concurrent(script, concurrency, pause=0.0, delay=0.05):
+    agent = SlowAgent(script, delay)
+    evaluation = EvaluationRunner(
+        agent,
+        FakeValidator(),
+        FakeExecutor(RESULTS),
+        VIEWS,
+        FakeGuard(),
+        pause_seconds=pause,
+        concurrency=concurrency,
+    )
+    return agent, evaluation
+
+
+async def test_independent_items_run_side_by_side_up_to_the_concurrency_limit():
+    script = {f"Q{n}": make_answer() for n in range(1, 6)}
+    agent, evaluation = concurrent(script, concurrency=3)
+
+    await run(evaluation, [golden(f"G00{n}", f"Q{n}", COUNT_SQL) for n in range(1, 6)])
+
+    assert agent.peak == 3
+
+
+async def test_a_chain_never_overlaps_itself_and_follow_ups_run_after_their_root():
+    script = {"Q1": make_answer(), "Q2": make_answer(), "Q3": make_answer()}
+    agent, evaluation = concurrent(script, concurrency=3)
+
+    report = await run(
+        evaluation,
+        [
+            chained("G003", "Q3", "G002"),
+            chained("G002", "Q2", "G001"),
+            golden("G001", "Q1", COUNT_SQL),
+        ],
+    )
+
+    assert [question for question, _ in agent.calls] == ["Q1", "Q2", "Q3"]
+    assert len({session for _, session in agent.calls}) == 1
+    assert agent.peak == 1
+    assert [item.id for item in report.items] == ["G001", "G002", "G003"]
+
+
+async def test_report_keeps_plan_order_when_items_finish_out_of_order():
+    script = {"Q1": make_answer(), "Q2": make_answer(), "Q3": make_answer()}
+    agent, evaluation = concurrent(script, concurrency=3)
+
+    report = await run(
+        evaluation,
+        [
+            golden("G001", "Q1", COUNT_SQL),
+            golden("G002", "Q2", COUNT_SQL),
+            golden("G003", "Q3", COUNT_SQL),
+        ],
+    )
+
+    assert [item.id for item in report.items] == ["G001", "G002", "G003"]
+
+
+async def test_pause_is_shared_across_workers_not_per_worker():
+    script = {f"Q{n}": make_answer() for n in range(1, 4)}
+    agent, evaluation = concurrent(script, concurrency=3, pause=0.1, delay=0.0)
+
+    await run(evaluation, [golden(f"G00{n}", f"Q{n}", COUNT_SQL) for n in range(1, 4)])
+
+    starts = sorted(agent.starts)
+    gaps = [later - earlier for earlier, later in zip(starts, starts[1:], strict=False)]
+    assert all(gap >= 0.09 for gap in gaps), gaps
