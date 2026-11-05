@@ -20,6 +20,8 @@ import { cn } from "#/lib/utils";
 import {
 	formatarCelulaResultado,
 	nomeAmigavelView,
+	PASSO_TABELA,
+	proximoLimiteTabela,
 	rotuloConfianca,
 	rotuloStatusResposta,
 } from "../conversions";
@@ -53,6 +55,7 @@ export function AgenteTurnoItem({
 	mostrarHorario?: boolean;
 }) {
 	const [detalhesAbertos, setDetalhesAbertos] = useState(false);
+	const [linhasMostradas, setLinhasMostradas] = useState(PASSO_TABELA);
 	const { data: usuario } = useSession();
 	const [tabelaAberta, setTabelaAberta] = useState<boolean | null>(null);
 	const [sqlAberto, setSqlAberto] = useState(false);
@@ -260,29 +263,48 @@ export function AgenteTurnoItem({
 										</tr>
 									</thead>
 									<tbody>
-										{resposta.rows.map((linha, indice) => (
-											<tr
-												// biome-ignore lint/suspicious/noArrayIndexKey: linhas do resultado não têm identificador próprio
-												key={indice}
-												className="border-b border-border last:border-b-0"
-											>
-												{colunas.map((coluna) => (
-													<td
-														key={coluna}
-														className="whitespace-nowrap px-3 py-2 tabular-nums text-text"
-													>
-														{formatarCelulaResultado(
-															coluna,
-															linha[coluna],
-															resposta.column_units?.[coluna],
-														)}
-													</td>
-												))}
-											</tr>
-										))}
+										{resposta.rows
+											.slice(0, linhasMostradas)
+											.map((linha, indice) => (
+												<tr
+													// biome-ignore lint/suspicious/noArrayIndexKey: linhas do resultado não têm identificador próprio
+													key={indice}
+													className="border-b border-border last:border-b-0"
+												>
+													{colunas.map((coluna) => (
+														<td
+															key={coluna}
+															className="whitespace-nowrap px-3 py-2 tabular-nums text-text"
+														>
+															{formatarCelulaResultado(
+																coluna,
+																linha[coluna],
+																resposta.column_units?.[coluna],
+															)}
+														</td>
+													))}
+												</tr>
+											))}
 									</tbody>
 								</table>
 							</div>
+						)}
+
+						{tabelaVisivel && resposta.rows.length > linhasMostradas && (
+							<button
+								type="button"
+								onClick={() =>
+									setLinhasMostradas(
+										proximoLimiteTabela(linhasMostradas, resposta.rows.length),
+									)
+								}
+								className="cursor-pointer text-small text-accent underline-offset-2 hover:underline"
+							>
+								Mostrar mais{" "}
+								{Math.min(PASSO_TABELA, resposta.rows.length - linhasMostradas)}{" "}
+								linhas ({formatNumero(linhasMostradas)} de{" "}
+								{formatNumero(resposta.rows.length)} mostradas)
+							</button>
 						)}
 
 						{sqlAberto && resposta.sql && (

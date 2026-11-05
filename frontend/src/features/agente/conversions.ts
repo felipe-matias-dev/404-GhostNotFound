@@ -391,3 +391,10 @@ export function camposDaAuditoria(registro: AuditoriaIa): CampoAuditoria[] {
 		{ rotulo: "Registrado em", valor: formatDataHora(registro.criado_em) },
 	];
 }
+
+/** Linhas da tabela de resposta mostradas de cada vez; "Mostrar mais" soma outro bloco. */
+export const PASSO_TABELA = 20;
+
+export function proximoLimiteTabela(atual: number, total: number): number {
+	return Math.min(total, atual + PASSO_TABELA);
+}

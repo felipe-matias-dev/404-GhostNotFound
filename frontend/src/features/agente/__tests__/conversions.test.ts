@@ -13,6 +13,8 @@ import {
 	MAX_PERGUNTA_CHARS,
 	mesclarSessoes,
 	nomeAmigavelView,
+	PASSO_TABELA,
+	proximoLimiteTabela,
 	reinserirSessao,
 	rotuloConfianca,
 	rotuloStatusResposta,
@@ -506,5 +508,14 @@ describe("camposDaAuditoria (painel da TI)", () => {
 		expect(valor("Versão do prompt")).toBe("v4");
 		expect(valor("Tempo")).toBe("4,2 segundos");
 		expect(valor("Tokens")).toBe("13.802 de entrada e 344 de saída");
+	});
+});
+
+describe("tabela da resposta", () => {
+	it("mostra um bloco a mais por clique, sem passar do total", () => {
+		expect(PASSO_TABELA).toBe(20);
+		expect(proximoLimiteTabela(20, 45)).toBe(40);
+		expect(proximoLimiteTabela(40, 45)).toBe(45);
+		expect(proximoLimiteTabela(45, 45)).toBe(45);
 	});
 });
