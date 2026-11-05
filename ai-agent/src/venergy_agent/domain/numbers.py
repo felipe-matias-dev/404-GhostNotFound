@@ -111,3 +111,17 @@ def _trimmed(value: Decimal) -> Decimal:
         digits_list.pop()
         exponent += 1
     return Decimal((sign, tuple(digits_list), exponent))
+
+
+TWO_DECIMAL_UNITS = frozenset({"h", "%", "R$"})
+INTEGER_UNITS = frozenset({"kWh", "contagem"})
+
+
+def display_for_unit(value: Decimal, unit: str | None) -> Decimal:
+    """Política de exibição por unidade (DEC-080): h, % e R$ com até 2 casas; kWh e contagem
+    inteiros; sem unidade, a regra antiga."""
+    if unit in TWO_DECIMAL_UNITS:
+        return _trimmed(value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+    if unit in INTEGER_UNITS:
+        return value.quantize(Decimal(1), rounding=ROUND_HALF_UP)
+    return rounded_for_display(value)

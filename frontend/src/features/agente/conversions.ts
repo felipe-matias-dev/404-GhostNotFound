@@ -1,11 +1,13 @@
 import { ApiError } from "#/lib/api";
 import {
+	formatAteDuasCasas,
 	formatBRL,
 	formatCompetencia,
 	formatData,
 	formatDataHora,
 	formatHoras,
 	formatIndice,
+	formatInteiro,
 	formatKWh,
 	formatNumero,
 } from "#/lib/format";
@@ -158,14 +160,14 @@ export function nomeAmigavelView(view: string): string {
 	return NOMES_DAS_VIEWS[view] ?? view;
 }
 
-const UNIDADES_SEM_SUFIXO = new Set(["contagem", "nota"]);
-
+// Política de exibição (DEC-080): R$, h e % com até 2 casas; kWh e contagem inteiros.
 function formatarPelaUnidade(valor: number, unidade: string): string {
 	if (unidade === "R$") return formatBRL(valor);
 	if (unidade === "kWh") return formatKWh(valor);
 	if (unidade === "h") return formatHoras(valor);
-	if (unidade === "%") return `${formatNumero(valor)}%`;
-	if (UNIDADES_SEM_SUFIXO.has(unidade)) return formatNumero(valor);
+	if (unidade === "%") return `${formatAteDuasCasas(valor)}%`;
+	if (unidade === "contagem") return formatInteiro(valor);
+	if (unidade === "nota") return formatNumero(valor);
 	return `${formatNumero(valor)} ${unidade}`;
 }
 
@@ -199,7 +201,7 @@ export function formatarCelulaResultado(
 		if (unidade) return formatarPelaUnidade(valor, unidade);
 		const col = coluna.toLowerCase();
 		if (col.includes("pct") || col.includes("percentual"))
-			return `${formatNumero(valor)}%`;
+			return `${formatAteDuasCasas(valor)}%`;
 		if (
 			col.includes("receita") ||
 			col.includes("tributo") ||

@@ -257,7 +257,7 @@ describe("formatarCelulaResultado", () => {
 	});
 
 	it("formata percentual e número puro", () => {
-		expect(formatarCelulaResultado("variacao_pct", 3.46)).toBe("3,5%");
+		expect(formatarCelulaResultado("variacao_pct", 3.46)).toBe("3,46%");
 		expect(formatarCelulaResultado("n_uc", 1234)).toBe("1.234");
 	});
 });
@@ -452,5 +452,13 @@ describe("extrairMensagemErro", () => {
 		expect(extrairMensagemErro(new ApiError(500, null))).toBe(generica);
 		expect(extrairMensagemErro(new Error("boom"))).toBe(generica);
 		expect(extrairMensagemErro("falhou")).toBe(generica);
+	});
+});
+
+describe("política de exibição por unidade (DEC-080)", () => {
+	it("contagem é inteira e percentual tem até duas casas, como no texto da resposta", () => {
+		expect(formatarCelulaResultado("n_ucs", 12.4, "contagem")).toBe("12");
+		expect(formatarCelulaResultado("variacao", 3.456, "%")).toBe("3,46%");
+		expect(formatarCelulaResultado("variacao", 0.5, "%")).toBe("0,5%");
 	});
 });

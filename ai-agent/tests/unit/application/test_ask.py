@@ -1670,3 +1670,12 @@ async def test_a_reply_after_an_answer_is_not_treated_as_a_clarification(layer):
     await use_case(layer, generator, history=history, history_turns=3).ask("percentual", "s1")
 
     assert generator.questions == ["percentual"]
+
+
+def test_fallback_text_shows_hours_and_percent_with_at_most_two_decimals():
+    from venergy_agent.application.ask import _with_unit
+
+    assert _with_unit(0.0256, "h") == "0,03 h"
+    assert _with_unit(3.456, "%") == "3,46%"
+    assert _with_unit(1234.5, "kWh") == "1.235 kWh"
+    assert _with_unit(12.4, "contagem") == "12"

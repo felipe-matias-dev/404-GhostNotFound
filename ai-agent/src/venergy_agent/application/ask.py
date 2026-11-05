@@ -33,9 +33,9 @@ from venergy_agent.domain.followup import (
     depends_on_previous_turn,
 )
 from venergy_agent.domain.numbers import (
+    display_for_unit,
     durations,
     pt_br_numbers,
-    rounded_for_display,
     supports,
     unsupported_numbers,
     written_units,
@@ -894,7 +894,7 @@ def _row_text(columns: tuple[str, ...], row: dict[str, object], units: Mapping[s
 
 
 def _with_unit(value: object, unit: str | None) -> str:
-    text = _pt_br(value)
+    text = _pt_br(value, unit)
     if value is None or unit is None or unit in UNITS_WITHOUT_SUFFIX:
         return text
     if unit == "R$":
@@ -902,13 +902,13 @@ def _with_unit(value: object, unit: str | None) -> str:
     return f"{text}%" if unit == "%" else f"{text} {unit}"
 
 
-def _pt_br(value: object) -> str:
+def _pt_br(value: object, unit: str | None = None) -> str:
     if value is None:
         return MISSING_VALUE
     if isinstance(value, bool):
         return "sim" if value else "não"
     if isinstance(value, int | float | Decimal):
-        number = rounded_for_display(Decimal(str(value)))
+        number = display_for_unit(Decimal(str(value)), unit)
         grouped = format(number, ",f")
         return grouped.replace(",", "_").replace(".", ",").replace("_", ".")
     return _shorten(str(value))

@@ -4,7 +4,11 @@ from collections.abc import Mapping
 from decimal import Decimal
 
 from venergy_agent.domain.answer import AgentAnswer
-from venergy_agent.domain.numbers import rounded_for_display
+from venergy_agent.domain.numbers import (
+    TWO_DECIMAL_UNITS,
+    display_for_unit,
+    rounded_for_display,
+)
 from venergy_agent.domain.question import Question
 from venergy_agent.domain.semantic import (
     ColumnSpec,
@@ -148,7 +152,7 @@ def render_answer_user(
     )
     rows = "\n".join(
         json.dumps(
-            {key: _for_display(value) for key, value in row.items()},
+            {key: _for_display(value, unit_of(key, units)) for key, value in row.items()},
             ensure_ascii=False,
             default=str,
         )
@@ -171,14 +175,22 @@ def render_answer_user(
     return "\n\n".join(parts)
 
 
-def _for_display(value: object) -> object:
+def _for_display(value: object, unit: str | None = None) -> object:
     if isinstance(value, bool):
         return value
     if isinstance(value, float):
-        return float(rounded_for_display(Decimal(str(value))))
+        return float(_display(Decimal(str(value)), unit))
     if isinstance(value, Decimal):
-        return rounded_for_display(value)
+        return _display(value, unit)
     return value
+
+
+def _display(value: Decimal, unit: str | None) -> Decimal:
+    # kWh e contagem continuam com a regra antiga aqui: o conferidor numérico só aceita
+    # inteiro arredondado de valor já inteiro, então o narrador segue vendo as casas do banco.
+    if unit in TWO_DECIMAL_UNITS:
+        return display_for_unit(value, unit)
+    return rounded_for_display(value)
 
 
 def _in_words(text: str) -> str:

@@ -345,7 +345,7 @@ def test_answer_user_prompt_rounds_long_decimals_and_labels_aliases():
     prompt = render_answer_user(question, draft, result, NONCE, {"receita_faturada": "R$"})
 
     assert "colunas: receita_2024 (R$), variacao_percentual (%), dec" in prompt
-    assert '"dec": 1.91' in prompt and '"variacao_percentual": 0.891' in prompt
+    assert '"dec": 1.91' in prompt and '"variacao_percentual": 0.89' in prompt
 
 
 def test_answer_user_prompt_carries_the_reason_of_a_refused_narrative():

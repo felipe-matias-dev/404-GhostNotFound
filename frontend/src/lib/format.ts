@@ -104,6 +104,16 @@ export function formatKWh(
 	return `${numero.format(valor)} kWh`;
 }
 
+/** Número inteiro (contagens): 12.4 → "12"; 1234 → "1.234" */
+export function formatInteiro(valor: Valor): string {
+	return valor == null ? VAZIO : inteiro.format(valor);
+}
+
+/** Número com até duas casas, sem unidade (o chamador acrescenta %): 3.456 → "3,46" */
+export function formatAteDuasCasas(valor: Valor): string {
+	return valor == null ? VAZIO : decimal2.format(valor);
+}
+
 /** Número sem unidade, até uma casa: 12.43 → "12,4"; 1234 → "1.234" */
 export function formatNumero(valor: Valor): string {
 	return valor == null ? VAZIO : decimal1.format(valor);
