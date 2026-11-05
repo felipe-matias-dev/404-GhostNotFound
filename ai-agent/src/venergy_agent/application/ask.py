@@ -37,6 +37,7 @@ from venergy_agent.domain.numbers import (
     durations,
     pt_br_numbers,
     supports,
+    threshold_percents,
     unsupported_numbers,
     written_units,
 )
@@ -732,6 +733,7 @@ class AskUseCase:
             *_months_between(validated.periods),
             *validated.years,
             *(pt_br_numbers(question_text) & _sql_numbers(validated.sql)),
+            *threshold_percents(question_text, _sql_numbers(validated.sql)),
             *(value for row in visible.rows for value in row.values()),
         ]
         unsupported = unsupported_numbers(narrative, values, allowed)

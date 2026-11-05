@@ -1690,3 +1690,17 @@ async def test_a_new_request_after_a_clarification_reaches_the_generator_unchang
     )
 
     assert generator.questions == ["Mostre a receita de junho de 2026"]
+
+
+async def test_a_percentage_threshold_is_not_invented_when_the_sql_uses_its_complement(layer):
+    sql = "SELECT count(*) AS total FROM sem_faturamento_mensal WHERE kwh_faturado < 0.7"
+    writer = FixedWriter(text="Há 3 UCs com queda acima de 30%.")
+
+    answer = await use_case(
+        layer,
+        ScriptedGenerator(generation(sql=sql)),
+        executor=ScriptedExecutor(table(("total",), (3,))),
+        writer=writer,
+    ).ask("Quantas UCs tiveram queda acima de 30%?", "s1")
+
+    assert answer.answer == "Há 3 UCs com queda acima de 30%."
