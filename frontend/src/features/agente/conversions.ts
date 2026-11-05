@@ -10,10 +10,12 @@ import {
 	formatInteiro,
 	formatKWh,
 	formatNumero,
+	formatSegundos,
 } from "#/lib/format";
 import { AgentProtocolError } from "./api";
 import type {
 	AnswerStatus,
+	AuditoriaIa,
 	Confidence,
 	EscopoSugestao,
 	ExemploPergunta,
@@ -359,4 +361,33 @@ export function extrairMensagemErro(error: unknown): string {
 			return "A pergunta enviada é inválida (máximo de 500 caracteres).";
 	}
 	return "Não foi possível concluir a consulta ao agente. Tente novamente.";
+}
+
+export type CampoAuditoria = { rotulo: string; valor: string };
+
+/**
+ * Os campos do registro de auditoria que a TI lê no painel, em ordem. Só o perfil TI chega
+ * aqui (o backend recusa a rota para os outros, com 403).
+ */
+export function camposDaAuditoria(registro: AuditoriaIa): CampoAuditoria[] {
+	return [
+		{ rotulo: "Pergunta", valor: registro.pergunta },
+		{ rotulo: "Status", valor: registro.status },
+		{
+			rotulo: "SQL",
+			valor: registro.sql ?? "nenhum (a consulta não foi gerada)",
+		},
+		{
+			rotulo: "Linhas",
+			valor: `${formatInteiro(registro.row_count)}${registro.truncated ? " (resultado truncado)" : ""}`,
+		},
+		{ rotulo: "Modelo", valor: registro.model },
+		{ rotulo: "Versão do prompt", valor: registro.prompt_version },
+		{ rotulo: "Tempo", valor: formatSegundos(registro.latency_ms) },
+		{
+			rotulo: "Tokens",
+			valor: `${formatInteiro(registro.input_tokens)} de entrada e ${formatInteiro(registro.output_tokens)} de saída`,
+		},
+		{ rotulo: "Registrado em", valor: formatDataHora(registro.criado_em) },
+	];
 }

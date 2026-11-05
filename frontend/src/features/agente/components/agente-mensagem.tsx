@@ -14,6 +14,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { Badge } from "#/components/ui/badge";
 import { Button } from "#/components/ui/button";
+import { useSession } from "#/features/auth";
 import { formatDataHora, formatNumero, formatSegundos } from "#/lib/format";
 import { cn } from "#/lib/utils";
 import {
@@ -23,6 +24,7 @@ import {
 	rotuloStatusResposta,
 } from "../conversions";
 import type { TurnoConversa } from "../types";
+import { AgenteAuditoria } from "./agente-auditoria";
 
 const PONTO_STATUS = {
 	success: "bg-success",
@@ -51,6 +53,7 @@ export function AgenteTurnoItem({
 	mostrarHorario?: boolean;
 }) {
 	const [detalhesAbertos, setDetalhesAbertos] = useState(false);
+	const { data: usuario } = useSession();
 	const [tabelaAberta, setTabelaAberta] = useState<boolean | null>(null);
 	const [sqlAberto, setSqlAberto] = useState(false);
 	const [copiado, setCopiado] = useState(false);
@@ -203,6 +206,9 @@ export function AgenteTurnoItem({
 										{resposta.model} · {resposta.prompt_version}
 									</span>
 								</div>
+							)}
+							{detalhesAbertos && usuario?.perfil === "ti" && (
+								<AgenteAuditoria auditId={resposta.audit_id} />
 							)}
 						</div>
 
