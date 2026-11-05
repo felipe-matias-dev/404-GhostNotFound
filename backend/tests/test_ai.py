@@ -77,6 +77,8 @@ def answered_answer() -> AgentAnswer:
         latency_ms=850,
         input_tokens=1200,
         output_tokens=80,
+        column_units={"receita_faturada": "R$"},
+        column_labels={"receita_faturada": "receita faturada"},
     )
 
 
@@ -268,6 +270,8 @@ def test_audit_returns_what_the_post_answered(
     assert auditoria["criado_em"]
     assert auditoria["sql"].startswith("SELECT competencia")
     assert auditoria["rows"][0]["receita_faturada"] == "1234.50"
+    assert auditoria["column_units"] == {"receita_faturada": "R$"}
+    assert auditoria["column_labels"] == {"receita_faturada": "receita faturada"}
 
 
 def test_audit_of_a_refused_answer_shows_the_reason(

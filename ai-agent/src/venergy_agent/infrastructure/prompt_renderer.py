@@ -15,6 +15,7 @@ from venergy_agent.domain.semantic import (
     unit_of,
 )
 from venergy_agent.domain.sql import AttemptFeedback, QueryResult, SqlDraft
+from venergy_agent.domain.wording import plain_words
 
 PLACEHOLDER = re.compile(r"\{\{(\w+)\}\}")
 TECHNICAL_NAME = re.compile(r"\b[a-zA-Z]+_\w+")
@@ -181,7 +182,7 @@ def _for_display(value: object) -> object:
 
 
 def _in_words(text: str) -> str:
-    return TECHNICAL_NAME.sub(lambda name: name.group().replace("_", " "), text)
+    return plain_words(text)
 
 
 def render_insight_system(template: str, nonce: str) -> str:

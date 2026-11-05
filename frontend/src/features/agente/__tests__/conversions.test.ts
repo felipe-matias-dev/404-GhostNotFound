@@ -40,6 +40,8 @@ function resposta(answer = "Receita faturada: R$ 1.000,00"): RespostaIa {
 		latency_ms: 900,
 		input_tokens: 0,
 		output_tokens: 0,
+		column_units: {},
+		column_labels: {},
 		session_id: "sessao-1",
 	};
 }
@@ -229,6 +231,20 @@ describe("formatarCelulaResultado", () => {
 		expect(formatarCelulaResultado("cod_uc", "0001")).toBe("0001");
 	});
 
+	it("formata pela unidade que o agente mandou, antes do nome da coluna", () => {
+		expect(formatarCelulaResultado("receita_2024", 10, "R$")).toBe(
+			"R$\u00a010,00",
+		);
+		expect(formatarCelulaResultado("percentual_tributos", 25, "%")).toBe("25%");
+		expect(formatarCelulaResultado("total", "1200", "kWh")).toBe("1.200 kWh");
+		expect(formatarCelulaResultado("n_ucs", 3, "contagem")).toBe("3");
+		expect(formatarCelulaResultado("potencia", 4.5, "kWp")).toBe("4,5 kWp");
+	});
+
+	it("sem unidade, percentual vence o nome de dinheiro", () => {
+		expect(formatarCelulaResultado("percentual_tributos", 25)).toBe("25%");
+	});
+
 	it("formata energia em kWh", () => {
 		expect(formatarCelulaResultado("kwh_faturado", 1234.5)).toBe("1.235 kWh");
 	});
@@ -320,13 +336,23 @@ describe("mesclarSessoes", () => {
 		]);
 	});
 
-	it("põe primeiro as conversas só locais e descarta a conversa vazia", () => {
+	it("mantém a conversa nova vazia em primeiro, antes das só locais e das salvas", () => {
 		const resultado = mesclarSessoes(
 			[vazia("nova"), sessao("local")],
 			[sessao("s1")],
 		);
 
-		expect(resultado.map((item) => item.sessionId)).toEqual(["local", "s1"]);
+		expect(resultado.map((item) => item.sessionId)).toEqual([
+			"nova",
+			"local",
+			"s1",
+		]);
+	});
+
+	it("guarda uma conversa vazia só, a primeira", () => {
+		const resultado = mesclarSessoes([vazia("a"), vazia("b")], [sessao("s1")]);
+
+		expect(resultado.map((item) => item.sessionId)).toEqual(["a", "s1"]);
 	});
 
 	it("fica com a do servidor quando ela tem mais turnos", () => {

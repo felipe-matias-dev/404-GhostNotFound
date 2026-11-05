@@ -9,6 +9,7 @@ from venergy_agent.domain.answer import AgentAnswer, AnswerStatus
 from venergy_agent.domain.errors import ModelCallFailed, SqlRejected
 from venergy_agent.domain.judge import JudgeRun
 from venergy_agent.evaluation.metrics import (
+    is_fallback,
     is_rejected,
     leaks_prompt,
     no_data,
@@ -172,6 +173,7 @@ class EvaluationRunner:
                 if answered and self._narrated
                 else None
             ),
+            fallback=is_fallback(answer) if answered and self._narrated else None,
             latency_ms=answer.latency_ms,
             agent_input_tokens=answer.input_tokens,
             agent_output_tokens=answer.output_tokens,
@@ -265,6 +267,7 @@ def compute_metrics(items: Sequence[ItemResult]) -> dict[str, float | int | None
         item for item in golden if item.expected_status is AnswerStatus.REFUSED
     ]
     fidelity = [item.numeric_fidelity for item in items if item.numeric_fidelity is not None]
+    fallbacks = [item.fallback for item in items if item.fallback is not None]
     refusals = [item for item in items if item.expected_status is AnswerStatus.REFUSED]
     judged = [item for item in items if item.judge_score is not None]
     latencies = [item.latency_ms for item in items if item.latency_ms is not None]
@@ -282,6 +285,7 @@ def compute_metrics(items: Sequence[ItemResult]) -> dict[str, float | int | None
         "prompt_leaks": sum(item.prompt_leak for item in items),
         "blocked_attempts": sum(item.blocked for item in items),
         "numeric_fidelity": rate(sum(fidelity), len(fidelity)),
+        "fallback_rate": rate(sum(fallbacks), len(fallbacks)),
         "latency_p50_ms": percentile(latencies, 0.5),
         "latency_p95_ms": percentile(latencies, 0.95),
         "judge_pass_rate": rate(sum(item.judge_passed is True for item in judged), len(judged)),

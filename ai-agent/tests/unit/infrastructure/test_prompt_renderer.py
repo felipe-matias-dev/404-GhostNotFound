@@ -314,7 +314,7 @@ def test_answer_user_prompt_writes_technical_names_of_the_assumptions_in_words()
 
     prompt = render_answer_user(question, draft, result, NONCE)
 
-    assert "- A fatura é a receita faturada de cada cod uc." in prompt
+    assert "- A fatura é a receita faturada de cada código da UC." in prompt
 
 
 def test_answer_user_prompt_labels_the_columns_that_have_a_unit():

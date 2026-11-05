@@ -177,21 +177,21 @@ Os itens de follow-up (`follow_up_of`) rodam logo depois da pergunta de origem, 
 
 `make eval-compare` não chama o modelo. Rodadas anteriores à medição de tokens gravam esses totais como 0, então a diferença de tokens só vale entre rodadas novas. Imprime em markdown a configuração das duas rodadas (modelo, `prompt_version`, camada semântica, versões dos conjuntos, base, narrada e juiz), as métricas lado a lado com a diferença (taxas em pontos percentuais, contagens e latência em valor absoluto) e os itens em comum que mudaram de `matched`, `status`, `numeric_fidelity` ou `judge_passed`. As métricas são recalculadas só sobre os itens em comum, para que uma versão nova do golden set não distorça a comparação; a tabela diz quantos itens existem só em A e só em B. Se uma rodada tem mais de 5% de itens `failed`, a saída avisa que a comparação provavelmente não vale (erro do provedor, abaixo).
 
-Última rodada, na Gold real, narrada e com o juiz, comparada com a anterior nos 95 itens em comum (nenhuma das duas acima de 5% de `failed`):
+Última rodada, na Gold real, narrada e com o juiz, comparada com a de 03/11 nos 95 itens em comum (nenhuma das duas acima de 5% de `failed`):
 
 | Métrica (95 itens em comum) | 03/11/2026 | 04/11/2026 | Diferença |
 |---|---|---|---|
-| execution_accuracy | 94.1% | 98.5% | +4.4 pp |
+| execution_accuracy | 94.1% | 100.0% | +5.9 pp |
 | status_accuracy | 95.8% | 100.0% | +4.2 pp |
 | failed_rate | 3.2% | 0.0% | -3.2 pp |
 | refusal_accuracy | 100.0% | 100.0% | +0.0 pp |
-| numeric_fidelity | 86.2% | 88.2% | +2.1 pp |
-| judge_pass_rate | 64.6% | 89.7% | +25.1 pp |
-| judge_mean_score | 4.11 | 4.74 | +0.63 |
-| latency_p50_ms | 2816 | 3847 | +1031 |
-| latency_p95_ms | 16611 | 27895 | +11284 |
+| fallback_rate | — | 1.5% | — |
+| judge_pass_rate | 64.6% | 97.1% | +32.4 pp |
+| judge_mean_score | 4.11 | 4.91 | +0.80 |
+| latency_p50_ms | 2816 | 4156 | +1340 |
+| latency_p95_ms | 16611 | 6398 | -10213 |
 
-Configuração: `google-gla:gemini-3.1-flash-lite` com a cadeia de reserva, prompt de SQL `v3`, camada 0.4.1, golden set 0.18.0. A rodada de 04/11 usa o prompt da narração `v4` e a segunda chance da narrativa ([DEC-079](../docs/decisoes.md#dec-079--narrativa-recusada-tem-uma-segunda-chance-e-chega-arredondada)). Os valores de cada item ficam em `eval/runs_gold/`, fora do Git (DEC-024).
+Configuração da rodada de 04/11: `openrouter:google/gemini-3.1-flash-lite` como principal, prompt de SQL `v4`, narração `answer/v5`, camada 0.4.2, golden set 0.19.0 (DEC-080). A `numeric_fidelity` da avaliação ainda não conhece as durações, os meses dentro de um `BETWEEN` e os filtros do SQL que a checagem do agente aceita; por isso ela fica abaixo do que o agente de fato mostra. Os valores de cada item ficam em `eval/runs_gold/`, fora do Git (DEC-024).
 
 ### Juiz (`--judge`)
 
@@ -245,31 +245,32 @@ Cada integrante usa a própria chave, no próprio `ai-agent/.env` (fora do Git):
 
 1. Entre em https://aistudio.google.com com a sua conta Google, vá em **Get API key** e crie uma chave.
 2. Preencha `VENERGY_AGENT_GOOGLE_API_KEY` no `ai-agent/.env`. O modelo padrão já é `google-gla:gemini-3.1-flash-lite`.
-3. A chave do Gemini pode ficar no Free Tier. Os limites aparecem em *Rate limit*, no AI Studio. Quando a cota gratuita acaba ou o modelo fica sobrecarregado, a pergunta segue para a reserva paga pelo OpenRouter ([Modelo reserva](#modelo-reserva)).
+3. A chave do Gemini pode ficar no Free Tier. Os limites aparecem em *Rate limit*, no AI Studio. Quando a cota gratuita acaba ou o modelo fica sobrecarregado, a pergunta segue para a reserva paga pelo OpenRouter ([Modelo principal e reserva](#modelo-principal-e-reserva)).
 
 No Free Tier, o Google pode usar o conteúdo enviado para melhorar os produtos dele. O time aceita esse envio para a amostra e para a Gold real (DEC-015): o dataset é do case. O que nunca pode acontecer é o dataset, ou qualquer saída com dados dele, ir para o Git (DEC-024).
 
 O OpenRouter continua disponível pelo prefixo `openrouter:` (veja `.env.example`). Os testes não usam nenhuma chave: o modelo é simulado.
 
-### Modelo reserva
+### Modelo principal e reserva
 
-Na API do `docker compose`, o agente sobe com um modelo reserva: `VENERGY_AGENT_FALLBACK_MODEL`, padrão `google-gla:gemini-3.5-flash` (troque por `GEMINI_FALLBACK_MODEL` no `.env` da raiz). Se o modelo principal falhar com 429 (cota) ou 503 (sobrecarga) depois das retentativas, a mesma pergunta vai para o reserva. No plano gratuito a cota é contada por modelo, então o reserva tem cota própria.
-
-A variável aceita uma **cadeia**, separada por vírgula, tentada em ordem. A cadeia recomendada usa créditos pagos do OpenRouter (`OPENROUTER_API_KEY` no `.env` da raiz) e cobre, nessa ordem, a cota do plano gratuito e uma queda do Google inteiro:
+O modelo principal recomendado é o Gemini Flash-Lite **pago** pelo OpenRouter (DEC-080). É o mesmo modelo avaliado, mas sem as falhas do plano gratuito: no portal, o gratuito estourava os 15 s por chamada e as respostas levavam de 20 a 29 s. Com o pago, ficaram entre 4 e 7 s. No `.env` da raiz:
 
 ```
-GEMINI_FALLBACK_MODEL=google-gla:gemini-3.5-flash,openrouter:google/gemini-3.1-flash-lite,openrouter:anthropic/claude-haiku-5.5
+LLM_MODEL=openrouter:google/gemini-3.1-flash-lite
+GEMINI_FALLBACK_MODEL=google-gla:gemini-3.1-flash-lite,openrouter:anthropic/claude-haiku-5.5
+OPENROUTER_API_KEY=...
 ```
 
 | Ordem | Modelo | Cobre |
 |---|---|---|
-| principal | `google-gla:gemini-3.1-flash-lite`, gratuito | o dia a dia |
-| 1 | `google-gla:gemini-3.5-flash`, gratuito | cota esgotada só no modelo principal |
-| 2 | `openrouter:google/gemini-3.1-flash-lite`, pago (US$ 0,25 / 1,50 por milhão de tokens de entrada / saída) | cota e limite por minuto do plano gratuito: é o mesmo modelo do principal, então responde igual ao que foi avaliado |
-| 3 | `openrouter:anthropic/claude-haiku-5.5`, pago (US$ 0,10 / 0,50) | queda do Google inteiro, que derruba também o Gemini do OpenRouter |
+| principal | `openrouter:google/gemini-3.1-flash-lite`, pago (US$ 0,25 / 1,50 por milhão de tokens de entrada / saída) | o dia a dia |
+| 1 | `google-gla:gemini-3.1-flash-lite`, gratuito | falha do OpenRouter |
+| 2 | `openrouter:anthropic/claude-haiku-5.5`, pago (US$ 0,10 / 0,50) | queda do Google inteiro, que derruba os dois Gemini |
 
-- Só se paga quando o Gemini gratuito falha. Cada modelo tem 15 s de tempo limite e, depois de uma falha, fica 60 s fora da cadeia: numa queda, só a primeira pergunta paga a espera.
-- O Haiku foi testado como único modelo em 13 perguntas do golden set na Gold real (04/11/2026), uma ou duas de cada tipo: SQL certo em 10 de 13 e status certo em 13 de 13, contra 9 e 12 do Gemini na rodada final, com latência mediana de 4,3 s. É um teste curto, suficiente para a última linha da cadeia, não uma rodada completa.
+Sem chave paga, `LLM_MODEL` fica vazio e o padrão do compose é o Gemini gratuito, com `GEMINI_FALLBACK_MODEL` (padrão `google-gla:gemini-3.5-flash`) como reserva. Uma pergunta custa menos de um centavo de dólar com o modelo pago.
+
+- A variável de reserva aceita uma **cadeia**, separada por vírgula, tentada em ordem. Cada modelo tem 15 s de tempo limite e, depois de uma falha, fica 60 s fora da cadeia: numa queda, só a primeira pergunta paga a espera.
+- O Haiku foi testado como único modelo em 13 perguntas do golden set na Gold real (04/11/2026), uma ou duas de cada tipo: SQL certo em 10 de 13 e status certo em 13 de 13, com latência mediana de 4,3 s. É um teste curto, suficiente para a última linha da cadeia, não uma rodada completa.
 - Sem créditos no OpenRouter, a alternativa são os modelos `:free` (`openrouter:nvidia/nemotron-3.5-super-vl:free`, `openrouter:google/gemma-4-31b-it:free`): limite de 50 chamadas por dia por conta, instáveis (no teste de 29/10, `gemma-4-31b` deu 429 e outros deram 503), e o `nemotron` leva cerca de 40 s por chamada.
 - Só entram modelos com *tool calling* (o agente devolve saída estruturada).
 - Um modelo `openrouter:` na cadeia exige a chave do OpenRouter: sem ela, o agente não sobe (o `/ai` responde 503). O padrão do compose é só Gemini por isso.

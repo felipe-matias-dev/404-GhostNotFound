@@ -108,8 +108,9 @@ export function AgenteProvider({
 	// computador. Sem resposta da API, a conversa nova continua disponível.
 	useEffect(() => {
 		const controller = new AbortController();
-		setSessoes([novaSessao(usuario)]);
-		setSessaoAtivaId(null);
+		const nova = novaSessao(usuario);
+		setSessoes([nova]);
+		setSessaoAtivaId(nova.sessionId);
 		setHistoricoIndisponivel(false);
 		perguntadas.current.clear();
 		pendentes.current.clear();

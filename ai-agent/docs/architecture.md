@@ -2,7 +2,7 @@
 
 Resumo para orientar quem chega ao `ai-agent/` (pessoa ou sessão de IA). A fonte da verdade continua sendo a [spec](specs/2026-10-19-architecture-design.md); este arquivo só diz o que existe hoje, onde está e o que falta. Atualize-o no mesmo PR que mudar o estado.
 
-- **Atualizado em:** 03/11/2026: insights de IA em cinco telas, com a IA escolhendo entre as leituras candidatas (prompt `insight/v4`, DEC-077); calibração e rodada final do juiz registradas (DEC-047) e Gold real carregada no banco local. Camada semântica 0.4.1 (contagens como `numeric` nas views, percentual, FEC do alimentador por média mensal de UCs e receita de energia sem bandeiras) com o contrato da Gold v0.3 (tabelas por UC). O que está em revisão está na spec §1.
+- **Atualizado em:** 04/11/2026: ajustes depois da apresentação (DEC-080): chat sempre numa conversa nova, prompt de SQL `v4` (follow-up pelo turno mais recente), narração `answer/v5`, camada 0.4.2 (tributos e perguntas de "por que"), checagem de unidade e de ano não pedido, `column_units` e `column_labels` no `AgentAnswer`, modelo pago como principal. Antes, 03/11/2026: insights de IA em cinco telas, com a IA escolhendo entre as leituras candidatas (prompt `insight/v4`, DEC-077); calibração e rodada final do juiz registradas (DEC-047) e Gold real carregada no banco local. Camada semântica 0.4.1 (contagens como `numeric` nas views, percentual, FEC do alimentador por média mensal de UCs e receita de energia sem bandeiras) com o contrato da Gold v0.3 (tabelas por UC). O que está em revisão está na spec §1.
 
 ## 1. O que o agente faz
 
@@ -28,8 +28,8 @@ Hexagonal: `domain` ← `application` ← `infrastructure`.
 | infrastructure | `sql_generator.py`, `prompt_renderer.py`, `llm.py` | PydanticAI com `output_type=SqlDraft`; prompt em `prompts/v1/`; delimitadores com nonce; Gemini direto (padrão) ou OpenRouter | pronto |
 | infrastructure | `semantic_source.py`, `views_sql.py` | `YamlSemanticLayerSource` valida `semantic/semantic_layer.yaml` contra `contracts/gold_schema.yaml` (inclusive `consumers` e `sensitive`); `views_sql` gera `semantic/views.sql` | pronto |
 | infrastructure | `answer_judge.py` | `PydanticAiAnswerJudge`: juiz de clareza e fidelidade, rubrica em `prompts/judge/v1/`, pergunta, resposta e linhas delimitadas por nonce; modelo próprio (`judge_model`) | feito (DEC-047), calibrado em 01/11/2026 (14 de 15) |
-| infrastructure | `answer_writer.py` | `PydanticAiAnswerWriter`: narra as linhas, com o conteúdo do banco delimitado como dado e a unidade de cada coluna vinda da camada semântica; prompt em `prompts/answer/v4/`, que pede o período das linhas e corrige o texto recusado; valores com mais de 2 casas chegam arredondados | item 8 |
-| infrastructure | `history_renderer.py`, `memory_history.py`, `prompts/v3/` | Bloco `<historico-{nonce}>` com o histórico como dado; adapter em memória (avaliação e testes, não é usado em produção); prompt de SQL v3 (v2 mais `history.md`), padrão desde a DEC-046 | G1-10 |
+| infrastructure | `answer_writer.py` | `PydanticAiAnswerWriter`: narra as linhas, com o conteúdo do banco delimitado como dado e a unidade de cada coluna vinda da camada semântica; prompt em `prompts/answer/v5/`, que pede o período das linhas, corrige o texto recusado, explica o porquê com os efeitos e diz o que uma contagem conta; valores com mais de 2 casas chegam arredondados | item 8 |
+| infrastructure | `history_renderer.py`, `memory_history.py`, `prompts/v3/` | Bloco `<historico-{nonce}>` com o histórico como dado; adapter em memória (avaliação e testes, não é usado em produção); prompt de SQL v3 (v2 mais `history.md`), padrão desde a DEC-046; v4 (referência do follow-up é o turno mais recente), padrão desde a DEC-080 | G1-10 |
 | raiz | `config.py`, `bootstrap.py`, `__main__.py` | `AgentSettings` (`VENERGY_AGENT_*`); `build_agent(settings)` monta o agente; `python -m venergy_agent "pergunta"` | pronto |
 
 ## 3. Fluxo do `ask()`
@@ -49,8 +49,18 @@ pergunta → Question → SemanticLayer (carregada uma vez)
             recusada de novo, falhou ou estourou o prazo → texto determinístico (com os valores, se o
               resultado tiver até 5 linhas e 6 colunas, e as colunas em palavras com a unidade:
               "receita faturada = R$ 35.482,79")
-        → AgentAnswer
+        → AgentAnswer (com column_units e column_labels de cada coluna, DEC-080)
 ```
+
+Travas da DEC-080, na ordem do fluxo:
+- **Ano não pedido:** depois da validação, um ano do SQL que não está na pergunta nem no histórico (nem é vizinho de um deles) vira esclarecimento sobre o período, sem executar.
+- **Prazo da narração:** a narração só começa com pelo menos `narration_min_seconds` (4 s) de prazo.
+- **Checagem da narrativa:**
+  - aceita o inteiro arredondado para exibição;
+  - aceita a duração da pergunta escrita como "12 meses" ou "12 primeiras";
+  - aceita os meses dentro de um `BETWEEN`;
+  - aceita o número da pergunta que o SQL usa como filtro;
+  - recusa a unidade errada (kWh, R$, % ou h numa coluna de outra unidade, ou numa contagem).
 
 Período (G1-05): quando as linhas têm `competencia`, o texto determinístico cita o primeiro e o último mês do resultado, e a narrativa só é aceita se citar os dois extremos das linhas que o redator viu (por exemplo "junho de 2025", "06/2025", "jun/2025" ou "entre junho e dezembro de 2025"); senão, o log registra `periodo_ausente_na_resposta`. Os meses usados como literal no SQL (`competencia = '2025-06'`) também valem na checagem de números (DEC-019); quando as linhas não têm `competencia`, são eles o período que a narrativa precisa citar e que o texto determinístico mostra. Desde a DEC-070: o par `AAAA-MM/AAAA-MM` conta como os dois meses; o ano de um prefixo `AAAA-%` vale na checagem de números; com um filtro de anos inteiros, citar cada ano basta; um número com casas decimais é aceito se for o valor da linha arredondado para essas casas; e as suposições chegam ao redator com os nomes técnicos em palavras. Desde a DEC-079: a duração que a pergunta ou as suposições citam ("12 meses") vale na checagem quando a narrativa a escreve como duração; uma narrativa recusada é escrita de novo uma vez, com o motivo (números sem suporte, período em palavras ou nome técnico); os valores com mais de 2 casas decimais chegam ao redator e ao texto determinístico arredondados (2 casas, ou 3 algarismos significativos abaixo de 1); e um alias de coluna ganha a unidade da camada quando é o radical de uma coluna mais um ano ou um qualificador (`receita_2024` → R$), ou `%` quando é percentual. Pedido de esclarecimento que cita nome técnico vira uma pergunta genérica sobre período e recorte. Detalhes, confiança e logs: spec §5.1. O backend monta o agente uma vez por processo com `build_agent(AgentSettings())`.
 
@@ -70,7 +80,7 @@ Período (G1-05): quando as linhas têm `competencia`, o texto determinístico c
 
 ## 4. Camada semântica hoje
 
-`semantic/semantic_layer.yaml` (versão 0.4.1 do arquivo, contrato da Gold v0.3) tem nove views:
+`semantic/semantic_layer.yaml` (versão 0.4.2 do arquivo, contrato da Gold v0.3) tem nove views:
 
 | View | Tabela da Gold | Responde sobre |
 |---|---|---|
@@ -136,4 +146,4 @@ O banco local carrega a Gold real pela carga (`venergy_api.carga`, a partir de `
 - Pedidos para outras áreas (D1 a D9): spec §10.
 - Ordem das próximas features: spec §11.
 - Contrato da Gold: `contracts/gold_schema.yaml`; dicionário em `docs/dicionario-de-dados.md`.
-- Planos executados e em curso: `docs/plans/`.
+- Planos executados e em curso: `docs/plans/`. Próximo passo de robustez, com validação pela tela do portal nos 5 usuários: [`2026-11-05-robustez-do-agente.md`](plans/2026-11-05-robustez-do-agente.md).

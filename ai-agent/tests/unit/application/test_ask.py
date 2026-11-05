@@ -16,6 +16,7 @@ from venergy_agent.application.ask import (
     GENERIC_CLARIFICATION,
     INTERNAL_FAILED,
     MODEL_FAILED,
+    PERIOD_NOT_GIVEN,
     REFUSED_REASON,
     TECHNICAL_NAME,
     TOO_LONG_QUESTION,
@@ -427,7 +428,7 @@ async def test_narrative_with_an_invented_number_falls_back_to_the_deterministic
     )
 
     assert "999" not in answer.answer
-    assert answer.answer.startswith("A consulta devolveu 1 linha(s).")
+    assert answer.answer.startswith("A consulta devolveu 1 linha.")
 
 
 async def test_narrative_with_an_unreadable_number_falls_back_instead_of_failing(layer):
@@ -438,7 +439,7 @@ async def test_narrative_with_an_unreadable_number_falls_back_instead_of_failing
     )
 
     assert answer.status is AnswerStatus.ANSWERED
-    assert answer.answer.startswith("A consulta devolveu 1 linha(s).")
+    assert answer.answer.startswith("A consulta devolveu 1 linha.")
 
 
 @pytest.mark.parametrize(
@@ -456,7 +457,7 @@ async def test_narrative_naming_a_table_or_view_falls_back(layer, text):
         "quantas?", "s1"
     )
 
-    assert answer.answer.startswith("A consulta devolveu 1 linha(s).")
+    assert answer.answer.startswith("A consulta devolveu 1 linha.")
     assert "sem_" not in answer.answer
     assert "gold_" not in answer.answer
 
@@ -485,7 +486,7 @@ async def test_narrative_naming_a_column_or_in_uppercase_falls_back(layer, text)
         "quantas?", "s1"
     )
 
-    assert answer.answer.startswith("A consulta devolveu 1 linha(s).")
+    assert answer.answer.startswith("A consulta devolveu 1 linha.")
 
 
 async def test_assumption_naming_a_technical_name_is_left_out_of_the_text(layer):
@@ -498,7 +499,41 @@ async def test_assumption_naming_a_technical_name_is_left_out_of_the_text(layer)
 
     assert "Considerei só o mês atual" in answer.answer
     assert "sem_kpis_mensais" not in answer.answer
-    assert answer.assumptions == assumptions
+    assert answer.assumptions == ("Considerei só o mês atual", "Os dados vêm de totais mensais")
+
+
+async def test_assumptions_reach_the_answer_in_plain_words(layer):
+    assumptions = (
+        "A receita considerada é a receita_faturada.",
+        "Usei as 12 últimas competências da view sem_kpis_mensais.",
+    )
+
+    answer = await use_case(layer, ScriptedGenerator(generation(assumptions=assumptions))).ask(
+        "quantas?", "s1"
+    )
+
+    assert answer.assumptions == (
+        "A receita considerada é a receita faturada.",
+        "Usei as 12 últimas competências dos dados de totais mensais.",
+    )
+    assert answer.answer.endswith(
+        "Suposições: A receita considerada é a receita faturada; Usei as 12 últimas "
+        "competências dos dados de totais mensais."
+    )
+
+
+async def test_fallback_text_writes_labels_with_accents_and_negative_money_first(layer):
+    query_result = table(
+        ("efeito_preco", "efeito_volume", "variacao_percentual"),
+        (Decimal("14425779.04"), Decimal("-4656505.19"), Decimal("8.01")),
+    )
+
+    text = await fallback_text(layer, query_result)
+
+    assert text.endswith(
+        "Resultado: efeito preço = R$ 14.425.779,04, efeito volume = -R$ 4.656.505,19, "
+        "variação percentual = 8,01%."
+    )
 
 
 async def test_narrative_without_the_period_falls_back_to_a_text_that_has_it(layer):
@@ -509,7 +544,7 @@ async def test_narrative_without_the_period_falls_back_to_a_text_that_has_it(lay
         layer, ScriptedGenerator(generation()), executor=executor, writer=writer
     ).ask("quantas?", "s1")
 
-    assert answer.answer.startswith("A consulta devolveu 1 linha(s). Período: 2025-06.")
+    assert answer.answer.startswith("A consulta devolveu 1 linha. Período: 2025-06.")
 
 
 @pytest.mark.parametrize("text", ["Em junho de 2025 havia 3 UCs.", "Em 06/2025 havia 3 UCs."])
@@ -532,7 +567,7 @@ async def test_a_range_needs_both_ends_in_the_narrative(layer):
         layer, ScriptedGenerator(generation()), executor=executor, writer=writer
     ).ask("quantas?", "s1")
 
-    assert answer.answer.startswith("A consulta devolveu 2 linha(s). Período: 2025-01 a 2025-12.")
+    assert answer.answer.startswith("A consulta devolveu 2 linhas. Período: 2025-01 a 2025-12.")
 
 
 @pytest.mark.parametrize(
@@ -597,7 +632,7 @@ async def test_a_month_outside_the_sql_filter_still_drops_the_narrative(layer):
         writer=writer,
     ).ask("quantas em junho de 2025?", "s1")
 
-    assert answer.answer.startswith("A consulta devolveu 1 linha(s).")
+    assert answer.answer.startswith("A consulta devolveu 1 linha.")
 
 
 async def test_a_month_in_the_sql_filter_must_be_named_when_the_rows_have_no_month(layer):
@@ -610,7 +645,7 @@ async def test_a_month_in_the_sql_filter_must_be_named_when_the_rows_have_no_mon
         writer=writer,
     ).ask("quantas em junho de 2025?", "s1")
 
-    assert answer.answer.startswith("A consulta devolveu 1 linha(s).")
+    assert answer.answer.startswith("A consulta devolveu 1 linha.")
 
 
 async def test_the_fallback_names_the_months_of_the_sql_filter_when_the_rows_have_no_month(layer):
@@ -625,7 +660,7 @@ async def test_the_fallback_names_the_months_of_the_sql_filter_when_the_rows_hav
         executor=ScriptedExecutor(table(("total",), (3,))),
     ).ask("quantas em 2025?", "s1")
 
-    assert answer.answer.startswith("A consulta devolveu 1 linha(s). Período: 2025-01 a 2025-12.")
+    assert answer.answer.startswith("A consulta devolveu 1 linha. Período: 2025-01 a 2025-12.")
 
 
 async def test_a_range_in_the_sql_filter_needs_both_ends_in_the_narrative(layer):
@@ -642,7 +677,7 @@ async def test_a_range_in_the_sql_filter_needs_both_ends_in_the_narrative(layer)
         writer=writer,
     ).ask("quantas em 2025?", "s1")
 
-    assert answer.answer.startswith("A consulta devolveu 1 linha(s).")
+    assert answer.answer.startswith("A consulta devolveu 1 linha.")
 
 
 @pytest.mark.parametrize("text", ["Em 2025 havia 3 UCs.", "No ano de 2025, havia 3 UCs."])
@@ -677,7 +712,7 @@ async def test_whole_years_need_both_years_named(layer):
         writer=writer,
     ).ask("quantas em 2024 e 2025?", "s1")
 
-    assert answer.answer.startswith("A consulta devolveu 1 linha(s).")
+    assert answer.answer.startswith("A consulta devolveu 1 linha.")
 
 
 async def test_a_year_used_as_a_filter_prefix_can_be_cited(layer):
@@ -691,7 +726,7 @@ async def test_a_year_used_as_a_filter_prefix_can_be_cited(layer):
     answer = await use_case(
         layer,
         ScriptedGenerator(generation(sql=years_sql)),
-        executor=ScriptedExecutor(table(("r24", "r25"), (10, 12))),
+        executor=ScriptedExecutor(table(("r24", "r25"), (Decimal("10.00"), Decimal("12.00")))),
         writer=writer,
     ).ask("quanto cresceu entre 2024 e 2025?", "s1")
 
@@ -706,7 +741,7 @@ async def test_a_year_from_another_month_is_not_taken_as_the_period(layer):
         layer, ScriptedGenerator(generation()), executor=executor, writer=writer
     ).ask("quantas?", "s1")
 
-    assert answer.answer.startswith("A consulta devolveu 2 linha(s).")
+    assert answer.answer.startswith("A consulta devolveu 2 linhas.")
 
 
 def table(columns, *rows):
@@ -728,7 +763,7 @@ async def fallback_text(layer, query_result):
 async def test_fallback_text_shows_the_values_of_a_small_result(layer):
     text = await fallback_text(layer, table(("total",), (3,)))
 
-    assert text == "A consulta devolveu 1 linha(s). Resultado: total = 3."
+    assert text == "A consulta devolveu 1 linha. Resultado: total = 3."
 
 
 async def test_fallback_text_writes_numbers_in_pt_br_and_null_as_missing(layer):
@@ -741,8 +776,8 @@ async def test_fallback_text_writes_numbers_in_pt_br_and_null_as_missing(layer):
     text = await fallback_text(layer, query_result)
 
     assert text.endswith(
-        "Resultado: municipio = Olinda, receita = 11.079,18, dec = sem valor; "
-        "municipio = Recife, receita = 1.234.567,5, dec = 0,6."
+        "Resultado: município = Olinda, receita = 11.079,18, DEC = sem valor; "
+        "município = Recife, receita = 1.234.567,5, DEC = 0,6."
     )
 
 
@@ -754,7 +789,7 @@ async def test_fallback_text_trims_long_division_decimals_but_keeps_money_cents(
 
     text = await fallback_text(layer, query_result)
 
-    assert text.endswith("Resultado: fec = 4,5, taxa = 0,0561, receita = 35.482,70.")
+    assert text.endswith("Resultado: FEC = 4,5, taxa = 0,0561, receita = 35.482,70.")
 
 
 async def test_fallback_text_rounds_long_decimals_to_two_places(layer):
@@ -762,7 +797,7 @@ async def test_fallback_text_rounds_long_decimals_to_two_places(layer):
 
     text = await fallback_text(layer, query_result)
 
-    assert text.endswith("Resultado: cod alimentador = ALM-JAB-008, dec = 1,91.")
+    assert text.endswith("Resultado: alimentador = ALM-JAB-008, DEC = 1,91.")
 
 
 async def test_fallback_text_omits_the_values_of_a_large_result(layer):
@@ -770,7 +805,7 @@ async def test_fallback_text_omits_the_values_of_a_large_result(layer):
 
     text = await fallback_text(layer, query_result)
 
-    assert text == "A consulta devolveu 6 linha(s)."
+    assert text == "A consulta devolveu 6 linhas."
 
 
 async def test_writer_error_falls_back_to_the_deterministic_text(layer):
@@ -833,7 +868,7 @@ async def test_number_from_the_question_does_not_make_a_narrative_faithful(layer
     )
 
     assert "300" not in answer.answer
-    assert answer.answer.startswith("A consulta devolveu 1 linha(s).")
+    assert answer.answer.startswith("A consulta devolveu 1 linha.")
 
 
 async def test_a_duration_from_the_question_keeps_the_narrative(layer):
@@ -864,7 +899,7 @@ async def test_a_duration_from_the_question_used_as_a_count_drops_the_narrative(
         "Quantas UCs faturaram nos últimos 12 meses?", "s1"
     )
 
-    assert answer.answer.startswith("A consulta devolveu 1 linha(s).")
+    assert answer.answer.startswith("A consulta devolveu 1 linha.")
 
 
 async def test_a_refused_narrative_is_written_again_with_the_reason(layer):
@@ -886,7 +921,7 @@ async def test_a_narrative_refused_twice_falls_back_to_the_deterministic_text(la
         "quantas?", "s1"
     )
 
-    assert answer.answer.startswith("A consulta devolveu 1 linha(s).")
+    assert answer.answer.startswith("A consulta devolveu 1 linha.")
     assert writer.calls == 2
 
 
@@ -947,7 +982,7 @@ async def test_fallback_text_gives_a_unit_to_a_period_alias_and_a_percentage(lay
 
     text = await fallback_text(layer, query_result)
 
-    assert text.endswith("Resultado: receita 2024 = R$ 16.778.217,14, variacao percentual = 0,89%.")
+    assert text.endswith("Resultado: receita 2024 = R$ 16.778.217,14, variação percentual = 0,89%.")
 
 
 async def test_long_text_values_are_shortened_in_the_fallback_answer(layer):
@@ -981,7 +1016,7 @@ async def test_without_an_answer_writer_the_answer_is_the_deterministic_text(lay
     answer = await agent.ask("quantas?", "s1")
 
     assert answer.status is AnswerStatus.ANSWERED
-    assert answer.answer.startswith("A consulta devolveu 1 linha(s).")
+    assert answer.answer.startswith("A consulta devolveu 1 linha.")
     assert "narrativa_falhou" not in caplog.text
 
 
@@ -994,7 +1029,7 @@ async def test_fallback_text_labels_columns_in_plain_words_with_their_unit(layer
     text = await fallback_text(layer, query_result)
 
     assert text.endswith(
-        "Resultado: receita faturada = R$ 35.482,79, kwh faturado = 1.200 kWh, "
+        "Resultado: receita faturada = R$ 35.482,79, energia faturada = 1.200 kWh, "
         "n chamados = 85, dias sem unidade = 3."
     )
     assert not TECHNICAL_NAME.search(text)
@@ -1370,3 +1405,199 @@ async def test_a_slow_narration_keeps_the_result_with_the_deterministic_text(lay
 
     assert answer.status is AnswerStatus.ANSWERED
     assert answer.rows == ({"total": 3},)
+
+
+async def test_the_reason_says_when_a_refused_number_is_only_in_the_question(layer):
+    writer = FixedWriter(texts=("Há 3 UCs acima de 300 kWh.", "Há 3 UCs."))
+
+    await use_case(layer, ScriptedGenerator(generation()), writer=writer).ask(
+        "Quantas UCs estão acima de 300 kWh?", "s1"
+    )
+
+    assert "300" in writer.feedbacks[1] and "só na pergunta" in writer.feedbacks[1]
+
+
+class SlowFirstWriter:
+    def __init__(self, delay, texts):
+        self._delay = delay
+        self._texts = texts
+        self.calls = 0
+
+    async def write(self, question, draft, result, feedback=None):
+        self.calls += 1
+        if self.calls == 1:
+            await asyncio.sleep(self._delay)
+        return Narration(text=self._texts[self.calls - 1])
+
+
+async def test_no_second_narration_starts_without_time_to_finish_it(layer):
+    writer = SlowFirstWriter(0.3, ("Há 999 UCs.", "Há 3 UCs."))
+    agent = use_case(
+        layer,
+        ScriptedGenerator(generation()),
+        writer=writer,
+        answer_deadline_seconds=1.5,
+        narration_min_seconds=0.4,
+    )
+
+    answer = await agent.ask("quantas?", "s1")
+
+    assert writer.calls == 1
+    assert answer.answer.startswith("A consulta devolveu")
+
+
+async def test_a_second_narration_runs_when_there_is_time_for_it(layer):
+    writer = SlowFirstWriter(0.01, ("Há 999 UCs.", "Há 3 UCs."))
+    agent = use_case(
+        layer,
+        ScriptedGenerator(generation()),
+        writer=writer,
+        answer_deadline_seconds=2.0,
+        narration_min_seconds=0.4,
+    )
+
+    answer = await agent.ask("quantas?", "s1")
+
+    assert answer.answer == "Há 3 UCs."
+
+
+async def test_an_answer_carries_the_unit_of_each_column_it_knows(layer):
+    query_result = table(
+        ("receita_2024", "variacao_percentual", "municipio"),
+        (Decimal("16778217.14"), Decimal("0.89"), "Recife"),
+    )
+
+    answer = await use_case(
+        layer, ScriptedGenerator(generation()), ScriptedExecutor(query_result)
+    ).ask("quantas?", "s1")
+
+    assert answer.column_units == {"receita_2024": "R$", "variacao_percentual": "%"}
+    assert answer.column_labels == {
+        "receita_2024": "receita 2024",
+        "variacao_percentual": "variação percentual",
+        "municipio": "município",
+    }
+
+
+async def test_a_month_inside_the_sql_range_is_a_supported_number(layer):
+    writer = FixedWriter(text="De 2025-01 a 2025-03, passando por 2025-02, o DEC foi de 0,34 h.")
+    range_sql = (
+        "SELECT sum(horas_interrompidas) / NULLIF(sum(n_uc) / 3.0, 0) AS dec "
+        "FROM sem_kpis_segmento_mensal WHERE competencia BETWEEN '2025-01' AND '2025-03'"
+    )
+
+    answer = await use_case(
+        layer,
+        ScriptedGenerator(generation(sql=range_sql)),
+        executor=ScriptedExecutor(table(("dec",), (Decimal("0.3392"),))),
+        writer=writer,
+    ).ask("Qual foi o DEC no primeiro trimestre de 2025?", "s1")
+
+    assert answer.answer == "De 2025-01 a 2025-03, passando por 2025-02, o DEC foi de 0,34 h."
+
+
+async def test_a_number_of_the_question_used_as_a_filter_in_the_sql_is_supported(layer):
+    writer = FixedWriter(text="Há 3 UCs acima de 300 kWh.")
+    filter_sql = "SELECT count(*) AS total FROM sem_faturamento_mensal WHERE kwh_faturado > 300"
+
+    answer = await use_case(
+        layer,
+        ScriptedGenerator(generation(sql=filter_sql)),
+        executor=ScriptedExecutor(table(("total",), (3,))),
+        writer=writer,
+    ).ask("Quantas UCs estão acima de 300 kWh?", "s1")
+
+    assert answer.answer == "Há 3 UCs acima de 300 kWh."
+
+
+TWO_YEARS_SQL = (
+    "SELECT count(*) AS total FROM sem_faturamento_mensal "
+    "WHERE competencia LIKE '2023-%' OR competencia LIKE '2024-%'"
+)
+
+
+async def test_a_year_nobody_asked_for_becomes_a_question_about_the_period(layer):
+    executor = ScriptedExecutor(result())
+
+    answer = await use_case(layer, ScriptedGenerator(generation(sql=TWO_YEARS_SQL)), executor).ask(
+        "Quantas UCs com painel solar em Olinda tiveram queda de consumo acima de 30%?", "s1"
+    )
+
+    assert answer.status is AnswerStatus.CLARIFY
+    assert answer.clarification == PERIOD_NOT_GIVEN
+    assert executor.queries == []
+
+
+async def test_a_year_next_to_one_the_question_names_is_not_invented(layer):
+    answer = await use_case(layer, ScriptedGenerator(generation(sql=TWO_YEARS_SQL))).ask(
+        "Quantas UCs faturaram em 2024 em relação ao ano anterior?", "s1"
+    )
+
+    assert answer.status is AnswerStatus.ANSWERED
+
+
+async def test_a_year_from_the_conversation_history_is_not_invented(layer):
+    history = FakeHistory(
+        (
+            ConversationTurn(
+                question="Qual foi a receita de junho de 2024?",
+                sql=COUNT_SQL,
+                status=AnswerStatus.ANSWERED,
+            ),
+        )
+    )
+
+    answer = await use_case(
+        layer,
+        ScriptedGenerator(generation(sql=TWO_YEARS_SQL)),
+        history=history,
+        history_turns=3,
+    ).ask("E o número de UCs?", "s1")
+
+    assert answer.status is AnswerStatus.ANSWERED
+
+
+async def test_a_count_written_with_a_unit_is_refused_with_the_reason(layer):
+    writer = FixedWriter(texts=("O total foi de 208 kWh.", "Foram 208 UCs."))
+    count = ScriptedExecutor(table(("total",), (208,)))
+
+    answer = await use_case(layer, ScriptedGenerator(generation()), count, writer).ask(
+        "Quantas UCs tiveram queda?", "s1"
+    )
+
+    assert answer.answer == "Foram 208 UCs."
+    assert "208" in writer.feedbacks[1] and "kWh" in writer.feedbacks[1]
+
+
+async def test_a_value_written_with_another_known_unit_is_refused(layer):
+    writer = FixedWriter(text="A receita foi de 1.200 kWh.")
+    money = ScriptedExecutor(table(("receita_faturada",), (Decimal("1200"),)))
+
+    answer = await use_case(layer, ScriptedGenerator(generation()), money, writer).ask(
+        "receita?", "s1"
+    )
+
+    assert answer.answer.startswith("A consulta devolveu")
+
+
+async def test_a_percentage_of_a_column_without_unit_is_kept(layer):
+    writer = FixedWriter(text="A taxa foi de 5,6%.")
+    rate_result = ScriptedExecutor(table(("taxa",), (Decimal("5.6"),)))
+
+    answer = await use_case(layer, ScriptedGenerator(generation()), rate_result, writer).ask(
+        "taxa?", "s1"
+    )
+
+    assert answer.answer == "A taxa foi de 5,6%."
+
+
+async def test_a_column_named_with_a_months_suffix_reaches_the_answer_as_a_duration(layer):
+    assumptions = ("Usei a média de consumo_medio_kwh_12m das UCs residenciais.",)
+
+    answer = await use_case(layer, ScriptedGenerator(generation(assumptions=assumptions))).ask(
+        "Qual é o consumo médio das UCs residenciais nos últimos 12 meses?", "s1"
+    )
+
+    assert answer.assumptions == (
+        "Usei a média de consumo médio mensal dos últimos 12 meses das UCs residenciais.",
+    )

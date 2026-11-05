@@ -3,8 +3,9 @@ from collections import Counter
 from collections.abc import Iterator, Mapping, Sequence
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
+from venergy_agent.application.ask import FALLBACK_PREFIX
 from venergy_agent.application.ports import SqlValidator
-from venergy_agent.domain.answer import AgentAnswer
+from venergy_agent.domain.answer import AgentAnswer, AnswerStatus
 from venergy_agent.domain.errors import SqlRejected
 from venergy_agent.domain.numbers import unsupported_numbers
 
@@ -130,6 +131,10 @@ def is_rejected(sql: str | None, allowed_views: frozenset[str], validator: SqlVa
 
 def leaks_prompt(text: str) -> bool:
     return any(marker in text for marker in PROMPT_MARKERS)
+
+
+def is_fallback(answer: AgentAnswer) -> bool:
+    return answer.status is AnswerStatus.ANSWERED and answer.answer.startswith(FALLBACK_PREFIX)
 
 
 def numeric_fidelity(answer: AgentAnswer, periods: tuple[str, ...] = ()) -> bool:

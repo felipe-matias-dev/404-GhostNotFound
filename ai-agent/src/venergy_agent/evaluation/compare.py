@@ -17,7 +17,7 @@ RUN_METRICS = (
     "follow_up_skipped",
     "other_dataset_skipped",
 )
-COMPARED_FIELDS = ("matched", "status", "numeric_fidelity", "judge_passed")
+COMPARED_FIELDS = ("matched", "status", "numeric_fidelity", "fallback", "judge_passed")
 DASH = "—"
 
 Metric = float | int | None

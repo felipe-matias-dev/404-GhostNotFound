@@ -125,7 +125,8 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | [DEC-066](#dec-066--insight-da-receita-dá-a-conclusão-não-repete-a-tela) | Insight da Receita dá a conclusão, não repete a tela | 01/11/2026 | Luis Felipe | adotada, revisada pela [DEC-077](#dec-077--insights-de-ia-nas-telas-do-dia-a-dia-com-a-ia-escolhendo-a-leitura) |
 | [DEC-070](#dec-070--checagem-da-narrativa-sem-descartar-texto-correto) | Checagem da narrativa sem descartar texto correto | 02/11/2026 | Luis Felipe | adotada, revisada pela [DEC-079](#dec-079--narrativa-recusada-tem-uma-segunda-chance-e-chega-arredondada) |
 | [DEC-077](#dec-077--insights-de-ia-nas-telas-do-dia-a-dia-com-a-ia-escolhendo-a-leitura) | Insights de IA nas telas do dia a dia, com a IA escolhendo a leitura | 03/11/2026 | Luis Felipe | adotada |
-| [DEC-079](#dec-079--narrativa-recusada-tem-uma-segunda-chance-e-chega-arredondada) | Narrativa recusada tem uma segunda chance e chega arredondada | 04/11/2026 | Luis Felipe | adotada |
+| [DEC-079](#dec-079--narrativa-recusada-tem-uma-segunda-chance-e-chega-arredondada) | Narrativa recusada tem uma segunda chance e chega arredondada | 04/11/2026 | Luis Felipe | adotada, revisada pela [DEC-080](#dec-080--agente-confiável-no-portal-depois-da-apresentação) |
+| [DEC-080](#dec-080--agente-confiável-no-portal-depois-da-apresentação) | Agente confiável no portal depois da apresentação | 04/11/2026 | Luis Felipe | adotada |
 
 ### Convenções sem número
 
@@ -2295,6 +2296,87 @@ Decisões de 19/10/2026, anteriores à numeração: [convenções do frontend](#
   - Rodada completa na Gold real, narrada e com o juiz (04/11/2026, 95 itens do golden set e 17 do red team), contra a de 03/11 nos mesmos 95 itens: execution accuracy 94,1% → 98,5%, status 95,8% → 100%, `failed` 3,2% → 0%, juiz 64,6% → 89,7% (nota média 4,11 → 4,74), fidelidade numérica 86,2% → 88,2%, red team sem violação. Nenhum item piorou no SQL ou no status, que é a regra da [DEC-016](#dec-016--exceção-de-versionamento-do-prompt-v1-proposta) para a troca do prompt. Pelos logs da etapa `resposta`, 11 narrativas foram recusadas na primeira tentativa (7 por número, 4 por período); 9 passaram na segunda, e 1 foi recusada de novo e saiu no texto de reserva.
   - Latência p50 de 3,3 s e p95 de 27,4 s (antes 2,8 s e 16,6 s): a segunda narração e, nessa rodada, a cota esgotada do primeiro modelo de reserva (429), que levou parte das perguntas ao modelo pago do OpenRouter. A melhora do SQL e do `failed` também reflete o provedor mais estável no dia, não só esta decisão.
 - **Consequências:** uma narrativa recusada custa uma chamada a mais ao modelo, e os tokens das duas narrações entram em `input_tokens` e `output_tokens` da resposta e no orçamento da sessão. O log da etapa `resposta` passa a trazer `attempt`. A porta `AnswerWriter.write` ganha o parâmetro opcional `feedback`.
+
+## DEC-080 · Agente confiável no portal depois da apresentação
+
+- **Data:** 04/11/2026 · **Área:** GenAI, Backend e Portal · **Autor:** Luis Felipe · **Revisa:** [DEC-079](#dec-079--narrativa-recusada-tem-uma-segunda-chance-e-chega-arredondada) (checagem e texto de reserva), [DEC-053](#dec-053--conversas-do-agente-por-usuário-no-banco) (conversa que o chat abre) e o contrato do `AgentAnswer` ([DEC-020](#dec-020--contrato-agentanswer-com-status-aceita))
+- **Contexto:** na apresentação, pelo portal, três respostas saíram ruins:
+  - **"De qual mês?":** em "Quanto era a receita sem tributos?", depois de uma pergunta sobre junho de 2026, o agente pediu o mês.
+  - **Texto de reserva cru:** a pergunta da diretora caiu no texto de reserva, porque a narrativa citou "12" de "12 primeiras e 12 últimas competências".
+  - **Percentual:** "percentil de tributos" saiu no texto de reserva com "25%", e a tabela mostrou "R$ 25,00".
+
+  Reproduzindo a conversa no portal, o que estava por trás era:
+  - **Conversa antiga:** o chat abria na última conversa salva do usuário, e não numa nova. Com o login do ensaio, a pergunta entrou numa conversa antiga, e o histórico misturou outros meses.
+  - **Arredondamento recusado:** o redator recebia "25" arredondado, mas a checagem exigia o valor exato (bug da DEC-079).
+  - **Coluna que não existe:** o modelo usou `tributos` em `sem_kpis_mensais`.
+  - **Tempo:** o Gemini gratuito estourava os 15 s por chamada, e as respostas levavam de 20 a 29 s.
+  - **Formatação no portal:** era decidida pelo nome da coluna, e `percentual_tributos` virava reais.
+- **Decisão:**
+  - **Conversa nova no portal:** o chat abre sempre numa conversa nova e vazia. As salvas ficam no histórico (`mesclarSessoes` mantém a vazia em primeiro; o `AgenteProvider` a marca como ativa).
+  - **Referência do follow-up:** o prompt de SQL `v4` diz que a referência de um follow-up é o turno mais recente do histórico, e que mês ou recorte herdado vira suposição, não pedido de esclarecimento.
+  - **Checagem da narrativa:**
+    - aceita o inteiro que é o valor arredondado para exibição ("25" para 24,9999…);
+    - aceita a duração escrita com "N primeiras/últimas" ou "N meses/competências" quando ela veio da pergunta ou das suposições;
+    - aceita os meses dentro de um `BETWEEN` do SQL;
+    - aceita o número da pergunta que o SQL executado usa como filtro ("acima de 300 kWh").
+  - **Checagem de unidade (nova):** a narrativa é recusada quando escreve R$, kWh, % ou h junto de um número cuja coluna tem outra unidade, ou R$/kWh junto de uma contagem ("208 kWh" para 208 UCs).
+  - **Motivo da recusa:** quando o número recusado está só na pergunta, o motivo diz isso.
+  - **Prazo:** a narração só começa se sobrarem `narration_min_seconds` (4 s) do prazo. Sem isso, a resposta sai direto no texto de reserva, em vez de esperar o estouro.
+  - **Ano não pedido:** se o SQL usa um ano que não aparece na pergunta nem no histórico (nem um ano vizinho a eles), o agente pede o período em vez de responder. O modelo não escolhe períodos sozinho, mesmo quando foge da regra do prompt.
+  - **Texto de reserva:**
+    - rótulos em português ("efeito preço", "receita de energia", "DEC");
+    - "-R$" para negativos;
+    - "1 linha" e "N linhas";
+    - sem ponto duplicado;
+    - suposições em palavras, com as views pelo nome ("totais mensais").
+  - **Suposições no `AgentAnswer`:** saem em palavras.
+  - **Contrato:** o `AgentAnswer` ganha `column_units` (unidade de cada coluna conhecida, inclusive aliases como `receita_2024` → R$ e `*_percentual` → %) e `column_labels` (rótulo em português). O backend grava os dois na auditoria (colunas JSONB acrescentadas por `garantir_estrutura_da_auditoria`) e os devolve no `POST /ai/ask` e na auditoria. O portal formata a célula pela unidade e mostra o rótulo no cabeçalho; sem unidade, o percentual vence o nome de dinheiro.
+  - **Camada semântica 0.4.2:**
+    - glossário de tributos;
+    - regra do percentual de tributos (`receita_faturada - receita_energia`);
+    - regra das perguntas de "por que" (efeitos de tarifa, bandeira, volume e mix separados, sem usar as porcentagens da pergunta);
+    - dois exemplos novos.
+  - **Prompt da narração `answer/v5`:** explica o porquê com os efeitos, escreve reduções sem sinal de menos e diz o que uma contagem conta.
+  - **Modelo principal:** o Gemini Flash-Lite pago do OpenRouter é o principal recomendado (`LLM_MODEL` no `.env` da raiz, novo no compose). O Gemini gratuito vira a primeira reserva, e o Claude Haiku, a última. O compose também passa `AGENT_SESSION_TOKEN_BUDGET`.
+  - **Avaliação:**
+    - `fallback_rate` (respostas `answered` no texto de reserva) entra nas métricas e no `make eval-compare`;
+    - golden set 0.19.0 com G106 a G110: a conversa da apresentação e a pergunta da diretora.
+- **Alternativas descartadas:**
+  - aceitar qualquer número da pergunta: a pergunta pode trazer premissa falsa;
+  - resposta pronta para as perguntas da apresentação: o agente precisa responder qualquer pergunta;
+  - formatar no portal pelo nome da coluna: um alias novo (`percentual_tributos`) quebra a regra;
+  - pedir a Dados a coluna `tributos` em `gold_kpis_mensais`: resolvido no agente, por decisão do Luis Felipe.
+- **Validação:** cada mudança foi conferida no portal (navegador, login `henrique`, página Agente):
+  - a conversa da apresentação (junho de 2026 → sem tributos → percentual de tributos) saiu certa e narrada, em 4 a 5 s;
+  - a pergunta da diretora foi respondida com os quatro efeitos;
+  - "queda acima de 30%" sem período pediu o período, e com "Entre 2024 e 2025" respondeu "208 UCs";
+  - FEC do alimentador do Iputinga e o bairro com maior queda saíram certos;
+  - pela API, 17 perguntas complexas saíram com o texto do modelo, em 4 a 7 s.
+- **Evidência:**
+  - **Rodada completa:** Gold real, narrada, com juiz, golden 0.19.0 (100 itens) e red team (17), modelo pago como principal (04/11/2026).
+  - **Contra a de 03/11, nos 95 itens em comum:**
+
+    | Métrica | 03/11 | 04/11 |
+    |---|---|---|
+    | execution accuracy | 94,1% | 100% |
+    | status | 95,8% | 100% |
+    | `failed` | 3,2% | 0% |
+    | juiz, aprovação (nota média) | 64,6% (4,11) | 97,1% (4,91) |
+    | latência p50 | 2,8 s | 4,2 s |
+    | latência p95 | 16,6 s | 6,4 s |
+
+  - **Contra a DEC-079:** nenhum item piorou no SQL ou no status (regra da [DEC-016](#dec-016--exceção-de-versionamento-do-prompt-v1-proposta)).
+  - **Texto de reserva** (`fallback_rate`, métrica nova): 1,4% das respostas (1 de 73).
+    - Foi o G008, por causa do nome `consumo_medio_kwh_12m` repetido como "12m". Isso foi corrigido depois da rodada, com o rótulo "consumo médio mensal dos últimos 12 meses" e "Nm" lido como "N meses".
+  - **Itens novos:** G106 a G110 certos, com nota 5 do juiz.
+  - **Juiz:** o G057 levou nota 2 porque o texto não cita o filtro "acima de 30%" (tarefa T7 do plano de robustez).
+  - **Fidelidade numérica (86,2% → 82,4%):** a métrica da avaliação não conhece as durações, os meses dentro de um `BETWEEN` nem os filtros do SQL que a checagem do agente passou a aceitar. Fica como pendência da avaliação.
+  - **Red team:** sem violação. O R015 continua como "não sei" em vez de recusa, como na DEC-079.
+- **Consequências:**
+  - o backend ganha duas colunas na auditoria, acrescentadas sem apagar nada (DEC-050);
+  - `contracts/openapi.json` e os tipos do portal foram regerados;
+  - quem sobe a demo precisa do `LLM_MODEL` e da `OPENROUTER_API_KEY` no `.env` da raiz para usar o modelo pago.
+  - **Pendência menor do portal:** o FEC na tabela usa 2 casas, e o texto, 3.
 
 ## Convenções do frontend (sem número)
 

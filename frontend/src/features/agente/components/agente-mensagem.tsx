@@ -248,7 +248,7 @@ export function AgenteTurnoItem({
 													scope="col"
 													className="whitespace-nowrap px-3 py-2 text-left font-medium text-text-muted"
 												>
-													{coluna}
+													{resposta.column_labels?.[coluna] ?? coluna}
 												</th>
 											))}
 										</tr>
@@ -265,7 +265,11 @@ export function AgenteTurnoItem({
 														key={coluna}
 														className="whitespace-nowrap px-3 py-2 tabular-nums text-text"
 													>
-														{formatarCelulaResultado(coluna, linha[coluna])}
+														{formatarCelulaResultado(
+															coluna,
+															linha[coluna],
+															resposta.column_units?.[coluna],
+														)}
 													</td>
 												))}
 											</tr>

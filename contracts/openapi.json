@@ -4414,6 +4414,22 @@
             "type": "integer",
             "title": "Output Tokens"
           },
+          "column_units": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Column Units",
+            "default": {}
+          },
+          "column_labels": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Column Labels",
+            "default": {}
+          },
           "pergunta": {
             "type": "string",
             "title": "Pergunta"
@@ -7207,6 +7223,22 @@
           "output_tokens": {
             "type": "integer",
             "title": "Output Tokens"
+          },
+          "column_units": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Column Units",
+            "default": {}
+          },
+          "column_labels": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Column Labels",
+            "default": {}
           },
           "session_id": {
             "type": "string",

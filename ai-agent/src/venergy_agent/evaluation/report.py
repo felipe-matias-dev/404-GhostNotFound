@@ -21,6 +21,7 @@ class ItemResult(BaseModel):
     blocked: bool = False
     prompt_leak: bool
     numeric_fidelity: bool | None
+    fallback: bool | None = None
     latency_ms: int | None
     agent_input_tokens: int = 0
     agent_output_tokens: int = 0

@@ -945,6 +945,20 @@ export interface components {
             input_tokens: number;
             /** Output Tokens */
             output_tokens: number;
+            /**
+             * Column Units
+             * @default {}
+             */
+            column_units: {
+                [key: string]: string;
+            };
+            /**
+             * Column Labels
+             * @default {}
+             */
+            column_labels: {
+                [key: string]: string;
+            };
             /** Pergunta */
             pergunta: string;
             /**
@@ -1845,6 +1859,20 @@ export interface components {
             input_tokens: number;
             /** Output Tokens */
             output_tokens: number;
+            /**
+             * Column Units
+             * @default {}
+             */
+            column_units: {
+                [key: string]: string;
+            };
+            /**
+             * Column Labels
+             * @default {}
+             */
+            column_labels: {
+                [key: string]: string;
+            };
             /** Session Id */
             session_id: string;
         };
