@@ -106,8 +106,8 @@ export function DecomposicaoTable({
 			width: "minmax(120px, 1.4fr)",
 			value: (l) => l.segmento,
 		},
-		valor("receita_base", "Receita de energia base", false),
-		valor("receita_atual", "Receita de energia atual", false),
+		valor("receita_base", "Energia base", false),
+		valor("receita_atual", "Energia atual", false),
 		valor("variacao_receita", "Variação", true),
 		VARIACAO_PCT,
 		// Efeitos na ordem e com os nomes da ponte. O efeito preço fica de fora: é tarifa + bandeira.
