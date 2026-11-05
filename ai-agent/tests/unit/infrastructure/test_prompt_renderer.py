@@ -458,3 +458,22 @@ def test_a_misspelled_term_gets_a_delimited_hint_and_no_hint_when_nothing_is_clo
         Question(text="percentil de tributos", session_id="s1"), None, CORRECTION, real, NONCE
     )
     assert "pode ser" not in known
+
+
+def test_answer_user_prompt_tells_the_narrator_when_the_result_was_cut():
+    question = Question(text="liste", session_id="s1")
+    draft = SqlDraft(status=DraftStatus.OK, sql="SELECT 1")
+    cut = QueryResult(columns=("a",), rows=({"a": 1},), row_count=4223, truncated=True)
+    whole = QueryResult(columns=("a",), rows=({"a": 1},), row_count=1, truncated=False)
+
+    assert "resultado truncado: sim" in render_answer_user(question, draft, cut, NONCE)
+    assert "resultado truncado: não" in render_answer_user(question, draft, whole, NONCE)
+
+
+def test_the_answer_prompt_in_use_is_v6_and_states_the_sample_rule():
+    from venergy_agent.config import AGENT_ROOT, AgentSettings
+
+    template = AgentSettings.model_fields["answer_prompt_version"].default
+    assert template == "v6"
+    text = (AGENT_ROOT / "prompts" / "answer" / "v6" / "answer.md").read_text(encoding="utf-8")
+    assert "resultado truncado" in text and "amostra" in text

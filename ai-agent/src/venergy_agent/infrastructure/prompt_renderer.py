@@ -183,6 +183,7 @@ def render_answer_user(
         [
             f"colunas: {columns}",
             f"total de linhas: {result.row_count}",
+            f"resultado truncado: {'sim' if result.truncated else 'não'}",
             "suposições declaradas:",
             assumptions,
             "linhas:",
