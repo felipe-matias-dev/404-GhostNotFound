@@ -178,3 +178,24 @@ def test_row_count_below_sample_size_is_rejected():
 def test_units_must_name_columns_of_the_rows():
     with pytest.raises(ValidationError):
         answer(AnswerStatus.ANSWERED, column_units={"outra": "R$"})
+
+
+def test_clarification_options_only_make_sense_for_a_clarify_answer():
+    base = dict(
+        answer="texto",
+        sql=None,
+        rows=(),
+        row_count=0,
+        truncated=False,
+        confidence=Confidence.UNKNOWN,
+        sources=(),
+        assumptions=(),
+        refused_reason="fora do escopo",
+        request_id="r1",
+        model="m",
+        prompt_version="v4",
+        latency_ms=1,
+        clarification_options=("em 2025",),
+    )
+    with pytest.raises(ValidationError):
+        AgentAnswer(status=AnswerStatus.REFUSED, clarification=None, **base)

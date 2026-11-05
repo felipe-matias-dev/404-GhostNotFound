@@ -1704,3 +1704,14 @@ async def test_a_percentage_threshold_is_not_invented_when_the_sql_uses_its_comp
     ).ask("Quantas UCs tiveram queda acima de 30%?", "s1")
 
     assert answer.answer == "Há 3 UCs com queda acima de 30%."
+
+
+async def test_a_period_clarification_offers_the_years_the_sql_assumed(layer):
+    answer = await use_case(
+        layer,
+        ScriptedGenerator(generation(sql=TWO_YEARS_SQL)),
+        ScriptedExecutor(result()),
+    ).ask("Quantas UCs com painel solar em Olinda tiveram queda de consumo acima de 30%?", "s1")
+
+    assert answer.status is AnswerStatus.CLARIFY
+    assert answer.clarification_options == ("em 2023", "em 2024", "nos últimos 12 meses")

@@ -427,7 +427,12 @@ class AskUseCase:
                     years=list(invented),
                 )
                 return self._clarify(
-                    PERIOD_NOT_GIVEN, request_id, started, model=generation.model, spent=spent
+                    PERIOD_NOT_GIVEN,
+                    request_id,
+                    started,
+                    model=generation.model,
+                    spent=spent,
+                    options=_period_options(invented),
                 )
             began = time.perf_counter()
 
@@ -814,7 +819,14 @@ class AskUseCase:
         return Confidence.HIGH
 
     def _clarify(
-        self, clarification: str, request_id: str, started: float, *, model: str, spent: _Spent
+        self,
+        clarification: str,
+        request_id: str,
+        started: float,
+        *,
+        model: str,
+        spent: _Spent,
+        options: tuple[str, ...] = (),
     ) -> AgentAnswer:
         return AgentAnswer(
             answer=CLARIFY_PREFIX + clarification,
@@ -827,6 +839,7 @@ class AskUseCase:
             sources=(),
             assumptions=(),
             clarification=clarification,
+            clarification_options=options,
             refused_reason=None,
             request_id=request_id,
             model=model,
@@ -1025,3 +1038,12 @@ def _conflicts(column_unit: str | None, written: str, value: object) -> bool:
     if written == "h":
         return "h" not in column_unit or column_unit.startswith("kWh")
     return not column_unit.startswith(written)
+
+
+PERIOD_OPTION_LIMIT = 2
+LAST_TWELVE_MONTHS = "nos últimos 12 meses"
+
+
+def _period_options(years: tuple[str, ...]) -> tuple[str, ...]:
+    """Até três opções para o pedido de período: os anos que o SQL assumiu e os últimos 12 meses."""
+    return (*(f"em {year}" for year in years[:PERIOD_OPTION_LIMIT]), LAST_TWELVE_MONTHS)

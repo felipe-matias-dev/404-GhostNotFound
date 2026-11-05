@@ -27,6 +27,7 @@ import {
 } from "../conversions";
 import type { TurnoConversa } from "../types";
 import { AgenteAuditoria } from "./agente-auditoria";
+import { useAgente } from "./agente-provider";
 
 const PONTO_STATUS = {
 	success: "bg-success",
@@ -57,6 +58,7 @@ export function AgenteTurnoItem({
 	const [detalhesAbertos, setDetalhesAbertos] = useState(false);
 	const [linhasMostradas, setLinhasMostradas] = useState(PASSO_TABELA);
 	const { data: usuario } = useSession();
+	const { enviarPergunta } = useAgente();
 	const [tabelaAberta, setTabelaAberta] = useState<boolean | null>(null);
 	const [sqlAberto, setSqlAberto] = useState(false);
 	const [copiado, setCopiado] = useState(false);
@@ -228,6 +230,24 @@ export function AgenteTurnoItem({
 								<p className="rounded-md border border-warning bg-warning-subtle p-2.5 text-small text-text">
 									{resposta.refused_reason}
 								</p>
+							)}
+
+						{resposta.status === "clarify" &&
+							resposta.clarification_options.length > 0 && (
+								<div className="flex flex-wrap gap-2">
+									{resposta.clarification_options.map((opcao) => (
+										<Button
+											key={opcao}
+											type="button"
+											variant="outline"
+											size="sm"
+											disabled={enviando}
+											onClick={() => void enviarPergunta(opcao)}
+										>
+											{opcao}
+										</Button>
+									))}
+								</div>
 							)}
 
 						{resposta.assumptions.length > 0 && (

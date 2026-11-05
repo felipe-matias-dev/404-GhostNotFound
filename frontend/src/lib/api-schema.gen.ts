@@ -959,6 +959,11 @@ export interface components {
             column_labels: {
                 [key: string]: string;
             };
+            /**
+             * Clarification Options
+             * @default []
+             */
+            clarification_options: string[];
             /** Pergunta */
             pergunta: string;
             /**
@@ -1873,6 +1878,11 @@ export interface components {
             column_labels: {
                 [key: string]: string;
             };
+            /**
+             * Clarification Options
+             * @default []
+             */
+            clarification_options: string[];
             /** Session Id */
             session_id: string;
         };

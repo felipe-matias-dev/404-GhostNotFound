@@ -33,6 +33,7 @@ function resposta(answer = "Receita faturada: R$ 1.000,00"): RespostaIa {
 	return {
 		audit_id: 1,
 		answer,
+		clarification_options: [],
 		status: "answered",
 		sql: "select 1",
 		rows: [],
