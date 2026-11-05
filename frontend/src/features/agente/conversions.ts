@@ -169,8 +169,9 @@ function formatarPelaUnidade(valor: number, unidade: string): string {
 	if (unidade === "h") return formatHoras(valor);
 	if (unidade === "%") return `${formatAteDuasCasas(valor)}%`;
 	if (unidade === "contagem") return formatInteiro(valor);
-	if (unidade === "nota") return formatNumero(valor);
-	return `${formatNumero(valor)} ${unidade}`;
+	if (unidade === "nota") return formatAteDuasCasas(valor);
+	if (unidade.startsWith("kWh")) return `${formatInteiro(valor)} ${unidade}`;
+	return `${formatAteDuasCasas(valor)} ${unidade}`;
 }
 
 /**

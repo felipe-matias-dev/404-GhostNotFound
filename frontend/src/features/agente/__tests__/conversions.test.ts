@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ApiError } from "#/lib/api";
+import { formatBRL } from "#/lib/format";
 import {
 	camposDaAuditoria,
 	desfazerAlteracao,
@@ -517,5 +518,18 @@ describe("tabela da resposta", () => {
 		expect(proximoLimiteTabela(20, 45)).toBe(40);
 		expect(proximoLimiteTabela(40, 45)).toBe(45);
 		expect(proximoLimiteTabela(45, 45)).toBe(45);
+	});
+});
+
+describe("unidades da camada na tabela, iguais ao texto", () => {
+	it("R$ com duas casas, kWh/mês inteiro, R$/kWh e UC·h com até duas casas", () => {
+		expect(formatarCelulaResultado("receita", 1234.5, "R$")).toBe(
+			formatBRL(1234.5),
+		);
+		expect(formatarCelulaResultado("consumo", 433.6, "kWh/mês")).toBe(
+			"434 kWh/mês",
+		);
+		expect(formatarCelulaResultado("tarifa", 0.5, "R$/kWh")).toBe("0,5 R$/kWh");
+		expect(formatarCelulaResultado("horas", 12.345, "UC·h")).toBe("12,35 UC·h");
 	});
 });

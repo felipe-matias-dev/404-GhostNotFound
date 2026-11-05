@@ -177,7 +177,7 @@ def test_a_duration_from_the_question_is_supported_with_its_period_unit(text):
     [
         (Decimal("0.0256"), "h", Decimal("0.03")),
         (Decimal("0.024"), "h", Decimal("0.02")),
-        (Decimal("1234.50"), "R$", Decimal("1234.5")),
+        (Decimal("0.5"), "R$/kWh", Decimal("0.5")),
         (Decimal("3.456"), "%", Decimal("3.46")),
         (Decimal("0.50"), "%", Decimal("0.5")),
     ],
@@ -199,3 +199,12 @@ def test_energy_and_counts_are_whole_numbers(value, unit, expected):
 
 def test_without_a_unit_the_display_rule_is_the_old_one():
     assert display_for_unit(Decimal("0.024567"), None) == rounded_for_display(Decimal("0.024567"))
+
+
+def test_money_keeps_two_decimals_so_it_matches_the_table_currency_format():
+    assert str(display_for_unit(Decimal("1234.5"), "R$")) == "1234.50"
+    assert str(display_for_unit(Decimal("1234.567"), "R$")) == "1234.57"
+
+
+def test_consumption_per_month_is_a_whole_number_like_kwh():
+    assert display_for_unit(Decimal("433.6"), "kWh/mês") == Decimal("434")
