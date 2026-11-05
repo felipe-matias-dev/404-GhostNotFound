@@ -127,6 +127,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | [DEC-077](#dec-077--insights-de-ia-nas-telas-do-dia-a-dia-com-a-ia-escolhendo-a-leitura) | Insights de IA nas telas do dia a dia, com a IA escolhendo a leitura | 03/11/2026 | Luis Felipe | adotada |
 | [DEC-079](#dec-079--narrativa-recusada-tem-uma-segunda-chance-e-chega-arredondada) | Narrativa recusada tem uma segunda chance e chega arredondada | 04/11/2026 | Luis Felipe | adotada, revisada pela [DEC-080](#dec-080--agente-confiável-no-portal-depois-da-apresentação) |
 | [DEC-080](#dec-080--agente-confiável-no-portal-depois-da-apresentação) | Agente confiável no portal depois da apresentação | 04/11/2026 | Luis Felipe | adotada |
+| [DEC-081](#dec-081--casas-decimais-por-unidade-iguais-no-texto-e-na-tabela) | Casas decimais por unidade iguais no texto e na tabela | 04/11/2026 | Lucas (T4 do plano de robustez) | adotada, pendente de rodada completa (DEC-016) |
 
 ### Convenções sem número
 
@@ -2405,3 +2406,21 @@ Decisões de 19/10/2026, anteriores à numeração: [convenções do frontend](#
 - **Alternativas descartadas:** cada uma com o motivo.
 - **Consequências:** o que muda para as outras frentes.
 ```
+
+## DEC-081 · Casas decimais por unidade iguais no texto e na tabela
+
+- **Data:** 04/11/2026 · **Área:** GenAI e Portal · **Autor:** Lucas (T4 do plano de robustez, `ai-agent/docs/plans/2026-11-05-robustez-do-agente.md`) · **Revisa:** nenhuma; complementa a DEC-080.
+- **Contexto:** o mesmo número saía diferente no texto e na tabela. Na Gold real, o texto de reserva mostrava DEC "0,024" (três algarismos significativos abaixo de 1) e a tabela "0,02". A tabela também mostrava contagem com uma casa decimal, e o consumo mensal (kWh/mês) com a regra antiga no texto.
+- **Decisão:** a mesma regra vale para o texto (`display_for_unit`, em `domain/numbers.py`) e para a tabela (`agente/conversions.ts`), pela unidade que a camada semântica declara:
+  - R$: sempre duas casas, como a moeda da tabela.
+  - R$/kWh, h, %, UC·h: até duas casas, sem zeros finais.
+  - kWh, kWh/mês e contagem: inteiros.
+  - Demais unidades (anos, dias, interrupções, kWp, nota): regra antiga no texto e até duas casas na tabela.
+- **Consequências:**
+  - A entrada do narrador usa as mesmas duas casas para as unidades de duas casas. Isso muda o que o modelo vê, então vale a DEC-016.
+  - kWh e contagem continuam com a regra antiga na entrada do narrador. O conferidor numérico só aceita inteiro arredondado de valor já inteiro; mudar isso exige commit próprio no conferidor.
+  - Valores de h, % e R$ abaixo de 1 mudam de casas no texto e na tabela.
+- **Pendências:**
+  - Rodada completa do golden com a nova entrada do narrador, antes do merge (DEC-016). Esta rodada não foi feita: a cota diária do Gemini estava esgotada.
+  - Revisar a regra das demais unidades se a tabela e o texto divergirem em valores abaixo de 1.
+- **Evidência:** testes de `display_for_unit` (representação, não só o valor, pelo problema de expoente do `Decimal`), testes de prompt e do texto de reserva, e testes de formatação da tabela (suíte do frontend com 230 testes).
