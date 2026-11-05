@@ -215,7 +215,10 @@ export function AgenteTurnoItem({
 							)}
 						</div>
 
-						<p className="whitespace-pre-line text-body text-text">
+						<p
+							data-testid="agente-resposta-texto"
+							className="whitespace-pre-line text-body text-text"
+						>
 							{resposta.answer}
 						</p>
 
@@ -247,7 +250,10 @@ export function AgenteTurnoItem({
 						)}
 
 						{tabelaVisivel && resposta.rows.length > 0 && (
-							<div className="overflow-x-auto rounded-md border border-border bg-surface-2/40">
+							<div
+								data-testid="agente-tabela"
+								className="overflow-x-auto rounded-md border border-border bg-surface-2/40"
+							>
 								<table className="w-full border-collapse text-small">
 									<thead>
 										<tr className="border-b border-border">

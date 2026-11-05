@@ -16,7 +16,8 @@
     "storybook": "storybook dev --port 6006",
     "build-storybook": "storybook build",
     "gen:mapa": "node scripts/gerar-mapa-rmr.mjs",
-    "test": "vitest run"
+    "test": "vitest run",
+    "e2e": "playwright test"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",
@@ -48,6 +49,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.5",
+    "@playwright/test": "^1.64.1",
     "@rolldown/plugin-babel": "^0.2.3",
     "@storybook/addon-a11y": "10.6.3",
     "@storybook/addon-docs": "10.6.3",
