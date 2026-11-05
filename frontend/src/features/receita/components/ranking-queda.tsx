@@ -18,7 +18,11 @@ import type { DecomposicaoLinha } from "../types";
 
 const MEDIDAS: { id: Medida; rotulo: string; nome: string }[] = [
 	{ id: "brl", rotulo: "R$", nome: "Ranquear pelo valor em reais" },
-	{ id: "pct", rotulo: "%", nome: "Ranquear pelo percentual da receita base" },
+	{
+		id: "pct",
+		rotulo: "%",
+		nome: "Ranquear pelo percentual da receita de energia base",
+	},
 ];
 
 const LIMITE = 5;
@@ -83,12 +87,12 @@ export function RankingQueda({
 		(ranking.houveQueda
 			? `${ranking.quedas} de ${ranking.total} ${PLURAL[nivel]} ${
 					ranking.quedas === 1 ? "perdeu" : "perderam"
-				} receita${POR[efeito]}`
-			: `${NENHUM[nivel]} perdeu receita${POR[efeito]}`);
+				} receita de energia${POR[efeito]}`
+			: `${NENHUM[nivel]} perdeu receita de energia${POR[efeito]}`);
 	const leitura =
 		contagem &&
 		(semBase
-			? `${contagem}. Sem receita base para comparar em %: veja em R$.`
+			? `${contagem}. Sem receita de energia base para comparar em %: veja em R$.`
 			: ranking?.houveQueda
 				? `${contagem}.`
 				: `${contagem}: abaixo, quem subiu menos.`);
