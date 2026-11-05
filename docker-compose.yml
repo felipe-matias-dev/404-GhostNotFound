@@ -42,8 +42,9 @@ services:
       # Agente de IA: usuário somente leitura e chave do Gemini de cada integrante (.env da raiz).
       VENERGY_AGENT_DATABASE_URL: postgresql://venergy_agent:${AGENT_DB_PASSWORD}@db:5432/venergy
       VENERGY_AGENT_GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
-      # Modelo principal do agente. Recomendado: o Gemini Flash-Lite pago do OpenRouter, que não
-      # espera os 15 s de cada falha do plano gratuito (DEC-080). O padrão continua sem chave paga.
+      # Modelo principal do agente. O padrão é o Gemini gratuito. Com crédito no OpenRouter, o
+      # Gemini Flash-Lite pago evita os 15 s de cada falha do plano gratuito (DEC-080); o custo
+      # e quem decide ligá-lo estão no .env.example.
       VENERGY_AGENT_LLM_MODEL: ${LLM_MODEL:-google-gla:gemini-3.1-flash-lite}
       # Tokens por usuário em 24 h (0 desliga), conferidos antes de chamar o modelo (DEC-046).
       VENERGY_AGENT_SESSION_TOKEN_BUDGET: ${AGENT_SESSION_TOKEN_BUDGET:-200000}

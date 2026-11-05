@@ -267,7 +267,13 @@ OPENROUTER_API_KEY=...
 | 1 | `google-gla:gemini-3.1-flash-lite`, gratuito | falha do OpenRouter |
 | 2 | `openrouter:anthropic/claude-haiku-5.5`, pago (US$ 0,10 / 0,50) | queda do Google inteiro, que derruba os dois Gemini |
 
-Sem chave paga, `LLM_MODEL` fica vazio e o padrão do compose é o Gemini gratuito, com `GEMINI_FALLBACK_MODEL` (padrão `google-gla:gemini-3.5-flash`) como reserva. Uma pergunta custa menos de um centavo de dólar com o modelo pago.
+O modelo pago é opcional: sem chave paga, `LLM_MODEL` fica vazio e o padrão do compose é o Gemini gratuito, com `GEMINI_FALLBACK_MODEL` (padrão `google-gla:gemini-3.5-flash`) como reserva.
+
+**Custo e quem decide:**
+- uma pergunta custa menos de US$ 0,01;
+- uma rodada completa do golden set na Gold real, narrada e com juiz, gasta cerca de 1,3 milhão de tokens do agente, perto de US$ 0,40;
+- o crédito é do grupo, e quem decide pôr crédito ou ligar o modelo pago num ambiente novo é o time de GenAI (Luis Felipe);
+- as chamadas pagas aparecem em openrouter.ai/activity.
 
 - A variável de reserva aceita uma **cadeia**, separada por vírgula, tentada em ordem. Cada modelo tem 15 s de tempo limite e, depois de uma falha, fica 60 s fora da cadeia: numa queda, só a primeira pergunta paga a espera.
 - O Haiku foi testado como único modelo em 13 perguntas do golden set na Gold real (04/11/2026), uma ou duas de cada tipo: SQL certo em 10 de 13 e status certo em 13 de 13, com latência mediana de 4,3 s. É um teste curto, suficiente para a última linha da cadeia, não uma rodada completa.

@@ -1601,3 +1601,33 @@ async def test_a_column_named_with_a_months_suffix_reaches_the_answer_as_a_durat
     assert answer.assumptions == (
         "Usei a média de consumo médio mensal dos últimos 12 meses das UCs residenciais.",
     )
+
+
+LAST_MONTHS_SQL = (
+    "SELECT sum(receita_faturada) AS receita FROM sem_kpis_mensais WHERE competencia >= '2025-07'"
+)
+
+
+@pytest.mark.parametrize(
+    "question",
+    [
+        "Qual foi a receita nos últimos 12 meses?",
+        "Qual foi a receita no primeiro ano da base?",
+    ],
+)
+async def test_a_period_relative_to_the_base_does_not_need_its_years_in_the_question(
+    layer, question
+):
+    answer = await use_case(layer, ScriptedGenerator(generation(sql=LAST_MONTHS_SQL))).ask(
+        question, "s1"
+    )
+
+    assert answer.status is AnswerStatus.ANSWERED
+
+
+async def test_a_calendar_last_year_without_years_still_asks_for_the_period(layer):
+    answer = await use_case(layer, ScriptedGenerator(generation(sql=LAST_MONTHS_SQL))).ask(
+        "Qual foi a receita no último ano?", "s1"
+    )
+
+    assert answer.clarification == PERIOD_NOT_GIVEN

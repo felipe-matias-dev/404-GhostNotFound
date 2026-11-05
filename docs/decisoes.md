@@ -2322,7 +2322,7 @@ Decisões de 19/10/2026, anteriores à numeração: [convenções do frontend](#
   - **Checagem de unidade (nova):** a narrativa é recusada quando escreve R$, kWh, % ou h junto de um número cuja coluna tem outra unidade, ou R$/kWh junto de uma contagem ("208 kWh" para 208 UCs).
   - **Motivo da recusa:** quando o número recusado está só na pergunta, o motivo diz isso.
   - **Prazo:** a narração só começa se sobrarem `narration_min_seconds` (4 s) do prazo. Sem isso, a resposta sai direto no texto de reserva, em vez de esperar o estouro.
-  - **Ano não pedido:** se o SQL usa um ano que não aparece na pergunta nem no histórico (nem um ano vizinho a eles), o agente pede o período em vez de responder. O modelo não escolhe períodos sozinho, mesmo quando foge da regra do prompt.
+  - **Ano não pedido:** se o SQL usa um ano que não aparece na pergunta nem no histórico (nem um ano vizinho a eles), o agente pede o período em vez de responder. O modelo não escolhe períodos sozinho, mesmo quando foge da regra do prompt. A trava não vale quando a pergunta diz um período relativo à base ("últimos 12 meses", "primeiro ano da base"): os anos do SQL vêm dessa janela, e não de uma escolha do modelo (revisão do Lucas no PR #144).
   - **Texto de reserva:**
     - rótulos em português ("efeito preço", "receita de energia", "DEC");
     - "-R$" para negativos;
@@ -2337,7 +2337,7 @@ Decisões de 19/10/2026, anteriores à numeração: [convenções do frontend](#
     - regra das perguntas de "por que" (efeitos de tarifa, bandeira, volume e mix separados, sem usar as porcentagens da pergunta);
     - dois exemplos novos.
   - **Prompt da narração `answer/v5`:** explica o porquê com os efeitos, escreve reduções sem sinal de menos e diz o que uma contagem conta.
-  - **Modelo principal:** o Gemini Flash-Lite pago do OpenRouter é o principal recomendado (`LLM_MODEL` no `.env` da raiz, novo no compose). O Gemini gratuito vira a primeira reserva, e o Claude Haiku, a última. O compose também passa `AGENT_SESSION_TOKEN_BUDGET`.
+  - **Modelo principal:** o Gemini Flash-Lite pago do OpenRouter é opcional e pode ser o principal (custo e decisão no `.env.example` e no README do agente) (`LLM_MODEL` no `.env` da raiz, novo no compose). O Gemini gratuito vira a primeira reserva, e o Claude Haiku, a última. O compose também passa `AGENT_SESSION_TOKEN_BUDGET`.
   - **Avaliação:**
     - `fallback_rate` (respostas `answered` no texto de reserva) entra nas métricas e no `make eval-compare`;
     - golden set 0.19.0 com G106 a G110: a conversa da apresentação e a pergunta da diretora.

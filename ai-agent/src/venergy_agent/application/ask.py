@@ -108,6 +108,7 @@ PERIOD_NOT_GIVEN = (
     '"de janeiro a março de 2025".'
 )
 YEAR = re.compile(r"\b(?:19|20)\d{2}\b")
+BASE_RELATIVE = re.compile(r"\b(?:primeiro|último)\s+ano\s+da\s+(?:nossa\s+)?base\b", re.IGNORECASE)
 GENERIC_CLARIFICATION = (
     "Pode dizer o período e o recorte (município, bairro ou classe) que você quer consultar?"
 )
@@ -984,7 +985,7 @@ def _invented_years(
     question: str, history: tuple[ConversationTurn, ...], validated: ValidatedQuery
 ) -> tuple[str, ...]:
     used = {period[:4] for period in validated.periods} | set(validated.years)
-    if not used:
+    if not used or durations(question) or BASE_RELATIVE.search(question):
         return ()
     context = " ".join([question, *(f"{turn.question} {turn.sql or ''}" for turn in history)])
     named = {int(year) for year in YEAR.findall(context)}
