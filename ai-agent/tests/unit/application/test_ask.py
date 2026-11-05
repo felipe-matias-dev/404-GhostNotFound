@@ -61,10 +61,12 @@ class ScriptedGenerator:
         self._outcomes = outcomes
         self.feedbacks = []
         self.histories = []
+        self.questions = []
 
     async def generate(self, question, layer, feedback, history=()):
         self.feedbacks.append(feedback)
         self.histories.append(history)
+        self.questions.append(question.text)
         outcome = self._outcomes[min(len(self.feedbacks), len(self._outcomes)) - 1]
         if isinstance(outcome, Exception):
             raise outcome
@@ -1631,3 +1633,40 @@ async def test_a_calendar_last_year_without_years_still_asks_for_the_period(laye
     )
 
     assert answer.clarification == PERIOD_NOT_GIVEN
+
+
+CLARIFY_TURN = turn("queda acima de 30%", sql=None, status="clarify")
+
+
+async def test_an_answer_to_a_clarification_completes_the_original_question(layer, caplog):
+    generator = ScriptedGenerator(generation())
+    history = FakeHistory((CLARIFY_TURN,))
+
+    with caplog.at_level(logging.INFO, logger="venergy_agent.ask"):
+        await use_case(layer, generator, history=history, history_turns=3).ask(
+            "entre 2024 e 2025", "s1"
+        )
+
+    assert generator.questions == ["queda acima de 30% Esclarecimento: entre 2024 e 2025"]
+    assert "pergunta_completada" in caplog.text
+    assert "queda acima de 30%" not in caplog.text
+
+
+async def test_a_new_complete_question_after_a_clarification_is_not_completed(layer):
+    generator = ScriptedGenerator(generation())
+    history = FakeHistory((CLARIFY_TURN,))
+
+    await use_case(layer, generator, history=history, history_turns=3).ask(
+        "Quantas UCs existem na base?", "s1"
+    )
+
+    assert generator.questions == ["Quantas UCs existem na base?"]
+
+
+async def test_a_reply_after_an_answer_is_not_treated_as_a_clarification(layer):
+    generator = ScriptedGenerator(generation())
+    history = FakeHistory((turn("quantas UCs?"),))
+
+    await use_case(layer, generator, history=history, history_turns=3).ask("percentual", "s1")
+
+    assert generator.questions == ["percentual"]

@@ -27,7 +27,11 @@ from venergy_agent.domain.errors import (
     SqlRejected,
 )
 from venergy_agent.domain.events import AgentEvent, AnswerEvent, Stage, StageEvent
-from venergy_agent.domain.followup import depends_on_previous_turn
+from venergy_agent.domain.followup import (
+    answers_a_clarification,
+    complete_question,
+    depends_on_previous_turn,
+)
 from venergy_agent.domain.numbers import (
     durations,
     pt_br_numbers,
@@ -289,6 +293,20 @@ class AskUseCase:
                 AnswerStatus.REFUSED, BUDGET_EXHAUSTED, request_id, session_id, started
             )
         history = await self._load_history(session_id, request_id)
+        if (
+            history
+            and history[-1].status is AnswerStatus.CLARIFY
+            and answers_a_clarification(question.text)
+        ):
+            self._log(
+                request_id,
+                session_id,
+                step="pergunta",
+                status="pergunta_completada",
+            )
+            question = question.model_copy(
+                update={"text": complete_question(history[-1].question, question.text)}
+            )
 
         spent = _Spent()
         if not history and depends_on_previous_turn(question.text):
