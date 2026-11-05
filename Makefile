@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help setup env up down db sample load test test-backend test-agent eval eval-compare eval-insights lint frontend-check openapi ci
+.PHONY: help setup env up down db sample load test test-backend test-agent eval eval-compare eval-insights esperado lint frontend-check openapi ci
 
 help:
 	@echo Alvos do V-Energy Grid 360, use: make alvo
@@ -57,6 +57,9 @@ test-agent: db
 
 eval: db
 	uv --directory ai-agent run --frozen python -m venergy_agent.evaluation --dataset $(or $(DATASET),amostra) $(if $(ONLY),--only $(ONLY)) $(if $(IDS),--ids $(IDS)) $(if $(JUDGE),--judge) $(if $(SQL_ONLY),--sql-only) $(if $(SMOKE),--smoke) $(if $(CONCURRENCY),--concurrency $(CONCURRENCY))
+
+esperado: db
+	uv --directory ai-agent run --frozen python -m venergy_agent.evaluation.expected_values gold_real
 
 eval-compare:
 	uv --directory ai-agent run --frozen python -m venergy_agent.evaluation.compare $(A) $(B) $(if $(SKIP),--skip $(SKIP))
