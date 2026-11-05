@@ -20,6 +20,20 @@ def _words(text: str) -> list[str]:
     return WORD.findall(text)
 
 
+def folded_words(text: str) -> list[str]:
+    return [_fold(word) for word in _words(text)]
+
+
+def known_words(vocabulary: Iterable[str]) -> frozenset[str]:
+    """Palavras do vocabulário, sem acento e em minúscula, que contam para detectar métrica."""
+    return frozenset(
+        folded
+        for term in vocabulary
+        for folded in folded_words(term)
+        if len(folded) >= MIN_LENGTH and folded not in STOPWORDS
+    )
+
+
 def close_terms(question: str, vocabulary: Iterable[str]) -> dict[str, list[str]]:
     """Palavras da pergunta que não estão no vocabulário e lembram uma que está.
 

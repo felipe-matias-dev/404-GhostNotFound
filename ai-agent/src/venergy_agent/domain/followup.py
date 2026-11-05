@@ -1,5 +1,7 @@
 import re
 
+from venergy_agent.domain.vocabulary import folded_words
+
 MAX_ELLIPTICAL_WORDS = 4
 
 SAME_AS_BEFORE = re.compile(
@@ -22,11 +24,29 @@ INTERROGATIVE_START = re.compile(
     r"^(?:qual|quais|quanto|quanta|quantos|quantas|como|por\s+que|onde|quem|quando)\b",
     re.IGNORECASE,
 )
+REQUEST_START = re.compile(
+    r"^(?:liste|listar|mostre|mostra|mostrar|compare|comparar|traga|traz|calcule|calcular|"
+    r"apresente|apresenta|informe|diga|me\s+(?:diga|mostre|mostra|informe|traga)|"
+    r"quero|preciso|gere|gera)\b",
+    re.IGNORECASE,
+)
+LONG_REPLY_WORDS = 5
 
 
-def answers_a_clarification(reply: str) -> bool:
+def answers_a_clarification(reply: str, known: frozenset[str]) -> bool:
+    """Resposta curta a um pedido de esclarecimento, e não uma pergunta nova.
+
+    Pergunta nova é: tem "?", começa com palavra interrogativa, começa com verbo de pedido,
+    ou tem cinco palavras ou mais e alguma delas é métrica do vocabulário. "percentual" ou
+    "entre 2024 e 2025" respondem ao esclarecimento; "Receita de junho de 2026" não.
+    """
     text = reply.strip()
-    return bool(text) and "?" not in text and INTERROGATIVE_START.match(text) is None
+    if not text or "?" in text:
+        return False
+    if INTERROGATIVE_START.match(text) or REQUEST_START.match(text):
+        return False
+    words = folded_words(text)
+    return not (len(words) >= LONG_REPLY_WORDS and any(word in known for word in words))
 
 
 def complete_question(original: str, reply: str) -> str:

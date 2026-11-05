@@ -50,6 +50,7 @@ from venergy_agent.domain.sql import (
     SqlDraft,
     ValidatedQuery,
 )
+from venergy_agent.domain.vocabulary import known_words, vocabulary_of
 from venergy_agent.domain.wording import label, plain_words
 
 logger = logging.getLogger("venergy_agent.ask")
@@ -182,6 +183,11 @@ class AskUseCase:
         narration_min_seconds: float = 4.0,
     ) -> None:
         self._layer = layer
+        self._known_words = known_words(
+            vocabulary_of(
+                layer.glossary, (column.name for view in layer.views for column in view.columns)
+            )
+        )
         self._generator = generator
         self._validator = validator
         self._executor = executor
@@ -296,7 +302,7 @@ class AskUseCase:
         if (
             history
             and history[-1].status is AnswerStatus.CLARIFY
-            and answers_a_clarification(question.text)
+            and answers_a_clarification(question.text, self._known_words)
         ):
             self._log(
                 request_id,

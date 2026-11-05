@@ -1679,3 +1679,14 @@ def test_fallback_text_shows_hours_and_percent_with_at_most_two_decimals():
     assert _with_unit(3.456, "%") == "3,46%"
     assert _with_unit(1234.5, "kWh") == "1.235 kWh"
     assert _with_unit(12.4, "contagem") == "12"
+
+
+async def test_a_new_request_after_a_clarification_reaches_the_generator_unchanged(layer):
+    generator = ScriptedGenerator(generation())
+    history = FakeHistory((CLARIFY_TURN,))
+
+    await use_case(layer, generator, history=history, history_turns=3).ask(
+        "Mostre a receita de junho de 2026", "s1"
+    )
+
+    assert generator.questions == ["Mostre a receita de junho de 2026"]
