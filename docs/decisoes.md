@@ -2520,4 +2520,3 @@ Decisões de 19/10/2026, anteriores à numeração: [convenções do frontend](#
   - o agente faz até 10 consultas fixas ao subir;
   - uma Gold recarregada com bairros novos só entra nas dicas depois de reiniciar a API;
   - os itens novos do golden aguardam a conferência de Dados.
-
