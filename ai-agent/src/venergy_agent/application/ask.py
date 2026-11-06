@@ -31,8 +31,10 @@ from venergy_agent.domain.followup import (
     answers_a_clarification,
     complete_question,
     depends_on_previous_turn,
+    needs_a_calendar_period,
 )
 from venergy_agent.domain.numbers import (
+    INTEGER_UNITS,
     display_for_unit,
     durations,
     pt_br_numbers,
@@ -51,6 +53,7 @@ from venergy_agent.domain.sql import (
     SqlDraft,
     ValidatedQuery,
 )
+from venergy_agent.domain.sql_checks import calculation_problem
 from venergy_agent.domain.vocabulary import known_words, vocabulary_of
 from venergy_agent.domain.wording import label, plain_words
 
@@ -331,6 +334,22 @@ class AskUseCase:
                 model=self._configured_model,
                 spent=spent,
             )
+        if needs_a_calendar_period(question.text):
+            self._log(
+                request_id,
+                session_id,
+                step="resposta",
+                status=AnswerStatus.CLARIFY.value,
+                reason="periodo_do_calendario",
+            )
+            return self._clarify(
+                PERIOD_NOT_GIVEN,
+                request_id,
+                started,
+                model=self._configured_model,
+                spent=spent,
+                options=_period_options(()),
+            )
         feedback: AttemptFeedback | None = None
         last_sql: str | None = None
         last_model: str | None = None
@@ -417,7 +436,23 @@ class AskUseCase:
                 sql=validated.sql,
                 latency_ms=_elapsed_ms(began),
             )
+            problem = calculation_problem(validated.sql)
+            if problem is not None:
+                self._log(
+                    request_id,
+                    session_id,
+                    step="validacao",
+                    status="calculo_proibido",
+                    attempt=attempt,
+                    sql=validated.sql,
+                )
+                feedback = AttemptFeedback(
+                    previous_sql=draft.sql, error_kind=ErrorKind.REJECTED, message=problem
+                )
+                continue
             invented = _invented_years(question.text, history, validated)
+            if not invented and _invented_base_window(question.text, history, validated.sql):
+                invented = ("janela_da_base",)
             if invented:
                 self._log(
                     request_id,
@@ -432,7 +467,7 @@ class AskUseCase:
                     started,
                     model=generation.model,
                     spent=spent,
-                    options=_period_options(invented),
+                    options=_period_options(tuple(year for year in invented if year.isdigit())),
                 )
             began = time.perf_counter()
 
@@ -690,7 +725,7 @@ class AskUseCase:
             spent.input_tokens += narration.input_tokens
             spent.output_tokens += narration.output_tokens
             rejection = self._rejection(
-                narration.text, question.text, visible, period, validated, allowed
+                narration.text, question.text, visible, period, validated, allowed, draft
             )
             if rejection is None:
                 self._log(
@@ -720,6 +755,7 @@ class AskUseCase:
         period: tuple[str, str] | None,
         validated: ValidatedQuery,
         allowed: set[Decimal],
+        draft: SqlDraft,
     ) -> tuple[str, str, dict[str, object]] | None:
         if TECHNICAL_NAME.search(narrative):
             return "nome_tecnico_na_resposta", TECHNICAL_NAME_FEEDBACK, {}
@@ -738,9 +774,21 @@ class AskUseCase:
             *_months_between(validated.periods),
             *validated.years,
             *(pt_br_numbers(question_text) & _sql_numbers(validated.sql)),
+            *(year for year in YEAR.findall(question_text) if year in validated.sql),
+            *(
+                pt_br_numbers(" ".join(plain_words(item) for item in draft.assumptions))
+                & _sql_numbers(validated.sql)
+            ),
             *threshold_percents(question_text, _sql_numbers(validated.sql)),
             *(value for row in visible.rows for value in row.values()),
+            *self._integer_display_values(visible),
         ]
+        allowed = allowed | {
+            duration
+            for name in self._layer.column_units.keys() | _column_names(self._layer)
+            if re.search(rf"\b{re.escape(name)}\b", validated.sql)
+            for duration in durations(label(name))
+        }
         unsupported = unsupported_numbers(narrative, values, allowed)
         if unsupported:
             feedback = NUMBERS_FEEDBACK.format(numbers=", ".join(unsupported))
@@ -760,6 +808,16 @@ class AskUseCase:
                     {"unit": unit},
                 )
         return None
+
+    def _integer_display_values(self, visible: QueryResult) -> list[Decimal]:
+        return [
+            display_for_unit(Decimal(str(value)), unit)
+            for row in visible.rows
+            for column, value in row.items()
+            if (unit := unit_of(column, self._layer.column_units)) in INTEGER_UNITS
+            and isinstance(value, int | float | Decimal)
+            and not isinstance(value, bool)
+        ]
 
     def _wrong_unit(self, token: str, unit: str, visible: QueryResult) -> bool:
         matches = [
@@ -1047,3 +1105,21 @@ LAST_TWELVE_MONTHS = "nos últimos 12 meses"
 def _period_options(years: tuple[str, ...]) -> tuple[str, ...]:
     """Até três opções para o pedido de período: os anos que o SQL assumiu e os últimos 12 meses."""
     return (*(f"em {year}" for year in years[:PERIOD_OPTION_LIMIT]), LAST_TWELVE_MONTHS)
+
+
+def _column_names(layer: SemanticLayer) -> set[str]:
+    return {column.name for view in layer.views for column in view.columns}
+
+
+BASE_WINDOW = re.compile(
+    r"row_number\s*\(\s*\)\s*over\s*\(\s*order\s+by\s+competencia"
+    r"|order\s+by\s+competencia\s+desc\s+limit\s+\d",
+    re.IGNORECASE,
+)
+
+
+def _invented_base_window(question: str, history: tuple[ConversationTurn, ...], sql: str) -> bool:
+    if not BASE_WINDOW.search(sql):
+        return False
+    context = " ".join([question, *(turn.question for turn in history)])
+    return not (durations(context) or BASE_RELATIVE.search(context))

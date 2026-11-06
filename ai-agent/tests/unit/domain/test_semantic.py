@@ -91,6 +91,8 @@ UNITS = {
         ("kwh_2025_06", "kWh"),
         ("variacao_percentual", "%"),
         ("participacao_pct", "%"),
+        ("receita_2022_2023", "R$"),
+        ("receita_media_ponderada", "R$"),
         ("dias_sem_unidade", None),
         ("variacao", None),
         ("total", None),

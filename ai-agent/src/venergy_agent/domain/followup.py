@@ -51,3 +51,25 @@ def answers_a_clarification(reply: str, known: frozenset[str]) -> bool:
 
 def complete_question(original: str, reply: str) -> str:
     return f"{original.rstrip(' ?.')} Esclarecimento: {reply.strip()}"
+
+
+CALENDAR_PERIOD = re.compile(
+    r"\b(?:[úu]ltim[oa]|passad[oa])\s+(?:ano|trimestre|semestre|m[êe]s)\b"
+    r"|\b(?:ano|trimestre|semestre|m[êe]s)\s+passado\b"
+    r"|\b[úu]ltimos\s+(\d+)\s+meses\b",
+    re.IGNORECASE,
+)
+BASE_PERIOD = re.compile(
+    r"\b(?:primeiro|[úu]ltimo)\s+ano\s+da\s+(?:nossa\s+)?base\b", re.IGNORECASE
+)
+WRITTEN_YEAR = re.compile(r"\b(?:19|20)\d{2}\b")
+BASE_WINDOW_MONTHS = "12"
+
+
+def needs_a_calendar_period(text: str) -> bool:
+    if WRITTEN_YEAR.search(text) or BASE_PERIOD.search(text):
+        return False
+    matches = list(CALENDAR_PERIOD.finditer(text))
+    if any(match.group(1) == BASE_WINDOW_MONTHS for match in matches):
+        return False
+    return bool(matches)

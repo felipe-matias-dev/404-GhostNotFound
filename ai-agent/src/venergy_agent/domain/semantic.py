@@ -7,9 +7,10 @@ from pydantic import BaseModel, ConfigDict, model_validator
 from venergy_agent.domain.sql import DraftStatus
 
 PERCENT_ALIAS = re.compile(r"(?:^|_)(?:percentual|pct)(?:_|$)")
-PERIOD_QUALIFIER = re.compile(
-    r"\d{4}(?:_\d{2})?|base|atual|anterior|inicial|final|total|media|soma"
+QUALIFIER_WORD = (
+    r"\d{4}|\d{2}|base|atual|anterior|inicial|final|total|media|soma|ponderada|mensal|anual"
 )
+PERIOD_QUALIFIER = re.compile(rf"(?:{QUALIFIER_WORD})(?:_(?:{QUALIFIER_WORD}))*")
 
 
 class ColumnSpec(BaseModel):
@@ -76,6 +77,7 @@ class SemanticLayer(BaseModel):
     glossary: tuple[GlossaryTerm, ...] = ()
     rules: tuple[BusinessRule, ...] = ()
     examples: tuple[FewShotExample, ...] = ()
+    categorical_values: dict[str, tuple[str, ...]] = {}
 
     @property
     def allowed_views(self) -> frozenset[str]:

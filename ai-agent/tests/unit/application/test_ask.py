@@ -888,7 +888,7 @@ async def test_a_duration_from_the_assumptions_keeps_the_narrative(layer):
     draft = generation(assumptions=("O período são as 12 últimas competências da base.",))
 
     answer = await use_case(layer, ScriptedGenerator(draft), writer=writer).ask(
-        "Quantas UCs faturaram no último ano?", "s1"
+        "Quantas UCs faturaram recentemente?", "s1"
     )
 
     assert answer.answer == "Considerando as 12 últimas competências da base, há 3 UCs."
@@ -1715,3 +1715,118 @@ async def test_a_period_clarification_offers_the_years_the_sql_assumed(layer):
 
     assert answer.status is AnswerStatus.CLARIFY
     assert answer.clarification_options == ("em 2023", "em 2024", "nos últimos 12 meses")
+
+
+async def test_energy_written_as_an_integer_matches_a_value_with_decimals(layer):
+    writer = FixedWriter(text="A energia faturada foi de 496.099 kWh.")
+    energy = ScriptedExecutor(table(("kwh_faturado",), (Decimal("496099.37"),)))
+
+    answer = await use_case(layer, ScriptedGenerator(generation()), energy, writer).ask(
+        "energia?", "s1"
+    )
+
+    assert answer.answer == "A energia faturada foi de 496.099 kWh."
+
+
+async def test_an_integer_still_does_not_round_a_value_without_an_integer_unit(layer):
+    writer = FixedWriter(text="A tarifa foi de 2.")
+    tariff = ScriptedExecutor(table(("tarifa_media",), (Decimal("1.71"),)))
+
+    answer = await use_case(layer, ScriptedGenerator(generation()), tariff, writer).ask(
+        "tarifa?", "s1"
+    )
+
+    assert answer.answer.startswith("A consulta devolveu")
+
+
+async def test_a_year_of_the_question_used_in_a_date_of_the_sql_can_be_cited(layer):
+    writer = FixedWriter(text="Em 2025, 3 UCs conectaram painel solar.")
+    date_sql = (
+        "SELECT count(*) AS total FROM sem_uc "
+        "WHERE data_conexao_gd BETWEEN '2025-01-01' AND '2025-12-31'"
+    )
+
+    answer = await use_case(layer, ScriptedGenerator(generation(sql=date_sql)), writer=writer).ask(
+        "Quantas UCs conectaram painel solar em 2025?", "s1"
+    )
+
+    assert answer.answer == "Em 2025, 3 UCs conectaram painel solar."
+
+
+async def test_a_duration_in_the_name_of_a_column_the_sql_reads_can_be_cited(layer):
+    writer = FixedWriter(text="Nos últimos 12 meses, o consumo médio foi de 3.")
+    column_sql = "SELECT avg(consumo_medio_kwh_12m) AS total FROM sem_uc"
+
+    answer = await use_case(
+        layer, ScriptedGenerator(generation(sql=column_sql)), writer=writer
+    ).ask("qual o consumo médio das casas residenciais?", "s1")
+
+    assert answer.answer == "Nos últimos 12 meses, o consumo médio foi de 3."
+
+
+async def test_a_calendar_period_without_a_year_is_asked_before_calling_the_model(layer):
+    generator = ScriptedGenerator(generation())
+
+    answer = await use_case(layer, generator).ask(
+        "Qual bairro mais perdeu volume residencial no último ano?", "s1"
+    )
+
+    assert answer.status is AnswerStatus.CLARIFY
+    assert answer.clarification == PERIOD_NOT_GIVEN
+    assert generator.feedbacks == []
+
+
+BASE_WINDOW_SQL = (
+    "WITH meses AS (SELECT competencia, row_number() OVER (ORDER BY competencia) AS ordem_inicio "
+    "FROM sem_kpis_mensais) SELECT count(*) AS total FROM meses WHERE ordem_inicio <= 12"
+)
+
+
+async def test_a_window_relative_to_the_base_nobody_asked_for_asks_the_period(layer):
+    executor = ScriptedExecutor(result())
+
+    answer = await use_case(
+        layer, ScriptedGenerator(generation(sql=BASE_WINDOW_SQL)), executor
+    ).ask(
+        "Quantas unidades com painel solar em Olinda tiveram queda de consumo acima de 30%?", "s1"
+    )
+
+    assert answer.clarification == PERIOD_NOT_GIVEN
+    assert executor.queries == []
+
+
+async def test_a_window_relative_to_the_base_the_question_asked_for_is_answered(layer):
+    answer = await use_case(layer, ScriptedGenerator(generation(sql=BASE_WINDOW_SQL))).ask(
+        "Quantas UCs faturaram nos últimos 12 meses?", "s1"
+    )
+
+    assert answer.status is AnswerStatus.ANSWERED
+
+
+async def test_a_number_of_an_assumption_that_the_sql_uses_can_be_cited(layer):
+    writer = FixedWriter(text="O DEC usa a média mensal de UCs, dividida por 3, e foi de 8.")
+    eight = ScriptedExecutor(table(("total",), (8,)))
+    draft = generation(
+        sql="SELECT sum(n_uc) / 3.0 AS total FROM sem_kpis_segmento_mensal",
+        assumptions=("A média mensal de UCs é a soma de n_uc dividida por 3.0.",),
+    )
+
+    answer = await use_case(layer, ScriptedGenerator(draft), eight, writer).ask(
+        "Qual foi o DEC de Olinda no primeiro trimestre de 2025?", "s1"
+    )
+
+    assert answer.answer == "O DEC usa a média mensal de UCs, dividida por 3, e foi de 8."
+    assert answer.assumptions == ("A média mensal de UCs é a soma de UCs dividida por 3.",)
+
+
+async def test_a_forbidden_calculation_goes_back_to_the_model_as_a_correctable_error(layer):
+    wrong = generation(sql="SELECT avg(satisfacao_media) AS total FROM sem_kpis_mensais")
+    right = generation(sql=COUNT_SQL)
+    generator = ScriptedGenerator(wrong, right)
+    executor = ScriptedExecutor(result())
+
+    answer = await use_case(layer, generator, executor).ask("satisfação de 2025?", "s1")
+
+    assert answer.status is AnswerStatus.ANSWERED
+    assert "soma_notas" in generator.feedbacks[1].message
+    assert len(executor.queries) == 1

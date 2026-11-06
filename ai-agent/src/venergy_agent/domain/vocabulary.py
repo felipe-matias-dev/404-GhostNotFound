@@ -7,6 +7,8 @@ from typing import Any
 MIN_LENGTH = 5
 CUTOFF = 0.8
 CANDIDATES = 3
+VALUE_CUTOFF = 0.85
+MAX_VALUE_WORDS = 4
 WORD = re.compile(r"[^\W\d_]+")
 STOPWORDS = frozenset({"entre", "quanto", "quantos", "quantas", "mostre", "dessa", "desse"})
 
@@ -82,3 +84,51 @@ def unmapped_report(
             }
         )
     return report
+
+
+def value_hints(question: str, values: Mapping[str, Sequence[str]]) -> list[tuple[str, str, str]]:
+    """Trechos da pergunta que são um valor da base escrito de outro jeito.
+
+    Devolve (como foi escrito, valor da base, coluna). Sem acento, com outra caixa, com erro de
+    digitação ou só o começo de um nome composto ("jaboatao" para Jaboatão dos Guararapes). O
+    valor escrito igual ao da base não precisa de dica.
+    """
+    words = _words(question)
+    folded_values = [
+        (_fold(value), value, column) for column, options in values.items() for value in options
+    ]
+    hints: list[tuple[str, str, str]] = []
+    used: set[int] = set()
+    for size in range(MAX_VALUE_WORDS, 0, -1):
+        for start in range(len(words) - size + 1):
+            span = set(range(start, start + size))
+            if span & used:
+                continue
+            written = " ".join(words[start : start + size])
+            match = _value_match(_fold(written), folded_values, size)
+            if match is None:
+                continue
+            used |= span
+            value, column = match
+            if written != value:
+                hints.append((written, value, column))
+    return sorted(hints, key=lambda hint: question.find(hint[0]))
+
+
+def _value_match(
+    folded: str, folded_values: Sequence[tuple[str, str, str]], size: int
+) -> tuple[str, str] | None:
+    if len(folded) < MIN_LENGTH:
+        return None
+    for value_folded, value, column in folded_values:
+        if folded == value_folded:
+            return value, column
+    for value_folded, value, column in folded_values:
+        if size == 1 and value_folded.startswith(f"{folded} "):
+            return value, column
+    for value_folded, value, column in folded_values:
+        if len(value_folded.split()) == size and (
+            difflib.SequenceMatcher(None, folded, value_folded).ratio() >= VALUE_CUTOFF
+        ):
+            return value, column
+    return None

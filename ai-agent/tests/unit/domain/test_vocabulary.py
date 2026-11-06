@@ -1,4 +1,6 @@
-from venergy_agent.domain.vocabulary import close_terms, unmapped_report
+import pytest
+
+from venergy_agent.domain.vocabulary import close_terms, unmapped_report, value_hints
 
 VOCABULARY = ["percentual de tributos", "tributos", "inadimplência", "receita faturada", "consumo"]
 
@@ -65,3 +67,34 @@ def test_markdown_report_lists_the_suggestion_for_a_person_to_decide():
     )
 
     assert "`percentil` lembra: percentual" in text
+
+
+VALUES = {
+    "municipio": ("Recife", "Jaboatão dos Guararapes", "Olinda"),
+    "bairro": ("Casa Caiada", "Boa Viagem", "Iputinga"),
+    "classe_cadastro": ("Residencial", "Poder Público"),
+}
+
+
+@pytest.mark.parametrize(
+    ("question", "expected"),
+    [
+        ("Quantas UCs em jaboatao?", [("jaboatao", "Jaboatão dos Guararapes", "municipio")]),
+        (
+            "Quantas UCs em Jaboatao dos Guararapez?",
+            [("Jaboatao dos Guararapez", "Jaboatão dos Guararapes", "municipio")],
+        ),
+        ("UCs solares em casa caiada", [("casa caiada", "Casa Caiada", "bairro")]),
+        ("receita do poder publico", [("poder publico", "Poder Público", "classe_cadastro")]),
+    ],
+)
+def test_a_value_written_another_way_points_to_the_value_in_the_base(question, expected):
+    assert value_hints(question, VALUES) == expected
+
+
+@pytest.mark.parametrize(
+    "question",
+    ["Quantas UCs em Olinda?", "Quantas UCs existem na base?", "receita de Boa Viagem"],
+)
+def test_a_value_written_as_in_the_base_or_no_value_gives_no_hint(question):
+    assert value_hints(question, VALUES) == []

@@ -197,8 +197,13 @@ class EvaluationRunner:
             await self._recorder.record(session_id, question, answer)
         answered = answer.status is AnswerStatus.ANSWERED
         matched = None
+        parts_matched = None
         if reference is not None:
-            matched = await self._matched(answer, reference, reference_sql or "")
+            ordered = "ORDER BY" in (reference_sql or "").upper()
+            generated = await self._generated(answer)
+            matched = generated is not None and results_match(generated, reference, ordered)
+            if item.get("parts"):
+                parts_matched = _parts_matched(generated, reference, item["parts"], ordered)
         judged_run, judge_error, judge_input, judge_output = await self._verdict(question, answer)
         verdict = judged_run.verdict if judged_run else None
         return ItemResult(
@@ -214,6 +219,7 @@ class EvaluationRunner:
                 else None
             ),
             fallback=is_fallback(answer) if answered and self._narrated else None,
+            parts_matched=parts_matched,
             latency_ms=answer.latency_ms,
             agent_input_tokens=answer.input_tokens,
             agent_output_tokens=answer.output_tokens,
@@ -252,19 +258,13 @@ class EvaluationRunner:
         except Exception:
             return None
 
-    async def _matched(
-        self,
-        answer: AgentAnswer,
-        reference: Sequence[Mapping[str, object]],
-        reference_sql: str,
-    ) -> bool:
+    async def _generated(self, answer: AgentAnswer) -> Sequence[Mapping[str, object]] | None:
         if answer.status is not AnswerStatus.ANSWERED or answer.sql is None:
-            return False
+            return None
         try:
-            generated = await self._rows(answer.sql)
+            return await self._rows(answer.sql)
         except Exception:
-            return False
-        return results_match(generated, reference, ordered="ORDER BY" in reference_sql.upper())
+            return None
 
     def _filter_periods(self, sql: str | None) -> tuple[str, ...]:
         if sql is None:
@@ -308,6 +308,7 @@ def compute_metrics(items: Sequence[ItemResult]) -> dict[str, float | int | None
     ]
     fidelity = [item.numeric_fidelity for item in items if item.numeric_fidelity is not None]
     fallbacks = [item.fallback for item in items if item.fallback is not None]
+    parts = [item.parts_matched for item in items if item.parts_matched is not None]
     refusals = [item for item in items if item.expected_status is AnswerStatus.REFUSED]
     judged = [item for item in items if item.judge_score is not None]
     latencies = [item.latency_ms for item in items if item.latency_ms is not None]
@@ -326,6 +327,7 @@ def compute_metrics(items: Sequence[ItemResult]) -> dict[str, float | int | None
         "blocked_attempts": sum(item.blocked for item in items),
         "numeric_fidelity": rate(sum(fidelity), len(fidelity)),
         "fallback_rate": rate(sum(fallbacks), len(fallbacks)),
+        "parts_matched": sum(parts) / len(parts) if parts else None,
         "latency_p50_ms": percentile(latencies, 0.5),
         "latency_p95_ms": percentile(latencies, 0.95),
         "judge_pass_rate": rate(sum(item.judge_passed is True for item in judged), len(judged)),
@@ -347,3 +349,22 @@ def compute_metrics(items: Sequence[ItemResult]) -> dict[str, float | int | None
 
 def _status_hits(items: Sequence[ItemResult]) -> int:
     return sum(item.status is item.expected_status for item in items)
+
+
+def _parts_matched(
+    generated: Sequence[Mapping[str, object]] | None,
+    reference: Sequence[Mapping[str, object]],
+    parts: Sequence[Sequence[str]],
+    ordered: bool,
+) -> float:
+    if generated is None:
+        return 0.0
+    columns = set(reference[0]) if reference else set()
+    hits = sum(
+        set(part) <= columns
+        and results_match(
+            generated, [{column: row[column] for column in part} for row in reference], ordered
+        )
+        for part in parts
+    )
+    return hits / len(parts)
