@@ -46,6 +46,7 @@ ACCENTED = {
 
 
 MONTHS_SUFFIX = re.compile(r"(\d+)m")
+MACHINE_DECIMAL = re.compile(r"(?<![\d.,])(\d+)\.(\d+)(?![\d,]|\.\d)")
 COLUMN_LABELS = {
     "consumo_medio_kwh_12m": "consumo médio mensal dos últimos 12 meses",
     "cod_alimentador": "alimentador",
@@ -79,4 +80,10 @@ def plain_words(text: str) -> str:
         lambda match: f"{VIEW_ARTICLES[match.group(1).lower()]} dados de {label(match.group(2))}",
         text,
     )
-    return TECHNICAL_NAME.sub(lambda name: label(name.group()), text)
+    text = TECHNICAL_NAME.sub(lambda name: label(name.group()), text)
+    return MACHINE_DECIMAL.sub(_pt_br_decimal, text)
+
+
+def _pt_br_decimal(match: re.Match[str]) -> str:
+    whole, fraction = match.group(1), match.group(2).rstrip("0")
+    return f"{whole},{fraction}" if fraction else whole

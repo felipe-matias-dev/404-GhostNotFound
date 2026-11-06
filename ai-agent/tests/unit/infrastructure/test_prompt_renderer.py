@@ -1,4 +1,5 @@
 import re
+from decimal import Decimal
 
 import pytest
 
@@ -470,10 +471,43 @@ def test_answer_user_prompt_tells_the_narrator_when_the_result_was_cut():
     assert "resultado truncado: não" in render_answer_user(question, draft, whole, NONCE)
 
 
-def test_the_answer_prompt_in_use_is_v6_and_states_the_sample_rule():
+def test_the_answer_prompt_in_use_is_v7_and_states_the_sample_and_premise_rules():
     from venergy_agent.config import AGENT_ROOT, AgentSettings
 
     template = AgentSettings.model_fields["answer_prompt_version"].default
-    assert template == "v6"
-    text = (AGENT_ROOT / "prompts" / "answer" / "v6" / "answer.md").read_text(encoding="utf-8")
+    assert template == "v7"
+    text = (AGENT_ROOT / "prompts" / "answer" / "v7" / "answer.md").read_text(encoding="utf-8")
     assert "resultado truncado" in text and "amostra" in text
+    assert "Nunca escreva o número da pergunta" in text
+
+
+def test_answer_user_prompt_shows_energy_and_counts_as_integers():
+    question = Question(text="energia?", session_id="s1")
+    draft = SqlDraft(status=DraftStatus.OK, sql="SELECT 1")
+    result = QueryResult(
+        columns=("kwh_faturado", "n_uc"),
+        rows=({"kwh_faturado": Decimal("496099.37"), "n_uc": Decimal("12.0")},),
+        row_count=1,
+        truncated=False,
+    )
+
+    prompt = render_answer_user(
+        question, draft, result, NONCE, {"kwh_faturado": "kWh", "n_uc": "contagem"}
+    )
+
+    assert '"kwh_faturado": "496099"' in prompt and '"n_uc": "12"' in prompt
+
+
+def test_a_value_written_another_way_gets_a_delimited_hint_with_the_value_of_the_base():
+    layer = SemanticLayer(
+        version="t",
+        views=(),
+        categorical_values={"municipio": ("Jaboatão dos Guararapes", "Recife")},
+    )
+
+    prompt = render_user_prompt(
+        Question(text="Quantas UCs em jaboatao?", session_id="s1"), None, CORRECTION, layer, NONCE
+    )
+
+    assert "jaboatao: Jaboatão dos Guararapes (municipio)" in prompt
+    assert prompt.index("Jaboatão dos Guararapes") < prompt.index(f"<pergunta-{NONCE}>")

@@ -89,7 +89,12 @@
 #          Só a assinatura e a nota mudam; a referência é a da 0.17.0.
 #   0.19.0 GenAI (04/11/2026, DEC-080): G106 a G110, da conversa da apresentação e da pergunta da diretora,
 #          só na Gold real. revisado_por fica null até Dados conferir.
-versao: 0.21.0
+#   0.20.0 e 0.21.0 GenAI (05/11/2026, plano de robustez, T2, T9 e T10): itens das lacunas do mapa, de sinônimos e de
+#          esclarecimento seguido de resposta; marcação smoke. revisado_por fica null até Dados conferir.
+#   0.22.0 GenAI (05/11/2026, T13.2 e T13.6): G109 passa a conferir as premissas da pergunta; G138 a G144, perguntas
+#          complexas com partes (parts: colunas da referência que formam cada parte) e um follow-up. revisado_por
+#          fica null até Dados conferir.
+versao: 0.22.0
 status: rascunho
 
 itens:
@@ -1243,11 +1248,12 @@ itens:
     smoke: true
     question: "A base de clientes cresceu, e a tarifa residencial acumulou reajuste homologado de 10,5% desde meados de 2022. Mesmo assim, comparando os últimos 12 meses com o primeiro ano da nossa base, o volume de energia faturada caiu quase 4% e a receita subiu só 8%. Ninguém nesta mesa sabe explicar por quê. Preciso de uma resposta baseada em dados, não em opinião."
     category: case
-    reference_sql: "SELECT round(sum(efeito_tarifa), 2) AS efeito_tarifa, round(sum(efeito_bandeira), 2) AS efeito_bandeira, round(sum(efeito_volume), 2) AS efeito_volume, round(sum(efeito_mix), 2) AS efeito_mix FROM sem_receita_decomposicao WHERE periodo_base = '2022-07/2023-06' AND periodo_atual = '2025-07/2026-06'"
+    reference_sql: "WITH meses AS (SELECT competencia, row_number() OVER (ORDER BY competencia) AS ordem_inicio, row_number() OVER (ORDER BY competencia DESC) AS ordem_fim FROM sem_kpis_mensais), faixas AS (SELECT (SELECT min(competencia) || '/' || max(competencia) FROM meses WHERE ordem_inicio <= 12) AS base, (SELECT min(competencia) || '/' || max(competencia) FROM meses WHERE ordem_fim <= 12) AS atual), totais AS (SELECT sum(CASE WHEN m.ordem_inicio <= 12 THEN k.kwh_faturado END) AS kwh_base, sum(CASE WHEN m.ordem_fim <= 12 THEN k.kwh_faturado END) AS kwh_atual, sum(CASE WHEN m.ordem_inicio <= 12 THEN k.receita_faturada END) AS receita_base, sum(CASE WHEN m.ordem_fim <= 12 THEN k.receita_faturada END) AS receita_atual FROM sem_kpis_mensais k JOIN meses m ON m.competencia = k.competencia), segmentos AS (SELECT sum(CASE WHEN m.ordem_inicio <= 12 THEN s.n_uc END) / 12.0 AS ucs_base, sum(CASE WHEN m.ordem_fim <= 12 THEN s.n_uc END) / 12.0 AS ucs_atual, sum(CASE WHEN m.ordem_inicio <= 12 AND s.classe = 'B1' THEN s.receita_energia END) / NULLIF(sum(CASE WHEN m.ordem_inicio <= 12 AND s.classe = 'B1' THEN s.kwh_faturado END), 0) AS tarifa_base, sum(CASE WHEN m.ordem_fim <= 12 AND s.classe = 'B1' THEN s.receita_energia END) / NULLIF(sum(CASE WHEN m.ordem_fim <= 12 AND s.classe = 'B1' THEN s.kwh_faturado END), 0) AS tarifa_atual FROM sem_kpis_segmento_mensal s JOIN meses m ON m.competencia = s.competencia), efeitos AS (SELECT sum(d.efeito_tarifa) AS efeito_tarifa, sum(d.efeito_bandeira) AS efeito_bandeira, sum(d.efeito_volume) AS efeito_volume, sum(d.efeito_mix) AS efeito_mix FROM sem_receita_decomposicao d, faixas f WHERE d.periodo_base = f.base AND d.periodo_atual = f.atual) SELECT round(100.0 * (s.ucs_atual - s.ucs_base) / NULLIF(s.ucs_base, 0), 2) AS variacao_ucs_pct, round(100.0 * (s.tarifa_atual - s.tarifa_base) / NULLIF(s.tarifa_base, 0), 2) AS variacao_tarifa_residencial_pct, round(100.0 * (t.kwh_atual - t.kwh_base) / NULLIF(t.kwh_base, 0), 2) AS variacao_energia_pct, round(100.0 * (t.receita_atual - t.receita_base) / NULLIF(t.receita_base, 0), 2) AS variacao_receita_pct, e.efeito_tarifa, e.efeito_bandeira, e.efeito_volume, e.efeito_mix FROM totais t, segmentos s, efeitos e"
+    parts: [[efeito_tarifa, efeito_bandeira, efeito_volume, efeito_mix], [variacao_energia_pct], [variacao_receita_pct], [variacao_tarifa_residencial_pct], [variacao_ucs_pct]]
     expected_status: answered
     datasets: [gold_real]
     follow_up_of: null
-    notes: "Fala da diretora no case, como foi feita na apresentação. Os períodos estão ditos ('últimos 12 meses' e 'primeiro ano da base'), então a resposta é a decomposição pronta, como no G104. As porcentagens da pergunta são premissas do usuário e não entram no SQL nem na resposta."
+    notes: "Mudança na 0.22.0 (GenAI, 05/11/2026, T13.2): a referência confere também as premissas da pergunta (variação de UCs, da tarifa residencial, da energia e da receita), além dos efeitos; cada uma é uma parte (parts). Revisado_por volta a null até Dados conferir. Fala da diretora no case, como foi feita na apresentação. Os períodos estão ditos ('últimos 12 meses' e 'primeiro ano da base'), então a resposta é a decomposição pronta, como no G104. As porcentagens da pergunta são premissas do usuário e não entram no SQL nem na resposta."
     revisado_por: null
   - id: G110
     question: "Quanto os tributos representaram da receita faturada em junho de 2026, em percentual?"
@@ -1508,4 +1514,73 @@ itens:
     datasets: [gold_real]
     follow_up_of: null
     notes: "Sinônimo 'imposto' (glossário 0.4.3) de tributos. Em sem_kpis_mensais não há coluna tributos: a referência usa receita_faturada - receita_energia, como manda o glossário."
+    revisado_por: null
+  - id: G138
+    question: "Entre o primeiro ano da base e os últimos 12 meses, quanto variaram em percentual a energia faturada e a receita faturada?"
+    category: case
+    reference_sql: "WITH meses AS (SELECT competencia, row_number() OVER (ORDER BY competencia) AS ordem_inicio, row_number() OVER (ORDER BY competencia DESC) AS ordem_fim FROM sem_kpis_mensais) SELECT round(100.0 * (sum(CASE WHEN m.ordem_fim <= 12 THEN k.kwh_faturado END) - sum(CASE WHEN m.ordem_inicio <= 12 THEN k.kwh_faturado END)) / NULLIF(sum(CASE WHEN m.ordem_inicio <= 12 THEN k.kwh_faturado END), 0), 2) AS variacao_energia_pct, round(100.0 * (sum(CASE WHEN m.ordem_fim <= 12 THEN k.receita_faturada END) - sum(CASE WHEN m.ordem_inicio <= 12 THEN k.receita_faturada END)) / NULLIF(sum(CASE WHEN m.ordem_inicio <= 12 THEN k.receita_faturada END), 0), 2) AS variacao_receita_pct FROM sem_kpis_mensais k JOIN meses m ON m.competencia = k.competencia"
+    parts: [[variacao_energia_pct], [variacao_receita_pct]]
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: null
+    notes: "Duas métricas na mesma pergunta, sobre os períodos relativos à base (T13.6)."
+    revisado_por: null
+  - id: G139
+    question: "Como ficaram o DEC e o FEC da distribuidora de julho de 2025 a junho de 2026, comparados a julho de 2022 a junho de 2023?"
+    category: case
+    reference_sql: "SELECT round(CAST(sum(CASE WHEN competencia BETWEEN '2022-07' AND '2023-06' THEN dec END) AS numeric), 2) AS dec_base, round(CAST(sum(CASE WHEN competencia BETWEEN '2025-07' AND '2026-06' THEN dec END) AS numeric), 2) AS dec_atual, round(CAST(sum(CASE WHEN competencia BETWEEN '2022-07' AND '2023-06' THEN fec END) AS numeric), 2) AS fec_base, round(CAST(sum(CASE WHEN competencia BETWEEN '2025-07' AND '2026-06' THEN fec END) AS numeric), 2) AS fec_atual FROM sem_kpis_mensais"
+    parts: [[dec_base, dec_atual], [fec_base, fec_atual]]
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: null
+    notes: "DEC e FEC acumulados nos dois períodos (soma dos meses, DEC-032), em uma pergunta (T13.6)."
+    revisado_por: null
+  - id: G140
+    question: "Quantos chamados o call center abriu em 2025 e qual foi a satisfação média nesse ano?"
+    category: case
+    reference_sql: "WITH chamados AS (SELECT sum(n_chamados) AS chamados FROM sem_kpis_mensais WHERE competencia BETWEEN '2025-01' AND '2025-12'), notas AS (SELECT round(CAST(sum(soma_notas) / NULLIF(sum(n_notas), 0) AS numeric), 2) AS satisfacao FROM sem_kpis_segmento_mensal WHERE competencia BETWEEN '2025-01' AND '2025-12') SELECT c.chamados, n.satisfacao FROM chamados c, notas n"
+    parts: [[chamados], [satisfacao]]
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: null
+    notes: "Atendimento: contagem e satisfação, que sai da soma dos componentes (T13.6)."
+    revisado_por: null
+  - id: G141
+    question: "Qual alimentador teve o maior DEC acumulado em 2025, e quantas UCs ele atende?"
+    category: case
+    reference_sql: "WITH topo AS (SELECT cod_alimentador, sum(dec) AS dec FROM sem_continuidade_alimentador_mensal WHERE competencia BETWEEN '2025-01' AND '2025-12' GROUP BY cod_alimentador ORDER BY sum(dec) DESC LIMIT 1) SELECT t.cod_alimentador, (SELECT count(*) FROM sem_uc u WHERE u.cod_alimentador = t.cod_alimentador) AS ucs FROM topo t"
+    parts: [[cod_alimentador], [ucs]]
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: null
+    notes: "Ranking e contagem ligados pelo alimentador (T13.6). A resposta pode trazer o DEC também."
+    revisado_por: null
+  - id: G142
+    question: "Em 2025, quantas faturas ficaram sem pagamento e que percentual do valor faturado isso representou?"
+    category: case
+    reference_sql: "SELECT sum(n_faturas_nao_pagas) AS faturas_nao_pagas, round(100.0 * sum(valor_nao_pago) / NULLIF(sum(receita_faturada), 0), 2) AS percentual_nao_pago FROM sem_kpis_segmento_mensal WHERE competencia BETWEEN '2025-01' AND '2025-12'"
+    parts: [[faturas_nao_pagas], [percentual_nao_pago]]
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: null
+    notes: "Inadimplência: contagem e percentual do valor, somando os componentes (T13.6)."
+    revisado_por: null
+  - id: G143
+    question: "Qual município teve a maior receita faturada em 2025 e qual foi a sua satisfação média no ano?"
+    category: case
+    reference_sql: "SELECT municipio, round(CAST(sum(soma_notas) / NULLIF(sum(n_notas), 0) AS numeric), 2) AS satisfacao FROM sem_kpis_segmento_mensal WHERE competencia BETWEEN '2025-01' AND '2025-12' GROUP BY municipio ORDER BY sum(receita_faturada) DESC LIMIT 1"
+    parts: [[municipio], [satisfacao]]
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: null
+    notes: "Ranking por receita e satisfação do mesmo município, sempre pela soma dos componentes (T13.6). Início da cadeia G143 → G144."
+    revisado_por: null
+  - id: G144
+    question: "E qual foi o DEC desse município no mesmo ano?"
+    category: followup
+    reference_sql: "SELECT round(CAST(sum(horas_interrompidas) / NULLIF(sum(n_uc) / 12.0, 0) AS numeric), 2) AS dec FROM sem_kpis_segmento_mensal WHERE competencia BETWEEN '2025-01' AND '2025-12' AND municipio = (SELECT municipio FROM sem_kpis_segmento_mensal WHERE competencia BETWEEN '2025-01' AND '2025-12' GROUP BY municipio ORDER BY sum(receita_faturada) DESC LIMIT 1)"
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: G143
+    notes: "Follow-up de uma pergunta complexa: herda o município e o ano do G143 (T13.6). DEC do recorte pela fórmula dos componentes, com a média mensal de UCs."
     revisado_por: null

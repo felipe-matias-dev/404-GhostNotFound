@@ -2,6 +2,10 @@ from venergy_agent.application.ask import AskUseCase
 from venergy_agent.application.ports import ConversationHistory, InsightWriter, SessionUsage
 from venergy_agent.config import AgentSettings
 from venergy_agent.infrastructure.answer_writer import PydanticAiAnswerWriter
+from venergy_agent.infrastructure.categorical_values import (
+    WithCategoricalValues,
+    postgres_loader,
+)
 from venergy_agent.infrastructure.insight_writer import PydanticAiInsightWriter
 from venergy_agent.infrastructure.llm import build_model
 from venergy_agent.infrastructure.postgres_executor import PostgresQueryExecutor
@@ -16,8 +20,11 @@ async def build_agent(
     history: ConversationHistory | None = None,
     usage: SessionUsage | None = None,
 ) -> AskUseCase:
-    layer = await YamlSemanticLayerSource(
-        settings.semantic_layer_path, settings.gold_contract_path
+    layer = await WithCategoricalValues(
+        YamlSemanticLayerSource(settings.semantic_layer_path, settings.gold_contract_path),
+        postgres_loader(
+            settings.database_url, settings.allowed_schema, settings.query_timeout_seconds
+        ),
     ).load()
     model = build_model(settings)
     return AskUseCase(

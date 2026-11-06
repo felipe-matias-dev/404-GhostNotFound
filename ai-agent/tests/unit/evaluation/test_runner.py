@@ -868,3 +868,62 @@ async def test_pause_is_shared_across_workers_not_per_worker():
     starts = sorted(agent.starts)
     gaps = [later - earlier for earlier, later in zip(starts, starts[1:], strict=False)]
     assert all(gap >= 0.09 for gap in gaps), gaps
+
+
+PARTS_REFERENCE = "SELECT 1 AS energia, 2 AS receita, 3 AS tarifa"
+HALF_ANSWER = "SELECT 1 AS energia, 2 AS receita, 9 AS tarifa"
+FULL_ANSWER = "SELECT 1 AS e, 2 AS r, 3 AS t, 4 AS extra"
+PARTS_RESULTS = {
+    **RESULTS,
+    PARTS_REFERENCE: [{"energia": 1, "receita": 2, "tarifa": 3}],
+    HALF_ANSWER: [{"energia": 1, "receita": 2, "tarifa": 9}],
+    FULL_ANSWER: [{"e": 1, "r": 2, "t": 3, "extra": 4}],
+}
+PARTS = [["energia"], ["receita"], ["tarifa"]]
+
+
+async def test_a_complex_item_counts_the_parts_its_answer_got_right():
+    _, evaluation = runner(
+        {"pergunta com três partes": make_answer(sql=HALF_ANSWER)}, results=PARTS_RESULTS
+    )
+    item = golden("G900", "pergunta com três partes", PARTS_REFERENCE, parts=PARTS)
+
+    report = await run(evaluation, [item])
+
+    (result,) = report.items
+    assert result.matched is False
+    assert result.parts_matched == 2 / 3
+    assert report.metrics["parts_matched"] == 2 / 3
+
+
+async def test_a_complex_item_with_every_part_right_is_matched():
+    _, evaluation = runner(
+        {"pergunta com três partes": make_answer(sql=FULL_ANSWER)}, results=PARTS_RESULTS
+    )
+    item = golden("G900", "pergunta com três partes", PARTS_REFERENCE, parts=PARTS)
+
+    report = await run(evaluation, [item])
+
+    assert report.items[0].matched is True
+    assert report.items[0].parts_matched == 1.0
+
+
+async def test_an_item_without_parts_has_no_parts_metric():
+    _, evaluation = runner({"quantas?": make_answer()})
+
+    report = await run(evaluation, [golden("G1", "quantas?", COUNT_SQL)])
+
+    assert report.items[0].parts_matched is None
+    assert report.metrics["parts_matched"] is None
+
+
+async def test_a_part_naming_a_column_the_reference_lacks_counts_as_missed():
+    _, evaluation = runner(
+        {"pergunta com três partes": make_answer(sql=FULL_ANSWER)}, results=PARTS_RESULTS
+    )
+    parts = [["energia"], ["coluna_que_nao_existe"]]
+    item = golden("G900", "pergunta com três partes", PARTS_REFERENCE, parts=parts)
+
+    report = await run(evaluation, [item])
+
+    assert report.items[0].parts_matched == 0.5

@@ -9,7 +9,6 @@ import {
 	formatIndice,
 	formatInteiro,
 	formatKWh,
-	formatNumero,
 	formatSegundos,
 } from "#/lib/format";
 import { AgentProtocolError } from "./api";
@@ -215,7 +214,7 @@ export function formatarCelulaResultado(
 		if (col.includes("kwh")) return formatKWh(valor);
 		if (col === "dec" || col.includes("horas")) return formatHoras(valor);
 		if (col === "fec" || col.includes("satisfacao")) return formatIndice(valor);
-		return formatNumero(valor);
+		return formatAteDuasCasas(valor);
 	}
 	return String(valor);
 }

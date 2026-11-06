@@ -251,6 +251,11 @@ describe("formatarCelulaResultado", () => {
 		expect(formatarCelulaResultado("potencia", 4.5, "kWp")).toBe("4,5 kWp");
 	});
 
+	it("sem unidade, o número mostra até duas casas", () => {
+		expect(formatarCelulaResultado("indice_qualquer", 1.4712)).toBe("1,47");
+		expect(formatarCelulaResultado("indice_qualquer", 3.9)).toBe("3,9");
+	});
+
 	it("sem unidade, percentual vence o nome de dinheiro", () => {
 		expect(formatarCelulaResultado("percentual_tributos", 25)).toBe("25%");
 	});

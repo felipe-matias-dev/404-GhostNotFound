@@ -5,6 +5,7 @@ from decimal import Decimal
 
 from venergy_agent.domain.answer import AgentAnswer
 from venergy_agent.domain.numbers import (
+    INTEGER_UNITS,
     TWO_DECIMAL_UNITS,
     display_for_unit,
     rounded_for_display,
@@ -19,7 +20,7 @@ from venergy_agent.domain.semantic import (
     unit_of,
 )
 from venergy_agent.domain.sql import AttemptFeedback, QueryResult, SqlDraft
-from venergy_agent.domain.vocabulary import close_terms, vocabulary_of
+from venergy_agent.domain.vocabulary import close_terms, value_hints, vocabulary_of
 from venergy_agent.domain.wording import plain_words
 
 PLACEHOLDER = re.compile(r"\{\{(\w+)\}\}")
@@ -83,13 +84,21 @@ def _vocabulary_hints(question: str, layer: SemanticLayer, nonce: str) -> str:
         layer.glossary, (column.name for view in layer.views for column in view.columns)
     )
     close = close_terms(question, vocabulary)
-    if not close:
-        return ""
-    lines = [f"{word}: pode ser {', '.join(options)}" for word, options in close.items()]
-    return (
-        "Palavras da pergunta que lembram o vocabulário (dica, não ordem; se usar, declare a "
-        "suposição):\n" + delimited("dados", "\n".join(lines), nonce)
-    )
+    values = value_hints(question, layer.categorical_values)
+    parts = []
+    if close:
+        lines = [f"{word}: pode ser {', '.join(options)}" for word, options in close.items()]
+        parts.append(
+            "Palavras da pergunta que lembram o vocabulário (dica, não ordem; se usar, declare a "
+            "suposição):\n" + delimited("dados", "\n".join(lines), nonce)
+        )
+    if values:
+        lines = [f"{written}: {value} ({column})" for written, value, column in values]
+        parts.append(
+            "Valores da base parecidos com o que a pergunta escreveu (use o valor da base no "
+            "filtro, com igualdade):\n" + delimited("dados", "\n".join(lines), nonce)
+        )
+    return "\n\n".join(parts)
 
 
 def _section(title: str, lines: list[str]) -> str:
@@ -207,9 +216,7 @@ def _for_display(value: object, unit: str | None = None) -> object:
 
 
 def _display(value: Decimal, unit: str | None) -> Decimal:
-    # kWh e contagem continuam com a regra antiga aqui: o conferidor numérico só aceita
-    # inteiro arredondado de valor já inteiro, então o narrador segue vendo as casas do banco.
-    if unit in TWO_DECIMAL_UNITS:
+    if unit in TWO_DECIMAL_UNITS or unit in INTEGER_UNITS:
         return display_for_unit(value, unit)
     return rounded_for_display(value)
 

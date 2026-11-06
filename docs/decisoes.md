@@ -129,6 +129,7 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | [DEC-080](#dec-080--agente-confiável-no-portal-depois-da-apresentação) | Agente confiável no portal depois da apresentação | 04/11/2026 | Luis Felipe | adotada |
 | [DEC-081](#dec-081--casas-decimais-por-unidade-iguais-no-texto-e-na-tabela) | Casas decimais por unidade iguais no texto e na tabela | 04/11/2026 | Lucas (T4 do plano de robustez) | adotada, pendente de rodada completa (DEC-016) |
 | [DEC-082](#dec-082--opções-de-esclarecimento-de-período-no-contrato) | Opções de esclarecimento de período no contrato | 05/11/2026 | Lucas (T5 do plano de robustez) | adotada, pendente de rodada completa (DEC-016) |
+| [DEC-083](#dec-083--valores-da-base-premissas-da-pergunta-e-perguntas-complexas) | Valores da base, premissas da pergunta e perguntas complexas | 05/11/2026 | Luis Felipe | adotada |
 
 ### Convenções sem número
 
@@ -2440,3 +2441,83 @@ Decisões de 19/10/2026, anteriores à numeração: [convenções do frontend](#
   - Os testes do backend rodam no CI do PR (precisam do banco de testes), não localmente.
   - Validação na tela pelo teste ponta a ponta (T3).
 - **Evidência:** testes do domínio (opções só em esclarecimento), do caso de uso (opções de período na ordem certa), suíte do frontend (230 testes) e do agente (713 testes).
+
+## DEC-083 · Valores da base, premissas da pergunta e perguntas complexas
+
+- **Data:** 05/11/2026 · **Área:** GenAI · **Autor:** Luis Felipe (T12.1, T13.2, T13.5 e T13.6 do plano de robustez) · **Revisa:** DEC-081 (kWh e contagem na entrada do narrador) e DEC-079 (checagem de números)
+- **Contexto:** o plano de robustez pediu três coisas:
+  - entender valores escritos de outro jeito ("jaboatao", "casa caiada");
+  - conferir os números que a própria pergunta afirma, como na fala da diretora ("tarifa +10,5%, energia −4%, receita +8%");
+  - medir se as perguntas com várias partes são respondidas por inteiro.
+
+  O PR #145 deixou uma limitação no T4: kWh e contagem chegavam ao narrador com as casas do banco, porque a checagem não aceitava o inteiro arredondado.
+- **Decisão:**
+  - **Valores reais das colunas de texto:**
+    - Ao montar o agente, os valores distintos de município, bairro, canal, assunto, tipo e causa são lidos uma vez, com consultas fixas do código pelo usuário somente leitura do agente (`infrastructure/categorical_values.py`). A camada continua valendo sem eles se a leitura falhar.
+    - Coluna com até 10 valores vira "valores possíveis" no prompt, como as colunas que têm `allowed` no contrato.
+    - Coluna com mais valores (município e bairro) vira dica delimitada quando a pergunta escreve o valor de outro jeito: sem acento, com outra caixa, com erro de digitação ou só o começo de um nome composto.
+  - **"Falta de luz" conta todas as interrupções:** a coluna `tipo` de `sem_interrupcoes_uc` só filtra quando a pergunta cita a categoria. Ao listar os tipos no prompt, o modelo passou a ler "falta de luz" como `tipo = 'FALTA DE ENERGIA'`; a regra e a descrição da coluna corrigem isso.
+  - **Premissas da pergunta (camada 0.4.4 e narração `answer/v7`):**
+    - quando a pergunta afirma números sobre a empresa, o SQL devolve também a variação percentual (`_pct`) de UCs, da tarifa média do recorte citado, da energia e da receita entre os mesmos períodos;
+    - a narração diz se os dados confirmam ou mostram outro valor, citando só o valor das linhas;
+    - a checagem de números continua impedindo que o número da pergunta apareça como fato.
+  - **Regras novas na camada:**
+    - inadimplência sem qualificador é pelo valor;
+    - "últimos N meses" com N diferente de 12 pede o período;
+    - consumo médio de um recorte sem período usa `consumo_medio_kwh_12m`.
+  - **Checagem:**
+    - kWh e contagem chegam ao narrador como inteiros, e a checagem aceita o inteiro de uma coluna com essa unidade (só dessas unidades: "2" continua não valendo para uma tarifa de 1,71);
+    - aceita o ano da pergunta que o SQL usa numa data (`'2025-01-01'`);
+    - aceita a duração do nome de uma coluna que o SQL lê ("últimos 12 meses" de `consumo_medio_kwh_12m`).
+  - **Juiz `judge/v2`:** acrescenta o critério de completude. O padrão continua `v1` até a calibração humana (DEC-047).
+  - **Golden 0.22.0:**
+    - o G109 confere as premissas;
+    - G138 a G144 são perguntas complexas com `parts`, as colunas da referência que formam cada parte;
+    - a avaliação mede `parts_matched`.
+  - **Teste no portal (T3):** o teste de ponta a ponta do PR #145 foi corrigido (seletor do login) e ampliado:
+    - a conversa da apresentação;
+    - a pergunta da diretora;
+    - o esclarecimento seguido de resposta;
+    - as perguntas complexas;
+    - o widget;
+    - os 5 usuários.
+- **Alternativas descartadas:**
+  - dica para todas as colunas de texto: os códigos (tipo, assunto) casavam com palavras comuns ("falta") e levaram o modelo a filtros errados;
+  - conferir as premissas com uma segunda consulta: fica para a T13.1 (várias consultas), que muda o contrato;
+  - trocar o juiz para a rubrica nova sem calibração.
+- **Checagem de cálculo (nova, `domain/sql_checks.py`):**
+  - um SQL validado que faz média de `satisfacao_media`, média de `tarifa_media` ou soma do DEC/FEC de mais de um alimentador volta ao modelo como erro corrigível, com a fórmula certa;
+  - as regras já estavam na camada, mas o modelo as quebrava em algumas rodadas (G010 em 3 de 7, G140 em 2 de 7).
+- **Período sem pedido, no código:**
+  - "último ano", "ano passado", "último trimestre", "mês passado" e "últimos N meses" (N diferente de 12) sem ano escrito pedem o período antes de chamar o modelo;
+  - um SQL que monta sozinho a janela relativa à base ("primeiro ano da base / últimos 12 meses") sem a pergunta pedir também pede o período.
+- **Suposições em pt-BR:** os números das suposições saem em formato brasileiro (3.0 vira 3), e um número que está na suposição e no SQL executado vale na checagem.
+- **Evidência:**
+  - **Rodada completa:** Gold real, narrada, juiz `openrouter:google/gemini-3.5-flash-lite` (pago e fora da cadeia do agente, para não repetir os erros de cota do juiz gratuito), `--concurrency 4`, golden 0.22.0 (134 itens) e red team 17 (05/11/2026).
+
+    | Métrica | DEC-080 | 05/11 |
+    |---|---|---|
+    | execution accuracy | — | 100% (todos os 134 itens) |
+    | status | — | 100% |
+    | texto de reserva | 1,4% | 0% |
+    | `parts_matched` | — | 100% |
+    | juiz, aprovação (nota média) | — | 96,1% (4,91) |
+    | latência p50 / p95 | — | 3,7 s / 5,3 s |
+    | red team | — | sem violação |
+
+  - **Contra a rodada da DEC-080, nos 95 itens em comum:** nenhum item piora em SQL ou status.
+  - **Teste no portal (T3), 5 usuários, 23 cenários cada:** 113 de 115. As 2 falhas foram de tempo (uma resposta em 26 s e outra em 14 s, na beatriz), com a resposta certa.
+  - **Depois da revisão de código:** o cenário 24 ("último ano" pede o período, e o botão "nos últimos 12 meses" responde) passou nos 5 usuários.
+  - **Antes de chegar aqui:** 6 rodadas completas e várias rodadas curtas acharam e corrigiram:
+    - o filtro por `tipo` em "falta de luz";
+    - o "falta" casando com um código;
+    - a satisfação anual pela média de médias;
+    - a janela da base escolhida pelo modelo;
+    - o "12" do nome da coluna;
+    - o ano dentro de uma data.
+  - **Rodada descartada:** a das 16h falhou por queda de DNS da máquina, não do agente.
+- **Consequências:**
+  - o agente faz até 10 consultas fixas ao subir;
+  - uma Gold recarregada com bairros novos só entra nas dicas depois de reiniciar a API;
+  - os itens novos do golden aguardam a conferência de Dados.
+

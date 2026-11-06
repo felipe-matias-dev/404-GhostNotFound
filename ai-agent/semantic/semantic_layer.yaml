@@ -13,7 +13,7 @@
 # As linhas de exemplo são sintéticas, escritas à mão. Nenhum valor real da Gold entra aqui.
 # Depois de cada mudança, gere o views.sql (ver a seção Camada semântica em ai-agent/README.md).
 
-version: "0.4.3"
+version: "0.4.4"
 
 views:
   - name: sem_uc
@@ -306,7 +306,7 @@ views:
         unit: "h"
         description: "duração da interrupção em horas"
       - name: tipo
-        description: "tipo da ocorrência, por exemplo FALTA DE ENERGIA ou OSCILACAO"
+        description: "tipo da ocorrência, por exemplo FALTA DE ENERGIA ou OSCILACAO. Não filtre por tipo quando a pergunta fala de falta de luz, falta de energia, apagão ou interrupção em geral: essas expressões contam todas as ocorrências, de qualquer tipo"
       - name: causa
         description: "causa registrada, por exemplo CLIMATICA ou VEGETACAO; vazia quando não foi registrada"
     sample_rows:
@@ -380,7 +380,7 @@ glossary:
     maps_to: "kwh_faturado"
   - term: "falta de luz"
     synonyms: ["apagão", "queda de energia", "interrupção", "ocorrência"]
-    maps_to: "de uma UC: as linhas de sem_interrupcoes_uc (count(*) e sum(duracao_horas)); de um alimentador, recorte ou da empresa: dec, fec, horas_interrompidas e n_interrupcoes"
+    maps_to: "de uma UC: as linhas de sem_interrupcoes_uc (count(*) e sum(duracao_horas)); de um alimentador, recorte ou da empresa: dec, fec, horas_interrompidas e n_interrupcoes. A coluna tipo de sem_interrupcoes_uc é a categoria técnica da ocorrência: 'falta de luz' na pergunta conta todas as interrupções, e só filtre por tipo quando a pergunta citar o tipo (fio partido, sobrecarga)"
   - term: "painel solar"
     synonyms: ["energia solar", "geração distribuída", "GD"]
     maps_to: "possui_gd"
@@ -434,8 +434,9 @@ rules:
   - text: "Competência é texto no formato AAAA-MM. Filtre por igualdade (competencia = '2025-03') ou por intervalo de texto (competencia BETWEEN '2025-01' AND '2025-03')."
   - text: "Não suponha quais competências existem. Consulte as views; se nenhuma linha atender ao filtro, o resultado vazio é a resposta."
   - text: "classe tem exatamente os valores B1, B2, B3 e A4. classe_cadastro tem Residencial, Comercial, Industrial, Rural e Poder Público, e é a única que separa Comercial de Poder Público."
-  - text: "Bairro só identifica um lugar junto com o município: filtre e agrupe sempre por municipio e bairro."
+  - text: "Bairro só identifica um lugar junto com o município: filtre e agrupe sempre por municipio e bairro, e devolva as duas colunas no SELECT."
   - text: "Totais da empresa por mês (energia, receita, DEC, FEC, chamados e satisfação) vêm prontos de sem_kpis_mensais."
+  - text: "Satisfação de um período de vários meses (um ano, um trimestre), da empresa ou de um recorte, é sum(soma_notas) / NULLIF(sum(n_notas), 0) em sem_kpis_segmento_mensal. Nunca faça a média de satisfacao_media de sem_kpis_mensais entre meses: meses com mais notas pesam mais. Por canal ou por assunto do chamado, a satisfação é avg(nota_satisfacao) de sem_atendimentos_uc, agrupada pelo canal ou assunto."
   - text: "DEC e FEC por alimentador vêm prontos de sem_continuidade_alimentador_mensal; da empresa, de sem_kpis_mensais. Leia; não recalcule."
   - text: "DEC e FEC de um período de vários meses (semestre, ano) são a soma dos valores mensais prontos, porque são indicadores acumulados: sum(dec) e sum(fec) sobre as competências do período. Nunca use a média (avg) dos meses (DEC-032). Por recorte de sem_kpis_segmento_mensal, use a fórmula dos componentes da regra de recortes."
   - text: "Por município, bairro, classe ou GD, use sem_kpis_segmento_mensal e some os componentes antes de dividir; nunca faça média de índices. Num mês: DEC = sum(horas_interrompidas) / sum(n_uc) e FEC = 1.0 * sum(n_interrupcoes) / sum(n_uc). Num período de vários meses, divida pela média mensal de UCs: sum(n_uc) dividido pelo número de meses do período pedido, escrito como decimal (3.0 num trimestre), e não pelos meses que aparecem no resultado. Satisfação = sum(soma_notas) / sum(n_notas), com NULLIF no divisor."
@@ -444,16 +445,20 @@ rules:
   - text: "Score de suspeita e perda não técnica não estão nas views: pergunta sobre eles é unknown."
   - text: "Por UC: interrupções em sem_interrupcoes_uc, chamados em sem_atendimentos_uc e medidor em sem_medidor_uc, todas ligadas a sem_uc por cod_uc. sem_faturamento_mensal, sem_interrupcoes_uc e sem_atendimentos_uc têm várias linhas por UC: nunca junte duas delas direto, porque a junção multiplica as somas. Agregue cada uma por cod_uc numa CTE antes de juntar."
   - text: "Falta de luz na rua ou na região de uma UC: responda com as interrupções da própria UC em sem_interrupcoes_uc. O DEC e o FEC do alimentador dela, em sem_continuidade_alimentador_mensal, complementam, mas não dizem se a UC foi afetada."
+  - text: "UCs que tiveram falta de luz, falta de energia ou interrupção: conte as UCs distintas de sem_interrupcoes_uc no período, sem filtrar a coluna tipo. O valor FALTA DE ENERGIA de tipo é só uma das categorias técnicas da ocorrência; filtre por tipo apenas quando a pergunta citar a categoria."
+  - text: "Consumo médio de uma classe ou recorte, sem período na pergunta, é a média de consumo_medio_kwh_12m de sem_uc (média mensal dos últimos 12 meses de cada UC), filtrando o recorte; declare essa suposição. Com período escrito, some kwh_faturado do período e divida pela soma de n_uc."
+  - text: "Inadimplência, sem dizer de quê, é pelo valor: 100.0 * sum(valor_nao_pago) / NULLIF(sum(receita_faturada), 0) em sem_kpis_segmento_mensal. Pelo número de faturas (n_faturas_nao_pagas / n_faturas) só quando a pergunta falar em faturas ou contas."
   - text: "Percentual de faturas não pagas de um recorte = 100.0 * sum(n_faturas_nao_pagas) / NULLIF(sum(n_faturas), 0); percentual do valor faturado sem pagamento = 100.0 * sum(valor_nao_pago) / NULLIF(sum(receita_faturada), 0); percentual de leituras estimadas = 100.0 * sum(n_leituras_estimadas) / NULLIF(sum(n_leituras), 0). Some os componentes antes de dividir."
   - text: "Percentual de tributos na receita, da empresa num mês ou período: em sem_kpis_mensais, 100.0 * sum(receita_faturada - receita_energia) / NULLIF(sum(receita_faturada), 0). sem_kpis_mensais não tem a coluna tributos; por recorte, use tributos de sem_kpis_segmento_mensal."
-  - text: "Pergunta que pede o porquê da receita (por que subiu menos que a tarifa, o que explica a variação, se a energia caiu e a receita subiu): responda com a decomposição de sem_receita_decomposicao, devolvendo efeito_tarifa, efeito_bandeira, efeito_volume e efeito_mix separados, além de receita_base e receita_atual. Não devolva só efeito_preco: ele junta tarifa e bandeira. Porcentagens e premissas escritas na pergunta são do usuário: não as use como filtro nem como resposta."
+  - text: "Pergunta que pede o porquê da receita (por que subiu menos que a tarifa, o que explica a variação, se a energia caiu e a receita subiu): responda com a decomposição de sem_receita_decomposicao, devolvendo efeito_tarifa, efeito_bandeira, efeito_volume e efeito_mix separados, além de receita_base e receita_atual. Não devolva só efeito_preco: ele junta tarifa e bandeira. Porcentagens e premissas escritas na pergunta são do usuário: nunca as use como filtro nem como resposta."
+  - text: "Quando a pergunta afirma números sobre a empresa (a tarifa subiu X%, a energia caiu Y%, a receita subiu Z%, a base de clientes cresceu), confira cada afirmação nos dados no mesmo SELECT: devolva também a variação percentual, com sufixo _pct, de UCs (média mensal de n_uc em sem_kpis_segmento_mensal), da tarifa média do recorte citado (receita_energia ÷ kwh_faturado; residencial é classe B1), da energia faturada e da receita faturada (sem_kpis_mensais) entre os mesmos períodos, como no exemplo. Os números da pergunta nunca entram no SQL."
   - text: "Quando a pergunta pede percentual, devolva o valor em pontos percentuais: multiplique por 100.0 no SQL (5,6 e não 0,056)."
   - text: "Divisão entre contagens inteiras (n_interrupcoes, n_uc, n_faturas, n_leituras, count(*)) é divisão inteira no Postgres e devolve 0: multiplique o numerador por 1.0 ou 100.0 antes de dividir, e escreva o número de meses do denominador como decimal (sum(n_uc) / 3.0, nunca / 3)."
   - text: "Para ligar uma UC ao alimentador use sem_uc.cod_alimentador = sem_continuidade_alimentador_mensal.cod_alimentador."
   - text: "sem_kpis_segmento_mensal já tem município, bairro e classe: nunca junte essa view com sem_uc nem com outra view, porque a junção repete as linhas e infla as somas. Use a subconsulta em sem_uc só para o alimentador, na regra seguinte."
   - text: "DEC ou FEC do alimentador que atende um bairro, município ou UC: pegue os cod_alimentador de sem_uc filtrados pelo recorte (subconsulta com IN) e leia sem_continuidade_alimentador_mensal. Com mais de um alimentador, some os componentes antes de dividir: num mês, DEC = sum(horas_interrompidas) / NULLIF(sum(n_uc), 0) e FEC = 1.0 * sum(n_interrupcoes) / NULLIF(sum(n_uc), 0); num período de vários meses, o divisor é a média mensal de UCs, sum(n_uc) / 3.0 num trimestre, porque DEC e FEC do período são acumulados (DEC-032). Isso é diferente do DEC ou FEC das UCs do recorte, que sai de sem_kpis_segmento_mensal."
   - text: "Períodos relativos à base ('primeiro ano da base', 'últimos 12 meses') saem das competências que existem. Numere as competências distintas com row_number() OVER (ORDER BY competencia) para o início e OVER (ORDER BY competencia DESC) para o fim, filtre por ordem <= 12 e declare os períodos usados como suposição. Nesse caso, não peça esclarecimento. A regra vale só para essas duas expressões."
-  - text: "'Último ano', 'ano passado', 'último trimestre', 'último semestre' e 'mês passado' sem ano ou mês escrito são sempre clarify, mesmo que a última competência da base pareça a resposta: dependem da data de referência e de ser período civil ou móvel. Não assuma os últimos meses da base como suposição, e nunca escreva anos ou meses fixos que a pergunta não trouxe."
+  - text: "'Último ano', 'ano passado', 'último trimestre', 'último semestre', 'mês passado' e 'últimos N meses' com N diferente de 12 (últimos 3 meses, últimos 6 meses) sem ano ou mês escrito são sempre clarify, mesmo que a última competência da base pareça a resposta: dependem da data de referência e de ser período civil ou móvel. Não assuma os últimos meses da base como suposição, e nunca escreva anos ou meses fixos que a pergunta não trouxe."
   - text: "Quando a pergunta compara dois períodos, ou fala em queda, aumento, crescimento ou variação, e não diz os períodos, peça esclarecimento (clarify). Não escolha os períodos sozinho. Períodos relativos à base, como 'primeiro ano da base' e 'últimos 12 meses', contam como ditos."
   - text: "n_uc é o número de UCs faturadas na competência (PRODIST). Para a quantidade de UCs num período, use a média mensal (soma dividida pelo número de meses), nunca a soma sozinha."
 examples:
@@ -499,10 +504,19 @@ examples:
   - question: "A energia caiu e a tarifa subiu entre o primeiro ano da base e os últimos 12 meses. O que explica a receita ter subido menos que a tarifa?"
     sql: "WITH meses AS (SELECT competencia, row_number() OVER (ORDER BY competencia) AS ordem_inicio, row_number() OVER (ORDER BY competencia DESC) AS ordem_fim FROM sem_kpis_mensais), faixas AS (SELECT (SELECT min(competencia) || '/' || max(competencia) FROM meses WHERE ordem_inicio <= 12) AS base, (SELECT min(competencia) || '/' || max(competencia) FROM meses WHERE ordem_fim <= 12) AS atual) SELECT sum(d.receita_base) AS receita_base, sum(d.receita_atual) AS receita_atual, sum(d.efeito_tarifa) AS efeito_tarifa, sum(d.efeito_bandeira) AS efeito_bandeira, sum(d.efeito_volume) AS efeito_volume, sum(d.efeito_mix) AS efeito_mix FROM sem_receita_decomposicao d, faixas f WHERE d.periodo_base = f.base AND d.periodo_atual = f.atual"
     expected_status: ok
+  - question: "A tarifa subiu 12% e a energia caiu 5% entre o primeiro ano da base e os últimos 12 meses, mas a receita subiu só 6%. A base de clientes até cresceu. Por que a receita subiu tão pouco?"
+    sql: "WITH meses AS (SELECT competencia, row_number() OVER (ORDER BY competencia) AS ordem_inicio, row_number() OVER (ORDER BY competencia DESC) AS ordem_fim FROM sem_kpis_mensais), faixas AS (SELECT (SELECT min(competencia) || '/' || max(competencia) FROM meses WHERE ordem_inicio <= 12) AS base, (SELECT min(competencia) || '/' || max(competencia) FROM meses WHERE ordem_fim <= 12) AS atual), totais AS (SELECT sum(CASE WHEN m.ordem_inicio <= 12 THEN k.kwh_faturado END) AS kwh_base, sum(CASE WHEN m.ordem_fim <= 12 THEN k.kwh_faturado END) AS kwh_atual, sum(CASE WHEN m.ordem_inicio <= 12 THEN k.receita_faturada END) AS receita_base, sum(CASE WHEN m.ordem_fim <= 12 THEN k.receita_faturada END) AS receita_atual FROM sem_kpis_mensais k JOIN meses m ON m.competencia = k.competencia), segmentos AS (SELECT sum(CASE WHEN m.ordem_inicio <= 12 THEN s.n_uc END) / 12.0 AS ucs_base, sum(CASE WHEN m.ordem_fim <= 12 THEN s.n_uc END) / 12.0 AS ucs_atual, sum(CASE WHEN m.ordem_inicio <= 12 AND s.classe = 'B1' THEN s.receita_energia END) / NULLIF(sum(CASE WHEN m.ordem_inicio <= 12 AND s.classe = 'B1' THEN s.kwh_faturado END), 0) AS tarifa_base, sum(CASE WHEN m.ordem_fim <= 12 AND s.classe = 'B1' THEN s.receita_energia END) / NULLIF(sum(CASE WHEN m.ordem_fim <= 12 AND s.classe = 'B1' THEN s.kwh_faturado END), 0) AS tarifa_atual FROM sem_kpis_segmento_mensal s JOIN meses m ON m.competencia = s.competencia), efeitos AS (SELECT sum(d.efeito_tarifa) AS efeito_tarifa, sum(d.efeito_bandeira) AS efeito_bandeira, sum(d.efeito_volume) AS efeito_volume, sum(d.efeito_mix) AS efeito_mix FROM sem_receita_decomposicao d, faixas f WHERE d.periodo_base = f.base AND d.periodo_atual = f.atual) SELECT round(100.0 * (s.ucs_atual - s.ucs_base) / NULLIF(s.ucs_base, 0), 2) AS variacao_ucs_pct, round(100.0 * (s.tarifa_atual - s.tarifa_base) / NULLIF(s.tarifa_base, 0), 2) AS variacao_tarifa_residencial_pct, round(100.0 * (t.kwh_atual - t.kwh_base) / NULLIF(t.kwh_base, 0), 2) AS variacao_energia_pct, round(100.0 * (t.receita_atual - t.receita_base) / NULLIF(t.receita_base, 0), 2) AS variacao_receita_pct, e.efeito_tarifa, e.efeito_bandeira, e.efeito_volume, e.efeito_mix FROM totais t, segmentos s, efeitos e"
+    expected_status: ok
   - question: "Quanto os tributos representaram da receita faturada em março de 2025, em percentual?"
     sql: "SELECT 100.0 * sum(receita_faturada - receita_energia) / NULLIF(sum(receita_faturada), 0) AS percentual_tributos FROM sem_kpis_mensais WHERE competencia = '2025-03'"
     expected_status: ok
   - question: "Por que a receita caiu?"
+    sql: null
+    expected_status: clarify
+  - question: "Quanto faturamos nos últimos 6 meses?"
+    sql: null
+    expected_status: clarify
+  - question: "Qual o município mais caro?"
     sql: null
     expected_status: clarify
   - question: "Quais UCs são as mais suspeitas de fraude?"

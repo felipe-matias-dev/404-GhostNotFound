@@ -486,29 +486,29 @@ Prioridade alta para 13.2, 13.5 e 13.6. A 13.1 e a 13.3 mudam o fluxo e o contra
 | 7e | T12.2, T12.3 e T13.4 (refinamentos) | os dois | — |
 | 8 | T8 | os dois | todas |
 
-## Progresso (atualizado em 04/11/2026)
+## Progresso (atualizado em 05/11/2026)
 
-Este PR empilha as tarefas sobre a branch da PR 144. Cada tarefa tem o seu commit. "Feito"
-quer dizer código e testes prontos, sem a validação que depende da rodada completa (DEC-016)
-ou do portal rodando (T3).
+"Feito" quer dizer código, testes e validação: a rodada completa do golden (DEC-016) e o teste no portal nos 5 usuários (T3). O PR #145 do Lucas fez a primeira parte; o lote seguinte, na branch `feat/ai-agent-robustez-lote2`, fechou a validação e acrescentou T12.1, T13.2, T13.5 e T13.6.
 
-| Tarefa | Status | Commit | Falta |
+| Tarefa | Status | Onde | Falta |
 |---|---|---|---|
-| T1 Fechar DEC-080 | Feito no PR 144, aguarda merge | (PR 144) | Merge. Os números da DEC-080 não foram reproduzidos nesta sessão (cota do Gemini) |
-| T2 Golden 0.20.0 | Parcial: 21 de cerca de 60 itens, com `expected_values` | 10cdb87 | Itens de "por UC" (precisam de códigos reais), follow-ups de 3 turnos, cadeias esclarecimento -> resposta (T9), revisão de Dados |
-| T3 Ponta a ponta | Esqueleto: teste escrito e listado (20 casos), não executado | 9a91636 | Rodar com o stack no ar, E2E_SENHA_DEMO, tabela "pergunta x usuário x ok" no PR |
-| T4 Casas decimais | Feito, com DEC-081 | 10937bd, 260cf46, 91f6d71 | Rodada completa (DEC-016): a entrada do narrador mudou para h, % e R$ |
-| T5 Vazio, grande, glossário, esclarecimento | Parcial: paginação da tabela | 299c34a | Resultado vazio narrado e grande narrado (DEC-016); glossário 0.4.3 (DEC-016); clarification_options (contrato, persistência e DEC) |
-| T6 Auditoria para a TI | Feito no portal; checagem na tela pendente (T3) | 4784e96 | Conferir no navegador com a TI logada |
-| T7 Filtro, recusas, tempo | Parcial: resumo de motivos de recusa | 29bd42a | Filtros no SqlDraft (DEC-016); medição de tempo com o modelo pago (fora do escopo desta sessão) |
-| T8 Rodada final | Não feito | — | Golden completo, juiz, T3 nos 5 usuários três vezes, DEC com as medições, docs |
-| T9 Resposta a esclarecimento | Feito no código e nos testes | 0f914c8 | Itens de golden (T2) e validação pela tela (T3) |
-| T10 Termos fora do vocabulário | Parcial: detector e relatório | cb24da3 | Dica no prompt e regra no prompt (DEC-016); sinônimos no glossário (DEC-016); itens de golden |
-| T11 Avaliação mais rápida | Feito | 2b1fdcc | Nada; a rodada completa em cerca de 8 minutos depende da cota e da concorrência escolhida |
-
-**Limitação conhecida (T4):** kWh e contagem continuam com a regra antiga na entrada do
-narrador, porque o conferidor numérico não aceita inteiro arredondado de um valor com duas
-casas. Mudar isso exige commit próprio no conferidor.
+| T1 Fechar DEC-080 | Feito | PR #144, mesclado | — |
+| T2 Golden | Parcial: 0.22.0, com os itens do Lucas e as complexas; `make esperado` | PR #145 e lote 2 | Itens "por UC", follow-ups de 3 turnos, revisão de Dados |
+| T3 Ponta a ponta | Feito: login corrigido; 24 cenários (apresentação, diretora, esclarecimento, complexas, widget, auditoria) nos 5 usuários; `make e2e-agente` | lote 2 | Testes de limite (429, orçamento) e de posse da conversa (403) |
+| T4 Casas decimais | Feito, com DEC-081; kWh e contagem inteiros na entrada do narrador (DEC-083) | PR #145 e lote 2 | — |
+| T5 Vazio, grande, esclarecimento | Feito: paginação, total e aviso de corte, opções de período (DEC-082) | PR #145 | — |
+| T6 Auditoria para a TI | Feito e conferido no portal (link só para a patricia) | PR #145 | — |
+| T7 Filtro, recusas, tempo | Parcial: motivos de recusa e filtro transformado ("acima de 30%") | PR #145 | Tempo limite por modelo medido com o pago |
+| T8 Rodada final | Feito para este lote: golden 100% SQL e status, portal 113/115 nos 5 usuários (DEC-083) | lote 2 | Repetir no fim do plano |
+| T9 Resposta a esclarecimento | Feito e conferido no portal | PR #145 | — |
+| T10 Termos fora do vocabulário | Feito: dica de termos, glossário 0.4.3 e relatório | PR #145 | Botão "não era isso" (T12.5) |
+| T11 Avaliação mais rápida | Feito: `--smoke` e `--concurrency` | PR #145 | — |
+| T12.1 Valores escritos de outro jeito | Feito (DEC-083) | lote 2 | — |
+| T12.2 a T12.5 | Não feito | — | Siglas, cobertura testada, variações automáticas, "entendi X como Y" |
+| T13.2 Premissas da pergunta | Feito (DEC-083) | lote 2 | — |
+| T13.5 Completude no juiz | Rubrica `judge/v2` criada | lote 2 | Calibração humana antes de virar padrão |
+| T13.6 Golden de complexas | Feito: G138 a G144 e `parts_matched` | lote 2 | Mais itens das falas das lideranças |
+| T13.1, T13.3, T13.4 | Não feito | — | Várias consultas, análises prontas, resposta estruturada |
 
 **Como manter:** atualizar a linha da tarefa no mesmo commit em que ela for concluída.
 
