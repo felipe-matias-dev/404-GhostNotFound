@@ -18,6 +18,7 @@ from venergy_agent.evaluation.__main__ import (
     report_path,
     runs_dir,
     select_items,
+    smoke_ids,
     write_report,
 )
 from venergy_agent.evaluation.report import EvaluationReport
@@ -163,3 +164,38 @@ def test_ids_are_refused_with_modes_that_do_not_run_the_golden(capsys):
         main(["--only", "red_team", "--ids", "G1"])
 
     assert "--ids" in capsys.readouterr().err
+
+
+def test_smoke_selects_the_marked_items_with_their_root_chains():
+    items = [
+        {"id": "G001", "smoke": True, "follow_up_of": None},
+        {"id": "G002", "smoke": False, "follow_up_of": "G001"},
+        {"id": "G003", "smoke": True, "follow_up_of": "G002"},
+        {"id": "G004", "follow_up_of": None},
+    ]
+
+    selected = select_items(items, smoke_ids(items))
+
+    assert [item["id"] for item in selected] == ["G001", "G002", "G003"]
+
+
+def test_smoke_without_any_marked_item_is_an_error():
+    with pytest.raises(UnknownItems):
+        smoke_ids([{"id": "G001", "follow_up_of": None}])
+
+
+def test_smoke_cannot_be_combined_with_ids_or_with_another_set():
+    with pytest.raises(SystemExit) as with_ids:
+        main(["--smoke", "--ids", "G001"])
+    with pytest.raises(SystemExit) as with_red_team:
+        main(["--smoke", "--only", "red_team"])
+
+    assert with_ids.value.code == 2
+    assert with_red_team.value.code == 2
+
+
+def test_concurrency_must_be_a_positive_integer():
+    with pytest.raises(SystemExit) as exit_info:
+        main(["--concurrency", "0"])
+
+    assert exit_info.value.code == 2

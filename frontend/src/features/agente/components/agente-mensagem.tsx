@@ -14,15 +14,20 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { Badge } from "#/components/ui/badge";
 import { Button } from "#/components/ui/button";
+import { useSession } from "#/features/auth";
 import { formatDataHora, formatNumero, formatSegundos } from "#/lib/format";
 import { cn } from "#/lib/utils";
 import {
 	formatarCelulaResultado,
 	nomeAmigavelView,
+	PASSO_TABELA,
+	proximoLimiteTabela,
 	rotuloConfianca,
 	rotuloStatusResposta,
 } from "../conversions";
 import type { TurnoConversa } from "../types";
+import { AgenteAuditoria } from "./agente-auditoria";
+import { useAgente } from "./agente-provider";
 
 const PONTO_STATUS = {
 	success: "bg-success",
@@ -51,6 +56,9 @@ export function AgenteTurnoItem({
 	mostrarHorario?: boolean;
 }) {
 	const [detalhesAbertos, setDetalhesAbertos] = useState(false);
+	const [linhasMostradas, setLinhasMostradas] = useState(PASSO_TABELA);
+	const { data: usuario } = useSession();
+	const { enviarPergunta } = useAgente();
 	const [tabelaAberta, setTabelaAberta] = useState<boolean | null>(null);
 	const [sqlAberto, setSqlAberto] = useState(false);
 	const [copiado, setCopiado] = useState(false);
@@ -204,9 +212,15 @@ export function AgenteTurnoItem({
 									</span>
 								</div>
 							)}
+							{detalhesAbertos && usuario?.perfil === "ti" && (
+								<AgenteAuditoria auditId={resposta.audit_id} />
+							)}
 						</div>
 
-						<p className="whitespace-pre-line text-body text-text">
+						<p
+							data-testid="agente-resposta-texto"
+							className="whitespace-pre-line text-body text-text"
+						>
 							{resposta.answer}
 						</p>
 
@@ -216,6 +230,24 @@ export function AgenteTurnoItem({
 								<p className="rounded-md border border-warning bg-warning-subtle p-2.5 text-small text-text">
 									{resposta.refused_reason}
 								</p>
+							)}
+
+						{resposta.status === "clarify" &&
+							resposta.clarification_options.length > 0 && (
+								<div className="flex flex-wrap gap-2">
+									{resposta.clarification_options.map((opcao) => (
+										<Button
+											key={opcao}
+											type="button"
+											variant="outline"
+											size="sm"
+											disabled={enviando}
+											onClick={() => void enviarPergunta(opcao)}
+										>
+											{opcao}
+										</Button>
+									))}
+								</div>
 							)}
 
 						{resposta.assumptions.length > 0 && (
@@ -238,7 +270,10 @@ export function AgenteTurnoItem({
 						)}
 
 						{tabelaVisivel && resposta.rows.length > 0 && (
-							<div className="overflow-x-auto rounded-md border border-border bg-surface-2/40">
+							<div
+								data-testid="agente-tabela"
+								className="overflow-x-auto rounded-md border border-border bg-surface-2/40"
+							>
 								<table className="w-full border-collapse text-small">
 									<thead>
 										<tr className="border-b border-border">
@@ -254,29 +289,48 @@ export function AgenteTurnoItem({
 										</tr>
 									</thead>
 									<tbody>
-										{resposta.rows.map((linha, indice) => (
-											<tr
-												// biome-ignore lint/suspicious/noArrayIndexKey: linhas do resultado não têm identificador próprio
-												key={indice}
-												className="border-b border-border last:border-b-0"
-											>
-												{colunas.map((coluna) => (
-													<td
-														key={coluna}
-														className="whitespace-nowrap px-3 py-2 tabular-nums text-text"
-													>
-														{formatarCelulaResultado(
-															coluna,
-															linha[coluna],
-															resposta.column_units?.[coluna],
-														)}
-													</td>
-												))}
-											</tr>
-										))}
+										{resposta.rows
+											.slice(0, linhasMostradas)
+											.map((linha, indice) => (
+												<tr
+													// biome-ignore lint/suspicious/noArrayIndexKey: linhas do resultado não têm identificador próprio
+													key={indice}
+													className="border-b border-border last:border-b-0"
+												>
+													{colunas.map((coluna) => (
+														<td
+															key={coluna}
+															className="whitespace-nowrap px-3 py-2 tabular-nums text-text"
+														>
+															{formatarCelulaResultado(
+																coluna,
+																linha[coluna],
+																resposta.column_units?.[coluna],
+															)}
+														</td>
+													))}
+												</tr>
+											))}
 									</tbody>
 								</table>
 							</div>
+						)}
+
+						{tabelaVisivel && resposta.rows.length > linhasMostradas && (
+							<button
+								type="button"
+								onClick={() =>
+									setLinhasMostradas(
+										proximoLimiteTabela(linhasMostradas, resposta.rows.length),
+									)
+								}
+								className="cursor-pointer text-small text-accent underline-offset-2 hover:underline"
+							>
+								Mostrar mais{" "}
+								{Math.min(PASSO_TABELA, resposta.rows.length - linhasMostradas)}{" "}
+								linhas ({formatNumero(linhasMostradas)} de{" "}
+								{formatNumero(resposta.rows.length)} mostradas)
+							</button>
 						)}
 
 						{sqlAberto && resposta.sql && (

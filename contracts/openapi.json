@@ -4430,6 +4430,14 @@
             "title": "Column Labels",
             "default": {}
           },
+          "clarification_options": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Clarification Options",
+            "default": []
+          },
           "pergunta": {
             "type": "string",
             "title": "Pergunta"
@@ -7239,6 +7247,14 @@
             "type": "object",
             "title": "Column Labels",
             "default": {}
+          },
+          "clarification_options": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Clarification Options",
+            "default": []
           },
           "session_id": {
             "type": "string",

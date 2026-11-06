@@ -91,7 +91,8 @@ def garantir_colunas_das_colunas(connection: Connection) -> None:
         text(
             "ALTER TABLE IF EXISTS app.ai_auditoria "
             "ADD COLUMN IF NOT EXISTS column_units jsonb NOT NULL DEFAULT '{}'::jsonb, "
-            "ADD COLUMN IF NOT EXISTS column_labels jsonb NOT NULL DEFAULT '{}'::jsonb"
+            "ADD COLUMN IF NOT EXISTS column_labels jsonb NOT NULL DEFAULT '{}'::jsonb, "
+            "ADD COLUMN IF NOT EXISTS clarification_options jsonb NOT NULL DEFAULT '[]'::jsonb"
         )
     )
 

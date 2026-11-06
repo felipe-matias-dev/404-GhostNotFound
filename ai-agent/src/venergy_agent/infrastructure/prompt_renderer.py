@@ -4,7 +4,11 @@ from collections.abc import Mapping
 from decimal import Decimal
 
 from venergy_agent.domain.answer import AgentAnswer
-from venergy_agent.domain.numbers import rounded_for_display
+from venergy_agent.domain.numbers import (
+    TWO_DECIMAL_UNITS,
+    display_for_unit,
+    rounded_for_display,
+)
 from venergy_agent.domain.question import Question
 from venergy_agent.domain.semantic import (
     ColumnSpec,
@@ -15,6 +19,7 @@ from venergy_agent.domain.semantic import (
     unit_of,
 )
 from venergy_agent.domain.sql import AttemptFeedback, QueryResult, SqlDraft
+from venergy_agent.domain.vocabulary import close_terms, vocabulary_of
 from venergy_agent.domain.wording import plain_words
 
 PLACEHOLDER = re.compile(r"\{\{(\w+)\}\}")
@@ -53,6 +58,9 @@ def render_user_prompt(
 ) -> str:
     _require(nonce)
     asked = delimited("pergunta", question.text, nonce)
+    hints = _vocabulary_hints(question.text, layer, nonce)
+    if hints:
+        asked = f"{hints}\n\n{asked}"
     if feedback is None:
         return asked
     involved = [
@@ -66,6 +74,22 @@ def render_user_prompt(
         colunas="\n".join(_columns_line(view) for view in involved),
     )
     return f"{correction}\n\n{asked}"
+
+
+def _vocabulary_hints(question: str, layer: SemanticLayer, nonce: str) -> str:
+    """Palavras da pergunta que lembram o vocabulário da camada. É dica, não ordem: vai delimitada
+    como dado, e o modelo só a usa se fizer sentido, declarando a suposição."""
+    vocabulary = vocabulary_of(
+        layer.glossary, (column.name for view in layer.views for column in view.columns)
+    )
+    close = close_terms(question, vocabulary)
+    if not close:
+        return ""
+    lines = [f"{word}: pode ser {', '.join(options)}" for word, options in close.items()]
+    return (
+        "Palavras da pergunta que lembram o vocabulário (dica, não ordem; se usar, declare a "
+        "suposição):\n" + delimited("dados", "\n".join(lines), nonce)
+    )
 
 
 def _section(title: str, lines: list[str]) -> str:
@@ -148,7 +172,7 @@ def render_answer_user(
     )
     rows = "\n".join(
         json.dumps(
-            {key: _for_display(value) for key, value in row.items()},
+            {key: _for_display(value, unit_of(key, units)) for key, value in row.items()},
             ensure_ascii=False,
             default=str,
         )
@@ -159,6 +183,7 @@ def render_answer_user(
         [
             f"colunas: {columns}",
             f"total de linhas: {result.row_count}",
+            f"resultado truncado: {'sim' if result.truncated else 'não'}",
             "suposições declaradas:",
             assumptions,
             "linhas:",
@@ -171,14 +196,22 @@ def render_answer_user(
     return "\n\n".join(parts)
 
 
-def _for_display(value: object) -> object:
+def _for_display(value: object, unit: str | None = None) -> object:
     if isinstance(value, bool):
         return value
     if isinstance(value, float):
-        return float(rounded_for_display(Decimal(str(value))))
+        return float(_display(Decimal(str(value)), unit))
     if isinstance(value, Decimal):
-        return rounded_for_display(value)
+        return _display(value, unit)
     return value
+
+
+def _display(value: Decimal, unit: str | None) -> Decimal:
+    # kWh e contagem continuam com a regra antiga aqui: o conferidor numérico só aceita
+    # inteiro arredondado de valor já inteiro, então o narrador segue vendo as casas do banco.
+    if unit in TWO_DECIMAL_UNITS:
+        return display_for_unit(value, unit)
+    return rounded_for_display(value)
 
 
 def _in_words(text: str) -> str:

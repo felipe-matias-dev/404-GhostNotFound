@@ -13,3 +13,7 @@ __unconfig*
 todos.json
 storybook-static
 *storybook.log
+
+# Playwright (make e2e-agente): capturas e relatório não vão para o Git
+test-results
+playwright-report

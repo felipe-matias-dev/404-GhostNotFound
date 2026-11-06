@@ -127,6 +127,8 @@ Registro das decisões tomadas pelo time onde os requisitos do case não eram ex
 | [DEC-077](#dec-077--insights-de-ia-nas-telas-do-dia-a-dia-com-a-ia-escolhendo-a-leitura) | Insights de IA nas telas do dia a dia, com a IA escolhendo a leitura | 03/11/2026 | Luis Felipe | adotada |
 | [DEC-079](#dec-079--narrativa-recusada-tem-uma-segunda-chance-e-chega-arredondada) | Narrativa recusada tem uma segunda chance e chega arredondada | 04/11/2026 | Luis Felipe | adotada, revisada pela [DEC-080](#dec-080--agente-confiável-no-portal-depois-da-apresentação) |
 | [DEC-080](#dec-080--agente-confiável-no-portal-depois-da-apresentação) | Agente confiável no portal depois da apresentação | 04/11/2026 | Luis Felipe | adotada |
+| [DEC-081](#dec-081--casas-decimais-por-unidade-iguais-no-texto-e-na-tabela) | Casas decimais por unidade iguais no texto e na tabela | 04/11/2026 | Lucas (T4 do plano de robustez) | adotada, pendente de rodada completa (DEC-016) |
+| [DEC-082](#dec-082--opções-de-esclarecimento-de-período-no-contrato) | Opções de esclarecimento de período no contrato | 05/11/2026 | Lucas (T5 do plano de robustez) | adotada, pendente de rodada completa (DEC-016) |
 
 ### Convenções sem número
 
@@ -2405,3 +2407,36 @@ Decisões de 19/10/2026, anteriores à numeração: [convenções do frontend](#
 - **Alternativas descartadas:** cada uma com o motivo.
 - **Consequências:** o que muda para as outras frentes.
 ```
+
+## DEC-081 · Casas decimais por unidade iguais no texto e na tabela
+
+- **Data:** 04/11/2026 · **Área:** GenAI e Portal · **Autor:** Lucas (T4 do plano de robustez, `ai-agent/docs/plans/2026-11-05-robustez-do-agente.md`) · **Revisa:** nenhuma; complementa a DEC-080.
+- **Contexto:** o mesmo número saía diferente no texto e na tabela. Na Gold real, o texto de reserva mostrava DEC "0,024" (três algarismos significativos abaixo de 1) e a tabela "0,02". A tabela também mostrava contagem com uma casa decimal, e o consumo mensal (kWh/mês) com a regra antiga no texto.
+- **Decisão:** a mesma regra vale para o texto (`display_for_unit`, em `domain/numbers.py`) e para a tabela (`agente/conversions.ts`), pela unidade que a camada semântica declara:
+  - R$: sempre duas casas, como a moeda da tabela.
+  - R$/kWh, h, %, UC·h: até duas casas, sem zeros finais.
+  - kWh, kWh/mês e contagem: inteiros.
+  - Demais unidades (anos, dias, interrupções, kWp, nota): regra antiga no texto e até duas casas na tabela.
+- **Consequências:**
+  - A entrada do narrador usa as mesmas duas casas para as unidades de duas casas. Isso muda o que o modelo vê, então vale a DEC-016.
+  - kWh e contagem continuam com a regra antiga na entrada do narrador. O conferidor numérico só aceita inteiro arredondado de valor já inteiro; mudar isso exige commit próprio no conferidor.
+  - Valores de h, % e R$ abaixo de 1 mudam de casas no texto e na tabela.
+- **Pendências:**
+  - Rodada completa do golden com a nova entrada do narrador, antes do merge (DEC-016). Esta rodada não foi feita: a cota diária do Gemini estava esgotada.
+  - Revisar a regra das demais unidades se a tabela e o texto divergirem em valores abaixo de 1.
+- **Evidência:** testes de `display_for_unit` (representação, não só o valor, pelo problema de expoente do `Decimal`), testes de prompt e do texto de reserva, e testes de formatação da tabela (suíte do frontend com 230 testes).
+
+## DEC-082 · Opções de esclarecimento de período no contrato
+
+- **Data:** 05/11/2026 · **Área:** GenAI, Backend e Portal · **Autor:** Lucas (T5 do plano de robustez, `ai-agent/docs/plans/2026-11-05-robustez-do-agente.md`) · **Revisa:** complementa a DEC-080 (pedido de período) e depende da DEC-079/T9 (resposta a esclarecimento).
+- **Contexto:** quando a pergunta pede o período e o SQL assumiu um ano que ninguém citou, o agente pedia "Qual período você quer consultar?" sem sugerir nada. O plano pedia botões com opções.
+- **Decisão:** `AgentAnswer` ganha `clarification_options`, com no máximo três opções, só para o status de esclarecimento. No pedido de período, as opções são os anos que o SQL assumiu (até dois) e "nos últimos 12 meses". No portal, cada opção é um botão que envia a resposta como próxima pergunta; o T9 completa a pergunta original.
+- **Por que é mudança de contrato:** muda o schema da resposta da API e o contrato OpenAPI, e as opções precisam ser gravadas na auditoria (coluna `clarification_options`, com ALTER para bancos antigos), senão somem ao recarregar a página.
+- **Consequências:**
+  - Respostas antigas da auditoria saem com lista vazia (sem botões).
+  - Clientes da API que não conhecem o campo continuam funcionando, porque ele tem valor padrão vazio.
+- **Pendências:**
+  - Os botões não cobrem a pergunta de esclarecimento que não é de período; só o pedido de período oferece opções.
+  - Os testes do backend rodam no CI do PR (precisam do banco de testes), não localmente.
+  - Validação na tela pelo teste ponta a ponta (T3).
+- **Evidência:** testes do domínio (opções só em esclarecimento), do caso de uso (opções de período na ordem certa), suíte do frontend (230 testes) e do agente (713 testes).

@@ -1,17 +1,21 @@
 import { ApiError } from "#/lib/api";
 import {
+	formatAteDuasCasas,
 	formatBRL,
 	formatCompetencia,
 	formatData,
 	formatDataHora,
 	formatHoras,
 	formatIndice,
+	formatInteiro,
 	formatKWh,
 	formatNumero,
+	formatSegundos,
 } from "#/lib/format";
 import { AgentProtocolError } from "./api";
 import type {
 	AnswerStatus,
+	AuditoriaIa,
 	Confidence,
 	EscopoSugestao,
 	ExemploPergunta,
@@ -158,15 +162,16 @@ export function nomeAmigavelView(view: string): string {
 	return NOMES_DAS_VIEWS[view] ?? view;
 }
 
-const UNIDADES_SEM_SUFIXO = new Set(["contagem", "nota"]);
-
+// Política de exibição (DEC-080): R$, h e % com até 2 casas; kWh e contagem inteiros.
 function formatarPelaUnidade(valor: number, unidade: string): string {
 	if (unidade === "R$") return formatBRL(valor);
 	if (unidade === "kWh") return formatKWh(valor);
 	if (unidade === "h") return formatHoras(valor);
-	if (unidade === "%") return `${formatNumero(valor)}%`;
-	if (UNIDADES_SEM_SUFIXO.has(unidade)) return formatNumero(valor);
-	return `${formatNumero(valor)} ${unidade}`;
+	if (unidade === "%") return `${formatAteDuasCasas(valor)}%`;
+	if (unidade === "contagem") return formatInteiro(valor);
+	if (unidade === "nota") return formatAteDuasCasas(valor);
+	if (unidade.startsWith("kWh")) return `${formatInteiro(valor)} ${unidade}`;
+	return `${formatAteDuasCasas(valor)} ${unidade}`;
 }
 
 /**
@@ -199,7 +204,7 @@ export function formatarCelulaResultado(
 		if (unidade) return formatarPelaUnidade(valor, unidade);
 		const col = coluna.toLowerCase();
 		if (col.includes("pct") || col.includes("percentual"))
-			return `${formatNumero(valor)}%`;
+			return `${formatAteDuasCasas(valor)}%`;
 		if (
 			col.includes("receita") ||
 			col.includes("tributo") ||
@@ -357,4 +362,40 @@ export function extrairMensagemErro(error: unknown): string {
 			return "A pergunta enviada é inválida (máximo de 500 caracteres).";
 	}
 	return "Não foi possível concluir a consulta ao agente. Tente novamente.";
+}
+
+export type CampoAuditoria = { rotulo: string; valor: string };
+
+/**
+ * Os campos do registro de auditoria que a TI lê no painel, em ordem. Só o perfil TI chega
+ * aqui (o backend recusa a rota para os outros, com 403).
+ */
+export function camposDaAuditoria(registro: AuditoriaIa): CampoAuditoria[] {
+	return [
+		{ rotulo: "Pergunta", valor: registro.pergunta },
+		{ rotulo: "Status", valor: registro.status },
+		{
+			rotulo: "SQL",
+			valor: registro.sql ?? "nenhum (a consulta não foi gerada)",
+		},
+		{
+			rotulo: "Linhas",
+			valor: `${formatInteiro(registro.row_count)}${registro.truncated ? " (resultado truncado)" : ""}`,
+		},
+		{ rotulo: "Modelo", valor: registro.model },
+		{ rotulo: "Versão do prompt", valor: registro.prompt_version },
+		{ rotulo: "Tempo", valor: formatSegundos(registro.latency_ms) },
+		{
+			rotulo: "Tokens",
+			valor: `${formatInteiro(registro.input_tokens)} de entrada e ${formatInteiro(registro.output_tokens)} de saída`,
+		},
+		{ rotulo: "Registrado em", valor: formatDataHora(registro.criado_em) },
+	];
+}
+
+/** Linhas da tabela de resposta mostradas de cada vez; "Mostrar mais" soma outro bloco. */
+export const PASSO_TABELA = 20;
+
+export function proximoLimiteTabela(atual: number, total: number): number {
+	return Math.min(total, atual + PASSO_TABELA);
 }

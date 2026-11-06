@@ -1079,6 +1079,8 @@ class RespostaIaBaseSchema(BaseModel):
     column_units: dict[str, str] = {}
     # Rótulo em português de cada coluna da amostra, para o cabeçalho da tabela.
     column_labels: dict[str, str] = {}
+    # Opções de esclarecimento de período, para os botões do portal (DEC-082).
+    clarification_options: list[str] = []
 
 
 class RespostaIaSchema(RespostaIaBaseSchema):

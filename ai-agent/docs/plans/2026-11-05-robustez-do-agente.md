@@ -486,6 +486,32 @@ Prioridade alta para 13.2, 13.5 e 13.6. A 13.1 e a 13.3 mudam o fluxo e o contra
 | 7e | T12.2, T12.3 e T13.4 (refinamentos) | os dois | — |
 | 8 | T8 | os dois | todas |
 
+## Progresso (atualizado em 04/11/2026)
+
+Este PR empilha as tarefas sobre a branch da PR 144. Cada tarefa tem o seu commit. "Feito"
+quer dizer código e testes prontos, sem a validação que depende da rodada completa (DEC-016)
+ou do portal rodando (T3).
+
+| Tarefa | Status | Commit | Falta |
+|---|---|---|---|
+| T1 Fechar DEC-080 | Feito no PR 144, aguarda merge | (PR 144) | Merge. Os números da DEC-080 não foram reproduzidos nesta sessão (cota do Gemini) |
+| T2 Golden 0.20.0 | Parcial: 21 de cerca de 60 itens, com `expected_values` | 10cdb87 | Itens de "por UC" (precisam de códigos reais), follow-ups de 3 turnos, cadeias esclarecimento -> resposta (T9), revisão de Dados |
+| T3 Ponta a ponta | Esqueleto: teste escrito e listado (20 casos), não executado | 9a91636 | Rodar com o stack no ar, E2E_SENHA_DEMO, tabela "pergunta x usuário x ok" no PR |
+| T4 Casas decimais | Feito, com DEC-081 | 10937bd, 260cf46, 91f6d71 | Rodada completa (DEC-016): a entrada do narrador mudou para h, % e R$ |
+| T5 Vazio, grande, glossário, esclarecimento | Parcial: paginação da tabela | 299c34a | Resultado vazio narrado e grande narrado (DEC-016); glossário 0.4.3 (DEC-016); clarification_options (contrato, persistência e DEC) |
+| T6 Auditoria para a TI | Feito no portal; checagem na tela pendente (T3) | 4784e96 | Conferir no navegador com a TI logada |
+| T7 Filtro, recusas, tempo | Parcial: resumo de motivos de recusa | 29bd42a | Filtros no SqlDraft (DEC-016); medição de tempo com o modelo pago (fora do escopo desta sessão) |
+| T8 Rodada final | Não feito | — | Golden completo, juiz, T3 nos 5 usuários três vezes, DEC com as medições, docs |
+| T9 Resposta a esclarecimento | Feito no código e nos testes | 0f914c8 | Itens de golden (T2) e validação pela tela (T3) |
+| T10 Termos fora do vocabulário | Parcial: detector e relatório | cb24da3 | Dica no prompt e regra no prompt (DEC-016); sinônimos no glossário (DEC-016); itens de golden |
+| T11 Avaliação mais rápida | Feito | 2b1fdcc | Nada; a rodada completa em cerca de 8 minutos depende da cota e da concorrência escolhida |
+
+**Limitação conhecida (T4):** kWh e contagem continuam com a regra antiga na entrada do
+narrador, porque o conferidor numérico não aceita inteiro arredondado de um valor com duas
+casas. Mudar isso exige commit próprio no conferidor.
+
+**Como manter:** atualizar a linha da tarefa no mesmo commit em que ela for concluída.
+
 ## Regras para quem implementar
 
 - **Código do agente:** em inglês, sem comentários, com testes só para regras do projeto. **Documentação:** em português.

@@ -27,12 +27,17 @@ from venergy_agent.domain.errors import (
     SqlRejected,
 )
 from venergy_agent.domain.events import AgentEvent, AnswerEvent, Stage, StageEvent
-from venergy_agent.domain.followup import depends_on_previous_turn
+from venergy_agent.domain.followup import (
+    answers_a_clarification,
+    complete_question,
+    depends_on_previous_turn,
+)
 from venergy_agent.domain.numbers import (
+    display_for_unit,
     durations,
     pt_br_numbers,
-    rounded_for_display,
     supports,
+    threshold_percents,
     unsupported_numbers,
     written_units,
 )
@@ -46,6 +51,7 @@ from venergy_agent.domain.sql import (
     SqlDraft,
     ValidatedQuery,
 )
+from venergy_agent.domain.vocabulary import known_words, vocabulary_of
 from venergy_agent.domain.wording import label, plain_words
 
 logger = logging.getLogger("venergy_agent.ask")
@@ -178,6 +184,11 @@ class AskUseCase:
         narration_min_seconds: float = 4.0,
     ) -> None:
         self._layer = layer
+        self._known_words = known_words(
+            vocabulary_of(
+                layer.glossary, (column.name for view in layer.views for column in view.columns)
+            )
+        )
         self._generator = generator
         self._validator = validator
         self._executor = executor
@@ -289,6 +300,20 @@ class AskUseCase:
                 AnswerStatus.REFUSED, BUDGET_EXHAUSTED, request_id, session_id, started
             )
         history = await self._load_history(session_id, request_id)
+        if (
+            history
+            and history[-1].status is AnswerStatus.CLARIFY
+            and answers_a_clarification(question.text, self._known_words)
+        ):
+            self._log(
+                request_id,
+                session_id,
+                step="pergunta",
+                status="pergunta_completada",
+            )
+            question = question.model_copy(
+                update={"text": complete_question(history[-1].question, question.text)}
+            )
 
         spent = _Spent()
         if not history and depends_on_previous_turn(question.text):
@@ -402,7 +427,12 @@ class AskUseCase:
                     years=list(invented),
                 )
                 return self._clarify(
-                    PERIOD_NOT_GIVEN, request_id, started, model=generation.model, spent=spent
+                    PERIOD_NOT_GIVEN,
+                    request_id,
+                    started,
+                    model=generation.model,
+                    spent=spent,
+                    options=_period_options(invented),
                 )
             began = time.perf_counter()
 
@@ -708,6 +738,7 @@ class AskUseCase:
             *_months_between(validated.periods),
             *validated.years,
             *(pt_br_numbers(question_text) & _sql_numbers(validated.sql)),
+            *threshold_percents(question_text, _sql_numbers(validated.sql)),
             *(value for row in visible.rows for value in row.values()),
         ]
         unsupported = unsupported_numbers(narrative, values, allowed)
@@ -788,7 +819,14 @@ class AskUseCase:
         return Confidence.HIGH
 
     def _clarify(
-        self, clarification: str, request_id: str, started: float, *, model: str, spent: _Spent
+        self,
+        clarification: str,
+        request_id: str,
+        started: float,
+        *,
+        model: str,
+        spent: _Spent,
+        options: tuple[str, ...] = (),
     ) -> AgentAnswer:
         return AgentAnswer(
             answer=CLARIFY_PREFIX + clarification,
@@ -801,6 +839,7 @@ class AskUseCase:
             sources=(),
             assumptions=(),
             clarification=clarification,
+            clarification_options=options,
             refused_reason=None,
             request_id=request_id,
             model=model,
@@ -876,7 +915,7 @@ def _row_text(columns: tuple[str, ...], row: dict[str, object], units: Mapping[s
 
 
 def _with_unit(value: object, unit: str | None) -> str:
-    text = _pt_br(value)
+    text = _pt_br(value, unit)
     if value is None or unit is None or unit in UNITS_WITHOUT_SUFFIX:
         return text
     if unit == "R$":
@@ -884,13 +923,13 @@ def _with_unit(value: object, unit: str | None) -> str:
     return f"{text}%" if unit == "%" else f"{text} {unit}"
 
 
-def _pt_br(value: object) -> str:
+def _pt_br(value: object, unit: str | None = None) -> str:
     if value is None:
         return MISSING_VALUE
     if isinstance(value, bool):
         return "sim" if value else "não"
     if isinstance(value, int | float | Decimal):
-        number = rounded_for_display(Decimal(str(value)))
+        number = display_for_unit(Decimal(str(value)), unit)
         grouped = format(number, ",f")
         return grouped.replace(",", "_").replace(".", ",").replace("_", ".")
     return _shorten(str(value))
@@ -999,3 +1038,12 @@ def _conflicts(column_unit: str | None, written: str, value: object) -> bool:
     if written == "h":
         return "h" not in column_unit or column_unit.startswith("kWh")
     return not column_unit.startswith(written)
+
+
+PERIOD_OPTION_LIMIT = 2
+LAST_TWELVE_MONTHS = "nos últimos 12 meses"
+
+
+def _period_options(years: tuple[str, ...]) -> tuple[str, ...]:
+    """Até três opções para o pedido de período: os anos que o SQL assumiu e os últimos 12 meses."""
+    return (*(f"em {year}" for year in years[:PERIOD_OPTION_LIMIT]), LAST_TWELVE_MONTHS)

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { ApiError } from "#/lib/api";
+import { formatBRL } from "#/lib/format";
 import {
+	camposDaAuditoria,
 	desfazerAlteracao,
 	ESCOPOS_AGENTE,
 	EXEMPLOS_PERGUNTAS,
@@ -12,18 +14,26 @@ import {
 	MAX_PERGUNTA_CHARS,
 	mesclarSessoes,
 	nomeAmigavelView,
+	PASSO_TABELA,
+	proximoLimiteTabela,
 	reinserirSessao,
 	rotuloConfianca,
 	rotuloStatusResposta,
 	sessaoDaApi,
 	validarPergunta,
 } from "../conversions";
-import type { ExemploPergunta, RespostaIa, SessaoConversa } from "../types";
+import type {
+	AuditoriaIa,
+	ExemploPergunta,
+	RespostaIa,
+	SessaoConversa,
+} from "../types";
 
 function resposta(answer = "Receita faturada: R$ 1.000,00"): RespostaIa {
 	return {
 		audit_id: 1,
 		answer,
+		clarification_options: [],
 		status: "answered",
 		sql: "select 1",
 		rows: [],
@@ -257,7 +267,7 @@ describe("formatarCelulaResultado", () => {
 	});
 
 	it("formata percentual e número puro", () => {
-		expect(formatarCelulaResultado("variacao_pct", 3.46)).toBe("3,5%");
+		expect(formatarCelulaResultado("variacao_pct", 3.46)).toBe("3,46%");
 		expect(formatarCelulaResultado("n_uc", 1234)).toBe("1.234");
 	});
 });
@@ -452,5 +462,75 @@ describe("extrairMensagemErro", () => {
 		expect(extrairMensagemErro(new ApiError(500, null))).toBe(generica);
 		expect(extrairMensagemErro(new Error("boom"))).toBe(generica);
 		expect(extrairMensagemErro("falhou")).toBe(generica);
+	});
+});
+
+describe("política de exibição por unidade (DEC-080)", () => {
+	it("contagem é inteira e percentual tem até duas casas, como no texto da resposta", () => {
+		expect(formatarCelulaResultado("n_ucs", 12.4, "contagem")).toBe("12");
+		expect(formatarCelulaResultado("variacao", 3.456, "%")).toBe("3,46%");
+		expect(formatarCelulaResultado("variacao", 0.5, "%")).toBe("0,5%");
+	});
+});
+
+describe("camposDaAuditoria (painel da TI)", () => {
+	const registro = {
+		audit_id: 42,
+		pergunta: "Quantas UCs?",
+		answer: "Há 8 UCs.",
+		status: "answered",
+		sql: null,
+		rows: [],
+		row_count: 1200,
+		truncated: true,
+		confidence: "high",
+		sources: [],
+		assumptions: [],
+		clarification: null,
+		refused_reason: null,
+		request_id: "r1",
+		model: "gemini-3.1-flash-lite",
+		prompt_version: "v4",
+		latency_ms: 4200,
+		input_tokens: 13802,
+		output_tokens: 344,
+		column_units: {},
+		column_labels: {},
+		criado_em: "2026-11-04T21:00:00Z",
+	} as unknown as AuditoriaIa;
+
+	it("mostra SQL ausente, resultado truncado e os tokens separados", () => {
+		const campos = camposDaAuditoria(registro);
+		const valor = (rotulo: string) =>
+			campos.find((campo) => campo.rotulo === rotulo)?.valor;
+
+		expect(valor("Pergunta")).toBe("Quantas UCs?");
+		expect(valor("SQL")).toBe("nenhum (a consulta não foi gerada)");
+		expect(valor("Linhas")).toBe("1.200 (resultado truncado)");
+		expect(valor("Versão do prompt")).toBe("v4");
+		expect(valor("Tempo")).toBe("4,2 segundos");
+		expect(valor("Tokens")).toBe("13.802 de entrada e 344 de saída");
+	});
+});
+
+describe("tabela da resposta", () => {
+	it("mostra um bloco a mais por clique, sem passar do total", () => {
+		expect(PASSO_TABELA).toBe(20);
+		expect(proximoLimiteTabela(20, 45)).toBe(40);
+		expect(proximoLimiteTabela(40, 45)).toBe(45);
+		expect(proximoLimiteTabela(45, 45)).toBe(45);
+	});
+});
+
+describe("unidades da camada na tabela, iguais ao texto", () => {
+	it("R$ com duas casas, kWh/mês inteiro, R$/kWh e UC·h com até duas casas", () => {
+		expect(formatarCelulaResultado("receita", 1234.5, "R$")).toBe(
+			formatBRL(1234.5),
+		);
+		expect(formatarCelulaResultado("consumo", 433.6, "kWh/mês")).toBe(
+			"434 kWh/mês",
+		);
+		expect(formatarCelulaResultado("tarifa", 0.5, "R$/kWh")).toBe("0,5 R$/kWh");
+		expect(formatarCelulaResultado("horas", 12.345, "UC·h")).toBe("12,35 UC·h");
 	});
 });

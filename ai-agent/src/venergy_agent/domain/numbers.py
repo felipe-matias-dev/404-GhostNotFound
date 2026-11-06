@@ -111,3 +111,39 @@ def _trimmed(value: Decimal) -> Decimal:
         digits_list.pop()
         exponent += 1
     return Decimal((sign, tuple(digits_list), exponent))
+
+
+# Unidades com até duas casas, no texto e na tabela (a mesma regra nos dois). R$ sempre tem
+# duas casas, como a moeda da tabela; as outras perdem zeros finais, como o número da tabela.
+TWO_DECIMAL_UNITS = frozenset({"R$", "R$/kWh", "h", "%", "UC·h"})
+PADDED_UNITS = frozenset({"R$"})
+INTEGER_UNITS = frozenset({"kWh", "kWh/mês", "contagem"})
+
+
+def display_for_unit(value: Decimal, unit: str | None) -> Decimal:
+    """Política de exibição por unidade (DEC-080). Sem unidade, a regra antiga."""
+    if unit in TWO_DECIMAL_UNITS:
+        rounded = value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        return rounded if unit in PADDED_UNITS else _trimmed(rounded)
+    if unit in INTEGER_UNITS:
+        return value.quantize(Decimal(1), rounding=ROUND_HALF_UP)
+    return rounded_for_display(value)
+
+
+PERCENT_IN_TEXT = re.compile(r"(?<![\d.,])(\d+(?:[.,]\d+)?)\s*%")
+
+
+def threshold_percents(text: str, sql_numbers: set[Decimal]) -> set[Decimal]:
+    """Percentuais citados no texto que o SQL usa de forma transformada (queda de 30% vira
+    0,7 = 1 - 0,3; alta de 30% vira 1,3; ou 0,3 direto). Sem isso, a narração que cita o filtro
+    da pergunta seria recusada por um número que não está no SQL literalmente."""
+    found: set[Decimal] = set()
+    for match in PERCENT_IN_TEXT.finditer(text):
+        percent = _from_pt_br(match.group(1))
+        if percent is None:
+            continue
+        fraction = percent / 100
+        forms = (fraction, 1 - fraction, 1 + fraction)
+        if any(abs(form - number) < Decimal("1e-9") for form in forms for number in sql_numbers):
+            found.add(percent)
+    return found

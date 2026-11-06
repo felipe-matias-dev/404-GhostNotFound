@@ -34,6 +34,7 @@ class AgentAnswer(BaseModel):
     sources: tuple[str, ...]
     assumptions: tuple[str, ...]
     clarification: NonBlankText | None
+    clarification_options: tuple[NonBlankText, ...] = Field(default=(), max_length=3)
     refused_reason: NonBlankText | None
     request_id: NonBlankText
     model: NonBlankText
@@ -67,6 +68,8 @@ class AgentAnswer(BaseModel):
 
         if self.confidence is not Confidence.UNKNOWN:
             raise ValueError(f"{self.status} requires unknown confidence")
+        if self.clarification_options and self.status is not AnswerStatus.CLARIFY:
+            raise ValueError("clarification_options only come with a clarify answer")
         if self.rows or self.row_count != 0 or self.column_units or self.column_labels:
             raise ValueError(f"{self.status} cannot carry result rows")
 

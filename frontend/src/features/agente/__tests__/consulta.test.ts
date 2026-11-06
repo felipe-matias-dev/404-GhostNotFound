@@ -11,6 +11,7 @@ vi.mock("../api", async (importOriginal) => ({
 
 const resposta: RespostaIa = {
 	audit_id: 1,
+	clarification_options: [],
 	answer: "Há 12 unidades consumidoras.",
 	status: "answered",
 	sql: "SELECT 12 AS total",

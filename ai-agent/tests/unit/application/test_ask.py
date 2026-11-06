@@ -61,10 +61,12 @@ class ScriptedGenerator:
         self._outcomes = outcomes
         self.feedbacks = []
         self.histories = []
+        self.questions = []
 
     async def generate(self, question, layer, feedback, history=()):
         self.feedbacks.append(feedback)
         self.histories.append(history)
+        self.questions.append(question.text)
         outcome = self._outcomes[min(len(self.feedbacks), len(self._outcomes)) - 1]
         if isinstance(outcome, Exception):
             raise outcome
@@ -1631,3 +1633,85 @@ async def test_a_calendar_last_year_without_years_still_asks_for_the_period(laye
     )
 
     assert answer.clarification == PERIOD_NOT_GIVEN
+
+
+CLARIFY_TURN = turn("queda acima de 30%", sql=None, status="clarify")
+
+
+async def test_an_answer_to_a_clarification_completes_the_original_question(layer, caplog):
+    generator = ScriptedGenerator(generation())
+    history = FakeHistory((CLARIFY_TURN,))
+
+    with caplog.at_level(logging.INFO, logger="venergy_agent.ask"):
+        await use_case(layer, generator, history=history, history_turns=3).ask(
+            "entre 2024 e 2025", "s1"
+        )
+
+    assert generator.questions == ["queda acima de 30% Esclarecimento: entre 2024 e 2025"]
+    assert "pergunta_completada" in caplog.text
+    assert "queda acima de 30%" not in caplog.text
+
+
+async def test_a_new_complete_question_after_a_clarification_is_not_completed(layer):
+    generator = ScriptedGenerator(generation())
+    history = FakeHistory((CLARIFY_TURN,))
+
+    await use_case(layer, generator, history=history, history_turns=3).ask(
+        "Quantas UCs existem na base?", "s1"
+    )
+
+    assert generator.questions == ["Quantas UCs existem na base?"]
+
+
+async def test_a_reply_after_an_answer_is_not_treated_as_a_clarification(layer):
+    generator = ScriptedGenerator(generation())
+    history = FakeHistory((turn("quantas UCs?"),))
+
+    await use_case(layer, generator, history=history, history_turns=3).ask("percentual", "s1")
+
+    assert generator.questions == ["percentual"]
+
+
+def test_fallback_text_shows_hours_and_percent_with_at_most_two_decimals():
+    from venergy_agent.application.ask import _with_unit
+
+    assert _with_unit(0.0256, "h") == "0,03 h"
+    assert _with_unit(3.456, "%") == "3,46%"
+    assert _with_unit(1234.5, "kWh") == "1.235 kWh"
+    assert _with_unit(12.4, "contagem") == "12"
+
+
+async def test_a_new_request_after_a_clarification_reaches_the_generator_unchanged(layer):
+    generator = ScriptedGenerator(generation())
+    history = FakeHistory((CLARIFY_TURN,))
+
+    await use_case(layer, generator, history=history, history_turns=3).ask(
+        "Mostre a receita de junho de 2026", "s1"
+    )
+
+    assert generator.questions == ["Mostre a receita de junho de 2026"]
+
+
+async def test_a_percentage_threshold_is_not_invented_when_the_sql_uses_its_complement(layer):
+    sql = "SELECT count(*) AS total FROM sem_faturamento_mensal WHERE kwh_faturado < 0.7"
+    writer = FixedWriter(text="Há 3 UCs com queda acima de 30%.")
+
+    answer = await use_case(
+        layer,
+        ScriptedGenerator(generation(sql=sql)),
+        executor=ScriptedExecutor(table(("total",), (3,))),
+        writer=writer,
+    ).ask("Quantas UCs tiveram queda acima de 30%?", "s1")
+
+    assert answer.answer == "Há 3 UCs com queda acima de 30%."
+
+
+async def test_a_period_clarification_offers_the_years_the_sql_assumed(layer):
+    answer = await use_case(
+        layer,
+        ScriptedGenerator(generation(sql=TWO_YEARS_SQL)),
+        ScriptedExecutor(result()),
+    ).ask("Quantas UCs com painel solar em Olinda tiveram queda de consumo acima de 30%?", "s1")
+
+    assert answer.status is AnswerStatus.CLARIFY
+    assert answer.clarification_options == ("em 2023", "em 2024", "nos últimos 12 meses")

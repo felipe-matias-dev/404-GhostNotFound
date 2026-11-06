@@ -487,6 +487,10 @@ class AiAuditoria(Base):
     column_units: Mapped[dict[str, str]] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
     # Rótulo em português de cada coluna da amostra ("efeito preço"), para o cabeçalho da tabela.
     column_labels: Mapped[dict[str, str]] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
+    # Opções que o portal oferece quando a pergunta pede um período (DEC-082). Vazio nas demais.
+    clarification_options: Mapped[list[str]] = mapped_column(
+        JSONB, server_default=text("'[]'::jsonb")
+    )
     # Login de quem perguntou: o limite, o orçamento e a posse da sessão valem por usuário
     # (DEC-046). Nulo nas linhas de antes da coluna.
     usuario: Mapped[str | None]

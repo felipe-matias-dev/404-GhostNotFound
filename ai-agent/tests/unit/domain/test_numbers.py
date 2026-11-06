@@ -3,7 +3,12 @@ from decimal import Decimal
 
 import pytest
 
-from venergy_agent.domain.numbers import durations, rounded_for_display, unsupported_numbers
+from venergy_agent.domain.numbers import (
+    display_for_unit,
+    durations,
+    rounded_for_display,
+    unsupported_numbers,
+)
 
 
 @pytest.mark.parametrize(
@@ -165,3 +170,60 @@ def test_an_integer_is_still_not_a_rounded_short_decimal():
 )
 def test_a_duration_from_the_question_is_supported_with_its_period_unit(text):
     assert unsupported_numbers(text, [3], {Decimal(12)}) == ()
+
+
+@pytest.mark.parametrize(
+    ("value", "unit", "expected"),
+    [
+        (Decimal("0.0256"), "h", Decimal("0.03")),
+        (Decimal("0.024"), "h", Decimal("0.02")),
+        (Decimal("0.5"), "R$/kWh", Decimal("0.5")),
+        (Decimal("3.456"), "%", Decimal("3.46")),
+        (Decimal("0.50"), "%", Decimal("0.5")),
+    ],
+)
+def test_hours_money_and_percent_have_at_most_two_decimals(value, unit, expected):
+    assert display_for_unit(value, unit) == expected
+
+
+@pytest.mark.parametrize(
+    ("value", "unit", "expected"),
+    [
+        (Decimal("1234.56"), "kWh", Decimal("1235")),
+        (Decimal("12.4"), "contagem", Decimal("12")),
+    ],
+)
+def test_energy_and_counts_are_whole_numbers(value, unit, expected):
+    assert display_for_unit(value, unit) == expected
+
+
+def test_without_a_unit_the_display_rule_is_the_old_one():
+    assert display_for_unit(Decimal("0.024567"), None) == rounded_for_display(Decimal("0.024567"))
+
+
+def test_money_keeps_two_decimals_so_it_matches_the_table_currency_format():
+    assert str(display_for_unit(Decimal("1234.5"), "R$")) == "1234.50"
+    assert str(display_for_unit(Decimal("1234.567"), "R$")) == "1234.57"
+
+
+def test_consumption_per_month_is_a_whole_number_like_kwh():
+    assert display_for_unit(Decimal("433.6"), "kWh/mês") == Decimal("434")
+
+
+@pytest.mark.parametrize(
+    ("text", "sql_numbers", "expected"),
+    [
+        ("queda acima de 30%", {Decimal("0.7")}, {Decimal(30)}),
+        ("queda acima de 30%", {Decimal("0.3")}, {Decimal(30)}),
+        ("alta de 30%", {Decimal("1.3")}, {Decimal(30)}),
+        ("acima de 12,5%", {Decimal("0.875")}, {Decimal("12.5")}),
+        ("acima de 30%", {Decimal("0.5")}, set()),
+        ("300 kWh", {Decimal("0.7")}, set()),
+    ],
+)
+def test_a_percentage_in_the_question_is_supported_by_its_transformed_literal(
+    text, sql_numbers, expected
+):
+    from venergy_agent.domain.numbers import threshold_percents
+
+    assert threshold_percents(text, sql_numbers) == expected

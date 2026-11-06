@@ -162,6 +162,8 @@ make eval SQL_ONLY=1                       # sem o redator: menos cota
 make eval ONLY=references DATASET=gold_real  # só confere as referências do golden na base carregada, sem modelo
 make eval DATASET=gold_real                # Gold real, com redator (relatório fora do Git)
 make eval JUDGE=1                          # com o juiz, só na amostra narrada
+make eval SMOKE=1 DATASET=gold_real         # só o conjunto de fumaça (itens com smoke: true e suas cadeias)
+make eval CONCURRENCY=3                   # até 3 cadeias ao mesmo tempo; a pausa entre chamadas vale para todas
 make eval-compare A=eval/runs/a.json B=eval/runs/b.json
 ```
 
