@@ -8,6 +8,7 @@ import { DecomposicaoTable } from "../components/decomposicao-table";
 import { MapaRecorte } from "../components/mapa-recorte";
 import { PonteWaterfall } from "../components/ponte-waterfall";
 import { RankingQueda } from "../components/ranking-queda";
+import { ReceitaFaturada } from "../components/receita-faturada";
 import type { Efeito } from "../conversions";
 import type { DecomposicaoLinha } from "../types";
 
@@ -146,12 +147,17 @@ export function ReceitaPage() {
 				>
 					{/* Largo: ponte e ranking lado a lado, sem a ponte esticar por toda a largura. */}
 					<div className="grid gap-3 @4xl:grid-cols-[minmax(0,1fr)_minmax(22rem,0.8fr)]">
-						<PonteWaterfall
-							par={par}
-							recorte={recorte}
-							efeito={causa}
-							onEfeito={escolherCausa}
-						/>
+						{/* A receita faturada fica colada na ponte: é ela que liga a ponte, em receita de
+						    energia, ao número da Visão geral (DEC-073). */}
+						<div className="flex min-w-0 flex-col gap-3">
+							<ReceitaFaturada par={par} recorte={recorte} />
+							<PonteWaterfall
+								par={par}
+								recorte={recorte}
+								efeito={causa}
+								onEfeito={escolherCausa}
+							/>
+						</div>
 						<RankingQueda
 							par={par}
 							recorte={recorte}

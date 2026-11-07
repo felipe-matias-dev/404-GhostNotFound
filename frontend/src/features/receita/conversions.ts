@@ -61,12 +61,12 @@ export function legendaDoMapa(
 ): NonNullable<RegionMapProps["legend"]> {
 	const titulo =
 		efeito === "variacao"
-			? "Variação da receita"
+			? "Variação da receita de energia"
 			: `Efeito ${EFEITO_ROTULO[efeito].toLowerCase()}`;
 	return {
 		title: titulo,
 		ticks: [formatPct(-SATURA), formatPct(0), formatPct(SATURA)],
-		description: `${titulo} sobre a receita base de cada região: vermelho para queda, verde para alta; a cor fica mais forte e brilha mais até ${formatPct(SATURA)}`,
+		description: `${titulo} sobre a receita de energia base de cada região: vermelho para queda, verde para alta; a cor fica mais forte e brilha mais até ${formatPct(SATURA)}`,
 	};
 }
 
@@ -100,11 +100,16 @@ export function passosDaPonte(linhas: DecomposicaoLinha[]): WaterfallStep[] {
 		}),
 	);
 	return [
-		{ id: "base", label: "Receita base", value: base, kind: "total" },
+		{
+			id: "base",
+			label: "Receita de energia base",
+			value: base,
+			kind: "total",
+		},
 		...efeitos,
 		{
 			id: "atual",
-			label: "Receita atual",
+			label: "Receita de energia atual",
 			value: centavos(efeitos.reduce((total, p) => total + p.value, base)),
 			kind: "total",
 		},

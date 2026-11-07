@@ -106,8 +106,8 @@ export function DecomposicaoTable({
 			width: "minmax(120px, 1.4fr)",
 			value: (l) => l.segmento,
 		},
-		valor("receita_base", "Receita base", false),
-		valor("receita_atual", "Receita atual", false),
+		valor("receita_base", "Energia base", false),
+		valor("receita_atual", "Energia atual", false),
 		valor("variacao_receita", "Variação", true),
 		VARIACAO_PCT,
 		// Efeitos na ordem e com os nomes da ponte. O efeito preço fica de fora: é tarifa + bandeira.
@@ -118,7 +118,7 @@ export function DecomposicaoTable({
 
 	return (
 		<DataTable
-			label={`Ponte de receita por ${NIVEL_ROTULO[nivel].toLowerCase()}`}
+			label={`Ponte de receita de energia por ${NIVEL_ROTULO[nivel].toLowerCase()}`}
 			columns={colunas}
 			rows={data}
 			resetKey={JSON.stringify({ ...filtro, ...par, efeito })}
