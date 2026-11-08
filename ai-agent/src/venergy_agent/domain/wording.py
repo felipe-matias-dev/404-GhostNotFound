@@ -15,8 +15,21 @@ VIEW_NAMES = {
 }
 VIEW_ARTICLES = {"na": "nos", "da": "dos", "a": "os"}
 ACCENTED = {
+    "kwp": "kWp",
+    "uc": "UC",
+    "gd": "GD",
+    "cod": "código",
+    "ultima": "última",
+    "potencia": "potência",
+    "ocorrencia": "ocorrência",
+    "nao": "não",
+    "ligacao": "ligação",
+    "instalacao": "instalação",
+    "duracao": "duração",
+    "conexao": "conexão",
     "arrecadacao": "arrecadação",
     "ate": "até",
+    "pct": "em %",
     "codigo": "código",
     "competencia": "competência",
     "competencias": "competências",
@@ -48,6 +61,12 @@ ACCENTED = {
 MONTHS_SUFFIX = re.compile(r"(\d+)m")
 MACHINE_DECIMAL = re.compile(r"(?<![\d.,])(\d+)\.(\d+)(?![\d,]|\.\d)")
 COLUMN_LABELS = {
+    "classe_cadastro": "classe do cadastro",
+    "cod_ocorrencia": "código da ocorrência",
+    "data_conexao_gd": "data de conexão da GD",
+    "duracao_horas": "duração em horas",
+    "energia_injetada_kwh_mes": "energia injetada por mês",
+    "possui_gd": "tem geração distribuída",
     "consumo_medio_kwh_12m": "consumo médio mensal dos últimos 12 meses",
     "cod_alimentador": "alimentador",
     "cod_uc": "código da UC",
@@ -66,7 +85,10 @@ def label(column: str) -> str:
         return VIEW_NAMES[column]
     if column in COLUMN_LABELS:
         return COLUMN_LABELS[column]
-    return " ".join(_word(word) for word in column.split("_"))
+    words = column.split("_")
+    if words[0] == "n" and len(words) > 1:
+        words = ["número", "de", *words[1:]]
+    return " ".join(_word(word) for word in words)
 
 
 def _word(word: str) -> str:

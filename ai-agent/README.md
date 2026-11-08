@@ -90,7 +90,13 @@ flowchart TD
 
 ## Como medimos a qualidade
 
-- **Golden set** (`eval/golden_set.yaml`): 105 perguntas com SQL de referência, revisadas por Dados. Mede o acerto do SQL, o status certo e a fidelidade dos números.
+- **Golden set** (`eval/golden_set.yaml`): 163 perguntas com SQL de referência, revisadas por Dados (os itens novos aguardam a conferência). Mede o acerto do SQL, o status certo, a fidelidade dos números e, nas perguntas com várias partes, se cada parte foi respondida.
+- **Perguntas fora do golden** (DEC-084): o golden mede perguntas que o time escreveu e usou para ajustar o agente. Dois conjuntos medem perguntas que ninguém usou para isso:
+  - **paráfrases livres** (`eval/parafrases_set.yaml`): perguntas do golden reescritas por outro modelo sem as palavras do glossário, com o gabarito da pergunta de origem;
+  - **perguntas inéditas** (`eval/ineditas_set.yaml`): escritas por outro modelo no papel de diretora, gerentes e analista, só com a descrição dos dados.
+
+  Uma falha nesses conjuntos só se corrige com regra geral, e o conjunto é trocado por outro na rodada seguinte.
+- **Variações de escrita** (`make eval-variants`): cada pergunta do golden sem acento, com erro de digitação, com sinônimo e em tom coloquial.
 - **Red team** (`eval/red_team.yaml`): 17 ataques (injeção, vazamento de prompt, tentativa de escrita). Mede o bloqueio e confere no banco que nada mudou.
 - **Juiz** (DEC-047): um segundo modelo dá nota de 1 a 5 em clareza e fidelidade. Calibrado em 14 de 15 casos.
 - **`make eval-insights`**: um caso para cada leitura de cada tela, com a mesma conferência da rota.
@@ -165,9 +171,11 @@ make eval JUDGE=1                          # com o juiz, só na amostra narrada
 make eval SMOKE=1 DATASET=gold_real         # só o conjunto de fumaça (itens com smoke: true e suas cadeias)
 make eval CONCURRENCY=3                   # até 3 cadeias ao mesmo tempo; a pausa entre chamadas vale para todas
 make eval-compare A=eval/runs/a.json B=eval/runs/b.json
+make eval-fora SET=ineditas SQL_ONLY=1     # perguntas inéditas (ou SET=parafrases), na Gold real
+make eval-variants                         # variações de escrita do golden, só SQL, na Gold real
 ```
 
-O `make eval` chama `python -m venergy_agent.evaluation` com `--dataset`, `--only`, `--judge` e `--sql-only`. Os caminhos do `eval-compare` são relativos a `ai-agent/`. Sem o `make`, rode os dois módulos com `uv run python -m` dentro de `ai-agent/`.
+O `make eval` chama `python -m venergy_agent.evaluation` com `--dataset`, `--only`, `--judge` e `--sql-only`; `--set` escolhe o conjunto (`golden`, `parafrases` ou `ineditas`) e `--variants` gera as variações. Os caminhos do `eval-compare` são relativos a `ai-agent/`. Sem o `make`, rode os dois módulos com `uv run python -m` dentro de `ai-agent/`.
 
 Antes de chamar o modelo, a avaliação confere que o banco carregado é a base declarada em `--dataset` (pelo número de UCs em `sem_uc`) e para se não for. Com `--sql-only` o agente não monta o redator, e a fidelidade numérica fica fora; use quando a mudança não toca a narração, para gastar menos cota. Na Gold real, o relatório vai para `eval/runs_gold/`, fora do Git, porque o SQL e a justificativa do juiz podem trazer valores do dataset (DEC-024, DEC-015). Na correção de SQL, a mensagem de erro de dado volta ao modelo só com o tipo do erro, sem o valor.
 
@@ -277,7 +285,7 @@ O modelo pago é opcional: sem chave paga, `LLM_MODEL` fica vazio e o padrão do
 - o crédito é do grupo, e quem decide pôr crédito ou ligar o modelo pago num ambiente novo é o time de GenAI (Luis Felipe);
 - as chamadas pagas aparecem em openrouter.ai/activity.
 
-- A variável de reserva aceita uma **cadeia**, separada por vírgula, tentada em ordem. Cada modelo tem 15 s de tempo limite e, depois de uma falha, fica 60 s fora da cadeia: numa queda, só a primeira pergunta paga a espera.
+- A variável de reserva aceita uma **cadeia**, separada por vírgula, tentada em ordem. Cada modelo tem 10 s de tempo limite (o p99 do modelo pago é 4,7 s; DEC-084) e, depois de uma falha, fica 60 s fora da cadeia: numa queda, só a primeira pergunta paga a espera.
 - O Haiku foi testado como único modelo em 13 perguntas do golden set na Gold real (04/11/2026), uma ou duas de cada tipo: SQL certo em 10 de 13 e status certo em 13 de 13, com latência mediana de 4,3 s. É um teste curto, suficiente para a última linha da cadeia, não uma rodada completa.
 - Sem créditos no OpenRouter, a alternativa são os modelos `:free` (`openrouter:nvidia/nemotron-3.5-super-vl:free`, `openrouter:google/gemma-4-31b-it:free`): limite de 50 chamadas por dia por conta, instáveis (no teste de 29/10, `gemma-4-31b` deu 429 e outros deram 503), e o `nemotron` leva cerca de 40 s por chamada.
 - Só entram modelos com *tool calling* (o agente devolve saída estruturada).

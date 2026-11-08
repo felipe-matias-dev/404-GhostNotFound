@@ -4,7 +4,18 @@ AVERAGE_OF_SATISFACTION = re.compile(r"\bavg\s*\(\s*(?:\w+\.)?satisfacao_media\s
 AVERAGE_OF_TARIFF = re.compile(r"\bavg\s*\(\s*(?:\w+\.)?tarifa_media\s*\)", re.IGNORECASE)
 SUM_OF_INDEX = re.compile(r"\bsum\s*\(\s*(?:\w+\.)?(dec|fec)\s*\)", re.IGNORECASE)
 FEEDER_VIEW = "sem_continuidade_alimentador_mensal"
+DECOMPOSITION_VIEW = "sem_receita_decomposicao"
+SEGMENT_VIEW = "sem_kpis_segmento_mensal"
+AGGREGATE = re.compile(r"\b(?:sum|count|avg|min|max)\s*\(|\bgroup\s+by\b", re.IGNORECASE)
+EFFECT = re.compile(r"(?P<before>\bsum\s*\(\s*)?(?:\w+\.)?\befeito_\w+", re.IGNORECASE)
+PER_FEEDER = re.compile(r"\bgroup\s+by\b[^;]*?\bcod_alimentador\b", re.IGNORECASE)
 SINGLE_FEEDER = re.compile(r"\bcod_alimentador\s*=\s*'", re.IGNORECASE)
+FEEDER_UC_JOIN = re.compile(
+    r"\bjoin\s+(?:\w+\.)?(?:sem_uc|sem_continuidade_alimentador_mensal)\b", re.IGNORECASE
+)
+UC_VIEW = re.compile(r"\bsem_uc\b")
+SERIES_AGGREGATE = re.compile(r"\b(?:sum|avg|count)\s*\(", re.IGNORECASE)
+SINGLE_UC = re.compile(r"\bcod_uc\s*=\s*'", re.IGNORECASE)
 
 SATISFACTION_FORMULA = (
     "Satisfação de vários meses não é a média de satisfacao_media: use "
@@ -21,6 +32,23 @@ GROUP_INDEX_FORMULA = (
     "FEC = 1.0 * sum(n_interrupcoes) / NULLIF(sum(n_uc), 0); num período de vários meses, "
     "divida pela média mensal de UCs (sum(n_uc) / 12.0 num ano)."
 )
+FEEDER_FANOUT_FORMULA = (
+    "Juntar sem_continuidade_alimentador_mensal com sem_uc repete cada linha do alimentador "
+    "uma vez por UC e multiplica as somas: filtre os alimentadores com "
+    "cod_alimentador IN (SELECT cod_alimentador FROM sem_uc WHERE ...), sem JOIN."
+)
+
+DECOMPOSITION_FORMULA = (
+    "sem_receita_decomposicao tem uma linha por município, bairro, classe e GD: some os efeitos "
+    "e as receitas sobre o recorte pedido, sum(efeito_preco), sum(receita_base) e assim por "
+    "diante, com o filtro do recorte quando a pergunta citar um."
+)
+
+SEGMENT_FORMULA = (
+    "sem_kpis_segmento_mensal tem uma linha por município, bairro, classe, alimentador, medidor "
+    "e GD em cada mês: some os componentes sobre o recorte pedido (sum(n_faturas), "
+    "sum(receita_faturada)), ou agrupe pela coluna que a pergunta pede."
+)
 
 
 def calculation_problem(sql: str) -> str | None:
@@ -28,6 +56,24 @@ def calculation_problem(sql: str) -> str | None:
         return SATISFACTION_FORMULA
     if AVERAGE_OF_TARIFF.search(sql):
         return TARIFF_FORMULA
-    if FEEDER_VIEW in sql and SUM_OF_INDEX.search(sql) and not SINGLE_FEEDER.search(sql):
+    if (
+        FEEDER_VIEW in sql
+        and SUM_OF_INDEX.search(sql)
+        and not SINGLE_FEEDER.search(sql)
+        and not PER_FEEDER.search(sql)
+    ):
         return GROUP_INDEX_FORMULA
+    if (
+        FEEDER_VIEW in sql
+        and UC_VIEW.search(sql)
+        and FEEDER_UC_JOIN.search(sql)
+        and SERIES_AGGREGATE.search(sql)
+        and not SINGLE_UC.search(sql)
+    ):
+        return FEEDER_FANOUT_FORMULA
+    if SEGMENT_VIEW in sql and not AGGREGATE.search(sql):
+        return SEGMENT_FORMULA
+    effects = list(EFFECT.finditer(sql))
+    if DECOMPOSITION_VIEW in sql and effects and not any(m["before"] for m in effects):
+        return DECOMPOSITION_FORMULA
     return None

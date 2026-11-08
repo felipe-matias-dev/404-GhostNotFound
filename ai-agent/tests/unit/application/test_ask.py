@@ -1032,7 +1032,7 @@ async def test_fallback_text_labels_columns_in_plain_words_with_their_unit(layer
 
     assert text.endswith(
         "Resultado: receita faturada = R$ 35.482,79, energia faturada = 1.200 kWh, "
-        "n chamados = 85, dias sem unidade = 3."
+        "número de chamados = 85, dias sem unidade = 3."
     )
     assert not TECHNICAL_NAME.search(text)
 
@@ -1530,6 +1530,74 @@ async def test_a_year_nobody_asked_for_becomes_a_question_about_the_period(layer
     assert executor.queries == []
 
 
+WHOLE_SERIES_SQL = "SELECT sum(receita_faturada) AS receita FROM sem_faturamento_mensal"
+
+
+async def test_a_sum_over_the_whole_series_without_a_period_becomes_a_question_about_it(layer):
+    executor = ScriptedExecutor(result())
+
+    answer = await use_case(
+        layer, ScriptedGenerator(generation(sql=WHOLE_SERIES_SQL)), executor
+    ).ask("Qual foi a receita?", "s1")
+
+    assert answer.status is AnswerStatus.CLARIFY
+    assert answer.clarification == PERIOD_NOT_GIVEN
+    assert executor.queries == []
+
+
+async def test_every_month_of_the_series_without_a_period_becomes_a_question_about_it(layer):
+    sql = (
+        "SELECT competencia, sum(receita_faturada) AS receita FROM sem_faturamento_mensal "
+        "GROUP BY competencia ORDER BY competencia"
+    )
+    executor = ScriptedExecutor(result())
+
+    answer = await use_case(layer, ScriptedGenerator(generation(sql=sql)), executor).ask(
+        "Qual foi a receita?", "s1"
+    )
+
+    assert answer.status is AnswerStatus.CLARIFY
+    assert executor.queries == []
+
+
+async def test_a_sum_over_the_whole_series_is_answered_when_the_question_asks_for_it(layer):
+    answer = await use_case(layer, ScriptedGenerator(generation(sql=WHOLE_SERIES_SQL))).ask(
+        "Qual foi a receita em todo o histórico?", "s1"
+    )
+
+    assert answer.status is AnswerStatus.ANSWERED
+
+
+async def test_a_sum_over_the_whole_series_keeps_the_period_of_the_conversation(layer):
+    history = FakeHistory(
+        (
+            ConversationTurn(
+                question="Qual foi a receita de junho de 2024?",
+                sql="SELECT sum(receita_faturada) FROM sem_faturamento_mensal "
+                "WHERE competencia = '2024-06'",
+                status=AnswerStatus.ANSWERED,
+            ),
+        )
+    )
+
+    answer = await use_case(
+        layer,
+        ScriptedGenerator(generation(sql=WHOLE_SERIES_SQL)),
+        history=history,
+        history_turns=3,
+    ).ask("E a receita?", "s1")
+
+    assert answer.status is AnswerStatus.ANSWERED
+
+
+async def test_years_written_in_words_are_not_invented(layer):
+    answer = await use_case(layer, ScriptedGenerator(generation(sql=TWO_YEARS_SQL))).ask(
+        "Quantas UCs faturaram de dois mil e vinte e três pra dois mil e vinte e quatro?", "s1"
+    )
+
+    assert answer.status is AnswerStatus.ANSWERED
+
+
 async def test_a_year_next_to_one_the_question_names_is_not_invented(layer):
     answer = await use_case(layer, ScriptedGenerator(generation(sql=TWO_YEARS_SQL))).ask(
         "Quantas UCs faturaram em 2024 em relação ao ano anterior?", "s1"
@@ -1717,6 +1785,69 @@ async def test_a_period_clarification_offers_the_years_the_sql_assumed(layer):
     assert answer.clarification_options == ("em 2023", "em 2024", "nos últimos 12 meses")
 
 
+async def test_a_period_clarification_from_the_model_offers_the_last_twelve_months(layer):
+    draft = generation(
+        status="clarify", sql=None, clarification="De qual período você quer a receita?"
+    )
+
+    answer = await use_case(layer, ScriptedGenerator(draft)).ask("Qual foi a receita?", "s1")
+
+    assert answer.clarification_options == ("nos últimos 12 meses",)
+
+
+async def test_a_clarification_from_the_model_about_something_else_has_no_options(layer):
+    draft = generation(
+        status="clarify", sql=None, clarification="O que você considera os piores bairros?"
+    )
+
+    answer = await use_case(layer, ScriptedGenerator(draft)).ask("Quais os piores bairros?", "s1")
+
+    assert answer.clarification_options == ()
+
+
+async def test_a_period_clarification_has_no_options_when_the_question_names_a_year(layer):
+    draft = generation(
+        status="clarify", sql=None, clarification="Qual mês de 2024 você quer consultar?"
+    )
+
+    answer = await use_case(layer, ScriptedGenerator(draft)).ask(
+        "Qual foi a receita em 2024?", "s1"
+    )
+
+    assert answer.clarification_options == ()
+
+
+async def test_a_period_clarification_has_no_options_when_the_conversation_has_a_period(layer):
+    history = FakeHistory(
+        (
+            ConversationTurn(
+                question="Qual a receita do primeiro ano da base?",
+                sql="SELECT sum(receita_faturada) FROM sem_kpis_mensais "
+                "WHERE competencia BETWEEN '2022-07' AND '2023-06'",
+                status=AnswerStatus.ANSWERED,
+            ),
+        )
+    )
+    draft = generation(status="clarify", sql=None, clarification="Qual mês você quer ver?")
+
+    answer = await use_case(layer, ScriptedGenerator(draft), history=history, history_turns=3).ask(
+        "E por classe?", "s1"
+    )
+
+    assert answer.clarification_options == ()
+
+
+async def test_a_base_window_does_not_cross_a_sentence(layer):
+    executor = ScriptedExecutor(result())
+
+    answer = await use_case(layer, ScriptedGenerator(generation(sql=TWO_YEARS_SQL)), executor).ask(
+        "Qual a receita do último trimestre? Quero os dados de Recife.", "s1"
+    )
+
+    assert answer.status is AnswerStatus.CLARIFY
+    assert executor.queries == []
+
+
 async def test_energy_written_as_an_integer_matches_a_value_with_decimals(layer):
     writer = FixedWriter(text="A energia faturada foi de 496.099 kWh.")
     energy = ScriptedExecutor(table(("kwh_faturado",), (Decimal("496099.37"),)))
@@ -1803,6 +1934,22 @@ async def test_a_window_relative_to_the_base_the_question_asked_for_is_answered(
     assert answer.status is AnswerStatus.ANSWERED
 
 
+@pytest.mark.parametrize(
+    "question",
+    [
+        "A energia caiu nos últimos doze meses comparando com o período inicial da série?",
+        "Comparando o arranque da base com os últimos doze meses, quanto variou a receita?",
+        "Quanto a receita mudou do começo do histórico até o ano mais recente dos dados?",
+    ],
+)
+async def test_a_window_relative_to_the_base_asked_in_other_words_is_answered(layer, question):
+    answer = await use_case(layer, ScriptedGenerator(generation(sql=BASE_WINDOW_SQL))).ask(
+        question, "s1"
+    )
+
+    assert answer.status is AnswerStatus.ANSWERED
+
+
 async def test_a_number_of_an_assumption_that_the_sql_uses_can_be_cited(layer):
     writer = FixedWriter(text="O DEC usa a média mensal de UCs, dividida por 3, e foi de 8.")
     eight = ScriptedExecutor(table(("total",), (8,)))
@@ -1829,4 +1976,20 @@ async def test_a_forbidden_calculation_goes_back_to_the_model_as_a_correctable_e
 
     assert answer.status is AnswerStatus.ANSWERED
     assert "soma_notas" in generator.feedbacks[1].message
+    assert len(executor.queries) == 1
+
+
+async def test_a_filter_value_that_is_not_in_the_column_goes_back_to_the_model(layer):
+    known = layer.model_copy(update={"categorical_values": {"municipio": ("Olinda", "Recife")}})
+    wrong = generation(
+        sql="SELECT count(*) AS total FROM sem_uc WHERE municipio = 'Região Metropolitana'"
+    )
+    right = generation(sql=COUNT_SQL)
+    generator = ScriptedGenerator(wrong, right)
+    executor = ScriptedExecutor(result())
+
+    answer = await use_case(known, generator, executor).ask("Quantas UCs na região?", "s1")
+
+    assert answer.status is AnswerStatus.ANSWERED
+    assert "'Região Metropolitana' não existe em municipio" in generator.feedbacks[1].message
     assert len(executor.queries) == 1

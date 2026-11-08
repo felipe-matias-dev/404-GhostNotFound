@@ -27,6 +27,7 @@ from venergy_agent.domain.errors import (
     SqlRejected,
 )
 from venergy_agent.domain.events import AgentEvent, AnswerEvent, Stage, StageEvent
+from venergy_agent.domain.filter_values import filter_value_problem, known_values
 from venergy_agent.domain.followup import (
     answers_a_clarification,
     complete_question,
@@ -54,6 +55,7 @@ from venergy_agent.domain.sql import (
     ValidatedQuery,
 )
 from venergy_agent.domain.sql_checks import calculation_problem
+from venergy_agent.domain.text import with_spelled_years_as_digits
 from venergy_agent.domain.vocabulary import known_words, vocabulary_of
 from venergy_agent.domain.wording import label, plain_words
 
@@ -117,7 +119,12 @@ PERIOD_NOT_GIVEN = (
     '"de janeiro a março de 2025".'
 )
 YEAR = re.compile(r"\b(?:19|20)\d{2}\b")
-BASE_RELATIVE = re.compile(r"\b(?:primeiro|último)\s+ano\s+da\s+(?:nossa\s+)?base\b", re.IGNORECASE)
+BASE_RELATIVE = re.compile(
+    r"\b(?:primeir[oa]s?|últim[oa]s?|inicia(?:l|is)|início|começo|arranque|partida|mais\s+recente)"
+    r"(?:[^\w.?!;]+\w+){0,4}?[^\w.?!;]+(?:base|série|histórico|dados)\b"
+    r"|\búltim[oa]s\s+(?:doze|vinte\s+e\s+quatro|seis|três)\s+(?:meses|ciclos)\b",
+    re.IGNORECASE,
+)
 GENERIC_CLARIFICATION = (
     "Pode dizer o período e o recorte (município, bairro ou classe) que você quer consultar?"
 )
@@ -187,6 +194,7 @@ class AskUseCase:
         narration_min_seconds: float = 4.0,
     ) -> None:
         self._layer = layer
+        self._known_values = _known_values(layer)
         self._known_words = known_words(
             vocabulary_of(
                 layer.glossary, (column.name for view in layer.views for column in view.columns)
@@ -405,7 +413,12 @@ class AskUseCase:
                     clarification = GENERIC_CLARIFICATION
                 self._log(request_id, session_id, step="resposta", status="clarify")
                 return self._clarify(
-                    clarification, request_id, started, model=generation.model, spent=spent
+                    clarification,
+                    request_id,
+                    started,
+                    model=generation.model,
+                    spent=spent,
+                    options=_model_period_options(question.text, history, clarification),
                 )
 
             emit(_stage_event(Stage.QUERYING, attempt, spent))
@@ -436,7 +449,9 @@ class AskUseCase:
                 sql=validated.sql,
                 latency_ms=_elapsed_ms(began),
             )
-            problem = calculation_problem(validated.sql)
+            problem = calculation_problem(validated.sql) or filter_value_problem(
+                validated.sql, self._known_values
+            )
             if problem is not None:
                 self._log(
                     request_id,
@@ -453,6 +468,8 @@ class AskUseCase:
             invented = _invented_years(question.text, history, validated)
             if not invented and _invented_base_window(question.text, history, validated.sql):
                 invented = ("janela_da_base",)
+            if not invented and _whole_series_without_period(question.text, history, validated):
+                invented = ("serie_inteira",)
             if invented:
                 self._log(
                     request_id,
@@ -774,7 +791,11 @@ class AskUseCase:
             *_months_between(validated.periods),
             *validated.years,
             *(pt_br_numbers(question_text) & _sql_numbers(validated.sql)),
-            *(year for year in YEAR.findall(question_text) if year in validated.sql),
+            *(
+                year
+                for year in YEAR.findall(with_spelled_years_as_digits(question_text))
+                if year in validated.sql
+            ),
             *(
                 pt_br_numbers(" ".join(plain_words(item) for item in draft.assumptions))
                 & _sql_numbers(validated.sql)
@@ -1084,7 +1105,9 @@ def _invented_years(
     used = {period[:4] for period in validated.periods} | set(validated.years)
     if not used or durations(question) or BASE_RELATIVE.search(question):
         return ()
-    context = " ".join([question, *(f"{turn.question} {turn.sql or ''}" for turn in history)])
+    context = with_spelled_years_as_digits(
+        " ".join([question, *(f"{turn.question} {turn.sql or ''}" for turn in history)])
+    )
     named = {int(year) for year in YEAR.findall(context)}
     allowed = {str(year + delta) for year in named for delta in (-1, 0, 1)}
     return tuple(sorted(used - allowed))
@@ -1107,6 +1130,20 @@ def _period_options(years: tuple[str, ...]) -> tuple[str, ...]:
     return (*(f"em {year}" for year in years[:PERIOD_OPTION_LIMIT]), LAST_TWELVE_MONTHS)
 
 
+def _known_values(layer: SemanticLayer) -> dict[str, tuple[str, ...]]:
+    return known_values(
+        [
+            *(
+                (column.name, column.allowed_values)
+                for view in layer.views
+                for column in view.columns
+                if column.allowed_values
+            ),
+            *layer.categorical_values.items(),
+        ]
+    )
+
+
 def _column_names(layer: SemanticLayer) -> set[str]:
     return {column.name for view in layer.views for column in view.columns}
 
@@ -1123,3 +1160,52 @@ def _invented_base_window(question: str, history: tuple[ConversationTurn, ...], 
         return False
     context = " ".join([question, *(turn.question for turn in history)])
     return not (durations(context) or BASE_RELATIVE.search(context))
+
+
+MONTHLY_VIEW = re.compile(
+    r"\bsem_(?:kpis_mensais|kpis_segmento_mensal|faturamento_mensal|continuidade_alimentador_mensal)\b"
+)
+SERIES_READING = re.compile(
+    r"\b(?:sum|avg)\s*\(|\b(?:group|order)\s+by\s+(?:\w+\.)?competencia\b", re.IGNORECASE
+)
+WHOLE_SERIES = re.compile(
+    r"\b(?:histórico|toda\s+a\s+(?:base|série)|todo\s+o\s+período|desde\s+o\s+(?:início|começo)"
+    r"|série\s+inteira)\b",
+    re.IGNORECASE,
+)
+MONTH_NAME = re.compile(rf"\b(?:{'|'.join(MONTH_NAMES)})\b", re.IGNORECASE)
+
+
+def _conversation(question: str, history: tuple[ConversationTurn, ...]) -> str:
+    return with_spelled_years_as_digits(" ".join([question, *(turn.question for turn in history)]))
+
+
+def _names_a_period(question: str, history: tuple[ConversationTurn, ...]) -> bool:
+    if any("competencia" in (turn.sql or "").lower() for turn in history):
+        return True
+    context = _conversation(question, history)
+    return bool(YEAR.search(context) or MONTH_DATE.search(context) or MONTH_NAME.search(context))
+
+
+ASKS_FOR_PERIOD = re.compile(r"\b(?:período|competência|mês|meses|ano)\b", re.IGNORECASE)
+
+
+def _model_period_options(
+    question: str, history: tuple[ConversationTurn, ...], clarification: str
+) -> tuple[str, ...]:
+    if not ASKS_FOR_PERIOD.search(clarification) or _names_a_period(question, history):
+        return ()
+    return _period_options(())
+
+
+def _whole_series_without_period(
+    question: str, history: tuple[ConversationTurn, ...], validated: ValidatedQuery
+) -> bool:
+    if validated.periods or validated.years or not MONTHLY_VIEW.search(validated.sql):
+        return False
+    if BASE_WINDOW.search(validated.sql) or not SERIES_READING.search(validated.sql):
+        return False
+    if _names_a_period(question, history):
+        return False
+    context = _conversation(question, history)
+    return not (BASE_RELATIVE.search(context) or WHOLE_SERIES.search(context) or durations(context))

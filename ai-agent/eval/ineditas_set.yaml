@@ -1,0 +1,163 @@
+# Perguntas inéditas (T12.4, DEC-084), segundo conjunto: escritas por outro modelo (Gemini 3.5 Flash-Lite) no papel
+# de gestores, só com a descrição dos dados, sem o glossário nem o golden. As referências foram escritas depois, sem
+# mudar a pergunta; ficaram de fora as perguntas sobre dado que não existe ou sem uma leitura única.
+# Não ajustar glossário, regras ou exemplos olhando para estas perguntas: uma falha só se corrige com regra geral.
+versao: 0.2.0
+itens:
+- id: I101
+  question: Bom dia, pessoal. Queria saber qual foi o faturamento total da distribuidora somando Recife e Olinda no acumulado
+    de 2024.
+  category: inedita
+  papel: diretora-presidente
+  reference_sql: SELECT sum(receita_faturada) AS receita_faturada FROM sem_kpis_segmento_mensal WHERE municipio IN ('Recife',
+    'Olinda') AND competencia BETWEEN '2024-01' AND '2024-12'
+  expected_status: answered
+  datasets:
+  - gold_real
+  follow_up_of: null
+  revisado_por: null
+- id: I103
+  question: Me traz o tempo médio que duraram as quedas de energia no bairro de Boa Viagem em março de 2025, por favor.
+  category: inedita
+  papel: gerente de operação
+  reference_sql: SELECT round(CAST(avg(i.duracao_horas) AS numeric), 2) AS duracao_media_horas FROM sem_interrupcoes_uc i
+    JOIN sem_uc u ON u.cod_uc = i.cod_uc WHERE u.municipio = 'Recife' AND u.bairro = 'Boa Viagem' AND i.competencia = '2025-03'
+  expected_status: answered
+  datasets:
+  - gold_real
+  follow_up_of: null
+  revisado_por: null
+- id: I104
+  question: Qual foi o canal que mais recebeu reclamação sobre valor da conta em Paulista no mês de janeiro de 2024?
+  category: inedita
+  papel: gerente de atendimento
+  reference_sql: SELECT a.canal, count(*) AS chamados FROM sem_atendimentos_uc a JOIN sem_uc u ON u.cod_uc = a.cod_uc WHERE
+    u.municipio = 'Paulista' AND a.assunto = 'FATURA' AND a.competencia = '2024-01' GROUP BY a.canal ORDER BY count(*) DESC
+    LIMIT 1
+  parts:
+  - - canal
+  - - chamados
+  expected_status: answered
+  datasets:
+  - gold_real
+  follow_up_of: null
+  revisado_por: null
+- id: I105
+  question: Quanto a gente deixou de arrecadar com contas em aberto no segmento industrial em Pernambuco, especificamente
+    na nossa área de concessão, em dezembro de 2024?
+  category: inedita
+  papel: analista financeiro
+  reference_sql: SELECT sum(valor_nao_pago) AS valor_nao_pago FROM sem_kpis_segmento_mensal WHERE classe_cadastro = 'Industrial'
+    AND competencia = '2024-12'
+  expected_status: answered
+  datasets:
+  - gold_real
+  follow_up_of: null
+  revisado_por: null
+- id: I108
+  question: Quantas leituras por estimativa os leituristas fizeram em Olinda no mês de fevereiro de 2025? Quero o total por
+    bairro.
+  category: inedita
+  papel: gerente de operação
+  reference_sql: SELECT bairro, sum(n_leituras_estimadas) AS leituras_estimadas FROM sem_kpis_segmento_mensal WHERE municipio
+    = 'Olinda' AND competencia = '2025-02' GROUP BY bairro
+  parts:
+  - - bairro
+  - - leituras_estimadas
+  expected_status: answered
+  datasets:
+  - gold_real
+  follow_up_of: null
+  revisado_por: null
+- id: I109
+  question: Qual era a nota média de satisfação do atendimento presencial lá em Paulista no trimestre de abril a junho de
+    2024?
+  category: inedita
+  papel: gerente de atendimento
+  reference_sql: SELECT round(CAST(avg(a.nota_satisfacao) AS numeric), 2) AS satisfacao_media FROM sem_atendimentos_uc a JOIN
+    sem_uc u ON u.cod_uc = a.cod_uc WHERE u.municipio = 'Paulista' AND a.canal = 'PRESENCIAL' AND a.competencia BETWEEN '2024-04'
+    AND '2024-06'
+  expected_status: answered
+  datasets:
+  - gold_real
+  follow_up_of: null
+  revisado_por: null
+- id: I112
+  question: E aí, o setor rural lá em Jaboatão faturou quanto no mês de agosto de 2024? Me dá o valor exato das contas.
+  category: inedita
+  papel: gerente comercial
+  reference_sql: SELECT sum(receita_faturada) AS receita_faturada FROM sem_kpis_segmento_mensal WHERE classe = 'B2' AND municipio
+    = 'Jaboatão dos Guararapes' AND competencia = '2024-08'
+  expected_status: answered
+  datasets:
+  - gold_real
+  follow_up_of: null
+  revisado_por: null
+- id: I114
+  question: Quantos atendimentos pelo canal de WhatsApp a gente teve em Olinda no mês de maio de 2025?
+  category: inedita
+  papel: gerente de atendimento
+  reference_sql: SELECT count(*) AS chamados FROM sem_atendimentos_uc a JOIN sem_uc u ON u.cod_uc = a.cod_uc WHERE u.municipio
+    = 'Olinda' AND a.canal = 'WHATSAPP' AND a.competencia = '2025-05'
+  expected_status: answered
+  datasets:
+  - gold_real
+  follow_up_of: null
+  revisado_por: null
+- id: I115
+  question: Quanto entrou no caixa de arrecadação no mês de janeiro de 2025 comparado com janeiro de 2024 na nossa distribuidora?
+  category: inedita
+  papel: analista financeiro
+  reference_sql: SELECT sum(CASE WHEN competencia = '2024-01' THEN receita_arrecadada END) AS arrecadada_2024_01, sum(CASE
+    WHEN competencia = '2025-01' THEN receita_arrecadada END) AS arrecadada_2025_01 FROM sem_kpis_segmento_mensal
+  parts:
+  - - arrecadada_2024_01
+  - - arrecadada_2025_01
+  expected_status: answered
+  datasets:
+  - gold_real
+  follow_up_of: null
+  revisado_por: null
+- id: I118
+  question: Qual circuito de Olinda deu mais problema de falta de luz no mês de outubro de 2024? Quero saber a duração total.
+  category: inedita
+  papel: gerente de operação
+  reference_sql: SELECT cod_alimentador, sum(horas_interrompidas) AS horas_interrompidas FROM sem_kpis_segmento_mensal WHERE
+    municipio = 'Olinda' AND competencia = '2024-10' GROUP BY cod_alimentador ORDER BY sum(horas_interrompidas) DESC LIMIT
+    1
+  parts:
+  - - cod_alimentador
+  - - horas_interrompidas
+  expected_status: answered
+  datasets:
+  - gold_real
+  follow_up_of: null
+  revisado_por: null
+- id: I119
+  question: Qual foi o assunto mais demandado nas nossas lojas físicas em Jaboatão dos Guararapes durante o mês de março de
+    2024?
+  category: inedita
+  papel: gerente de atendimento
+  reference_sql: SELECT a.assunto, count(*) AS chamados FROM sem_atendimentos_uc a JOIN sem_uc u ON u.cod_uc = a.cod_uc WHERE
+    u.municipio = 'Jaboatão dos Guararapes' AND a.canal = 'PRESENCIAL' AND a.competencia = '2024-03' GROUP BY a.assunto ORDER
+    BY count(*) DESC LIMIT 1
+  parts:
+  - - assunto
+  - - chamados
+  expected_status: answered
+  datasets:
+  - gold_real
+  follow_up_of: null
+  revisado_por: null
+- id: I120
+  question: Qual o percentual de inadimplência (contas em aberto) do segmento residencial em Recife no fechamento de dezembro
+    de 2023?
+  category: inedita
+  papel: analista financeiro
+  reference_sql: SELECT round(100.0 * sum(valor_nao_pago) / NULLIF(sum(receita_faturada), 0), 2) AS nao_pago_pct FROM sem_kpis_segmento_mensal
+    WHERE classe = 'B1' AND municipio = 'Recife' AND competencia = '2023-12'
+  expected_status: answered
+  datasets:
+  - gold_real
+  follow_up_of: null
+  revisado_por: null

@@ -4,8 +4,10 @@ from pathlib import Path
 import pytest
 
 from venergy_agent.evaluation.__main__ import (
+    EVAL_DIR,
     RUNS_DIR,
     RUNS_GOLD_DIR,
+    SETS,
     DatasetMismatch,
     JudgeNotAllowed,
     UnknownItems,
@@ -16,6 +18,7 @@ from venergy_agent.evaluation.__main__ import (
     main,
     narrates,
     report_path,
+    report_prefix,
     runs_dir,
     select_items,
     smoke_ids,
@@ -199,3 +202,59 @@ def test_concurrency_must_be_a_positive_integer():
         main(["--concurrency", "0"])
 
     assert exit_info.value.code == 2
+
+
+def test_variants_cannot_be_combined_with_another_set():
+    with pytest.raises(SystemExit) as with_red_team:
+        main(["--variants", "--only", "red_team"])
+    with pytest.raises(SystemExit) as with_references:
+        main(["--variants", "--only", "references"])
+
+    assert with_red_team.value.code == 2
+    assert with_references.value.code == 2
+
+
+def test_a_variants_report_is_named_apart_from_the_golden_reports():
+    started = datetime(2026, 11, 6, 12, 0, tzinfo=UTC)
+
+    assert report_path(Path("runs"), started, prefix="variantes-") == Path(
+        "runs/variantes-2026-11-06T120000Z.json"
+    )
+
+
+def test_another_set_cannot_be_combined_with_variants_smoke_or_only():
+    for argv in (
+        ["--set", "parafrases", "--variants"],
+        ["--set", "ineditas", "--only", "red_team"],
+        ["--set", "parafrases", "--smoke"],
+    ):
+        with pytest.raises(SystemExit) as error:
+            main(argv)
+        assert error.value.code == 2
+
+
+def test_reports_of_other_sets_are_named_by_the_set():
+    assert report_prefix("golden", variants=False) == ""
+    assert report_prefix("golden", variants=True) == "variantes-"
+    assert report_prefix("ineditas", variants=False) == "ineditas-"
+
+
+def test_every_set_item_has_a_reference_or_a_status_without_one():
+    for name, file in SETS.items():
+        if name == "golden":
+            continue
+        _, items = load_set(EVAL_DIR / file)
+        for item in items:
+            assert item["reference_sql"] or item["expected_status"] != "answered", (
+                name,
+                item["id"],
+            )
+
+
+def test_the_paraphrase_set_points_to_existing_golden_items():
+    _, golden = load_set(EVAL_DIR / "golden_set.yaml")
+    _, paraphrases = load_set(EVAL_DIR / SETS["parafrases"])
+    sources = {item["id"]: item for item in golden}
+
+    for item in paraphrases:
+        assert item["reference_sql"] == sources[item["origem"]]["reference_sql"]

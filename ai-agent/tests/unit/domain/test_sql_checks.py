@@ -45,3 +45,81 @@ def test_a_calculation_the_layer_forbids_is_reported_with_the_right_formula(sql,
 )
 def test_allowed_calculations_pass(sql):
     assert calculation_problem(sql) is None
+
+
+def test_decomposition_effects_without_a_sum_go_back_with_the_rule():
+    sql = (
+        "SELECT efeito_preco, efeito_volume FROM sem_receita_decomposicao "
+        "WHERE periodo_base = '2025-02/2025-02' AND periodo_atual = '2026-02/2026-02'"
+    )
+
+    assert "some" in calculation_problem(sql)
+
+
+def test_summed_decomposition_effects_pass():
+    sql = (
+        "SELECT sum(d.efeito_preco) AS efeito_preco, sum(d.efeito_volume) AS efeito_volume "
+        "FROM sem_receita_decomposicao d WHERE d.periodo_base = '2025-02/2025-02'"
+    )
+
+    assert calculation_problem(sql) is None
+
+
+def test_the_accumulated_index_of_each_feeder_is_not_a_sum_across_feeders():
+    sql = (
+        "SELECT cod_alimentador, sum(dec) AS dec FROM sem_continuidade_alimentador_mensal "
+        "WHERE competencia BETWEEN '2025-01' AND '2025-12' GROUP BY cod_alimentador "
+        "ORDER BY sum(dec) DESC LIMIT 1"
+    )
+
+    assert calculation_problem(sql) is None
+
+
+def test_segment_components_read_without_a_sum_go_back_with_the_rule():
+    sql = (
+        "SELECT n_faturas_pagas_com_atraso FROM sem_kpis_segmento_mensal "
+        "WHERE competencia = '2025-03'"
+    )
+
+    assert "some" in calculation_problem(sql)
+
+
+def test_segment_components_summed_or_grouped_pass():
+    summed = (
+        "SELECT sum(n_faturas) AS faturas FROM sem_kpis_segmento_mensal "
+        "WHERE competencia = '2025-03'"
+    )
+    grouped = (
+        "SELECT municipio, sum(receita_faturada) AS receita FROM sem_kpis_segmento_mensal "
+        "GROUP BY municipio"
+    )
+
+    assert calculation_problem(summed) is None
+    assert calculation_problem(grouped) is None
+
+
+def test_feeder_rows_joined_to_every_uc_are_flagged():
+    sql = (
+        "SELECT a.cod_alimentador, sum(a.horas_interrompidas) AS horas "
+        "FROM sem_continuidade_alimentador_mensal AS a "
+        "JOIN sem_uc AS u ON u.cod_alimentador = a.cod_alimentador "
+        "WHERE u.municipio = 'Olinda' GROUP BY a.cod_alimentador"
+    )
+
+    assert "IN (SELECT cod_alimentador" in calculation_problem(sql)
+
+
+def test_feeder_of_a_single_uc_or_filtered_by_subquery_passes():
+    one_uc = (
+        "SELECT a.fec FROM sem_continuidade_alimentador_mensal AS a "
+        "JOIN sem_uc AS u ON u.cod_alimentador = a.cod_alimentador "
+        "WHERE u.cod_uc = '0003' AND a.competencia = '2025-03' AND count(*) > 0"
+    )
+    subquery = (
+        "SELECT cod_alimentador, sum(horas_interrompidas) AS horas "
+        "FROM sem_continuidade_alimentador_mensal WHERE cod_alimentador IN "
+        "(SELECT cod_alimentador FROM sem_uc WHERE municipio = 'Olinda') GROUP BY cod_alimentador"
+    )
+
+    assert calculation_problem(one_uc) is None
+    assert calculation_problem(subquery) is None

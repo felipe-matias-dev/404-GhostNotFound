@@ -94,7 +94,13 @@
 #   0.22.0 GenAI (05/11/2026, T13.2 e T13.6): G109 passa a conferir as premissas da pergunta; G138 a G144, perguntas
 #          complexas com partes (parts: colunas da referência que formam cada parte) e um follow-up. revisado_por
 #          fica null até Dados conferir.
-versao: 0.22.0
+#   0.23.0 GenAI (06/11/2026, T12.2): G145 a G149, siglas e sinônimos do glossário 0.4.5 (DEC, FEC, alta e baixa
+#          tensão, arrecadação). revisado_por fica null até Dados conferir.
+#   0.24.0 GenAI (06/11/2026, T13.6 e T2): G150 a G157, perguntas complexas com parts; G158 a G163, duas cadeias
+#          de follow-up de 3 turnos (troca de período, recorte e métrica).
+#   0.24.1 Dados (08/11/2026, Luis Felipe no papel de Dados): revisado_por preenchido em G106 a G163, cada referência
+#          executada e conferida na Gold real. G120 e G121: "por classe" é a classe do cadastro; a referência não muda.
+versao: 0.24.1
 status: rascunho
 
 itens:
@@ -1223,7 +1229,7 @@ itens:
     datasets: [gold_real]
     follow_up_of: null
     notes: "Primeira pergunta da conversa da apresentação (04/11/2026). Receita sem qualificador é a receita faturada (DEC-022). Início da cadeia G106 → G107 → G108."
-    revisado_por: null
+    revisado_por: "Luis Felipe Perylo (Dados)"
   - id: G107
     smoke: true
     question: "Quanto era a receita sem tributos?"
@@ -1233,7 +1239,7 @@ itens:
     datasets: [gold_real]
     follow_up_of: G106
     notes: "Follow-up da apresentação: herda junho de 2026 do G106. Receita sem tributos é receita_energia (glossário da camada 0.4.2). Na apresentação, o agente pediu o mês porque a pergunta caiu numa conversa antiga (DEC-080)."
-    revisado_por: null
+    revisado_por: "Luis Felipe Perylo (Dados)"
   - id: G108
     smoke: true
     question: "quanto era o percentil de tributos na receita de junho"
@@ -1243,7 +1249,7 @@ itens:
     datasets: [gold_real]
     follow_up_of: G107
     notes: "Follow-up da apresentação, escrito como foi digitado ('percentil' no sentido de percentual). Junho é o de 2026, da conversa. sem_kpis_mensais não tem a coluna tributos: o percentual sai de receita_faturada e receita_energia (regra da camada 0.4.2)."
-    revisado_por: null
+    revisado_por: "Luis Felipe Perylo (Dados)"
   - id: G109
     smoke: true
     question: "A base de clientes cresceu, e a tarifa residencial acumulou reajuste homologado de 10,5% desde meados de 2022. Mesmo assim, comparando os últimos 12 meses com o primeiro ano da nossa base, o volume de energia faturada caiu quase 4% e a receita subiu só 8%. Ninguém nesta mesa sabe explicar por quê. Preciso de uma resposta baseada em dados, não em opinião."
@@ -1254,7 +1260,7 @@ itens:
     datasets: [gold_real]
     follow_up_of: null
     notes: "Mudança na 0.22.0 (GenAI, 05/11/2026, T13.2): a referência confere também as premissas da pergunta (variação de UCs, da tarifa residencial, da energia e da receita), além dos efeitos; cada uma é uma parte (parts). Revisado_por volta a null até Dados conferir. Fala da diretora no case, como foi feita na apresentação. Os períodos estão ditos ('últimos 12 meses' e 'primeiro ano da base'), então a resposta é a decomposição pronta, como no G104. As porcentagens da pergunta são premissas do usuário e não entram no SQL nem na resposta."
-    revisado_por: null
+    revisado_por: "Luis Felipe Perylo (Dados)"
   - id: G110
     question: "Quanto os tributos representaram da receita faturada em junho de 2026, em percentual?"
     category: simples
@@ -1263,7 +1269,7 @@ itens:
     datasets: [gold_real]
     follow_up_of: null
     notes: "Versão completa do G108, sem depender da conversa."
-    revisado_por: null
+    revisado_por: "Luis Felipe Perylo (Dados)"
 
   # 0.20.0 (T2 do plano de robustez, parcial): 20 itens das lacunas do mapa de tipos de
   # pergunta. Formas coloquiais e com erro de digitação, percentuais por recorte, resultado
@@ -1277,7 +1283,7 @@ itens:
     datasets: [gold_real]
     follow_up_of: null
     notes: "Forma coloquial de 'receita faturada' (faturamento). Mesma intenção de G106, sem o 'mês de'."
-    revisado_por: null
+    revisado_por: "Luis Felipe Perylo (Dados)"
   - id: G112
     question: "faturamento de jun 2025"
     category: sinonimo
@@ -1286,7 +1292,7 @@ itens:
     datasets: [gold_real]
     follow_up_of: null
     notes: "Escrita curta, com a abreviação 'jun' e sem pontuação. Mesma intenção de G111."
-    revisado_por: null
+    revisado_por: "Luis Felipe Perylo (Dados)"
   - id: G113
     question: "quantas unidades consumidoras estão cadastradas?"
     category: sinonimo
@@ -1295,7 +1301,7 @@ itens:
     datasets: [gold_real]
     follow_up_of: null
     notes: "Unidade consumidora por extenso, em vez de 'UCs'. Mesma intenção de G001."
-    revisado_por: null
+    revisado_por: "Luis Felipe Perylo (Dados)"
   - id: G114
     question: "receita de enrgia em abril de 2025"
     category: sinonimo
@@ -1304,7 +1310,7 @@ itens:
     datasets: [gold_real]
     follow_up_of: null
     notes: "Erro de digitação ('enrgia'). A intenção é receita sem tributos (receita_energia). Teste de tolerância a erro, não de sinônimo."
-    revisado_por: null
+    revisado_por: "Luis Felipe Perylo (Dados)"
   - id: G115
     question: "quantas UCs em olinda"
     category: sinonimo
@@ -1313,7 +1319,7 @@ itens:
     datasets: [gold_real]
     follow_up_of: null
     notes: "Recorte por município sem acento nem maiúscula. Mesma intenção de G002."
-    revisado_por: null
+    revisado_por: "Luis Felipe Perylo (Dados)"
   - id: G116
     question: "qual o consumo médio das casas residenciais?"
     category: sinonimo
@@ -1322,7 +1328,7 @@ itens:
     datasets: [gold_real]
     follow_up_of: null
     notes: "'Casas residenciais' é o mesmo recorte de classe_cadastro = 'Residencial' (glossário; B1 na Gold real). A média é calculada pelo banco."
-    revisado_por: null
+    revisado_por: "Luis Felipe Perylo (Dados)"
   - id: G117
     question: "qual o percentil de tributos em junho de 2026?"
     category: sinonimo
@@ -1331,7 +1337,7 @@ itens:
     datasets: [gold_real]
     follow_up_of: null
     notes: "Termo trocado: 'percentil' por 'percentual' (o caso do João, 04/11/2026). A referência é a mesma de G110. Resposta esperada: o percentual, com a suposição declarada."
-    revisado_por: null
+    revisado_por: "Luis Felipe Perylo (Dados)"
   - id: G118
     question: "quanto a inadimplência representou da receita faturada em 2025?"
     category: sinonimo
@@ -1340,7 +1346,7 @@ itens:
     datasets: [gold_real]
     follow_up_of: null
     notes: "Inadimplência é valor não pago sobre a receita faturada (DEC-046 e o diagnóstico, H6). O período é o ano de 2025, citado na pergunta."
-    revisado_por: null
+    revisado_por: "Luis Felipe Perylo (Dados)"
   - id: G119
     question: "liste as UCs de Olinda com a classe e o consumo médio"
     category: simples
@@ -1349,7 +1355,7 @@ itens:
     datasets: [gold_real]
     follow_up_of: null
     notes: "Resultado grande: Olinda tem mais UCs do que a amostra exibida (200 linhas). A resposta deve avisar que é amostra e o portal pagina a tabela."
-    revisado_por: null
+    revisado_por: "Luis Felipe Perylo (Dados)"
   - id: G120
     question: "percentual de tributos por classe em junho de 2026"
     category: simples
@@ -1357,8 +1363,8 @@ itens:
     expected_status: answered
     datasets: [gold_real]
     follow_up_of: null
-    notes: "Percentual por recorte, que o mapa listava como lacuna. Tributos são a coluna da camada; o percentual é calculado pelo banco."
-    revisado_por: null
+    notes: "Percentual por recorte, que o mapa listava como lacuna. Tributos são a coluna da camada; o percentual é calculado pelo banco. Revisão de Dados (08/11/2026): 'por classe' sem qualificador é a classe de consumo do cadastro (classe_cadastro: residencial, comercial, industrial, rural e poder público), a da regulação e a única que separa comercial de poder público, que dividem o B3. A coluna classe (B1, B2, B3, A4) só vale quando a pergunta cita o código ou a tensão."
+    revisado_por: "Luis Felipe Perylo (Dados)"
   - id: G121
     question: "qual a inadimplência por classe em junho de 2025?"
     category: simples
@@ -1366,8 +1372,8 @@ itens:
     expected_status: answered
     datasets: [gold_real]
     follow_up_of: null
-    notes: "Percentual de inadimplência por classe, mês definido. Mesmo cálculo de G118, por recorte."
-    revisado_por: null
+    notes: "Percentual de inadimplência por classe, mês definido. Mesmo cálculo de G118, por recorte. 'Por classe' é a classe do cadastro, como no G120 (revisão de Dados de 08/11/2026)."
+    revisado_por: "Luis Felipe Perylo (Dados)"
   - id: G122
     question: "E o percentual?"
     category: followup
@@ -1376,7 +1382,7 @@ itens:
     datasets: [gold_real]
     follow_up_of: G106
     notes: "Troca de métrica no follow-up: depois de receita de junho de 2026 (G106), 'o percentual' é o percentual de tributos do mesmo mês. Herda o período."
-    revisado_por: null
+    revisado_por: "Luis Felipe Perylo (Dados)"
   - id: G123
     question: "e em março de 2025?"
     category: followup
@@ -1385,7 +1391,7 @@ itens:
     datasets: [gold_real]
     follow_up_of: G122
     notes: "Troca de período no follow-up de uma troca de métrica: três turnos, cada um herdando o anterior (G106 -> G122 -> G123)."
-    revisado_por: null
+    revisado_por: "Luis Felipe Perylo (Dados)"
   - id: G124
     question: "quantos chamados tivemos em junho de 2026?"
     category: sinonimo
@@ -1394,7 +1400,7 @@ itens:
     datasets: [gold_real]
     follow_up_of: null
     notes: "Atendimento com linguagem coloquial ('chamados' em vez de atendimentos). Mesmo recorte de G026."
-    revisado_por: null
+    revisado_por: "Luis Felipe Perylo (Dados)"
   - id: G125
     question: "qual a satisfação média dos clientes em dezembro de 2025?"
     category: sinonimo
@@ -1403,7 +1409,7 @@ itens:
     datasets: [gold_real]
     follow_up_of: null
     notes: "'Clientes' no lugar de consumidores, e a satisfação média do mês. Tem de sair na escala da coluna, sem unidade."
-    revisado_por: null
+    revisado_por: "Luis Felipe Perylo (Dados)"
   - id: G126
     question: "quais são os 3 alimentadores com maior DEC em março de 2025?"
     category: simples
@@ -1412,7 +1418,7 @@ itens:
     datasets: [gold_real]
     follow_up_of: null
     notes: "Top N com LIMIT. O DEC do alimentador já vem calculado na view (DEC-032), e não deve ser recalculado."
-    revisado_por: null
+    revisado_por: "Luis Felipe Perylo (Dados)"
   - id: G127
     question: "quanto faturamos nos últimos 3 meses?"
     category: temporal
@@ -1421,7 +1427,7 @@ itens:
     datasets: [gold_real]
     follow_up_of: null
     notes: "'Últimos 3 meses' depende da data de referência, que a pergunta não traz. Pela regra da camada, pede o período em vez de escolher um. Sem SQL de referência, porque o item é de esclarecimento."
-    revisado_por: null
+    revisado_por: "Luis Felipe Perylo (Dados)"
   - id: G128
     question: "qual a receita faturada do primeiro ano da base?"
     category: temporal
@@ -1430,7 +1436,7 @@ itens:
     datasets: [gold_real]
     follow_up_of: null
     notes: "Primeiro ano da base pelos meses que existem (row_number), como G041. Outra redação do mesmo recorte temporal relativo à base."
-    revisado_por: null
+    revisado_por: "Luis Felipe Perylo (Dados)"
   - id: G129
     question: "quantos cancelamentos de contrato tivemos em 2025?"
     category: sem_resposta
@@ -1439,7 +1445,7 @@ itens:
     datasets: [gold_real]
     follow_up_of: null
     notes: "Cancelamento de contrato não existe nas views. O agente deve dizer que não sabe, sem inventar número."
-    revisado_por: null
+    revisado_por: "Luis Felipe Perylo (Dados)"
   - id: G130
     question: "quantos postes foram trocados em 2025?"
     category: sem_resposta
@@ -1448,7 +1454,7 @@ itens:
     datasets: [gold_real]
     follow_up_of: null
     notes: "Poste não aparece em nenhuma view. Dado fora do escopo da camada: resposta 'não sei'."
-    revisado_por: null
+    revisado_por: "Luis Felipe Perylo (Dados)"
   - id: G131
     question: "qual o consumo?"
     category: ambigua
@@ -1457,7 +1463,7 @@ itens:
     datasets: [gold_real]
     follow_up_of: null
     notes: "Pergunta sem recorte, sem período e sem dizer se é consumo faturado, médio ou por UC. Pede esclarecimento."
-    revisado_por: null
+    revisado_por: "Luis Felipe Perylo (Dados)"
 
   # 0.21.0 (T2, T9 e T10): itens de sinônimos do glossário 0.4.3, de esclarecimento seguido de
   # resposta (T9) e de pergunta nova depois de esclarecimento. revisado_por fica null.
@@ -1469,7 +1475,7 @@ itens:
     datasets: [gold_real]
     follow_up_of: null
     notes: "Receita sem recorte nem período. Pede o período, e a resposta de esclarecimento traz opções (T5, DEC-082). Início da cadeia G132 -> G133 e G132 -> G134."
-    revisado_por: null
+    revisado_por: "Luis Felipe Perylo (Dados)"
   - id: G133
     question: "em junho de 2026"
     category: followup
@@ -1478,7 +1484,7 @@ itens:
     datasets: [gold_real]
     follow_up_of: G132
     notes: "Resposta ao esclarecimento de G132: completa a pergunta original (T9). Receita sem qualificador é a receita faturada (DEC-022)."
-    revisado_por: null
+    revisado_por: "Luis Felipe Perylo (Dados)"
   - id: G134
     question: "Mostre a receita de junho de 2026"
     category: followup
@@ -1487,7 +1493,7 @@ itens:
     datasets: [gold_real]
     follow_up_of: G132
     notes: "Pergunta nova depois de esclarecimento: não deve ser fundida com a pergunta de G132 (correção do item 1 da revisão do PR 145)."
-    revisado_por: null
+    revisado_por: "Luis Felipe Perylo (Dados)"
   - id: G135
     question: "qual a conta de luz de março de 2025?"
     category: sinonimo
@@ -1496,7 +1502,7 @@ itens:
     datasets: [gold_real]
     follow_up_of: null
     notes: "Sinônimo 'conta de luz' (glossário 0.4.3) = receita faturada. Mesma intenção de G111."
-    revisado_por: null
+    revisado_por: "Luis Felipe Perylo (Dados)"
   - id: G136
     question: "quanto de consumo faturado teve março de 2025?"
     category: sinonimo
@@ -1505,7 +1511,7 @@ itens:
     datasets: [gold_real]
     follow_up_of: null
     notes: "Sinônimo 'consumo faturado' (glossário 0.4.3) = energia faturada, em kWh, inteira."
-    revisado_por: null
+    revisado_por: "Luis Felipe Perylo (Dados)"
   - id: G137
     question: "quanto foi o imposto de junho de 2026?"
     category: sinonimo
@@ -1514,7 +1520,7 @@ itens:
     datasets: [gold_real]
     follow_up_of: null
     notes: "Sinônimo 'imposto' (glossário 0.4.3) de tributos. Em sem_kpis_mensais não há coluna tributos: a referência usa receita_faturada - receita_energia, como manda o glossário."
-    revisado_por: null
+    revisado_por: "Luis Felipe Perylo (Dados)"
   - id: G138
     question: "Entre o primeiro ano da base e os últimos 12 meses, quanto variaram em percentual a energia faturada e a receita faturada?"
     category: case
@@ -1524,7 +1530,7 @@ itens:
     datasets: [gold_real]
     follow_up_of: null
     notes: "Duas métricas na mesma pergunta, sobre os períodos relativos à base (T13.6)."
-    revisado_por: null
+    revisado_por: "Luis Felipe Perylo (Dados)"
   - id: G139
     question: "Como ficaram o DEC e o FEC da distribuidora de julho de 2025 a junho de 2026, comparados a julho de 2022 a junho de 2023?"
     category: case
@@ -1534,7 +1540,7 @@ itens:
     datasets: [gold_real]
     follow_up_of: null
     notes: "DEC e FEC acumulados nos dois períodos (soma dos meses, DEC-032), em uma pergunta (T13.6)."
-    revisado_por: null
+    revisado_por: "Luis Felipe Perylo (Dados)"
   - id: G140
     question: "Quantos chamados o call center abriu em 2025 e qual foi a satisfação média nesse ano?"
     category: case
@@ -1544,7 +1550,7 @@ itens:
     datasets: [gold_real]
     follow_up_of: null
     notes: "Atendimento: contagem e satisfação, que sai da soma dos componentes (T13.6)."
-    revisado_por: null
+    revisado_por: "Luis Felipe Perylo (Dados)"
   - id: G141
     question: "Qual alimentador teve o maior DEC acumulado em 2025, e quantas UCs ele atende?"
     category: case
@@ -1554,7 +1560,7 @@ itens:
     datasets: [gold_real]
     follow_up_of: null
     notes: "Ranking e contagem ligados pelo alimentador (T13.6). A resposta pode trazer o DEC também."
-    revisado_por: null
+    revisado_por: "Luis Felipe Perylo (Dados)"
   - id: G142
     question: "Em 2025, quantas faturas ficaram sem pagamento e que percentual do valor faturado isso representou?"
     category: case
@@ -1564,7 +1570,7 @@ itens:
     datasets: [gold_real]
     follow_up_of: null
     notes: "Inadimplência: contagem e percentual do valor, somando os componentes (T13.6)."
-    revisado_por: null
+    revisado_por: "Luis Felipe Perylo (Dados)"
   - id: G143
     question: "Qual município teve a maior receita faturada em 2025 e qual foi a sua satisfação média no ano?"
     category: case
@@ -1574,7 +1580,7 @@ itens:
     datasets: [gold_real]
     follow_up_of: null
     notes: "Ranking por receita e satisfação do mesmo município, sempre pela soma dos componentes (T13.6). Início da cadeia G143 → G144."
-    revisado_por: null
+    revisado_por: "Luis Felipe Perylo (Dados)"
   - id: G144
     question: "E qual foi o DEC desse município no mesmo ano?"
     category: followup
@@ -1583,4 +1589,183 @@ itens:
     datasets: [gold_real]
     follow_up_of: G143
     notes: "Follow-up de uma pergunta complexa: herda o município e o ano do G143 (T13.6). DEC do recorte pela fórmula dos componentes, com a média mensal de UCs."
-    revisado_por: null
+    revisado_por: "Luis Felipe Perylo (Dados)"
+  - id: G145
+    question: "Quanto foi o tempo médio sem luz por cliente na distribuidora em março de 2025?"
+    category: sinonimo
+    reference_sql: "SELECT dec FROM sem_kpis_mensais WHERE competencia = '2025-03'"
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: null
+    notes: "'Tempo médio sem luz por cliente' é o DEC (sigla e sinônimo no glossário 0.4.5, T12.2)."
+    revisado_por: "Luis Felipe Perylo (Dados)"
+  - id: G146
+    question: "Quantas quedas por cliente a distribuidora teve em junho de 2025?"
+    category: sinonimo
+    reference_sql: "SELECT fec FROM sem_kpis_mensais WHERE competencia = '2025-06'"
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: null
+    notes: "'Quedas por cliente' é o FEC (glossário 0.4.5, T12.2)."
+    revisado_por: "Luis Felipe Perylo (Dados)"
+  - id: G147
+    question: "Quantas UCs de alta tensão existem?"
+    category: sinonimo
+    reference_sql: "SELECT count(*) AS ucs FROM sem_uc WHERE classe = 'A4'"
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: null
+    notes: "Alta tensão (AT, grupo A) é a classe A4 (glossário 0.4.5, T12.2)."
+    revisado_por: "Luis Felipe Perylo (Dados)"
+  - id: G148
+    question: "Quantos clientes de baixa tensão existem em Olinda?"
+    category: sinonimo
+    reference_sql: "SELECT count(*) AS ucs FROM sem_uc WHERE classe IN ('B1', 'B2', 'B3') AND municipio = 'Olinda'"
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: null
+    notes: "Baixa tensão (BT, grupo B) são as classes B1, B2 e B3; 'clientes' são UCs (glossário 0.4.5, T12.2)."
+    revisado_por: "Luis Felipe Perylo (Dados)"
+  - id: G149
+    question: "Qual foi a arrecadação de junho de 2026?"
+    category: sinonimo
+    reference_sql: "SELECT sum(receita_arrecadada) AS receita_arrecadada FROM sem_kpis_segmento_mensal WHERE competencia = '2026-06'"
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: null
+    notes: "Arrecadação é receita_arrecadada (glossário 0.4.5, T12.2); da empresa, pela soma de sem_kpis_segmento_mensal."
+    revisado_por: "Luis Felipe Perylo (Dados)"
+  - id: G150
+    question: "Em 2025, qual foi a receita faturada, a energia faturada e a tarifa média das UCs residenciais (B1)?"
+    category: case
+    reference_sql: "SELECT sum(receita_faturada) AS receita_faturada, sum(kwh_faturado) AS kwh_faturado, round(sum(receita_energia) / NULLIF(sum(kwh_faturado), 0), 4) AS tarifa_media FROM sem_kpis_segmento_mensal WHERE classe = 'B1' AND competencia BETWEEN '2025-01' AND '2025-12'"
+    parts: [[receita_faturada], [kwh_faturado], [tarifa_media]]
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: null
+    notes: "Três métricas de um recorte; a tarifa média do grupo é receita de energia sobre kWh, nunca a média de tarifa_media (T13.6, lote 3)."
+    revisado_por: "Luis Felipe Perylo (Dados)"
+  - id: G151
+    question: "Comparando 2024 com 2025, quanto variou a receita faturada de cada município, em reais e em percentual?"
+    category: case
+    reference_sql: "SELECT municipio, sum(CASE WHEN competencia BETWEEN '2025-01' AND '2025-12' THEN receita_faturada END) - sum(CASE WHEN competencia BETWEEN '2024-01' AND '2024-12' THEN receita_faturada END) AS variacao, round(100.0 * (sum(CASE WHEN competencia BETWEEN '2025-01' AND '2025-12' THEN receita_faturada END) - sum(CASE WHEN competencia BETWEEN '2024-01' AND '2024-12' THEN receita_faturada END)) / NULLIF(sum(CASE WHEN competencia BETWEEN '2024-01' AND '2024-12' THEN receita_faturada END), 0), 2) AS variacao_pct FROM sem_kpis_segmento_mensal GROUP BY municipio"
+    parts: [[municipio], [variacao], [variacao_pct]]
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: null
+    notes: "Agrupamento com variação absoluta e percentual entre dois anos (T13.6, lote 3)."
+    revisado_por: "Luis Felipe Perylo (Dados)"
+  - id: G152
+    question: "Quais os 3 bairros de Recife com mais interrupções em 2025, e qual foi o DEC de cada um nesse ano?"
+    category: case
+    reference_sql: "SELECT bairro, sum(n_interrupcoes) AS interrupcoes, round(CAST(sum(horas_interrompidas) / NULLIF(sum(n_uc) / 12.0, 0) AS numeric), 2) AS dec FROM sem_kpis_segmento_mensal WHERE municipio = 'Recife' AND competencia BETWEEN '2025-01' AND '2025-12' GROUP BY bairro ORDER BY sum(n_interrupcoes) DESC LIMIT 3"
+    parts: [[bairro], [interrupcoes], [dec]]
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: null
+    notes: "Ranking e índice do mesmo recorte; DEC do ano pela média mensal de UCs (DEC-032, T13.6, lote 3)."
+    revisado_por: "Luis Felipe Perylo (Dados)"
+  - id: G153
+    question: "Em 2025, qual foi a participação das UCs com geração distribuída na energia faturada e na receita faturada da distribuidora?"
+    category: case
+    reference_sql: "SELECT round(100.0 * sum(CASE WHEN possui_gd THEN kwh_faturado END) / NULLIF(sum(kwh_faturado), 0), 2) AS participacao_energia_pct, round(100.0 * sum(CASE WHEN possui_gd THEN receita_faturada END) / NULLIF(sum(receita_faturada), 0), 2) AS participacao_receita_pct FROM sem_kpis_segmento_mensal WHERE competencia BETWEEN '2025-01' AND '2025-12'"
+    parts: [[participacao_energia_pct], [participacao_receita_pct]]
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: null
+    notes: "Dois percentuais de participação na mesma pergunta (T13.6, lote 3)."
+    revisado_por: "Luis Felipe Perylo (Dados)"
+  - id: G154
+    question: "Qual canal de atendimento recebeu mais chamados em 2025, e qual foi a nota média de satisfação desse canal?"
+    category: case
+    reference_sql: "SELECT canal, count(*) AS chamados, round(CAST(avg(nota_satisfacao) AS numeric), 2) AS satisfacao FROM sem_atendimentos_uc WHERE competencia BETWEEN '2025-01' AND '2025-12' GROUP BY canal ORDER BY count(*) DESC LIMIT 1"
+    parts: [[canal], [chamados], [satisfacao]]
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: null
+    notes: "Ranking por contagem e satisfação do mesmo canal, de sem_atendimentos_uc (T13.6, lote 3)."
+    revisado_por: "Luis Felipe Perylo (Dados)"
+  - id: G155
+    question: "Quais foram as 3 principais causas de interrupção em 2025, com o número de ocorrências e a duração média de cada uma?"
+    category: case
+    reference_sql: "SELECT causa, count(*) AS ocorrencias, round(CAST(avg(duracao_horas) AS numeric), 2) AS duracao_media_horas FROM sem_interrupcoes_uc WHERE competencia BETWEEN '2025-01' AND '2025-12' AND causa IS NOT NULL GROUP BY causa ORDER BY count(*) DESC LIMIT 3"
+    parts: [[causa], [ocorrencias], [duracao_media_horas]]
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: null
+    notes: "Top N com duas métricas por grupo; causa nula fica fora do ranking (T13.6, lote 3)."
+    revisado_por: "Luis Felipe Perylo (Dados)"
+  - id: G156
+    question: "No primeiro semestre de 2026, qual mês teve a maior receita faturada e qual foi o FEC da distribuidora nesse mês?"
+    category: case
+    reference_sql: "SELECT competencia, receita_faturada, fec FROM sem_kpis_mensais WHERE competencia BETWEEN '2026-01' AND '2026-06' ORDER BY receita_faturada DESC LIMIT 1"
+    parts: [[competencia], [fec]]
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: null
+    notes: "Ranking de meses e índice do mesmo mês (T13.6, lote 3)."
+    revisado_por: "Luis Felipe Perylo (Dados)"
+  - id: G157
+    question: "Em Olinda, em 2025, qual foi o percentual de leituras estimadas e o percentual de faturas pagas com atraso?"
+    category: case
+    reference_sql: "SELECT round(100.0 * sum(n_leituras_estimadas) / NULLIF(sum(n_leituras), 0), 2) AS leituras_estimadas_pct, round(100.0 * sum(n_faturas_pagas_com_atraso) / NULLIF(sum(n_faturas), 0), 2) AS pagas_com_atraso_pct FROM sem_kpis_segmento_mensal WHERE municipio = 'Olinda' AND competencia BETWEEN '2025-01' AND '2025-12'"
+    parts: [[leituras_estimadas_pct], [pagas_com_atraso_pct]]
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: null
+    notes: "Dois percentuais de qualidade e de cobrança no mesmo recorte (T13.6, lote 3)."
+    revisado_por: "Luis Felipe Perylo (Dados)"
+  - id: G158
+    question: "Qual foi a receita faturada de Olinda em março de 2026?"
+    category: followup
+    reference_sql: "SELECT sum(receita_faturada) AS receita_faturada FROM sem_kpis_segmento_mensal WHERE municipio = 'Olinda' AND competencia = '2026-03'"
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: null
+    notes: "Início da cadeia de 3 turnos G158 → G159 → G160: troca de período e depois de recorte (T2, lote 3)."
+    revisado_por: "Luis Felipe Perylo (Dados)"
+  - id: G159
+    question: "E em abril?"
+    category: followup
+    reference_sql: "SELECT sum(receita_faturada) AS receita_faturada FROM sem_kpis_segmento_mensal WHERE municipio = 'Olinda' AND competencia = '2026-04'"
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: G158
+    notes: "Troca só o mês: mantém Olinda e o ano de 2026 do turno anterior."
+    revisado_por: "Luis Felipe Perylo (Dados)"
+  - id: G160
+    question: "E de Recife?"
+    category: followup
+    reference_sql: "SELECT sum(receita_faturada) AS receita_faturada FROM sem_kpis_segmento_mensal WHERE municipio = 'Recife' AND competencia = '2026-04'"
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: G159
+    notes: "Troca o recorte e mantém abril de 2026, o período do último turno."
+    revisado_por: "Luis Felipe Perylo (Dados)"
+  - id: G161
+    question: "Qual foi o DEC da distribuidora em 2025?"
+    category: followup
+    reference_sql: "SELECT round(CAST(sum(dec) AS numeric), 2) AS dec FROM sem_kpis_mensais WHERE competencia BETWEEN '2025-01' AND '2025-12'"
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: null
+    notes: "Início da cadeia de 3 turnos G161 → G162 → G163: troca de métrica e depois de período. DEC do ano é a soma dos meses (DEC-032)."
+    revisado_por: "Luis Felipe Perylo (Dados)"
+  - id: G162
+    question: "E quanto foi o FEC?"
+    category: followup
+    reference_sql: "SELECT round(CAST(sum(fec) AS numeric), 2) AS fec FROM sem_kpis_mensais WHERE competencia BETWEEN '2025-01' AND '2025-12'"
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: G161
+    notes: "Troca a métrica e mantém 2025."
+    revisado_por: "Luis Felipe Perylo (Dados)"
+  - id: G163
+    question: "E como foi em 2024?"
+    category: followup
+    reference_sql: "SELECT round(CAST(sum(fec) AS numeric), 2) AS fec FROM sem_kpis_mensais WHERE competencia BETWEEN '2024-01' AND '2024-12'"
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: G162
+    notes: "Troca o período e mantém o FEC, a métrica do último turno."
+    revisado_por: "Luis Felipe Perylo (Dados)"

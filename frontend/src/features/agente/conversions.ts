@@ -22,7 +22,7 @@ import type {
 	SessaoIa,
 } from "./types";
 
-export const MAX_PERGUNTA_CHARS = 500;
+export const MAX_PERGUNTA_CHARS = 1000;
 
 export const MAX_SESSOES = 15;
 
@@ -352,13 +352,23 @@ export function formatarSessaoComoMarkdown(sessao: SessaoConversa): string {
 	return blocos.join("\n\n");
 }
 
+// Limite de perguntas (429), conversa de outro usuário (403) e pergunta em andamento (409):
+// a API explica o motivo no detail, e é ele que a pessoa precisa ler.
+const MOTIVO_DA_API = new Set([403, 409, 429]);
+
 export function extrairMensagemErro(error: unknown): string {
 	if (error instanceof AgentProtocolError) return error.message;
 	if (error instanceof ApiError) {
 		if (error.status === 503)
 			return "O agente de IA não está disponível neste ambiente (verifique a configuração da chave do modelo).";
 		if (error.status === 422)
-			return "A pergunta enviada é inválida (máximo de 500 caracteres).";
+			return `A pergunta enviada é inválida (máximo de ${MAX_PERGUNTA_CHARS} caracteres).`;
+		if (MOTIVO_DA_API.has(error.status)) {
+			const detail = (error.body as { detail?: unknown } | null)?.detail;
+			if (typeof detail === "string" && detail.trim()) return detail;
+			if (error.status === 429)
+				return "Você atingiu o limite de perguntas. Aguarde alguns minutos e tente de novo.";
+		}
 	}
 	return "Não foi possível concluir a consulta ao agente. Tente novamente.";
 }

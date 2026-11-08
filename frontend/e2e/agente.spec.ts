@@ -5,10 +5,15 @@
 // o modelo. Só vale como validado o que aparece na tela (definição do plano).
 import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { randomUUID } from "node:crypto";
 import { type Page, expect, test } from "@playwright/test";
 
 const USUARIOS = ["henrique", "camila", "rafael", "beatriz", "patricia"] as const;
 const SENHA = process.env.E2E_SENHA_DEMO ?? "";
+// Limites: só testados quando a API sobe com eles ligados (a rodada normal desliga os dois).
+const LIMITE_PERGUNTAS = Number(process.env.E2E_LIMITE_PERGUNTAS ?? "0");
+const ORCAMENTO_LIGADO = process.env.E2E_ORCAMENTO === "1";
+const PERGUNTA_BARATA = "Quantas UCs existem na base?";
 // Nomes técnicos que não podem aparecer no texto (item 4 da definição de validado).
 const NOME_TECNICO = /\b[a-zA-Z]+_\w+\b/;
 const TEXTO_DE_RESERVA = "A consulta devolveu";
@@ -69,11 +74,44 @@ const CONVERSAS: Record<string, Passo[]> = {
 	"alimentador com maior DEC e suas UCs": [{ id: "G141" }],
 	"inadimplência em contagem e percentual": [{ id: "G142" }],
 	"município com maior receita e o DEC dele": [{ id: "G143" }, { id: "G144" }],
+	"receita, energia e tarifa de um recorte": [{ id: "G150" }],
+	"variação de cada município": [{ id: "G151" }],
+	"bairros com mais interrupções e o DEC": [{ id: "G152" }],
+	"participação da geração distribuída": [{ id: "G153" }],
+	"canal com mais chamados e a satisfação": [{ id: "G154" }],
+	"principais causas de interrupção": [{ id: "G155" }],
+	"mês de maior receita e o FEC": [{ id: "G156" }],
+	"leituras estimadas e pagas com atraso": [{ id: "G157" }],
+	"três turnos trocando período e recorte": [{ id: "G158" }, { id: "G159" }, { id: "G160" }],
+	"três turnos trocando métrica e período": [{ id: "G161" }, { id: "G162" }, { id: "G163" }],
 	"último ano pede o período e a opção responde": [
 		{
 			pergunta: "Qual bairro mais perdeu volume residencial no último ano?",
 			espera: "esclarecimento",
 		},
+		{ opcao: "nos últimos 12 meses" },
+	],
+	"ano escrito por extenso": [
+		{
+			pergunta: "Qual foi a receita da distribuidora em setembro de dois mil e vinte e quatro?",
+			comoId: "G005",
+		},
+	],
+	"anos por extenso numa comparação": [
+		{
+			pergunta:
+				"Quanto a receita faturada cresceu entre dois mil e vinte e quatro e dois mil e vinte e cinco?",
+			comoId: "G015",
+		},
+	],
+	"circuito de um bairro": [
+		{
+			pergunta: "Qual o FEC de março de 2025 do circuito que atende o bairro Iputinga, em Recife?",
+			comoId: "G089",
+		},
+	],
+	"receita sem período pede o período": [
+		{ pergunta: "Qual foi a receita?", espera: "esclarecimento" },
 		{ opcao: "nos últimos 12 meses" },
 	],
 	"fora do escopo": [
@@ -114,6 +152,18 @@ async function perguntar(page: Page, pergunta: string) {
 	return (await mensagem.innerText()).trim();
 }
 
+// A tabela mostra a competência como mês abreviado ("fev/2026" para 2026-02).
+const MESES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+// Índices e taxas aparecem com no máximo duas casas (DEC-081): "0,118" vira "0,12".
+function comoNaTabela(valor: string): string {
+	const competencia = /^(\d{4})-(\d{2})$/.exec(valor);
+	if (competencia) return `${MESES[Number(competencia[2]) - 1]}/${competencia[1]}`;
+	const decimal = /^(\d+),(\d{3,})$/.exec(valor);
+	if (!decimal) return valor;
+	const arredondado = Number(`${decimal[1]}.${decimal[2]}`).toFixed(2);
+	return arredondado.replace(".", ",").replace(/0+$/, "").replace(/,$/, "");
+}
+
 // Os números do gabarito aparecem na tabela, formatados pela unidade, e o texto é do modelo,
 // sem nome técnico. A tabela é a prova de que o SQL acertou; o texto, de que a narração passou.
 async function conferirResposta(page: Page, texto: string, item: ItemEsperado) {
@@ -134,7 +184,9 @@ async function conferirResposta(page: Page, texto: string, item: ItemEsperado) {
 			// A tabela não mostra zero à direita ("3,9" para 3,90): compara sem ele.
 			const magnitude = valor.replace(/^-/, "").replace(/(,\d*?)0+$/, "$1").replace(/,$/, "");
 			if (magnitude)
-				expect(conteudo, `${item.id}: valor ${valor} na tabela`).toContain(magnitude);
+				expect(conteudo, `${item.id}: valor ${valor} na tabela`).toContain(
+					comoNaTabela(magnitude),
+				);
 		}
 	}
 }
@@ -198,6 +250,45 @@ for (const login of USUARIOS) {
 			await page.getByRole("button", { name: "Agente", exact: true }).click();
 			const texto = await perguntar(page, item.pergunta);
 			await conferirResposta(page, texto, item);
+		});
+
+		test("a conversa deste usuário não abre para outro (403)", async ({ page, browser }) => {
+			const sessionId = randomUUID();
+			const dono = await page.request.post("/api/ai/ask", {
+				data: { question: PERGUNTA_BARATA, session_id: sessionId },
+			});
+			expect(dono.status(), "dono da conversa").toBe(200);
+			const outro = USUARIOS[(USUARIOS.indexOf(login) + 1) % USUARIOS.length];
+			const contexto = await browser.newContext();
+			const pagina = await contexto.newPage();
+			await entrar(pagina, outro);
+			const intruso = await pagina.request.post("/api/ai/ask", {
+				data: { question: PERGUNTA_BARATA, session_id: sessionId },
+			});
+			expect(intruso.status(), `${outro} na conversa de ${login}`).toBe(403);
+			expect((await intruso.json()).detail).toContain("pertence a outro usuário");
+			await contexto.close();
+		});
+
+		test("passar do limite de perguntas mostra a mensagem do limite", async ({ page }) => {
+			test.skip(LIMITE_PERGUNTAS === 0, "suba a API com o limite e defina E2E_LIMITE_PERGUNTAS");
+			await page.goto("/agente");
+			for (let feita = 0; feita < LIMITE_PERGUNTAS; feita++) {
+				await perguntar(page, PERGUNTA_BARATA);
+			}
+			await page.getByLabel("Pergunta para o agente").fill(PERGUNTA_BARATA);
+			await page.getByLabel("Enviar pergunta").click();
+			await expect(page.getByText(/Você atingiu o limite de \d+ perguntas/).last()).toBeVisible({
+				timeout: 30_000,
+			});
+		});
+
+		test("orçamento esgotado mostra a mensagem de limite de uso", async ({ page }) => {
+			test.skip(!ORCAMENTO_LIGADO, "suba a API com orçamento baixo e defina E2E_ORCAMENTO=1");
+			await page.goto("/agente");
+			await perguntar(page, PERGUNTA_BARATA);
+			const texto = await perguntar(page, PERGUNTA_BARATA);
+			expect(texto).toContain("Você atingiu o limite de uso");
 		});
 
 		test("o link de auditoria aparece só para a TI", async ({ page }) => {
