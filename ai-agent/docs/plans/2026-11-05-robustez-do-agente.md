@@ -169,7 +169,7 @@ Uma pergunta está validada quando, no portal, logado, pela página Agente **e**
 
 1. **Status certo:** resposta, esclarecimento, "não sei" ou recusa.
 2. **Números:** os do texto batem com o gabarito do golden set, em formato pt-BR.
-3. **Texto do modelo:** "A consulta devolveu…" só aparece quando o modelo falhou, e a falha fica registrada no log.
+3. **Texto do modelo:** o texto de reserva ("Direto dos dados…") só aparece quando o modelo falhou, e a falha fica registrada no log.
 4. **Sem nome técnico** (`receita_faturada`, `sem_*`, `cod_uc`) no texto, nas suposições e no cabeçalho da tabela.
 5. **Tabela:** formatada pela unidade (R$, kWh, %, h, contagem) e com rótulo em português.
 6. **Período citado.**

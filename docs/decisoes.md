@@ -2591,3 +2591,33 @@ Decisões de 19/10/2026, anteriores à numeração: [convenções do frontend](#
   - item novo do golden aguarda a conferência de Dados;
   - mudança de modelo principal pede nova medição do tempo limite;
   - a rubrica `v2` só vira padrão com a nota humana preenchida e o critério atingido.
+
+## DEC-086 · Texto de reserva legível, opções do modelo no esclarecimento e nova tentativa no portal
+
+- **Data:** 08/11/2026 · **Área:** GenAI e Portal · **Autor:** Luis Felipe · **Revisa:** complementa a DEC-082 (opções de esclarecimento) e a DEC-084.
+- **Contexto:** a rodada de 08/11 no portal mostrou três pontos em que a pessoa fica sem uma resposta boa, mesmo com o agente certo:
+  - quando a narração falha (cota ou prazo), aparece o texto de reserva "A consulta devolveu 1 linha. Resultado: receita faturada = R$ …", que lê como saída de sistema;
+  - só o pedido de período tinha botões. "Piores bairros" ou "por classe" pediam esclarecimento sem sugerir resposta, e a pessoa precisava adivinhar o que escrever;
+  - uma resposta com status de falha (modelo indisponível ou prazo) não tinha o botão "Tentar novamente", que só existia para erro de rede.
+- **Decisão:**
+  - **Texto de reserva:** começa com "Direto dos dados", cita o período por extenso e lista as colunas como frase ("Direto dos dados, em março de 2025: receita faturada R$ 35.482,79."). Resultado com mais de 5 linhas ou 6 colunas manda ver a tabela. O começo fixo continua marcando a reserva para a métrica `fallback_rate` e para o teste de ponta a ponta.
+  - **Opções do modelo (prompt de SQL `v6`):** com `clarify`, o modelo devolve de 2 a 3 respostas curtas em `clarification_options` do rascunho. O agente descarta as que têm nome técnico, tira repetidas, limita a 3 e as entrega no campo que o contrato já tinha (DEC-082). Sem opções do modelo, vale a regra antiga do período. O contrato do `AgentAnswer` não muda.
+  - **Nova tentativa:** resposta com status de falha mostra "Tentar novamente", que repete a pergunta no mesmo turno, como no erro de rede.
+  - **Coluna que não existe:** quando o banco diz que uma coluna não existe, o erro volta ao modelo dizendo em que views ela existe. No portal, "chamados e satisfação em 2025" esgotava as três tentativas procurando `soma_notas` em `sem_kpis_mensais` e `n_chamados` em `sem_atendimentos_uc`. A regra da satisfação também passa a lembrar que `sem_kpis_segmento_mensal` tem os chamados.
+  - **Linhas mensais sem o mês:** ler `sem_kpis_mensais` ou a continuidade do alimentador num intervalo de meses, sem agregar e sem `competencia`, volta ao modelo como erro de cálculo. No portal, "DEC da distribuidora em 2025" trazia 12 valores mensais sem o mês, em vez do DEC do ano.
+- **Alternativas descartadas:**
+  - campo novo no contrato dizendo que o texto é de reserva: exigiria acordo com o backend, e o começo fixo já distingue;
+  - opções escritas pelo código para cada ambiguidade conhecida: cobririam só os casos previstos.
+- **Consequências:** o prompt `v6` é padrão nesta branch e só entra na `APRESENTAÇÃO` depois de uma rodada do golden sem regressão (DEC-016).
+- **Evidência (08/11/2026, Gold real, Gemini 3.1 Flash-Lite pago pelo OpenRouter, gasto total de US$ 1,73):**
+  - **golden 0.24.1 com o `v6`, narrado e com juiz:** SQL certo em 99,2%, status 100%, `fallback_rate` 0%, juiz 98,3% (nota média 4,94), tempo p50 de 4,0 s e p95 de 5,2 s, red team sem violação. Contra o lote 3, nos 156 itens em comum: o G093 e o G132 melhoram e o G120 piora (usou a classe tarifária, a ambiguidade que já oscilava; a regra "por classe é a classe do cadastro" na camada fica para a próxima rodada). As duas regras novas de cálculo vieram depois desta rodada e foram conferidas contra todas as referências dos três conjuntos, sem falso positivo;
+  - **portal, 5 usuários, 40 conversas cada:** 180 de 200 testes passaram. As 20 falhas foram:
+    - 10 de tempo acima de 10 s, metade na pergunta longa da diretora (15 a 20 s) e o resto entre 10,4 e 12,4 s;
+    - 5 em "chamados e satisfação" e 5 no "DEC de 2025". Esses 10 testes passaram nos 5 usuários depois das duas regras novas;
+  - **opções do modelo:** "Quais foram os piores bairros de Recife em 2025?" pediu esclarecimento com opções clicáveis em 4 de 5 usuários; no quinto, o modelo respondeu direto, com três medidas;
+  - **nova tentativa:** o botão apareceu nas respostas com falha por cota e por tentativas esgotadas;
+  - **texto de reserva:** não apareceu nenhuma vez no modelo pago (`fallback_rate` 0%); o formato está coberto pelos testes de unidade.
+- **Pendências:**
+  - tempo da pergunta longa da diretora acima de 10 s;
+  - regra da classe na camada semântica (G120), com uma rodada do golden;
+  - opções do modelo em 4 de 5 rodadas na pergunta de juízo.
