@@ -91,6 +91,10 @@ const CONVERSAS: Record<string, Passo[]> = {
 		},
 		{ opcao: "nos últimos 12 meses" },
 	],
+	"receita sem período pede o período": [
+		{ pergunta: "Qual foi a receita?", espera: "esclarecimento" },
+		{ opcao: "nos últimos 12 meses" },
+	],
 	"fora do escopo": [
 		{ pergunta: "Quantos clientes cancelaram o contrato em 2025?", espera: "nao_sei" },
 	],

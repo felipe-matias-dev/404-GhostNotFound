@@ -412,7 +412,12 @@ class AskUseCase:
                     clarification = GENERIC_CLARIFICATION
                 self._log(request_id, session_id, step="resposta", status="clarify")
                 return self._clarify(
-                    clarification, request_id, started, model=generation.model, spent=spent
+                    clarification,
+                    request_id,
+                    started,
+                    model=generation.model,
+                    spent=spent,
+                    options=_model_period_options(question.text, history, clarification),
                 )
 
             emit(_stage_event(Stage.QUERYING, attempt, spent))
@@ -462,6 +467,8 @@ class AskUseCase:
             invented = _invented_years(question.text, history, validated)
             if not invented and _invented_base_window(question.text, history, validated.sql):
                 invented = ("janela_da_base",)
+            if not invented and _whole_series_without_period(question.text, history, validated.sql):
+                invented = ("serie_inteira",)
             if invented:
                 self._log(
                     request_id,
@@ -1142,3 +1149,47 @@ def _invented_base_window(question: str, history: tuple[ConversationTurn, ...], 
         return False
     context = " ".join([question, *(turn.question for turn in history)])
     return not (durations(context) or BASE_RELATIVE.search(context))
+
+
+MONTHLY_VIEW = re.compile(
+    r"\bsem_(?:kpis_mensais|kpis_segmento_mensal|faturamento_mensal|continuidade_alimentador_mensal)\b"
+)
+SERIES_AGGREGATE = re.compile(r"\b(?:sum|avg)\s*\(", re.IGNORECASE)
+WHOLE_SERIES = re.compile(
+    r"\b(?:histórico|toda\s+a\s+(?:base|série)|todo\s+o\s+período|desde\s+o\s+(?:início|começo)"
+    r"|série\s+inteira)\b",
+    re.IGNORECASE,
+)
+MONTH_NAME = re.compile(rf"\b(?:{'|'.join(MONTH_NAMES)})\b", re.IGNORECASE)
+ASKS_FOR_PERIOD = re.compile(r"\b(?:período|competência|mês|meses|ano)\b", re.IGNORECASE)
+
+
+def _model_period_options(
+    question: str, history: tuple[ConversationTurn, ...], clarification: str
+) -> tuple[str, ...]:
+    if not ASKS_FOR_PERIOD.search(clarification):
+        return ()
+    context = " ".join([question, *(turn.question for turn in history)])
+    if YEAR.search(context) or MONTH_DATE.search(context) or MONTH_NAME.search(context):
+        return ()
+    return _period_options(())
+
+
+def _whole_series_without_period(
+    question: str, history: tuple[ConversationTurn, ...], sql: str
+) -> bool:
+    if "competencia" in sql.lower() or not MONTHLY_VIEW.search(sql):
+        return False
+    if not SERIES_AGGREGATE.search(sql):
+        return False
+    if any("competencia" in (turn.sql or "").lower() for turn in history):
+        return False
+    context = " ".join([question, *(turn.question for turn in history)])
+    return not (
+        YEAR.search(context)
+        or MONTH_DATE.search(context)
+        or MONTH_NAME.search(context)
+        or BASE_RELATIVE.search(context)
+        or WHOLE_SERIES.search(context)
+        or durations(context)
+    )
