@@ -27,7 +27,7 @@ from venergy_agent.domain.errors import (
     SqlRejected,
 )
 from venergy_agent.domain.events import AgentEvent, AnswerEvent, Stage, StageEvent
-from venergy_agent.domain.filter_values import filter_value_problem
+from venergy_agent.domain.filter_values import filter_value_problem, known_values
 from venergy_agent.domain.followup import (
     answers_a_clarification,
     complete_question,
@@ -121,7 +121,7 @@ PERIOD_NOT_GIVEN = (
 YEAR = re.compile(r"\b(?:19|20)\d{2}\b")
 BASE_RELATIVE = re.compile(
     r"\b(?:primeir[oa]s?|últim[oa]s?|inicia(?:l|is)|início|começo|arranque|partida|mais\s+recente)"
-    r"(?:\W+\w+){0,4}?\W+(?:base|série|histórico|dados)\b"
+    r"(?:[^\w.?!;]+\w+){0,4}?[^\w.?!;]+(?:base|série|histórico|dados)\b"
     r"|\búltim[oa]s\s+(?:doze|vinte\s+e\s+quatro|seis|três)\s+(?:meses|ciclos)\b",
     re.IGNORECASE,
 )
@@ -1131,13 +1131,17 @@ def _period_options(years: tuple[str, ...]) -> tuple[str, ...]:
 
 
 def _known_values(layer: SemanticLayer) -> dict[str, tuple[str, ...]]:
-    known = {
-        column.name: tuple(column.allowed_values)
-        for view in layer.views
-        for column in view.columns
-        if column.allowed_values
-    }
-    return known | dict(layer.categorical_values)
+    return known_values(
+        [
+            *(
+                (column.name, column.allowed_values)
+                for view in layer.views
+                for column in view.columns
+                if column.allowed_values
+            ),
+            *layer.categorical_values.items(),
+        ]
+    )
 
 
 def _column_names(layer: SemanticLayer) -> set[str]:
@@ -1161,25 +1165,33 @@ def _invented_base_window(question: str, history: tuple[ConversationTurn, ...], 
 MONTHLY_VIEW = re.compile(
     r"\bsem_(?:kpis_mensais|kpis_segmento_mensal|faturamento_mensal|continuidade_alimentador_mensal)\b"
 )
-SERIES_AGGREGATE = re.compile(r"\b(?:sum|avg)\s*\(", re.IGNORECASE)
+SUM_OR_AVERAGE = re.compile(r"\b(?:sum|avg)\s*\(", re.IGNORECASE)
 WHOLE_SERIES = re.compile(
     r"\b(?:histórico|toda\s+a\s+(?:base|série)|todo\s+o\s+período|desde\s+o\s+(?:início|começo)"
     r"|série\s+inteira)\b",
     re.IGNORECASE,
 )
 MONTH_NAME = re.compile(rf"\b(?:{'|'.join(MONTH_NAMES)})\b", re.IGNORECASE)
+
+
+def _conversation(question: str, history: tuple[ConversationTurn, ...]) -> str:
+    return with_spelled_years_as_digits(" ".join([question, *(turn.question for turn in history)]))
+
+
+def _names_a_period(question: str, history: tuple[ConversationTurn, ...]) -> bool:
+    if any("competencia" in (turn.sql or "").lower() for turn in history):
+        return True
+    context = _conversation(question, history)
+    return bool(YEAR.search(context) or MONTH_DATE.search(context) or MONTH_NAME.search(context))
+
+
 ASKS_FOR_PERIOD = re.compile(r"\b(?:período|competência|mês|meses|ano)\b", re.IGNORECASE)
 
 
 def _model_period_options(
     question: str, history: tuple[ConversationTurn, ...], clarification: str
 ) -> tuple[str, ...]:
-    if not ASKS_FOR_PERIOD.search(clarification):
-        return ()
-    context = with_spelled_years_as_digits(
-        " ".join([question, *(turn.question for turn in history)])
-    )
-    if YEAR.search(context) or MONTH_DATE.search(context) or MONTH_NAME.search(context):
+    if not ASKS_FOR_PERIOD.search(clarification) or _names_a_period(question, history):
         return ()
     return _period_options(())
 
@@ -1189,18 +1201,9 @@ def _whole_series_without_period(
 ) -> bool:
     if "competencia" in sql.lower() or not MONTHLY_VIEW.search(sql):
         return False
-    if not SERIES_AGGREGATE.search(sql):
+    if not SUM_OR_AVERAGE.search(sql):
         return False
-    if any("competencia" in (turn.sql or "").lower() for turn in history):
+    if _names_a_period(question, history):
         return False
-    context = with_spelled_years_as_digits(
-        " ".join([question, *(turn.question for turn in history)])
-    )
-    return not (
-        YEAR.search(context)
-        or MONTH_DATE.search(context)
-        or MONTH_NAME.search(context)
-        or BASE_RELATIVE.search(context)
-        or WHOLE_SERIES.search(context)
-        or durations(context)
-    )
+    context = _conversation(question, history)
+    return not (BASE_RELATIVE.search(context) or WHOLE_SERIES.search(context) or durations(context))

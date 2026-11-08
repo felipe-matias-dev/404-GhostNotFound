@@ -1,10 +1,3 @@
-"""Calibração do juiz (DEC-047): prepara a planilha às cegas e compara as notas.
-
-`prepare` gera as respostas dos itens escolhidos na Gold real, grava a planilha que a pessoa
-preenche sem ver as notas do juiz e guarda à parte as notas das rubricas pedidas. `compare` lê
-as notas humanas e calcula o acordo. Tudo fica em eval/runs_gold/, fora do Git (DEC-024).
-"""
-
 import argparse
 import asyncio
 import csv

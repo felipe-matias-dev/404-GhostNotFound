@@ -1,13 +1,21 @@
 import re
 import unicodedata
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 
 MAX_LISTED = 15
 COLUMN = r"(?:(?:lower|upper|unaccent)\s*\(\s*)?(?:\w+\.)?(?P<column>\w+)\s*\)?"
 LITERAL = r"'(?P<value>(?:[^']|'')*)'"
 COMPARISON = re.compile(rf"{COLUMN}\s*(?:=|i?like)\s*{LITERAL}", re.IGNORECASE)
 IN_LIST = re.compile(rf"{COLUMN}\s+in\s*\((?P<items>[^)]*)\)", re.IGNORECASE)
+SUBQUERY = re.compile(r"\s*select\b", re.IGNORECASE)
 ITEM = re.compile(r"'((?:[^']|'')*)'")
+
+
+def known_values(columns: Iterable[tuple[str, Sequence[str]]]) -> dict[str, tuple[str, ...]]:
+    known: dict[str, tuple[str, ...]] = {}
+    for name, values in columns:
+        known[name] = tuple(dict.fromkeys((*known.get(name, ()), *values)))
+    return known
 
 
 def filter_value_problem(sql: str, known: Mapping[str, Sequence[str]]) -> str | None:
@@ -37,13 +45,19 @@ def filter_value_problem(sql: str, known: Mapping[str, Sequence[str]]) -> str | 
 def _filters(sql: str) -> list[tuple[str, str]]:
     found = [(match["column"], match["value"]) for match in COMPARISON.finditer(sql)]
     for match in IN_LIST.finditer(sql):
+        if SUBQUERY.match(match["items"]):
+            continue
         found.extend((match["column"], item) for item in ITEM.findall(match["items"]))
     return found
 
 
 def _matches(value: str, options: Sequence[str]) -> bool:
     pattern = re.compile(
-        ".*".join(re.escape(part) for part in _normalized(value).split("%")), re.DOTALL
+        ".*".join(
+            ".".join(re.escape(piece) for piece in part.split("_"))
+            for part in _normalized(value).split("%")
+        ),
+        re.DOTALL,
     )
     return any(pattern.fullmatch(_normalized(option)) for option in options)
 

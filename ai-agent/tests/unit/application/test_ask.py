@@ -1802,6 +1802,37 @@ async def test_a_period_clarification_has_no_options_when_the_question_names_a_y
     assert answer.clarification_options == ()
 
 
+async def test_a_period_clarification_has_no_options_when_the_conversation_has_a_period(layer):
+    history = FakeHistory(
+        (
+            ConversationTurn(
+                question="Qual a receita do primeiro ano da base?",
+                sql="SELECT sum(receita_faturada) FROM sem_kpis_mensais "
+                "WHERE competencia BETWEEN '2022-07' AND '2023-06'",
+                status=AnswerStatus.ANSWERED,
+            ),
+        )
+    )
+    draft = generation(status="clarify", sql=None, clarification="Qual mês você quer ver?")
+
+    answer = await use_case(layer, ScriptedGenerator(draft), history=history, history_turns=3).ask(
+        "E por classe?", "s1"
+    )
+
+    assert answer.clarification_options == ()
+
+
+async def test_a_base_window_does_not_cross_a_sentence(layer):
+    executor = ScriptedExecutor(result())
+
+    answer = await use_case(layer, ScriptedGenerator(generation(sql=TWO_YEARS_SQL)), executor).ask(
+        "Qual a receita do último trimestre? Quero os dados de Recife.", "s1"
+    )
+
+    assert answer.status is AnswerStatus.CLARIFY
+    assert executor.queries == []
+
+
 async def test_energy_written_as_an_integer_matches_a_value_with_decimals(layer):
     writer = FixedWriter(text="A energia faturada foi de 496.099 kWh.")
     energy = ScriptedExecutor(table(("kwh_faturado",), (Decimal("496099.37"),)))

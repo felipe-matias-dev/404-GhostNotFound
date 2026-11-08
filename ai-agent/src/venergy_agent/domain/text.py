@@ -42,7 +42,7 @@ TENS = {
 _UNIT = "|".join(sorted(UNITS, key=len, reverse=True))
 _TEN = "|".join(TENS)
 SPELLED_YEAR = re.compile(
-    rf"\bdois\s+mil(?:\s+e\s+(?:(?P<ten>{_TEN})(?:\s+e\s+(?P<tail>{_UNIT}))?|(?P<unit>{_UNIT})))?\b",
+    rf"\bdois\s+mil\s+e\s+(?:(?P<ten>{_TEN})(?:\s+e\s+(?P<tail>{_UNIT}))?|(?P<unit>{_UNIT}))\b",
     re.IGNORECASE,
 )
 
