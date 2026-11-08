@@ -195,7 +195,7 @@ for (const login of USUARIOS) {
 		test("pelo widget, numa tela do perfil", async ({ page }) => {
 			const item = ESPERADO.get("G106");
 			if (!item) return;
-			await page.getByRole("button", { name: "Agente", exact: true }).click();
+			await page.getByRole("button", { name: "Agente de IA", exact: true }).click();
 			const texto = await perguntar(page, item.pergunta);
 			await conferirResposta(page, texto, item);
 		});
