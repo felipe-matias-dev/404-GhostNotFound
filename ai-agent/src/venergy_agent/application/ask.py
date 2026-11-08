@@ -55,6 +55,7 @@ from venergy_agent.domain.sql import (
     ValidatedQuery,
 )
 from venergy_agent.domain.sql_checks import calculation_problem
+from venergy_agent.domain.text import with_spelled_years_as_digits
 from venergy_agent.domain.vocabulary import known_words, vocabulary_of
 from venergy_agent.domain.wording import label, plain_words
 
@@ -790,7 +791,11 @@ class AskUseCase:
             *_months_between(validated.periods),
             *validated.years,
             *(pt_br_numbers(question_text) & _sql_numbers(validated.sql)),
-            *(year for year in YEAR.findall(question_text) if year in validated.sql),
+            *(
+                year
+                for year in YEAR.findall(with_spelled_years_as_digits(question_text))
+                if year in validated.sql
+            ),
             *(
                 pt_br_numbers(" ".join(plain_words(item) for item in draft.assumptions))
                 & _sql_numbers(validated.sql)
@@ -1100,7 +1105,9 @@ def _invented_years(
     used = {period[:4] for period in validated.periods} | set(validated.years)
     if not used or durations(question) or BASE_RELATIVE.search(question):
         return ()
-    context = " ".join([question, *(f"{turn.question} {turn.sql or ''}" for turn in history)])
+    context = with_spelled_years_as_digits(
+        " ".join([question, *(f"{turn.question} {turn.sql or ''}" for turn in history)])
+    )
     named = {int(year) for year in YEAR.findall(context)}
     allowed = {str(year + delta) for year in named for delta in (-1, 0, 1)}
     return tuple(sorted(used - allowed))
@@ -1169,7 +1176,9 @@ def _model_period_options(
 ) -> tuple[str, ...]:
     if not ASKS_FOR_PERIOD.search(clarification):
         return ()
-    context = " ".join([question, *(turn.question for turn in history)])
+    context = with_spelled_years_as_digits(
+        " ".join([question, *(turn.question for turn in history)])
+    )
     if YEAR.search(context) or MONTH_DATE.search(context) or MONTH_NAME.search(context):
         return ()
     return _period_options(())
@@ -1184,7 +1193,9 @@ def _whole_series_without_period(
         return False
     if any("competencia" in (turn.sql or "").lower() for turn in history):
         return False
-    context = " ".join([question, *(turn.question for turn in history)])
+    context = with_spelled_years_as_digits(
+        " ".join([question, *(turn.question for turn in history)])
+    )
     return not (
         YEAR.search(context)
         or MONTH_DATE.search(context)

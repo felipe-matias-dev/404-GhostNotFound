@@ -10,6 +10,12 @@ AGGREGATE = re.compile(r"\b(?:sum|count|avg|min|max)\s*\(|\bgroup\s+by\b", re.IG
 EFFECT = re.compile(r"(?P<before>\bsum\s*\(\s*)?(?:\w+\.)?\befeito_\w+", re.IGNORECASE)
 PER_FEEDER = re.compile(r"\bgroup\s+by\b[^;]*?\bcod_alimentador\b", re.IGNORECASE)
 SINGLE_FEEDER = re.compile(r"\bcod_alimentador\s*=\s*'", re.IGNORECASE)
+FEEDER_UC_JOIN = re.compile(
+    r"\bjoin\s+(?:\w+\.)?(?:sem_uc|sem_continuidade_alimentador_mensal)\b", re.IGNORECASE
+)
+UC_VIEW = re.compile(r"\bsem_uc\b")
+SERIES_AGGREGATE = re.compile(r"\b(?:sum|avg|count)\s*\(", re.IGNORECASE)
+SINGLE_UC = re.compile(r"\bcod_uc\s*=\s*'", re.IGNORECASE)
 
 SATISFACTION_FORMULA = (
     "Satisfação de vários meses não é a média de satisfacao_media: use "
@@ -25,6 +31,11 @@ GROUP_INDEX_FORMULA = (
     "DEC = sum(horas_interrompidas) / NULLIF(sum(n_uc), 0) e "
     "FEC = 1.0 * sum(n_interrupcoes) / NULLIF(sum(n_uc), 0); num período de vários meses, "
     "divida pela média mensal de UCs (sum(n_uc) / 12.0 num ano)."
+)
+FEEDER_FANOUT_FORMULA = (
+    "Juntar sem_continuidade_alimentador_mensal com sem_uc repete cada linha do alimentador "
+    "uma vez por UC e multiplica as somas: filtre os alimentadores com "
+    "cod_alimentador IN (SELECT cod_alimentador FROM sem_uc WHERE ...), sem JOIN."
 )
 
 DECOMPOSITION_FORMULA = (
@@ -52,6 +63,14 @@ def calculation_problem(sql: str) -> str | None:
         and not PER_FEEDER.search(sql)
     ):
         return GROUP_INDEX_FORMULA
+    if (
+        FEEDER_VIEW in sql
+        and UC_VIEW.search(sql)
+        and FEEDER_UC_JOIN.search(sql)
+        and SERIES_AGGREGATE.search(sql)
+        and not SINGLE_UC.search(sql)
+    ):
+        return FEEDER_FANOUT_FORMULA
     if SEGMENT_VIEW in sql and not AGGREGATE.search(sql):
         return SEGMENT_FORMULA
     effects = list(EFFECT.finditer(sql))

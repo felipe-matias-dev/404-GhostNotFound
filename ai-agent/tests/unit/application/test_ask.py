@@ -1575,6 +1575,14 @@ async def test_a_sum_over_the_whole_series_keeps_the_period_of_the_conversation(
     assert answer.status is AnswerStatus.ANSWERED
 
 
+async def test_years_written_in_words_are_not_invented(layer):
+    answer = await use_case(layer, ScriptedGenerator(generation(sql=TWO_YEARS_SQL))).ask(
+        "Quantas UCs faturaram de dois mil e vinte e três pra dois mil e vinte e quatro?", "s1"
+    )
+
+    assert answer.status is AnswerStatus.ANSWERED
+
+
 async def test_a_year_next_to_one_the_question_names_is_not_invented(layer):
     answer = await use_case(layer, ScriptedGenerator(generation(sql=TWO_YEARS_SQL))).ask(
         "Quantas UCs faturaram em 2024 em relação ao ano anterior?", "s1"

@@ -1,292 +1,161 @@
-# Perguntas inéditas (T12.4, DEC-084): escritas por outro modelo (Gemini 3.5 Flash-Lite) no papel de gestores,
-# só com a descrição dos dados, sem o glossário nem o golden. As referências foram escritas depois, sem mudar a pergunta.
+# Perguntas inéditas (T12.4, DEC-084), segundo conjunto: escritas por outro modelo (Gemini 3.5 Flash-Lite) no papel
+# de gestores, só com a descrição dos dados, sem o glossário nem o golden. As referências foram escritas depois, sem
+# mudar a pergunta; ficaram de fora as perguntas sobre dado que não existe ou sem uma leitura única.
 # Não ajustar glossário, regras ou exemplos olhando para estas perguntas: uma falha só se corrige com regra geral.
-versao: 0.1.0
+versao: 0.2.0
 itens:
-- id: I001
-  question: Quanto a gente faturou no residencial B1 lá em Olinda em maio de 2024?
+- id: I101
+  question: Bom dia, pessoal. Queria saber qual foi o faturamento total da distribuidora somando Recife e Olinda no acumulado
+    de 2024.
   category: inedita
   papel: diretora-presidente
-  reference_sql: SELECT sum(receita_faturada) AS receita_faturada FROM sem_kpis_segmento_mensal WHERE classe = 'B1' AND municipio
-    = 'Olinda' AND competencia = '2024-05'
+  reference_sql: SELECT sum(receita_faturada) AS receita_faturada FROM sem_kpis_segmento_mensal WHERE municipio IN ('Recife',
+    'Olinda') AND competencia BETWEEN '2024-01' AND '2024-12'
   expected_status: answered
   datasets:
   - gold_real
   follow_up_of: null
   revisado_por: null
-- id: I002
-  question: Compara pra mim o total de energia faturada na alta tensão A4 em Jaboatão entre junho de 2023 e junho de 2025.
+- id: I103
+  question: Me traz o tempo médio que duraram as quedas de energia no bairro de Boa Viagem em março de 2025, por favor.
   category: inedita
-  papel: diretora-presidente
-  reference_sql: SELECT sum(CASE WHEN competencia = '2023-06' THEN kwh_faturado END) AS kwh_2023_06, sum(CASE WHEN competencia
-    = '2025-06' THEN kwh_faturado END) AS kwh_2025_06 FROM sem_kpis_segmento_mensal WHERE classe = 'A4' AND municipio = 'Jaboatão
-    dos Guararapes'
-  parts:
-  - - kwh_2023_06
-  - - kwh_2025_06
+  papel: gerente de operação
+  reference_sql: SELECT round(CAST(avg(i.duracao_horas) AS numeric), 2) AS duracao_media_horas FROM sem_interrupcoes_uc i
+    JOIN sem_uc u ON u.cod_uc = i.cod_uc WHERE u.municipio = 'Recife' AND u.bairro = 'Boa Viagem' AND i.competencia = '2025-03'
   expected_status: answered
   datasets:
   - gold_real
   follow_up_of: null
   revisado_por: null
-- id: I003
-  question: Quais foram os cinco bairros do Recife que tiveram mais chamados no call center por falta de energia em novembro
-    de 2025?
+- id: I104
+  question: Qual foi o canal que mais recebeu reclamação sobre valor da conta em Paulista no mês de janeiro de 2024?
   category: inedita
-  papel: diretora-presidente
-  reference_sql: SELECT u.bairro, count(*) AS chamados FROM sem_atendimentos_uc a JOIN sem_uc u ON u.cod_uc = a.cod_uc WHERE
-    u.municipio = 'Recife' AND a.assunto = 'FALTA DE ENERGIA' AND a.competencia = '2025-11' GROUP BY u.bairro ORDER BY count(*)
-    DESC LIMIT 5
+  papel: gerente de atendimento
+  reference_sql: SELECT a.canal, count(*) AS chamados FROM sem_atendimentos_uc a JOIN sem_uc u ON u.cod_uc = a.cod_uc WHERE
+    u.municipio = 'Paulista' AND a.assunto = 'FATURA' AND a.competencia = '2024-01' GROUP BY a.canal ORDER BY count(*) DESC
+    LIMIT 1
   parts:
-  - - bairro
+  - - canal
   - - chamados
   expected_status: answered
   datasets:
   - gold_real
   follow_up_of: null
   revisado_por: null
-- id: I004
-  question: Qual foi o percentual de leituras estimadas em relação ao total e qual a taxa de inadimplência (valor não pago)
-    na classe comercial B3 em Boa Viagem em março de 2024?
+- id: I105
+  question: Quanto a gente deixou de arrecadar com contas em aberto no segmento industrial em Pernambuco, especificamente
+    na nossa área de concessão, em dezembro de 2024?
   category: inedita
-  papel: diretora-presidente
-  reference_sql: SELECT round(100.0 * sum(n_leituras_estimadas) / NULLIF(sum(n_leituras), 0), 2) AS leituras_estimadas_pct,
-    round(100.0 * sum(valor_nao_pago) / NULLIF(sum(receita_faturada), 0), 2) AS nao_pago_pct FROM sem_kpis_segmento_mensal
-    WHERE classe = 'B3' AND municipio = 'Recife' AND bairro = 'Boa Viagem' AND competencia = '2024-03'
-  parts:
-  - - leituras_estimadas_pct
-  - - nao_pago_pct
+  papel: analista financeiro
+  reference_sql: SELECT sum(valor_nao_pago) AS valor_nao_pago FROM sem_kpis_segmento_mensal WHERE classe_cadastro = 'Industrial'
+    AND competencia = '2024-12'
   expected_status: answered
   datasets:
   - gold_real
   follow_up_of: null
   revisado_por: null
-- id: I006
-  question: Por que a receita da distribuidora caiu em fevereiro de 2026 comparado com o mesmo mês de 2025, olhando o efeito
-    preço, volume e mix?
+- id: I108
+  question: Quantas leituras por estimativa os leituristas fizeram em Olinda no mês de fevereiro de 2025? Quero o total por
+    bairro.
   category: inedita
-  papel: diretora-presidente
-  reference_sql: SELECT sum(receita_base) AS receita_base, sum(receita_atual) AS receita_atual, round(sum(efeito_preco), 2)
-    AS efeito_preco, round(sum(efeito_volume), 2) AS efeito_volume, round(sum(efeito_mix), 2) AS efeito_mix FROM sem_receita_decomposicao
-    WHERE periodo_base = '2025-02/2025-02' AND periodo_atual = '2026-02/2026-02'
-  parts:
-  - - efeito_preco
-  - - efeito_volume
-  - - efeito_mix
-  expected_status: answered
-  datasets:
-  - gold_real
-  follow_up_of: null
-  revisado_por: null
-- id: I007
-  question: Qual foi o valor total faturado no Recife em julho de 2024?
-  category: inedita
-  papel: gerente comercial
-  reference_sql: SELECT sum(receita_faturada) AS receita_faturada FROM sem_kpis_segmento_mensal WHERE municipio = 'Recife'
-    AND competencia = '2024-07'
-  expected_status: answered
-  datasets:
-  - gold_real
-  follow_up_of: null
-  revisado_por: null
-- id: I008
-  question: Como ficou a arrecadação da classe residencial B1 em Olinda comparando junho de 2023 com junho de 2025?
-  category: inedita
-  papel: gerente comercial
-  reference_sql: SELECT sum(CASE WHEN competencia = '2023-06' THEN receita_arrecadada END) AS arrecadada_2023_06, sum(CASE
-    WHEN competencia = '2025-06' THEN receita_arrecadada END) AS arrecadada_2025_06 FROM sem_kpis_segmento_mensal WHERE classe
-    = 'B1' AND municipio = 'Olinda'
-  parts:
-  - - arrecadada_2023_06
-  - - arrecadada_2025_06
-  expected_status: answered
-  datasets:
-  - gold_real
-  follow_up_of: null
-  revisado_por: null
-- id: I009
-  question: Quais foram os cinco bairros do Recife que mais registraram chamados no call center por falta de energia em 2024?
-  category: inedita
-  papel: gerente comercial
-  reference_sql: SELECT u.bairro, count(*) AS chamados FROM sem_atendimentos_uc a JOIN sem_uc u ON u.cod_uc = a.cod_uc WHERE
-    u.municipio = 'Recife' AND a.assunto = 'FALTA DE ENERGIA' AND a.competencia BETWEEN '2024-01' AND '2024-12' GROUP BY u.bairro
-    ORDER BY count(*) DESC LIMIT 5
+  papel: gerente de operação
+  reference_sql: SELECT bairro, sum(n_leituras_estimadas) AS leituras_estimadas FROM sem_kpis_segmento_mensal WHERE municipio
+    = 'Olinda' AND competencia = '2025-02' GROUP BY bairro
   parts:
   - - bairro
+  - - leituras_estimadas
+  expected_status: answered
+  datasets:
+  - gold_real
+  follow_up_of: null
+  revisado_por: null
+- id: I109
+  question: Qual era a nota média de satisfação do atendimento presencial lá em Paulista no trimestre de abril a junho de
+    2024?
+  category: inedita
+  papel: gerente de atendimento
+  reference_sql: SELECT round(CAST(avg(a.nota_satisfacao) AS numeric), 2) AS satisfacao_media FROM sem_atendimentos_uc a JOIN
+    sem_uc u ON u.cod_uc = a.cod_uc WHERE u.municipio = 'Paulista' AND a.canal = 'PRESENCIAL' AND a.competencia BETWEEN '2024-04'
+    AND '2024-06'
+  expected_status: answered
+  datasets:
+  - gold_real
+  follow_up_of: null
+  revisado_por: null
+- id: I112
+  question: E aí, o setor rural lá em Jaboatão faturou quanto no mês de agosto de 2024? Me dá o valor exato das contas.
+  category: inedita
+  papel: gerente comercial
+  reference_sql: SELECT sum(receita_faturada) AS receita_faturada FROM sem_kpis_segmento_mensal WHERE classe = 'B2' AND municipio
+    = 'Jaboatão dos Guararapes' AND competencia = '2024-08'
+  expected_status: answered
+  datasets:
+  - gold_real
+  follow_up_of: null
+  revisado_por: null
+- id: I114
+  question: Quantos atendimentos pelo canal de WhatsApp a gente teve em Olinda no mês de maio de 2025?
+  category: inedita
+  papel: gerente de atendimento
+  reference_sql: SELECT count(*) AS chamados FROM sem_atendimentos_uc a JOIN sem_uc u ON u.cod_uc = a.cod_uc WHERE u.municipio
+    = 'Olinda' AND a.canal = 'WHATSAPP' AND a.competencia = '2025-05'
+  expected_status: answered
+  datasets:
+  - gold_real
+  follow_up_of: null
+  revisado_por: null
+- id: I115
+  question: Quanto entrou no caixa de arrecadação no mês de janeiro de 2025 comparado com janeiro de 2024 na nossa distribuidora?
+  category: inedita
+  papel: analista financeiro
+  reference_sql: SELECT sum(CASE WHEN competencia = '2024-01' THEN receita_arrecadada END) AS arrecadada_2024_01, sum(CASE
+    WHEN competencia = '2025-01' THEN receita_arrecadada END) AS arrecadada_2025_01 FROM sem_kpis_segmento_mensal
+  parts:
+  - - arrecadada_2024_01
+  - - arrecadada_2025_01
+  expected_status: answered
+  datasets:
+  - gold_real
+  follow_up_of: null
+  revisado_por: null
+- id: I118
+  question: Qual circuito de Olinda deu mais problema de falta de luz no mês de outubro de 2024? Quero saber a duração total.
+  category: inedita
+  papel: gerente de operação
+  reference_sql: SELECT cod_alimentador, sum(horas_interrompidas) AS horas_interrompidas FROM sem_kpis_segmento_mensal WHERE
+    municipio = 'Olinda' AND competencia = '2024-10' GROUP BY cod_alimentador ORDER BY sum(horas_interrompidas) DESC LIMIT
+    1
+  parts:
+  - - cod_alimentador
+  - - horas_interrompidas
+  expected_status: answered
+  datasets:
+  - gold_real
+  follow_up_of: null
+  revisado_por: null
+- id: I119
+  question: Qual foi o assunto mais demandado nas nossas lojas físicas em Jaboatão dos Guararapes durante o mês de março de
+    2024?
+  category: inedita
+  papel: gerente de atendimento
+  reference_sql: SELECT a.assunto, count(*) AS chamados FROM sem_atendimentos_uc a JOIN sem_uc u ON u.cod_uc = a.cod_uc WHERE
+    u.municipio = 'Jaboatão dos Guararapes' AND a.canal = 'PRESENCIAL' AND a.competencia = '2024-03' GROUP BY a.assunto ORDER
+    BY count(*) DESC LIMIT 1
+  parts:
+  - - assunto
   - - chamados
   expected_status: answered
   datasets:
   - gold_real
   follow_up_of: null
   revisado_por: null
-- id: I010
-  question: Qual o percentual de leituras estimadas em relação ao total de faturamento na Região Metropolitana no ano de 2025?
+- id: I120
+  question: Qual o percentual de inadimplência (contas em aberto) do segmento residencial em Recife no fechamento de dezembro
+    de 2023?
   category: inedita
-  papel: gerente comercial
-  reference_sql: SELECT round(100.0 * sum(n_leituras_estimadas) / NULLIF(sum(n_leituras), 0), 2) AS leituras_estimadas_pct
-    FROM sem_kpis_segmento_mensal WHERE competencia BETWEEN '2025-01' AND '2025-12'
-  expected_status: answered
-  datasets:
-  - gold_real
-  follow_up_of: null
-  revisado_por: null
-- id: I012
-  question: Por que a receita da distribuidora caiu em Jaboatão em maio de 2023, foi efeito preço, volume ou mix?
-  category: inedita
-  papel: gerente comercial
-  reference_sql: null
-  expected_status: clarify
-  datasets:
-  - gold_real
-  follow_up_of: null
-  revisado_por: null
-- id: I014
-  question: Por que o tempo médio de interrupção por unidade consumidora disparou tanto em Jaboatão dos Guararapes em dezembro
-    de 2023 comparado com o mesmo mês de 2022?
-  category: inedita
-  papel: gerente de operação e manutenção da rede
-  reference_sql: SELECT round(CAST(sum(CASE WHEN competencia = '2022-12' THEN horas_interrompidas END) / NULLIF(sum(CASE WHEN
-    competencia = '2022-12' THEN n_uc END), 0) AS numeric), 2) AS dec_2022_12, round(CAST(sum(CASE WHEN competencia = '2023-12'
-    THEN horas_interrompidas END) / NULLIF(sum(CASE WHEN competencia = '2023-12' THEN n_uc END), 0) AS numeric), 2) AS dec_2023_12
-    FROM sem_kpis_segmento_mensal WHERE municipio = 'Jaboatão dos Guararapes'
-  parts:
-  - - dec_2022_12
-  - - dec_2023_12
-  expected_status: answered
-  datasets:
-  - gold_real
-  follow_up_of: null
-  revisado_por: null
-- id: I019
-  question: Qual foi o valor total faturado para a classe residencial B1 em Jaboatão dos Guararapes em dezembro de 2024?
-  category: inedita
-  papel: gerente de atendimento ao cliente
-  reference_sql: SELECT sum(receita_faturada) AS receita_faturada FROM sem_kpis_segmento_mensal WHERE classe = 'B1' AND municipio
-    = 'Jaboatão dos Guararapes' AND competencia = '2024-12'
-  expected_status: answered
-  datasets:
-  - gold_real
-  follow_up_of: null
-  revisado_por: null
-- id: I021
-  question: Me mostra o ranking dos 5 bairros do Recife com maior número de chamados no call center em março de 2026, detalhando
-    o canal mais usado e a nota média de satisfação.
-  category: inedita
-  papel: gerente de atendimento ao cliente
-  reference_sql: SELECT u.bairro, count(*) AS chamados, round(CAST(avg(a.nota_satisfacao) AS numeric), 2) AS satisfacao FROM
-    sem_atendimentos_uc a JOIN sem_uc u ON u.cod_uc = a.cod_uc WHERE u.municipio = 'Recife' AND a.competencia = '2026-03'
-    GROUP BY u.bairro ORDER BY count(*) DESC LIMIT 5
-  parts:
-  - - bairro
-  - - chamados
-  - - satisfacao
-  expected_status: answered
-  datasets:
-  - gold_real
-  follow_up_of: null
-  revisado_por: null
-- id: I022
-  question: Qual foi o percentual de leituras estimadas em relação ao total de leituras em Olinda no ano de 2023?
-  category: inedita
-  papel: gerente de atendimento ao cliente
-  reference_sql: SELECT round(100.0 * sum(n_leituras_estimadas) / NULLIF(sum(n_leituras), 0), 2) AS leituras_estimadas_pct
-    FROM sem_kpis_segmento_mensal WHERE municipio = 'Olinda' AND competencia BETWEEN '2023-01' AND '2023-12'
-  expected_status: answered
-  datasets:
-  - gold_real
-  follow_up_of: null
-  revisado_por: null
-- id: I024
-  question: Por que a nossa receita em 2024 caiu em relação a 2023, separando o quanto foi efeito preço, volume e mix?
-  category: inedita
-  papel: gerente de atendimento ao cliente
-  reference_sql: SELECT sum(receita_base) AS receita_base, sum(receita_atual) AS receita_atual, round(sum(efeito_preco), 2)
-    AS efeito_preco, round(sum(efeito_volume), 2) AS efeito_volume, round(sum(efeito_mix), 2) AS efeito_mix FROM sem_receita_decomposicao
-    WHERE periodo_base = '2023-01/2023-12' AND periodo_atual = '2024-01/2024-12'
-  parts:
-  - - efeito_preco
-  - - efeito_volume
-  - - efeito_mix
-  expected_status: answered
-  datasets:
-  - gold_real
-  follow_up_of: null
-  revisado_por: null
-- id: I025
-  question: Qual foi o valor total pago pelos clientes residenciais de Jaboatão em junho de 2025?
-  category: inedita
-  papel: analista de cobrança
-  reference_sql: SELECT sum(receita_arrecadada) AS receita_arrecadada FROM sem_kpis_segmento_mensal WHERE classe = 'B1' AND
-    municipio = 'Jaboatão dos Guararapes' AND competencia = '2025-06'
-  expected_status: answered
-  datasets:
-  - gold_real
-  follow_up_of: null
-  revisado_por: null
-- id: I026
-  question: Como o volume faturado e a inadimplência na classe comercial do Recife se comportaram em maio de 2026 comparado
-    com maio de 2025?
-  category: inedita
-  papel: analista de cobrança
-  reference_sql: SELECT sum(CASE WHEN competencia = '2025-05' THEN kwh_faturado END) AS kwh_2025_05, sum(CASE WHEN competencia
-    = '2026-05' THEN kwh_faturado END) AS kwh_2026_05, round(100.0 * sum(CASE WHEN competencia = '2025-05' THEN valor_nao_pago
-    END) / NULLIF(sum(CASE WHEN competencia = '2025-05' THEN receita_faturada END), 0), 2) AS nao_pago_2025_05_pct, round(100.0
-    * sum(CASE WHEN competencia = '2026-05' THEN valor_nao_pago END) / NULLIF(sum(CASE WHEN competencia = '2026-05' THEN receita_faturada
-    END), 0), 2) AS nao_pago_2026_05_pct FROM sem_kpis_segmento_mensal WHERE classe = 'B3' AND municipio = 'Recife'
-  parts:
-  - - kwh_2025_05
-    - kwh_2026_05
-  - - nao_pago_2025_05_pct
-    - nao_pago_2026_05_pct
-  expected_status: answered
-  datasets:
-  - gold_real
-  follow_up_of: null
-  revisado_por: null
-- id: I027
-  question: Quais foram os cinco bairros do Recife com maior volume de energia não paga no acumulado de 2024?
-  category: inedita
-  papel: analista de cobrança
-  reference_sql: SELECT bairro, sum(valor_nao_pago) AS valor_nao_pago FROM sem_kpis_segmento_mensal WHERE municipio = 'Recife'
-    AND competencia BETWEEN '2024-01' AND '2024-12' GROUP BY bairro ORDER BY sum(valor_nao_pago) DESC LIMIT 5
-  parts:
-  - - bairro
-  - - valor_nao_pago
-  expected_status: answered
-  datasets:
-  - gold_real
-  follow_up_of: null
-  revisado_por: null
-- id: I029
-  question: Me traz o valor faturado, o montante que ficou em atraso e o total de chamados sobre cobrança no município de
-    Paulista em novembro de 2025.
-  category: inedita
-  papel: analista de cobrança
-  reference_sql: WITH f AS (SELECT sum(receita_faturada) AS receita_faturada, sum(valor_nao_pago) AS valor_nao_pago FROM sem_kpis_segmento_mensal
-    WHERE municipio = 'Paulista' AND competencia = '2025-11'), c AS (SELECT count(*) AS chamados_fatura FROM sem_atendimentos_uc
-    a JOIN sem_uc u ON u.cod_uc = a.cod_uc WHERE u.municipio = 'Paulista' AND a.assunto = 'FATURA' AND a.competencia = '2025-11')
-    SELECT f.receita_faturada, f.valor_nao_pago, c.chamados_fatura FROM f, c
-  parts:
-  - - receita_faturada
-  - - valor_nao_pago
-  - - chamados_fatura
-  expected_status: answered
-  datasets:
-  - gold_real
-  follow_up_of: null
-  revisado_por: null
-- id: I030
-  question: Por que a inadimplência na classe residencial subiu tanto em Boa Viagem em março de 2026 em relação ao mesmo mês
-    do ano anterior?
-  category: inedita
-  papel: analista de cobrança
-  reference_sql: SELECT round(100.0 * sum(CASE WHEN competencia = '2025-03' THEN valor_nao_pago END) / NULLIF(sum(CASE WHEN
-    competencia = '2025-03' THEN receita_faturada END), 0), 2) AS nao_pago_2025_03_pct, round(100.0 * sum(CASE WHEN competencia
-    = '2026-03' THEN valor_nao_pago END) / NULLIF(sum(CASE WHEN competencia = '2026-03' THEN receita_faturada END), 0), 2)
-    AS nao_pago_2026_03_pct FROM sem_kpis_segmento_mensal WHERE classe = 'B1' AND municipio = 'Recife' AND bairro = 'Boa Viagem'
-  parts:
-  - - nao_pago_2025_03_pct
-    - nao_pago_2026_03_pct
+  papel: analista financeiro
+  reference_sql: SELECT round(100.0 * sum(valor_nao_pago) / NULLIF(sum(receita_faturada), 0), 2) AS nao_pago_pct FROM sem_kpis_segmento_mensal
+    WHERE classe = 'B1' AND municipio = 'Recife' AND competencia = '2023-12'
   expected_status: answered
   datasets:
   - gold_real

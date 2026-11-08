@@ -91,6 +91,25 @@ const CONVERSAS: Record<string, Passo[]> = {
 		},
 		{ opcao: "nos últimos 12 meses" },
 	],
+	"ano escrito por extenso": [
+		{
+			pergunta: "Qual foi a receita da distribuidora em setembro de dois mil e vinte e quatro?",
+			comoId: "G005",
+		},
+	],
+	"anos por extenso numa comparação": [
+		{
+			pergunta:
+				"Quanto a receita faturada cresceu entre dois mil e vinte e quatro e dois mil e vinte e cinco?",
+			comoId: "G015",
+		},
+	],
+	"circuito de um bairro": [
+		{
+			pergunta: "Qual o FEC de março de 2025 do circuito que atende o bairro Iputinga, em Recife?",
+			comoId: "G089",
+		},
+	],
 	"receita sem período pede o período": [
 		{ pergunta: "Qual foi a receita?", espera: "esclarecimento" },
 		{ opcao: "nos últimos 12 meses" },

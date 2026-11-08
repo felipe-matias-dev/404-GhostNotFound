@@ -96,3 +96,30 @@ def test_segment_components_summed_or_grouped_pass():
 
     assert calculation_problem(summed) is None
     assert calculation_problem(grouped) is None
+
+
+def test_feeder_rows_joined_to_every_uc_are_flagged():
+    sql = (
+        "SELECT a.cod_alimentador, sum(a.horas_interrompidas) AS horas "
+        "FROM sem_continuidade_alimentador_mensal AS a "
+        "JOIN sem_uc AS u ON u.cod_alimentador = a.cod_alimentador "
+        "WHERE u.municipio = 'Olinda' GROUP BY a.cod_alimentador"
+    )
+
+    assert "IN (SELECT cod_alimentador" in calculation_problem(sql)
+
+
+def test_feeder_of_a_single_uc_or_filtered_by_subquery_passes():
+    one_uc = (
+        "SELECT a.fec FROM sem_continuidade_alimentador_mensal AS a "
+        "JOIN sem_uc AS u ON u.cod_alimentador = a.cod_alimentador "
+        "WHERE u.cod_uc = '0003' AND a.competencia = '2025-03' AND count(*) > 0"
+    )
+    subquery = (
+        "SELECT cod_alimentador, sum(horas_interrompidas) AS horas "
+        "FROM sem_continuidade_alimentador_mensal WHERE cod_alimentador IN "
+        "(SELECT cod_alimentador FROM sem_uc WHERE municipio = 'Olinda') GROUP BY cod_alimentador"
+    )
+
+    assert calculation_problem(one_uc) is None
+    assert calculation_problem(subquery) is None
