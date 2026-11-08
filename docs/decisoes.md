@@ -2589,3 +2589,41 @@ Decisões de 19/10/2026, anteriores à numeração: [convenções do frontend](#
   - item novo do golden aguarda a conferência de Dados;
   - mudança de modelo principal pede nova medição do tempo limite;
   - a rubrica `v2` só vira padrão com a nota humana preenchida e o critério atingido.
+
+## DEC-085 · Interpretações corrigíveis, análises prontas e várias consultas por pergunta (proposta)
+
+- **Data:** 08/11/2026 · **Área:** GenAI, Backend e Portal · **Autor:** Luis Felipe (lote 4 do plano de robustez, `ai-agent/docs/plans/2026-11-08-robustez-lote4.md`) · **Status:** proposta, aguarda o acordo do backend e do portal, porque muda o contrato do `AgentAnswer` (spec §4, DEC-020) · **Revisa:** complementa a DEC-084 (palavras fora do glossário) e a DEC-083 (perguntas complexas).
+- **Contexto:**
+  - Desde a DEC-084, o agente lê palavras que não estão no glossário e avisa "Entendi 'X' como Y" nas suposições. O usuário não tem como corrigir essa leitura, e a suposição se mistura às outras (T12.5).
+  - Perguntas recorrentes ("por que a receita mudou", "pior alimentador") dependem do SQL que o modelo escreve a cada vez, o que dá variação de formato entre rodadas (T13.3).
+  - A pergunta com vários fatos cabe hoje num único `SELECT`. Quando os fatos vêm de views sem relação (KPIs e decomposição, DEC-018), o modelo junta tudo à força ou responde só parte (T13.1).
+- **Decisão (proposta):**
+  1. **Interpretações (T12.5):**
+     - o `SqlDraft` e o `AgentAnswer` ganham `interpretations`, com até três itens `Interpretation(term, reading, alternatives)`, e cada item tem até três alternativas;
+     - a leitura de um termo sai de `assumptions`, para não aparecer duas vezes;
+     - o portal mostra "Entendi 'X' como Y" com o botão "não era isso", que oferece as alternativas como opções (o mesmo componente das `clarification_options`, DEC-082) e envia a escolha como resposta, que a T9 completa;
+     - o backend grava `interpretations` na auditoria (coluna nova, por `garantir_estrutura_do_app`, DEC-050) e registra cada "não era isso" numa tabela nova `app.ai_interpretacao_rejeitada` (pergunta, termo, leitura rejeitada, alternativa escolhida, usuário, data). O relatório de termos da T10 passa a ler essa tabela.
+  2. **Análises prontas (T13.3):**
+     - a camada semântica ganha `analyses:`, com modelos de SQL parametrizados para quatro casos: `receita_por_que`, `comparar_periodos`, `pior_recorte` e `evolucao_mensal`;
+     - os parâmetros são tipados: período `AAAA-MM`, intervalo `AAAA-MM/AAAA-MM`, recorte com os valores conhecidos (DEC-083) e N de 1 a 20;
+     - o `SqlDraft` ganha o status `analysis`, com `analysis_name` e `analysis_params`. O agente monta o SQL pelo modelo e o SQL montado passa pelo `SqlglotValidator` e pelo executor como qualquer outro: a análise pronta nunca dispensa a validação;
+     - um parâmetro fora do permitido volta como erro corrigível;
+     - o `AgentAnswer` não muda, e o nome da análise entra em `sources`.
+  3. **Várias consultas (T13.1):**
+     - o gerador pode devolver um `QueryPlan` de 2 a 4 passos, cada um com uma sub-pergunta e o seu SQL, só quando a pergunta pede mais de um fato;
+     - cada passo é validado e executado com o mesmo usuário somente leitura, e o prazo total da pergunta vale para a soma dos passos;
+     - o `AgentAnswer` ganha `steps`, com a pergunta, o SQL, as linhas, o total e se foi truncado. `steps` só existe no status `answered` e só com 2 ou mais passos;
+     - `sql`, `rows` e `row_count` continuam vindo do primeiro passo, então o portal atual não quebra;
+     - a narração recebe os passos separados, e a checagem de números (DEC-019) vale sobre a união das linhas;
+     - um passo que falha não derruba os outros: a resposta diz o que faltou. Se todos falharem, o status é `failed`.
+- **Ordem:** T12.5, depois T13.3, depois T13.1. A T12.5 é a menor e fecha o ciclo da DEC-084. A T13.3 deixa as perguntas recorrentes determinísticas sem mudar o contrato. A T13.1 é a maior mudança de fluxo e vem por último, medida contra as duas anteriores.
+- **Alternativas descartadas:**
+  - **"Não era isso" como texto livre:** o usuário teria de reescrever a pergunta, e a escolha não ficaria registrada para o glossário.
+  - **Análises prontas no lugar do SQL livre:** cobririam só as perguntas previstas. Elas ficam como atalho, e o SQL livre continua valendo para o resto.
+  - **Várias consultas como várias chamadas ao `ask()` feitas pelo backend:** a narração não veria os fatos juntos, e cada chamada gastaria uma pergunta do limite do usuário.
+  - **`UNION` ou `CROSS JOIN` num único `SELECT`:** é o que o modelo faz hoje e o que produz as respostas parciais.
+- **Consequências:**
+  - O contrato OpenAPI e os tipos do portal são regerados nas duas mudanças de contrato (`interpretations` e `steps`). Clientes antigos continuam funcionando, porque os dois campos têm padrão vazio.
+  - Cada mudança de prompt vai para uma versão nova (`prompts/v6/`), e nenhuma entra se o golden regredir (DEC-016).
+  - O golden ganha itens para cada análise pronta e para as perguntas de vários fatos, com `revisado_por: null` até Dados conferir.
+- **Evidência:** pendente. Cada tarefa registra aqui a rodada do golden e o teste no portal com os 5 usuários.
