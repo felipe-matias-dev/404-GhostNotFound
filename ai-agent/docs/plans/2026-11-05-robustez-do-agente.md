@@ -493,7 +493,7 @@ Prioridade alta para 13.2, 13.5 e 13.6. A 13.1 e a 13.3 mudam o fluxo e o contra
 | Tarefa | Status | Onde | Falta |
 |---|---|---|---|
 | T1 Fechar DEC-080 | Feito | PR #144, mesclado | — |
-| T2 Golden | Parcial: 0.24.0 (163 itens), com as complexas G150 a G157 e duas cadeias de 3 turnos (G158 a G163); `make esperado` | PR #145, lotes 2 e 3 | Itens "por UC", revisão de Dados dos itens novos |
+| T2 Golden | Parcial: 0.24.1 (163 itens, todos revisados por Dados), com as complexas G150 a G157 e duas cadeias de 3 turnos (G158 a G163); `make esperado` | PR #145, lotes 2 e 3 | Itens "por UC" |
 | T3 Ponta a ponta | Feito: 34 cenários nos 5 usuários (apresentação, diretora, esclarecimento, complexas, 3 turnos, widget, auditoria); posse da conversa (403), limite (429, com o motivo na tela) e orçamento com `E2E_LIMITE_PERGUNTAS` e `E2E_ORCAMENTO`; `make e2e-agente` | lotes 2 e 3 | Tempo abaixo de 10 s só medido com o modelo pago |
 | T4 Casas decimais | Feito, com DEC-081; kWh e contagem inteiros na entrada do narrador (DEC-083) | PR #145 e lote 2 | — |
 | T5 Vazio, grande, esclarecimento | Feito: paginação, total e aviso de corte, opções de período (DEC-082) | PR #145 | — |
