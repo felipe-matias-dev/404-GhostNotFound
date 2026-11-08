@@ -1545,6 +1545,21 @@ async def test_a_sum_over_the_whole_series_without_a_period_becomes_a_question_a
     assert executor.queries == []
 
 
+async def test_every_month_of_the_series_without_a_period_becomes_a_question_about_it(layer):
+    sql = (
+        "SELECT competencia, sum(receita_faturada) AS receita FROM sem_faturamento_mensal "
+        "GROUP BY competencia ORDER BY competencia"
+    )
+    executor = ScriptedExecutor(result())
+
+    answer = await use_case(layer, ScriptedGenerator(generation(sql=sql)), executor).ask(
+        "Qual foi a receita?", "s1"
+    )
+
+    assert answer.status is AnswerStatus.CLARIFY
+    assert executor.queries == []
+
+
 async def test_a_sum_over_the_whole_series_is_answered_when_the_question_asks_for_it(layer):
     answer = await use_case(layer, ScriptedGenerator(generation(sql=WHOLE_SERIES_SQL))).ask(
         "Qual foi a receita em todo o histórico?", "s1"

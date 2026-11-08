@@ -468,7 +468,7 @@ class AskUseCase:
             invented = _invented_years(question.text, history, validated)
             if not invented and _invented_base_window(question.text, history, validated.sql):
                 invented = ("janela_da_base",)
-            if not invented and _whole_series_without_period(question.text, history, validated.sql):
+            if not invented and _whole_series_without_period(question.text, history, validated):
                 invented = ("serie_inteira",)
             if invented:
                 self._log(
@@ -1165,7 +1165,9 @@ def _invented_base_window(question: str, history: tuple[ConversationTurn, ...], 
 MONTHLY_VIEW = re.compile(
     r"\bsem_(?:kpis_mensais|kpis_segmento_mensal|faturamento_mensal|continuidade_alimentador_mensal)\b"
 )
-SUM_OR_AVERAGE = re.compile(r"\b(?:sum|avg)\s*\(", re.IGNORECASE)
+SERIES_READING = re.compile(
+    r"\b(?:sum|avg)\s*\(|\b(?:group|order)\s+by\s+(?:\w+\.)?competencia\b", re.IGNORECASE
+)
 WHOLE_SERIES = re.compile(
     r"\b(?:histórico|toda\s+a\s+(?:base|série)|todo\s+o\s+período|desde\s+o\s+(?:início|começo)"
     r"|série\s+inteira)\b",
@@ -1197,11 +1199,11 @@ def _model_period_options(
 
 
 def _whole_series_without_period(
-    question: str, history: tuple[ConversationTurn, ...], sql: str
+    question: str, history: tuple[ConversationTurn, ...], validated: ValidatedQuery
 ) -> bool:
-    if "competencia" in sql.lower() or not MONTHLY_VIEW.search(sql):
+    if validated.periods or validated.years or not MONTHLY_VIEW.search(validated.sql):
         return False
-    if not SUM_OR_AVERAGE.search(sql):
+    if BASE_WINDOW.search(validated.sql) or not SERIES_READING.search(validated.sql):
         return False
     if _names_a_period(question, history):
         return False
