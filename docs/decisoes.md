@@ -2520,3 +2520,60 @@ Decisões de 19/10/2026, anteriores à numeração: [convenções do frontend](#
   - o agente faz até 10 consultas fixas ao subir;
   - uma Gold recarregada com bairros novos só entra nas dicas depois de reiniciar a API;
   - os itens novos do golden aguardam a conferência de Dados.
+
+## DEC-084 · Vocabulário testado, variações de escrita, resposta em lista e tempo limite medido
+
+- **Data:** 06/11/2026 · **Área:** GenAI · **Autor:** Luis Felipe (T12.2, T12.3, T12.4, T13.4, T7 e os testes de limite e posse da T3 do plano de robustez) · **Revisa:** DEC-080 (tempo limite de 15 s) e DEC-083 (rubrica `judge/v2` sem calibração)
+- **Contexto:** o golden mede uma escrita de cada pergunta. Na apresentação, "percentil" no lugar de "percentual" e siglas como DEC e UC mostraram que o vocabulário do usuário precisa de teste próprio. O plano também deixou abertos o tempo limite do modelo pago, a resposta para perguntas com várias partes e os testes de limite e de posse da conversa no portal.
+- **Decisão:**
+  - **Siglas e termos do setor (T12.2, camada 0.4.5):**
+    - o glossário ganha DEC, FEC, UC, kWh, alta e baixa tensão (grupo A é a classe A4, grupo B são B1 a B3), mês de referência, tarifa, arrecadação e efeito mix;
+    - painel solar, medidor e inadimplência apontam também para as colunas de GD, idade e trocas do medidor e atraso.
+  - **Cobertura testada (T12.3):** `tests/unit/test_semantic_vocabulary.py` falha se uma coluna das views não tiver rótulo em português com acento, se um rótulo começar com a abreviação "n" ou se uma coluna que o usuário não escreve como está ficar sem termo no glossário. Os rótulos que faltavam entraram em `domain/wording.py` ("número de", "código", "GD", "UC", "kWp").
+  - **Variações automáticas (T12.4):**
+    - `evaluation/variants.py` escreve cada pergunta do golden de quatro jeitos: sem acento, com uma troca de letras na palavra mais longa, com o sinônimo do glossário e em tom coloquial ("me diz …");
+    - follow-ups, injeção e manipulação ficam fora;
+    - cada variação usa o gabarito da pergunta original e roda por `make eval-variants` (só SQL, Gold real), com relatório `variantes-…json` fora do Git;
+    - golden 0.23.0: G145 a G149, perguntas com sinônimos e siglas.
+  - **Perguntas fora do golden:** o golden mede as perguntas que o próprio time escreveu e ajustou. Dois conjuntos novos medem o que o agente faz com perguntas que ninguém usou para ajustá-lo:
+    - `eval/parafrases_set.yaml`: perguntas do golden reescritas por outro modelo (Gemini 3.5 Flash-Lite) sem as palavras do glossário, revisadas à mão para manter o sentido, com o gabarito da pergunta de origem;
+    - `eval/ineditas_set.yaml`: perguntas escritas por outro modelo no papel de diretora, gerentes e analista, só com a descrição dos dados, e as referências escritas depois, sem mudar a pergunta;
+    - rodam por `make eval-fora SET=parafrases` ou `SET=ineditas`; uma falha só se corrige com regra geral, nunca olhando a pergunta, e o conjunto é trocado por outro na rodada seguinte.
+  - **Palavra fora do glossário (prompt de SQL `v5`):** o modelo interpreta a palavra pelo sentido numa distribuidora e declara a interpretação nas suposições, que aparecem na tela ("Entendi 'papéis' como faturas."). Só pede esclarecimento quando há duas leituras plausíveis com números diferentes. Antes, a palavra desconhecida virava esclarecimento ou "não sei". Palavras de juízo sem critério ("piores", "melhores") continuam pedindo esclarecimento: elas não nomeiam uma medida (o G037 voltou a ser respondido sem critério na primeira versão da regra e foi corrigido).
+  - **Valor do filtro conferido (`domain/filter_values.py`):** um SQL que filtra município, bairro, classe, canal, assunto e as outras colunas de texto por um valor que não existe nelas volta ao modelo como erro corrigível, dizendo em que coluna o valor existe ("'Boa Viagem' é bairro") ou listando os valores, com a opção de não filtrar quando a pergunta fala da área toda ("Região Metropolitana").
+  - **Chamados de um assunto e decomposição somada (camada 0.4.6):** chamados de um assunto ou canal contam `sem_atendimentos_uc`, não o total `n_chamados`; e os efeitos da decomposição sem `sum` voltam ao modelo como erro de cálculo, porque a view tem uma linha por recorte. Pelo mesmo motivo, ler componentes de `sem_kpis_segmento_mensal` sem `sum` nem `GROUP BY` volta ao modelo com a regra de somar; e o DEC acumulado de cada alimentador (`sum(dec)` com `GROUP BY cod_alimentador`) deixa de ser barrado pela checagem do lote 2, que só deve barrar a soma entre alimentadores.
+  - **Janela da base escrita de outro jeito:** a trava que pede o período quando o modelo monta sozinho a janela "primeiro ano da base / últimos 12 meses" passa a reconhecer outras formas de pedir essa janela ("período inicial da série", "arranque da base", "últimos doze meses"). Antes, o SQL certo era descartado e a pessoa recebia um pedido de período.
+  - **Métrica do turno mais recente (`prompts/v5/history.md`):** um follow-up que só troca o período ou o recorte ("e em 2024?") herda a métrica do turno mais recente, e não a de um turno mais antigo. No portal, a conversa "DEC de 2025" → "E quanto foi o FEC?" → "E como foi em 2024?" devolveu o DEC de 2024 para um dos usuários.
+  - **Recorte num período sai dos segmentos (camada 0.4.6):** participação, soma ou comparação por município, bairro, classe, alimentador ou GD num período usa `sem_kpis_segmento_mensal`, que guarda o recorte de cada mês. Juntar o faturamento com o cadastro atual (`sem_uc`) conta o ano todo para uma UC que ligou painel solar no meio dele: no portal, a participação da GD em 2025 saiu 4,2% por esse caminho, contra 2,00% pelos segmentos. Colunas terminadas em `_pct` aparecem na tabela como "em %".
+  - **Motivo do bloqueio na tela (frontend):** limite de perguntas (429), conversa de outro usuário (403) e pergunta em andamento (409) mostram o motivo que a API manda. Antes, o portal mostrava a mensagem genérica de falha, e o teste de limite nos 5 usuários falhou por isso.
+  - **"Call center" são todos os canais:** o glossário diz que call center e central de atendimento não filtram canal; o modelo lia "call center" como telefone.
+  - **Resposta em lista (T13.4, narração `answer/v8`):** pergunta com várias partes recebe uma frase de conclusão e uma lista de até seis itens, um por parte. A pergunta passa a aceitar até 1.000 caracteres (eram 500), no agente, na API e no portal, para caberem perguntas longas com premissas como a da diretora.
+  - **Tempo limite (T7):**
+    - medido com o Flash-Lite pago em 715 gerações de SQL das rodadas de 05/11: p50 2,2 s, p95 3,1 s, p99 4,7 s, máximo 8,4 s, nenhuma acima de 15 s;
+    - `llm_request_timeout_seconds` cai de 15 s para 10 s, acima do máximo medido; uma chamada presa passa ao modelo reserva mais cedo.
+  - **Limites e posse no portal (T3):** o teste de ponta a ponta confere, nos 5 usuários, que a conversa de um não abre para outro (403); com `E2E_LIMITE_PERGUNTAS` e `E2E_ORCAMENTO=1`, confere também a mensagem do limite de perguntas (429) e a do orçamento esgotado.
+  - **Calibração do juiz (preparação):** `python -m venergy_agent.evaluation.calibration prepare` responde 15 perguntas na Gold real, grava a planilha às cegas e guarda à parte as notas das rubricas `v1` e `v2`, tudo em `eval/runs_gold/`. O comando `compare` calcula o acordo pelo critério da DEC-047. A rubrica padrão continua `v1` até a nota humana.
+- **Alternativas descartadas:**
+  - incluir as variações no golden: quadruplicaria o custo da rodada e repetiria gabaritos; elas rodam à parte, só com SQL;
+  - variação com erro em qualquer palavra: erros em palavras curtas ("de", "em") não representam o usuário e geram ruído;
+  - manter 15 s: nenhuma chamada medida passou de 8,4 s, e 15 s atrasava a troca de modelo numa queda do provedor.
+- **Evidência (06 e 07/11/2026, Gold real, Gemini 3.1 Flash-Lite na cota gratuita, prompt de SQL `v5`):**
+  - **Perguntas fora do golden, só SQL:**
+
+    | Conjunto | antes das correções | depois |
+    |---|---|---|
+    | paráfrases livres (40) | 25 certas (29 sem os erros de cota) | 35 |
+    | perguntas inéditas (20) | 10 | 13 a 14 |
+
+    O que sobra é, em geral, ambiguidade real ("pontos de suprimento", "tempo desligado", "julho de 21") ou formato diferente do gabarito com a resposta certa (MWh em vez de kWh, uma linha por mês em vez de colunas).
+  - **Golden 0.24.0 (163 itens), narrado e com juiz `google-gla:gemini-3.5-flash-lite`:** a rodada completa na cota gratuita teve itens com erro de cota (15 requisições por minuto) e de DNS da máquina; os itens com erro foram repetidos devagar até terem resultado. Contra a rodada final do lote 2, nos 151 itens em comum, nenhum item piora em SQL ou status depois das correções (G027, G037 e G141 repetidos com as regras finais: 8 de 8 certos). Red team (17): sem violação.
+  - **Follow-ups do golden depois da regra da métrica:** 30 itens (os 19 de follow-up e os turnos de que dependem), SQL e status 100%. Itens com recorte (49, referência em `sem_kpis_segmento_mensal` ou `sem_uc`) depois da regra de recortes: 48 certos; o G120 ("por classe") continua ambíguo, à espera de Dados.
+  - **Portal, 5 usuários, 34 cenários cada (07/11/2026), com dois modelos gratuitos (Gemini 3.1 Flash-Lite e 3.5 Flash-Lite de reserva):**
+    - primeira rodada: 143 de 175 testes passaram; das falhas, 4 eram do agente ou do teste: a memória da métrica no 3º turno (camila), corrigida com a regra do histórico; o G156, que o teste comparava com mais casas do que a tabela mostra; e a participação da GD pelo cadastro atual, corrigida com a regra de recortes. As demais foram tempo acima de 10 s ou erro do modelo por limite da cota gratuita (15 requisições por minuto);
+    - depois das correções, as conversas afetadas foram repetidas nos 5 usuários: a participação da GD saiu pelos segmentos em todas as respostas com SQL, e as falhas restantes foram erro do modelo ou prazo do teste, por cota;
+    - limite de perguntas (429): a mensagem do limite aparece na tela nos 5 usuários (antes da correção do frontend aparecia a mensagem genérica); orçamento esgotado: 5 de 5; posse da conversa (403): 5 de 5.
+  - **Tempo:** na cota gratuita, o provedor devolve 429 e o agente espera e tenta de novo; o tempo abaixo de 10 s vale com o modelo pago (p95 de 5,3 s na DEC-083) e não foi medido de novo neste lote.
+- **Consequências:**
+  - item novo do golden aguarda a conferência de Dados;
+  - mudança de modelo principal pede nova medição do tempo limite;
+  - a rubrica `v2` só vira padrão com a nota humana preenchida e o critério atingido.

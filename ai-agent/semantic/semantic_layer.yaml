@@ -13,7 +13,7 @@
 # As linhas de exemplo são sintéticas, escritas à mão. Nenhum valor real da Gold entra aqui.
 # Depois de cada mudança, gere o views.sql (ver a seção Camada semântica em ai-agent/README.md).
 
-version: "0.4.4"
+version: "0.4.6"
 
 views:
   - name: sem_uc
@@ -329,7 +329,7 @@ views:
       - name: data_fechamento
         description: "fechamento do chamado"
       - name: canal
-        description: "canal de entrada, por exemplo TELEFONE, APP ou WHATSAPP"
+        description: "canal de entrada, por exemplo TELEFONE, APP ou WHATSAPP; o call center são todos os canais, e não só TELEFONE"
       - name: assunto
         description: "assunto do chamado, por exemplo FALTA DE ENERGIA ou FATURA"
       - name: subassunto
@@ -369,6 +369,36 @@ views:
       - {cod_uc: "0002", cod_medidor: "MD-0002", tipo_medidor: "smart", modelo: "Modelo exemplo Y", data_instalacao: "2024-02-01", idade_anos: 1.9, n_trocas: 0, data_ultima_troca: null}
 
 glossary:
+  - term: "DEC"
+    synonyms: ["duração equivalente de interrupção", "horas sem luz por cliente", "tempo médio sem luz"]
+    maps_to: "dec (horas por UC) em sem_continuidade_alimentador_mensal e sem_kpis_mensais; por recorte, horas_interrompidas e n_uc em sem_kpis_segmento_mensal"
+  - term: "FEC"
+    synonyms: ["frequência equivalente de interrupção", "quedas por cliente", "número médio de interrupções"]
+    maps_to: "fec (interrupções por UC) em sem_continuidade_alimentador_mensal e sem_kpis_mensais; por recorte, n_interrupcoes e n_uc em sem_kpis_segmento_mensal"
+  - term: "UC"
+    synonyms: ["unidade consumidora", "cliente", "consumidor", "imóvel"]
+    maps_to: "uma linha de sem_uc (cod_uc); n_uc é o número de UCs faturadas no mês"
+  - term: "kWh"
+    synonyms: ["quilowatt-hora", "consumo em kWh", "consumo médio"]
+    maps_to: "kwh_faturado; consumo médio mensal dos últimos 12 meses de cada UC: consumo_medio_kwh_12m em sem_uc"
+  - term: "alta tensão"
+    synonyms: ["AT", "grupo A"]
+    maps_to: "classe A4"
+  - term: "baixa tensão"
+    synonyms: ["BT", "grupo B"]
+    maps_to: "classes B1, B2 e B3"
+  - term: "mês de referência"
+    synonyms: ["competência", "mês da conta", "mês ref", "referência"]
+    maps_to: "competencia (texto AAAA-MM) em todas as views mensais; dias_faturados é o número de dias que a conta cobriu"
+  - term: "tarifa"
+    synonyms: ["preço do kWh", "preço da energia", "tarifa média"]
+    maps_to: "tarifa_media de uma UC num mês; de um grupo ou período, sum(receita_energia) / sum(kwh_faturado)"
+  - term: "arrecadação"
+    synonyms: ["valor recebido", "dinheiro que entrou", "receita arrecadada"]
+    maps_to: "receita_arrecadada"
+  - term: "efeito mix"
+    synonyms: ["mudança no perfil de consumo", "mix de classes"]
+    maps_to: "efeito_mix em sem_receita_decomposicao; receita_base e receita_atual são a receita de energia de cada período"
   - term: "tributos"
     synonyms: ["impostos", "imposto", "percentual de tributos", "percentil de tributos", "carga tributária", "receita sem tributos"]
     maps_to: "tributos em sem_faturamento_mensal e sem_kpis_segmento_mensal; em sem_kpis_mensais não há coluna tributos: use receita_faturada - receita_energia. Receita sem tributos é receita_energia"
@@ -383,19 +413,19 @@ glossary:
     maps_to: "de uma UC: as linhas de sem_interrupcoes_uc (count(*) e sum(duracao_horas)); de um alimentador, recorte ou da empresa: dec, fec, horas_interrompidas e n_interrupcoes. A coluna tipo de sem_interrupcoes_uc é a categoria técnica da ocorrência: 'falta de luz' na pergunta conta todas as interrupções, e só filtre por tipo quando a pergunta citar o tipo (fio partido, sobrecarga)"
   - term: "painel solar"
     synonyms: ["energia solar", "geração distribuída", "GD"]
-    maps_to: "possui_gd"
+    maps_to: "possui_gd; data_conexao_gd, modalidade_gd, potencia_kwp (potência instalada) e energia_injetada_kwh_mes (energia injetada na rede) em sem_uc"
   - term: "chamado"
-    synonyms: ["atendimento", "reclamação", "ligação para o call center"]
-    maps_to: "n_chamados em sem_kpis_mensais ou sem_kpis_segmento_mensal; de uma UC, por canal ou por assunto: as linhas de sem_atendimentos_uc"
+    synonyms: ["atendimento", "reclamação", "ligação para o call center", "call center", "central de atendimento"]
+    maps_to: "n_chamados em sem_kpis_mensais ou sem_kpis_segmento_mensal; de uma UC, por canal ou por assunto: as linhas de sem_atendimentos_uc. Call center e central de atendimento são todos os canais: só filtre canal quando a pergunta citar um (telefone, app, site, WhatsApp, presencial)"
   - term: "satisfação"
     synonyms: ["nota do atendimento", "avaliação do atendimento"]
     maps_to: "satisfacao_media em sem_kpis_mensais; soma_notas e n_notas em sem_kpis_segmento_mensal; por canal ou assunto, avg(nota_satisfacao) em sem_atendimentos_uc"
   - term: "medidor"
     synonyms: ["relógio de luz", "relógio"]
-    maps_to: "sem_medidor_uc (medidor vigente da UC); tipo_medidor da leitura em sem_faturamento_mensal"
+    maps_to: "sem_medidor_uc (medidor vigente da UC: idade_anos, n_trocas); tipo_medidor da leitura em sem_faturamento_mensal"
   - term: "inadimplência"
     synonyms: ["conta atrasada", "fatura em atraso", "conta não paga", "calote"]
-    maps_to: "status_pagamento e dias_em_atraso em sem_faturamento_mensal; n_faturas_nao_pagas, n_faturas e valor_nao_pago em sem_kpis_segmento_mensal"
+    maps_to: "status_pagamento e dias_em_atraso em sem_faturamento_mensal; n_faturas_nao_pagas, n_faturas, valor_nao_pago, n_faturas_pagas_com_atraso e soma_dias_em_atraso em sem_kpis_segmento_mensal"
   - term: "leitura estimada"
     synonyms: ["conta pela média", "leitura pela média", "sem leitura"]
     maps_to: "tipo_leitura = 'estimada' em sem_faturamento_mensal; n_leituras_estimadas e n_leituras em sem_kpis_segmento_mensal"
@@ -440,6 +470,9 @@ rules:
   - text: "DEC e FEC por alimentador vêm prontos de sem_continuidade_alimentador_mensal; da empresa, de sem_kpis_mensais. Leia; não recalcule."
   - text: "DEC e FEC de um período de vários meses (semestre, ano) são a soma dos valores mensais prontos, porque são indicadores acumulados: sum(dec) e sum(fec) sobre as competências do período. Nunca use a média (avg) dos meses (DEC-032). Por recorte de sem_kpis_segmento_mensal, use a fórmula dos componentes da regra de recortes."
   - text: "Por município, bairro, classe ou GD, use sem_kpis_segmento_mensal e some os componentes antes de dividir; nunca faça média de índices. Num mês: DEC = sum(horas_interrompidas) / sum(n_uc) e FEC = 1.0 * sum(n_interrupcoes) / sum(n_uc). Num período de vários meses, divida pela média mensal de UCs: sum(n_uc) dividido pelo número de meses do período pedido, escrito como decimal (3.0 num trimestre), e não pelos meses que aparecem no resultado. Satisfação = sum(soma_notas) / sum(n_notas), com NULLIF no divisor."
+  - text: "Recorte por município, bairro, classe, alimentador ou GD num período (participação, soma, comparação) sai de sem_kpis_segmento_mensal, que guarda o recorte de cada UC em cada mês. Não junte sem_faturamento_mensal com sem_uc para isso: sem_uc é o cadastro de hoje, e uma UC que ligou painel solar ou mudou de classe no meio do período entraria no período todo. A junção com sem_uc fica para o que só ela tem (classe do cadastro, data de ligação, potência)."
+  - text: "Call center, central de atendimento e atendimento ao cliente são todos os canais juntos (telefone, app, site, WhatsApp e presencial): nunca filtre canal por essas palavras. Só filtre canal quando a pergunta citar o canal."
+  - text: "Chamados de um assunto ou canal (falta de energia, fatura, religação, por telefone) contam as linhas de sem_atendimentos_uc filtradas por assunto ou canal, ligada a sem_uc por cod_uc para o recorte de município ou bairro. n_chamados das views de KPIs é o total de todos os assuntos e só responde quando a pergunta não cita assunto nem canal."
   - text: "Efeitos de preço, tarifa, bandeira, volume e mix são lidos de sem_receita_decomposicao e somados sobre o recorte; não recalcule. receita_base e receita_atual são receita de energia, sem tributos."
   - text: "Em sem_receita_decomposicao, periodo_base e periodo_atual são faixas AAAA-MM/AAAA-MM. Filtre pelo par exato de períodos. Para 'primeiro ano da base' e 'últimos 12 meses', cada faixa é min(competencia) || '/' || max(competencia) dos 12 meses de sem_kpis_mensais, como no exemplo; nunca use min ou max de periodo_base e periodo_atual. Se a pergunta não disser os dois períodos, peça esclarecimento (clarify)."
   - text: "Score de suspeita e perda não técnica não estão nas views: pergunta sobre eles é unknown."

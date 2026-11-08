@@ -471,14 +471,15 @@ def test_answer_user_prompt_tells_the_narrator_when_the_result_was_cut():
     assert "resultado truncado: não" in render_answer_user(question, draft, whole, NONCE)
 
 
-def test_the_answer_prompt_in_use_is_v7_and_states_the_sample_and_premise_rules():
+def test_the_answer_prompt_in_use_is_v8_and_states_the_sample_premise_and_list_rules():
     from venergy_agent.config import AGENT_ROOT, AgentSettings
 
     template = AgentSettings.model_fields["answer_prompt_version"].default
-    assert template == "v7"
-    text = (AGENT_ROOT / "prompts" / "answer" / "v7" / "answer.md").read_text(encoding="utf-8")
+    assert template == "v8"
+    text = (AGENT_ROOT / "prompts" / "answer" / "v8" / "answer.md").read_text(encoding="utf-8")
     assert "resultado truncado" in text and "amostra" in text
     assert "Nunca escreva o número da pergunta" in text
+    assert "lista curta de até seis itens" in text
 
 
 def test_answer_user_prompt_shows_energy_and_counts_as_integers():

@@ -486,29 +486,31 @@ Prioridade alta para 13.2, 13.5 e 13.6. A 13.1 e a 13.3 mudam o fluxo e o contra
 | 7e | T12.2, T12.3 e T13.4 (refinamentos) | os dois | — |
 | 8 | T8 | os dois | todas |
 
-## Progresso (atualizado em 05/11/2026)
+## Progresso (atualizado em 06/11/2026)
 
-"Feito" quer dizer código, testes e validação: a rodada completa do golden (DEC-016) e o teste no portal nos 5 usuários (T3). O PR #145 do Lucas fez a primeira parte; o lote seguinte, na branch `feat/ai-agent-robustez-lote2`, fechou a validação e acrescentou T12.1, T13.2, T13.5 e T13.6.
+"Feito" quer dizer código, testes e validação: a rodada completa do golden (DEC-016) e o teste no portal nos 5 usuários (T3). O PR #145 do Lucas fez a primeira parte; o lote seguinte, na branch `feat/ai-agent-robustez-lote2`, fechou a validação e acrescentou T12.1, T13.2, T13.5 e T13.6. O lote 3 (`feat/ai-agent-robustez-lote3`, DEC-084) fez T12.2 a T12.4, T13.4, o tempo limite da T7 e os testes de limite e posse da T3.
 
 | Tarefa | Status | Onde | Falta |
 |---|---|---|---|
 | T1 Fechar DEC-080 | Feito | PR #144, mesclado | — |
-| T2 Golden | Parcial: 0.22.0, com os itens do Lucas e as complexas; `make esperado` | PR #145 e lote 2 | Itens "por UC", follow-ups de 3 turnos, revisão de Dados |
-| T3 Ponta a ponta | Feito: login corrigido; 24 cenários (apresentação, diretora, esclarecimento, complexas, widget, auditoria) nos 5 usuários; `make e2e-agente` | lote 2 | Testes de limite (429, orçamento) e de posse da conversa (403) |
+| T2 Golden | Parcial: 0.24.0 (163 itens), com as complexas G150 a G157 e duas cadeias de 3 turnos (G158 a G163); `make esperado` | PR #145, lotes 2 e 3 | Itens "por UC", revisão de Dados dos itens novos |
+| T3 Ponta a ponta | Feito: 34 cenários nos 5 usuários (apresentação, diretora, esclarecimento, complexas, 3 turnos, widget, auditoria); posse da conversa (403), limite (429, com o motivo na tela) e orçamento com `E2E_LIMITE_PERGUNTAS` e `E2E_ORCAMENTO`; `make e2e-agente` | lotes 2 e 3 | Tempo abaixo de 10 s só medido com o modelo pago |
 | T4 Casas decimais | Feito, com DEC-081; kWh e contagem inteiros na entrada do narrador (DEC-083) | PR #145 e lote 2 | — |
 | T5 Vazio, grande, esclarecimento | Feito: paginação, total e aviso de corte, opções de período (DEC-082) | PR #145 | — |
 | T6 Auditoria para a TI | Feito e conferido no portal (link só para a patricia) | PR #145 | — |
-| T7 Filtro, recusas, tempo | Parcial: motivos de recusa e filtro transformado ("acima de 30%") | PR #145 | Tempo limite por modelo medido com o pago |
+| T7 Filtro, recusas, tempo | Feito: motivos de recusa, filtro transformado e tempo limite de 10 s medido com o pago (DEC-084) | PR #145 e lote 3 | — |
 | T8 Rodada final | Feito para este lote: golden 100% SQL e status, portal 113/115 nos 5 usuários (DEC-083) | lote 2 | Repetir no fim do plano |
 | T9 Resposta a esclarecimento | Feito e conferido no portal | PR #145 | — |
 | T10 Termos fora do vocabulário | Feito: dica de termos, glossário 0.4.3 e relatório | PR #145 | Botão "não era isso" (T12.5) |
 | T11 Avaliação mais rápida | Feito: `--smoke` e `--concurrency` | PR #145 | — |
 | T12.1 Valores escritos de outro jeito | Feito (DEC-083) | lote 2 | — |
-| T12.2 a T12.5 | Não feito | — | Siglas, cobertura testada, variações automáticas, "entendi X como Y" |
+| T12.2 a T12.4 | Feito: siglas no glossário, cobertura testada, `make eval-variants`, paráfrases livres e perguntas inéditas (`make eval-fora`), prompt de SQL `v5` para palavras fora do glossário e checagem do valor do filtro (DEC-084) | lote 3 | Trocar as paráfrases e as inéditas por um conjunto novo a cada rodada |
+| T12.5 "Entendi X como Y" | Não feito | — | Pede DEC (muda o contrato) |
 | T13.2 Premissas da pergunta | Feito (DEC-083) | lote 2 | — |
-| T13.5 Completude no juiz | Rubrica `judge/v2` criada | lote 2 | Calibração humana antes de virar padrão |
-| T13.6 Golden de complexas | Feito: G138 a G144 e `parts_matched` | lote 2 | Mais itens das falas das lideranças |
-| T13.1, T13.3, T13.4 | Não feito | — | Várias consultas, análises prontas, resposta estruturada |
+| T13.5 Completude no juiz | Rubrica `judge/v2` criada; planilha de calibração por `evaluation.calibration prepare` | lotes 2 e 3 | Nota humana e `compare` antes de virar padrão |
+| T13.6 Golden de complexas | Feito: G138 a G144, G150 a G157 e `parts_matched` | lotes 2 e 3 | Mais itens das falas das lideranças |
+| T13.4 Resposta estruturada | Feito: conclusão e lista na `answer/v8`; pergunta até 1.000 caracteres (DEC-084) | lote 3 | — |
+| T13.1, T13.3 | Não feito | — | Várias consultas e análises prontas; pedem DEC |
 
 **Como manter:** atualizar a linha da tarefa no mesmo commit em que ela for concluída.
 

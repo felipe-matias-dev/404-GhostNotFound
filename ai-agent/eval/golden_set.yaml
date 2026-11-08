@@ -94,7 +94,11 @@
 #   0.22.0 GenAI (05/11/2026, T13.2 e T13.6): G109 passa a conferir as premissas da pergunta; G138 a G144, perguntas
 #          complexas com partes (parts: colunas da referência que formam cada parte) e um follow-up. revisado_por
 #          fica null até Dados conferir.
-versao: 0.22.0
+#   0.23.0 GenAI (06/11/2026, T12.2): G145 a G149, siglas e sinônimos do glossário 0.4.5 (DEC, FEC, alta e baixa
+#          tensão, arrecadação). revisado_por fica null até Dados conferir.
+#   0.24.0 GenAI (06/11/2026, T13.6 e T2): G150 a G157, perguntas complexas com parts; G158 a G163, duas cadeias
+#          de follow-up de 3 turnos (troca de período, recorte e métrica).
+versao: 0.24.0
 status: rascunho
 
 itens:
@@ -1583,4 +1587,183 @@ itens:
     datasets: [gold_real]
     follow_up_of: G143
     notes: "Follow-up de uma pergunta complexa: herda o município e o ano do G143 (T13.6). DEC do recorte pela fórmula dos componentes, com a média mensal de UCs."
+    revisado_por: null
+  - id: G145
+    question: "Quanto foi o tempo médio sem luz por cliente na distribuidora em março de 2025?"
+    category: sinonimo
+    reference_sql: "SELECT dec FROM sem_kpis_mensais WHERE competencia = '2025-03'"
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: null
+    notes: "'Tempo médio sem luz por cliente' é o DEC (sigla e sinônimo no glossário 0.4.5, T12.2)."
+    revisado_por: null
+  - id: G146
+    question: "Quantas quedas por cliente a distribuidora teve em junho de 2025?"
+    category: sinonimo
+    reference_sql: "SELECT fec FROM sem_kpis_mensais WHERE competencia = '2025-06'"
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: null
+    notes: "'Quedas por cliente' é o FEC (glossário 0.4.5, T12.2)."
+    revisado_por: null
+  - id: G147
+    question: "Quantas UCs de alta tensão existem?"
+    category: sinonimo
+    reference_sql: "SELECT count(*) AS ucs FROM sem_uc WHERE classe = 'A4'"
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: null
+    notes: "Alta tensão (AT, grupo A) é a classe A4 (glossário 0.4.5, T12.2)."
+    revisado_por: null
+  - id: G148
+    question: "Quantos clientes de baixa tensão existem em Olinda?"
+    category: sinonimo
+    reference_sql: "SELECT count(*) AS ucs FROM sem_uc WHERE classe IN ('B1', 'B2', 'B3') AND municipio = 'Olinda'"
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: null
+    notes: "Baixa tensão (BT, grupo B) são as classes B1, B2 e B3; 'clientes' são UCs (glossário 0.4.5, T12.2)."
+    revisado_por: null
+  - id: G149
+    question: "Qual foi a arrecadação de junho de 2026?"
+    category: sinonimo
+    reference_sql: "SELECT sum(receita_arrecadada) AS receita_arrecadada FROM sem_kpis_segmento_mensal WHERE competencia = '2026-06'"
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: null
+    notes: "Arrecadação é receita_arrecadada (glossário 0.4.5, T12.2); da empresa, pela soma de sem_kpis_segmento_mensal."
+    revisado_por: null
+  - id: G150
+    question: "Em 2025, qual foi a receita faturada, a energia faturada e a tarifa média das UCs residenciais (B1)?"
+    category: case
+    reference_sql: "SELECT sum(receita_faturada) AS receita_faturada, sum(kwh_faturado) AS kwh_faturado, round(sum(receita_energia) / NULLIF(sum(kwh_faturado), 0), 4) AS tarifa_media FROM sem_kpis_segmento_mensal WHERE classe = 'B1' AND competencia BETWEEN '2025-01' AND '2025-12'"
+    parts: [[receita_faturada], [kwh_faturado], [tarifa_media]]
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: null
+    notes: "Três métricas de um recorte; a tarifa média do grupo é receita de energia sobre kWh, nunca a média de tarifa_media (T13.6, lote 3)."
+    revisado_por: null
+  - id: G151
+    question: "Comparando 2024 com 2025, quanto variou a receita faturada de cada município, em reais e em percentual?"
+    category: case
+    reference_sql: "SELECT municipio, sum(CASE WHEN competencia BETWEEN '2025-01' AND '2025-12' THEN receita_faturada END) - sum(CASE WHEN competencia BETWEEN '2024-01' AND '2024-12' THEN receita_faturada END) AS variacao, round(100.0 * (sum(CASE WHEN competencia BETWEEN '2025-01' AND '2025-12' THEN receita_faturada END) - sum(CASE WHEN competencia BETWEEN '2024-01' AND '2024-12' THEN receita_faturada END)) / NULLIF(sum(CASE WHEN competencia BETWEEN '2024-01' AND '2024-12' THEN receita_faturada END), 0), 2) AS variacao_pct FROM sem_kpis_segmento_mensal GROUP BY municipio"
+    parts: [[municipio], [variacao], [variacao_pct]]
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: null
+    notes: "Agrupamento com variação absoluta e percentual entre dois anos (T13.6, lote 3)."
+    revisado_por: null
+  - id: G152
+    question: "Quais os 3 bairros de Recife com mais interrupções em 2025, e qual foi o DEC de cada um nesse ano?"
+    category: case
+    reference_sql: "SELECT bairro, sum(n_interrupcoes) AS interrupcoes, round(CAST(sum(horas_interrompidas) / NULLIF(sum(n_uc) / 12.0, 0) AS numeric), 2) AS dec FROM sem_kpis_segmento_mensal WHERE municipio = 'Recife' AND competencia BETWEEN '2025-01' AND '2025-12' GROUP BY bairro ORDER BY sum(n_interrupcoes) DESC LIMIT 3"
+    parts: [[bairro], [interrupcoes], [dec]]
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: null
+    notes: "Ranking e índice do mesmo recorte; DEC do ano pela média mensal de UCs (DEC-032, T13.6, lote 3)."
+    revisado_por: null
+  - id: G153
+    question: "Em 2025, qual foi a participação das UCs com geração distribuída na energia faturada e na receita faturada da distribuidora?"
+    category: case
+    reference_sql: "SELECT round(100.0 * sum(CASE WHEN possui_gd THEN kwh_faturado END) / NULLIF(sum(kwh_faturado), 0), 2) AS participacao_energia_pct, round(100.0 * sum(CASE WHEN possui_gd THEN receita_faturada END) / NULLIF(sum(receita_faturada), 0), 2) AS participacao_receita_pct FROM sem_kpis_segmento_mensal WHERE competencia BETWEEN '2025-01' AND '2025-12'"
+    parts: [[participacao_energia_pct], [participacao_receita_pct]]
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: null
+    notes: "Dois percentuais de participação na mesma pergunta (T13.6, lote 3)."
+    revisado_por: null
+  - id: G154
+    question: "Qual canal de atendimento recebeu mais chamados em 2025, e qual foi a nota média de satisfação desse canal?"
+    category: case
+    reference_sql: "SELECT canal, count(*) AS chamados, round(CAST(avg(nota_satisfacao) AS numeric), 2) AS satisfacao FROM sem_atendimentos_uc WHERE competencia BETWEEN '2025-01' AND '2025-12' GROUP BY canal ORDER BY count(*) DESC LIMIT 1"
+    parts: [[canal], [chamados], [satisfacao]]
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: null
+    notes: "Ranking por contagem e satisfação do mesmo canal, de sem_atendimentos_uc (T13.6, lote 3)."
+    revisado_por: null
+  - id: G155
+    question: "Quais foram as 3 principais causas de interrupção em 2025, com o número de ocorrências e a duração média de cada uma?"
+    category: case
+    reference_sql: "SELECT causa, count(*) AS ocorrencias, round(CAST(avg(duracao_horas) AS numeric), 2) AS duracao_media_horas FROM sem_interrupcoes_uc WHERE competencia BETWEEN '2025-01' AND '2025-12' AND causa IS NOT NULL GROUP BY causa ORDER BY count(*) DESC LIMIT 3"
+    parts: [[causa], [ocorrencias], [duracao_media_horas]]
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: null
+    notes: "Top N com duas métricas por grupo; causa nula fica fora do ranking (T13.6, lote 3)."
+    revisado_por: null
+  - id: G156
+    question: "No primeiro semestre de 2026, qual mês teve a maior receita faturada e qual foi o FEC da distribuidora nesse mês?"
+    category: case
+    reference_sql: "SELECT competencia, receita_faturada, fec FROM sem_kpis_mensais WHERE competencia BETWEEN '2026-01' AND '2026-06' ORDER BY receita_faturada DESC LIMIT 1"
+    parts: [[competencia], [fec]]
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: null
+    notes: "Ranking de meses e índice do mesmo mês (T13.6, lote 3)."
+    revisado_por: null
+  - id: G157
+    question: "Em Olinda, em 2025, qual foi o percentual de leituras estimadas e o percentual de faturas pagas com atraso?"
+    category: case
+    reference_sql: "SELECT round(100.0 * sum(n_leituras_estimadas) / NULLIF(sum(n_leituras), 0), 2) AS leituras_estimadas_pct, round(100.0 * sum(n_faturas_pagas_com_atraso) / NULLIF(sum(n_faturas), 0), 2) AS pagas_com_atraso_pct FROM sem_kpis_segmento_mensal WHERE municipio = 'Olinda' AND competencia BETWEEN '2025-01' AND '2025-12'"
+    parts: [[leituras_estimadas_pct], [pagas_com_atraso_pct]]
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: null
+    notes: "Dois percentuais de qualidade e de cobrança no mesmo recorte (T13.6, lote 3)."
+    revisado_por: null
+  - id: G158
+    question: "Qual foi a receita faturada de Olinda em março de 2026?"
+    category: followup
+    reference_sql: "SELECT sum(receita_faturada) AS receita_faturada FROM sem_kpis_segmento_mensal WHERE municipio = 'Olinda' AND competencia = '2026-03'"
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: null
+    notes: "Início da cadeia de 3 turnos G158 → G159 → G160: troca de período e depois de recorte (T2, lote 3)."
+    revisado_por: null
+  - id: G159
+    question: "E em abril?"
+    category: followup
+    reference_sql: "SELECT sum(receita_faturada) AS receita_faturada FROM sem_kpis_segmento_mensal WHERE municipio = 'Olinda' AND competencia = '2026-04'"
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: G158
+    notes: "Troca só o mês: mantém Olinda e o ano de 2026 do turno anterior."
+    revisado_por: null
+  - id: G160
+    question: "E de Recife?"
+    category: followup
+    reference_sql: "SELECT sum(receita_faturada) AS receita_faturada FROM sem_kpis_segmento_mensal WHERE municipio = 'Recife' AND competencia = '2026-04'"
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: G159
+    notes: "Troca o recorte e mantém abril de 2026, o período do último turno."
+    revisado_por: null
+  - id: G161
+    question: "Qual foi o DEC da distribuidora em 2025?"
+    category: followup
+    reference_sql: "SELECT round(CAST(sum(dec) AS numeric), 2) AS dec FROM sem_kpis_mensais WHERE competencia BETWEEN '2025-01' AND '2025-12'"
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: null
+    notes: "Início da cadeia de 3 turnos G161 → G162 → G163: troca de métrica e depois de período. DEC do ano é a soma dos meses (DEC-032)."
+    revisado_por: null
+  - id: G162
+    question: "E quanto foi o FEC?"
+    category: followup
+    reference_sql: "SELECT round(CAST(sum(fec) AS numeric), 2) AS fec FROM sem_kpis_mensais WHERE competencia BETWEEN '2025-01' AND '2025-12'"
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: G161
+    notes: "Troca a métrica e mantém 2025."
+    revisado_por: null
+  - id: G163
+    question: "E como foi em 2024?"
+    category: followup
+    reference_sql: "SELECT round(CAST(sum(fec) AS numeric), 2) AS fec FROM sem_kpis_mensais WHERE competencia BETWEEN '2024-01' AND '2024-12'"
+    expected_status: answered
+    datasets: [gold_real]
+    follow_up_of: G162
+    notes: "Troca o período e mantém o FEC, a métrica do último turno."
     revisado_por: null

@@ -16,6 +16,7 @@ from venergy_agent.evaluation.database_guard import PostgresDatabaseGuard
 from venergy_agent.evaluation.references import check_references
 from venergy_agent.evaluation.report import EvaluationReport
 from venergy_agent.evaluation.runner import EvaluationRunner
+from venergy_agent.evaluation.variants import make_variants
 from venergy_agent.infrastructure.answer_judge import PydanticAiAnswerJudge
 from venergy_agent.infrastructure.llm import build_judge_model
 from venergy_agent.infrastructure.memory_history import InMemoryConversationHistory
@@ -32,6 +33,11 @@ RUNS_GOLD_DIR = EVAL_DIR / "runs_gold"
 DEFAULT_PAUSE_SECONDS = 4.0
 SAMPLE_MAX_UCS = 1000
 UC_COUNT_SQL = "SELECT count(*) AS total FROM sem_uc"
+SETS = {
+    "golden": "golden_set.yaml",
+    "parafrases": "parafrases_set.yaml",
+    "ineditas": "ineditas_set.yaml",
+}
 
 
 class DatasetMismatch(Exception):
@@ -113,8 +119,14 @@ def _format_value(name: str, value: float | int | None) -> str:
     return str(value)
 
 
-def report_path(root: Path, started_at: datetime) -> Path:
-    return root / f"{started_at.astimezone(UTC):%Y-%m-%dT%H%M%SZ}.json"
+def report_path(root: Path, started_at: datetime, prefix: str = "") -> Path:
+    return root / f"{prefix}{started_at.astimezone(UTC):%Y-%m-%dT%H%M%SZ}.json"
+
+
+def report_prefix(question_set: str, variants: bool) -> str:
+    if variants:
+        return "variantes-"
+    return "" if question_set == "golden" else f"{question_set}-"
 
 
 def write_report(path: Path, report: EvaluationReport) -> None:
@@ -139,6 +151,17 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
         help="só os itens marcados com smoke: true no golden, com as cadeias de follow-up",
     )
     parser.add_argument(
+        "--variants",
+        action="store_true",
+        help="roda variações das perguntas do golden (sem acento, erro, sinônimo, coloquial)",
+    )
+    parser.add_argument(
+        "--set",
+        choices=sorted(SETS),
+        default="golden",
+        help="conjunto de perguntas: golden, paráfrases livres ou perguntas inéditas",
+    )
+    parser.add_argument(
         "--concurrency",
         type=positive_int,
         default=1,
@@ -150,6 +173,12 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
         parser.error("--only references não chama o modelo: não use com --sql-only nem --judge")
     if args.ids and args.only in ("red_team", "references"):
         parser.error("--ids escolhe itens do golden: não use com --only red_team nem references")
+    if args.variants and args.only in ("red_team", "references"):
+        parser.error("--variants usa o golden: não use com --only red_team nem references")
+    if args.set != "golden" and (
+        args.variants or args.smoke or args.only in ("red_team", "references")
+    ):
+        parser.error("--set escolhe outro conjunto: não use com --variants, --smoke nem --only")
     if args.smoke and (args.ids or args.only in ("red_team", "references")):
         parser.error("--smoke escolhe itens do golden: não use com --ids, red_team nem references")
     return args
@@ -179,9 +208,13 @@ async def _evaluate(
     ids: set[str] | None = None,
     smoke: bool = False,
     concurrency: int = 1,
+    variants: bool = False,
+    question_set: str = "golden",
 ) -> tuple[Path, list[str]]:
     with_judge = judges(judge, sql_only)
-    golden_version, golden = load_set(EVAL_DIR / "golden_set.yaml")
+    golden_version, golden = load_set(EVAL_DIR / SETS[question_set])
+    if question_set != "golden":
+        only = "golden"
     if smoke:
         ids = smoke_ids(golden)
     if ids:
@@ -199,6 +232,9 @@ async def _evaluate(
     executor = PostgresQueryExecutor(settings.database_url, settings.query_timeout_seconds)
     counted = await executor.execute(validator.validate(UC_COUNT_SQL, layer.allowed_views))
     check_dataset(dataset, int(counted.rows[0]["total"]))
+    if variants:
+        golden = make_variants(golden, layer.glossary)
+        only = "golden"
     narrate = narrates(sql_only)
     memory = InMemoryConversationHistory()
     agent = await build_agent(settings, narrate=narrate, history=memory)
@@ -230,7 +266,11 @@ async def _evaluate(
         judge_model=settings.judge_model if with_judge else None,
         judge_prompt_version=settings.judge_prompt_version if with_judge else None,
     )
-    path = report_path(runs_dir(dataset), report.started_at)
+    path = report_path(
+        runs_dir(dataset),
+        report.started_at,
+        prefix=report_prefix(question_set, variants),
+    )
     write_report(path, report)
     return path, format_metrics(report.metrics)
 
@@ -271,6 +311,8 @@ def main(argv: list[str]) -> int:
                 set(args.ids.split(",")) if args.ids else None,
                 smoke=args.smoke,
                 concurrency=args.concurrency,
+                variants=args.variants,
+                question_set=args.set,
             )
         )
     except ValidationError as error:

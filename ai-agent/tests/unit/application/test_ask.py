@@ -1032,7 +1032,7 @@ async def test_fallback_text_labels_columns_in_plain_words_with_their_unit(layer
 
     assert text.endswith(
         "Resultado: receita faturada = R$ 35.482,79, energia faturada = 1.200 kWh, "
-        "n chamados = 85, dias sem unidade = 3."
+        "número de chamados = 85, dias sem unidade = 3."
     )
     assert not TECHNICAL_NAME.search(text)
 
@@ -1803,6 +1803,22 @@ async def test_a_window_relative_to_the_base_the_question_asked_for_is_answered(
     assert answer.status is AnswerStatus.ANSWERED
 
 
+@pytest.mark.parametrize(
+    "question",
+    [
+        "A energia caiu nos últimos doze meses comparando com o período inicial da série?",
+        "Comparando o arranque da base com os últimos doze meses, quanto variou a receita?",
+        "Quanto a receita mudou do começo do histórico até o ano mais recente dos dados?",
+    ],
+)
+async def test_a_window_relative_to_the_base_asked_in_other_words_is_answered(layer, question):
+    answer = await use_case(layer, ScriptedGenerator(generation(sql=BASE_WINDOW_SQL))).ask(
+        question, "s1"
+    )
+
+    assert answer.status is AnswerStatus.ANSWERED
+
+
 async def test_a_number_of_an_assumption_that_the_sql_uses_can_be_cited(layer):
     writer = FixedWriter(text="O DEC usa a média mensal de UCs, dividida por 3, e foi de 8.")
     eight = ScriptedExecutor(table(("total",), (8,)))
@@ -1829,4 +1845,20 @@ async def test_a_forbidden_calculation_goes_back_to_the_model_as_a_correctable_e
 
     assert answer.status is AnswerStatus.ANSWERED
     assert "soma_notas" in generator.feedbacks[1].message
+    assert len(executor.queries) == 1
+
+
+async def test_a_filter_value_that_is_not_in_the_column_goes_back_to_the_model(layer):
+    known = layer.model_copy(update={"categorical_values": {"municipio": ("Olinda", "Recife")}})
+    wrong = generation(
+        sql="SELECT count(*) AS total FROM sem_uc WHERE municipio = 'Região Metropolitana'"
+    )
+    right = generation(sql=COUNT_SQL)
+    generator = ScriptedGenerator(wrong, right)
+    executor = ScriptedExecutor(result())
+
+    answer = await use_case(known, generator, executor).ask("Quantas UCs na região?", "s1")
+
+    assert answer.status is AnswerStatus.ANSWERED
+    assert "'Região Metropolitana' não existe em municipio" in generator.feedbacks[1].message
     assert len(executor.queries) == 1

@@ -1027,7 +1027,7 @@ class OrdemDetalheSchema(OrdemSchema):
     eventos: list[EventoSchema]
 
 
-# A entrada é limitada na API, antes de chegar ao agente. O teto de 500 caracteres da pergunta
+# A entrada é limitada na API, antes de chegar ao agente. O teto de 1000 caracteres da pergunta
 # continua sendo do agente; este é folgado, só para não aceitar um corpo gigante.
 MAX_PERGUNTA_IA = 2000
 

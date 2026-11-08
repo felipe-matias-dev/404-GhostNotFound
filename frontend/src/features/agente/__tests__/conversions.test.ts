@@ -115,6 +115,7 @@ describe("validarPergunta", () => {
 	});
 
 	it("aceita até o limite e recusa acima dele", () => {
+		expect(MAX_PERGUNTA_CHARS).toBe(1000);
 		expect(validarPergunta("a".repeat(MAX_PERGUNTA_CHARS))).toMatchObject({
 			ok: true,
 		});
@@ -457,7 +458,30 @@ describe("extrairMensagemErro", () => {
 
 	it("explica a pergunta inválida", () => {
 		expect(extrairMensagemErro(new ApiError(422, { detail: [] }))).toBe(
-			"A pergunta enviada é inválida (máximo de 500 caracteres).",
+			"A pergunta enviada é inválida (máximo de 1000 caracteres).",
+		);
+	});
+
+	it("mostra o motivo da API no limite, na posse da conversa e na trava", () => {
+		const limite = "Você atingiu o limite de 20 perguntas a cada 10 minutos.";
+		expect(extrairMensagemErro(new ApiError(429, { detail: limite }))).toBe(
+			limite,
+		);
+		expect(
+			extrairMensagemErro(
+				new ApiError(403, { detail: "A conversa pertence a outro usuário." }),
+			),
+		).toBe("A conversa pertence a outro usuário.");
+		expect(
+			extrairMensagemErro(
+				new ApiError(409, { detail: "Aguarde a resposta anterior." }),
+			),
+		).toBe("Aguarde a resposta anterior.");
+	});
+
+	it("usa um texto próprio no limite quando a API não manda o motivo", () => {
+		expect(extrairMensagemErro(new ApiError(429, null))).toBe(
+			"Você atingiu o limite de perguntas. Aguarde alguns minutos e tente de novo.",
 		);
 	});
 

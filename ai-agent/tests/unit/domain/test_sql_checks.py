@@ -45,3 +45,54 @@ def test_a_calculation_the_layer_forbids_is_reported_with_the_right_formula(sql,
 )
 def test_allowed_calculations_pass(sql):
     assert calculation_problem(sql) is None
+
+
+def test_decomposition_effects_without_a_sum_go_back_with_the_rule():
+    sql = (
+        "SELECT efeito_preco, efeito_volume FROM sem_receita_decomposicao "
+        "WHERE periodo_base = '2025-02/2025-02' AND periodo_atual = '2026-02/2026-02'"
+    )
+
+    assert "some" in calculation_problem(sql)
+
+
+def test_summed_decomposition_effects_pass():
+    sql = (
+        "SELECT sum(d.efeito_preco) AS efeito_preco, sum(d.efeito_volume) AS efeito_volume "
+        "FROM sem_receita_decomposicao d WHERE d.periodo_base = '2025-02/2025-02'"
+    )
+
+    assert calculation_problem(sql) is None
+
+
+def test_the_accumulated_index_of_each_feeder_is_not_a_sum_across_feeders():
+    sql = (
+        "SELECT cod_alimentador, sum(dec) AS dec FROM sem_continuidade_alimentador_mensal "
+        "WHERE competencia BETWEEN '2025-01' AND '2025-12' GROUP BY cod_alimentador "
+        "ORDER BY sum(dec) DESC LIMIT 1"
+    )
+
+    assert calculation_problem(sql) is None
+
+
+def test_segment_components_read_without_a_sum_go_back_with_the_rule():
+    sql = (
+        "SELECT n_faturas_pagas_com_atraso FROM sem_kpis_segmento_mensal "
+        "WHERE competencia = '2025-03'"
+    )
+
+    assert "some" in calculation_problem(sql)
+
+
+def test_segment_components_summed_or_grouped_pass():
+    summed = (
+        "SELECT sum(n_faturas) AS faturas FROM sem_kpis_segmento_mensal "
+        "WHERE competencia = '2025-03'"
+    )
+    grouped = (
+        "SELECT municipio, sum(receita_faturada) AS receita FROM sem_kpis_segmento_mensal "
+        "GROUP BY municipio"
+    )
+
+    assert calculation_problem(summed) is None
+    assert calculation_problem(grouped) is None

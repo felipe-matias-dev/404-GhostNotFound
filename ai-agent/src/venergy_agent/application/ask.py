@@ -27,6 +27,7 @@ from venergy_agent.domain.errors import (
     SqlRejected,
 )
 from venergy_agent.domain.events import AgentEvent, AnswerEvent, Stage, StageEvent
+from venergy_agent.domain.filter_values import filter_value_problem
 from venergy_agent.domain.followup import (
     answers_a_clarification,
     complete_question,
@@ -117,7 +118,12 @@ PERIOD_NOT_GIVEN = (
     '"de janeiro a março de 2025".'
 )
 YEAR = re.compile(r"\b(?:19|20)\d{2}\b")
-BASE_RELATIVE = re.compile(r"\b(?:primeiro|último)\s+ano\s+da\s+(?:nossa\s+)?base\b", re.IGNORECASE)
+BASE_RELATIVE = re.compile(
+    r"\b(?:primeir[oa]s?|últim[oa]s?|inicia(?:l|is)|início|começo|arranque|partida|mais\s+recente)"
+    r"(?:\W+\w+){0,4}?\W+(?:base|série|histórico|dados)\b"
+    r"|\búltim[oa]s\s+(?:doze|vinte\s+e\s+quatro|seis|três)\s+(?:meses|ciclos)\b",
+    re.IGNORECASE,
+)
 GENERIC_CLARIFICATION = (
     "Pode dizer o período e o recorte (município, bairro ou classe) que você quer consultar?"
 )
@@ -187,6 +193,7 @@ class AskUseCase:
         narration_min_seconds: float = 4.0,
     ) -> None:
         self._layer = layer
+        self._known_values = _known_values(layer)
         self._known_words = known_words(
             vocabulary_of(
                 layer.glossary, (column.name for view in layer.views for column in view.columns)
@@ -436,7 +443,9 @@ class AskUseCase:
                 sql=validated.sql,
                 latency_ms=_elapsed_ms(began),
             )
-            problem = calculation_problem(validated.sql)
+            problem = calculation_problem(validated.sql) or filter_value_problem(
+                validated.sql, self._known_values
+            )
             if problem is not None:
                 self._log(
                     request_id,
@@ -1105,6 +1114,16 @@ LAST_TWELVE_MONTHS = "nos últimos 12 meses"
 def _period_options(years: tuple[str, ...]) -> tuple[str, ...]:
     """Até três opções para o pedido de período: os anos que o SQL assumiu e os últimos 12 meses."""
     return (*(f"em {year}" for year in years[:PERIOD_OPTION_LIMIT]), LAST_TWELVE_MONTHS)
+
+
+def _known_values(layer: SemanticLayer) -> dict[str, tuple[str, ...]]:
+    known = {
+        column.name: tuple(column.allowed_values)
+        for view in layer.views
+        for column in view.columns
+        if column.allowed_values
+    }
+    return known | dict(layer.categorical_values)
 
 
 def _column_names(layer: SemanticLayer) -> set[str]:

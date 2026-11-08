@@ -144,3 +144,11 @@ def test_semantic_layer_and_contract_paths_resolve_inside_the_repository(require
 )
 def test_settings_load_without_judging_whatever_the_judge_model_is(required_env, overrides):
     assert AgentSettings(_env_file=None, **overrides).judge_model
+
+
+def test_a_long_question_with_premises_fits_the_agent_limit():
+    assert AgentSettings.model_fields["max_question_chars"].default == 1000
+
+
+def test_a_stuck_model_call_gives_up_before_the_slowest_normal_call_doubles():
+    assert AgentSettings.model_fields["llm_request_timeout_seconds"].default == 10.0

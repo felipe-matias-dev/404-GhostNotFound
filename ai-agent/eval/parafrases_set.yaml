@@ -1,0 +1,489 @@
+# Paráfrases livres do golden (T12.4, DEC-084): perguntas reescritas por outro modelo (Gemini 3.5 Flash-Lite),
+# sem as palavras do glossário e revisadas à mão para manter o sentido. Medem se o agente entende termos que não
+# estão mapeados. Cada item usa o gabarito do item de origem. Não ajustar glossário, regras ou exemplos olhando
+# para estas perguntas: uma falha só se corrige com regra geral, e o conjunto é trocado por um novo na rodada seguinte.
+versao: 0.1.0
+itens:
+- id: G001~livre2
+  question: Qual é o total de contratos cadastrados no sistema hoje?
+  category: parafrase
+  reference_sql: SELECT count(*) AS total FROM sem_uc
+  expected_status: answered
+  datasets:
+  - amostra
+  - gold_real
+  follow_up_of: null
+  origem: G001
+  revisado_por: null
+- id: G004~livre1
+  question: Quantas instalações contam com microgeração solar na nossa área de concessão?
+  category: parafrase
+  reference_sql: SELECT count(*) AS total FROM sem_uc WHERE possui_gd
+  expected_status: answered
+  datasets: &id001
+  - amostra
+  - gold_real
+  follow_up_of: null
+  origem: G004
+  revisado_por: null
+- id: G004~livre2
+  question: Qual é a quantidade de endereços com geradores fotovoltaicos conectados à rede hoje?
+  category: parafrase
+  reference_sql: SELECT count(*) AS total FROM sem_uc WHERE possui_gd
+  expected_status: answered
+  datasets: *id001
+  follow_up_of: null
+  origem: G004
+  revisado_por: null
+- id: G007~livre1
+  question: Quais são os 5 maiores contratos com os maiores valores cobrados no mês de junho de 2025?
+  category: parafrase
+  reference_sql: SELECT cod_uc, receita_faturada FROM sem_faturamento_mensal WHERE competencia = '2025-06' ORDER BY receita_faturada
+    DESC LIMIT 5
+  expected_status: answered
+  datasets: &id002
+  - amostra
+  - gold_real
+  follow_up_of: null
+  origem: G007
+  revisado_por: null
+- id: G007~livre2
+  question: Me mostra a lista dos 5 maiores pontos de suprimento que tiveram as maiores cobranças emitidas em junho de 2025?
+  category: parafrase
+  reference_sql: SELECT cod_uc, receita_faturada FROM sem_faturamento_mensal WHERE competencia = '2025-06' ORDER BY receita_faturada
+    DESC LIMIT 5
+  expected_status: answered
+  datasets: *id002
+  follow_up_of: null
+  origem: G007
+  revisado_por: null
+- id: G010~livre1
+  question: Quanto tempo o pessoal da rua fica sem serviço ao longo de 2025 naqueles circuitos onde a vizinhança instalou
+    aquelas placas de captação solar nos telhados?
+  category: parafrase
+  reference_sql: SELECT round((sum(c.horas_interrompidas) / NULLIF(sum(c.n_uc) / 12.0, 0))::numeric, 2) AS dec_grupo FROM
+    sem_continuidade_alimentador_mensal c WHERE c.competencia LIKE '2025-%' AND c.cod_alimentador IN (SELECT u.cod_alimentador
+    FROM sem_uc u WHERE u.possui_gd)
+  expected_status: answered
+  datasets:
+  - amostra
+  - gold_real
+  follow_up_of: null
+  origem: G010
+  revisado_por: null
+- id: G013~livre2
+  question: Qual foi o valor médio lançado por domicílio residencial em Olinda em junho de 2025?
+  category: parafrase
+  reference_sql: SELECT round(avg(f.receita_faturada), 2) AS receita_media FROM sem_uc u JOIN sem_faturamento_mensal f ON
+    f.cod_uc = u.cod_uc WHERE u.classe = 'B1' AND u.municipio ILIKE 'Olinda' AND f.competencia = '2025-06'
+  expected_status: answered
+  datasets:
+  - amostra
+  - gold_real
+  follow_up_of: null
+  origem: G013
+  revisado_por: null
+- id: G016~livre1
+  question: Quanto andou o volume de megawatt-hora entregue nas moradias comparando o fechamento de 2024 com 2025?
+  category: parafrase
+  reference_sql: SELECT round(100.0 * (a.total - b.total) / NULLIF(b.total, 0), 2) AS variacao_percentual FROM (SELECT sum(f.kwh_faturado)
+    AS total FROM sem_faturamento_mensal f JOIN sem_uc u ON u.cod_uc = f.cod_uc WHERE u.classe = 'B1' AND f.competencia LIKE
+    '2025-%') a, (SELECT sum(f.kwh_faturado) AS total FROM sem_faturamento_mensal f JOIN sem_uc u ON u.cod_uc = f.cod_uc WHERE
+    u.classe = 'B1' AND f.competencia LIKE '2024-%') b
+  expected_status: answered
+  datasets: &id003
+  - amostra
+  - gold_real
+  follow_up_of: null
+  origem: G016
+  revisado_por: null
+- id: G016~livre2
+  question: Me traz o comparativo de 2024 para 2025 no suprimento de eletricidade para as casas da nossa área de concessão.
+  category: parafrase
+  reference_sql: SELECT round(100.0 * (a.total - b.total) / NULLIF(b.total, 0), 2) AS variacao_percentual FROM (SELECT sum(f.kwh_faturado)
+    AS total FROM sem_faturamento_mensal f JOIN sem_uc u ON u.cod_uc = f.cod_uc WHERE u.classe = 'B1' AND f.competencia LIKE
+    '2025-%') a, (SELECT sum(f.kwh_faturado) AS total FROM sem_faturamento_mensal f JOIN sem_uc u ON u.cod_uc = f.cod_uc WHERE
+    u.classe = 'B1' AND f.competencia LIKE '2024-%') b
+  expected_status: answered
+  datasets: *id003
+  follow_up_of: null
+  origem: G016
+  revisado_por: null
+- id: G019~livre1
+  question: Quanto custou o megawatt-hora pra galera de casa lá em julho de 21?
+  category: parafrase
+  reference_sql: SELECT sum(f.receita_energia) / NULLIF(sum(f.kwh_faturado), 0) AS tarifa_media FROM sem_faturamento_mensal
+    f JOIN sem_uc u ON u.cod_uc = f.cod_uc WHERE u.classe = 'B1' AND f.competencia = '2021-07'
+  expected_status: answered
+  datasets: &id004
+  - amostra
+  - gold_real
+  follow_up_of: null
+  origem: G019
+  revisado_por: null
+- id: G019~livre2
+  question: Qual foi o preço médio do quilowatt-hora pra quem mora em residência no mês 07 de 2021?
+  category: parafrase
+  reference_sql: SELECT sum(f.receita_energia) / NULLIF(sum(f.kwh_faturado), 0) AS tarifa_media FROM sem_faturamento_mensal
+    f JOIN sem_uc u ON u.cod_uc = f.cod_uc WHERE u.classe = 'B1' AND f.competencia = '2021-07'
+  expected_status: answered
+  datasets: *id004
+  follow_up_of: null
+  origem: G019
+  revisado_por: null
+- id: G022~livre2
+  question: Quanto somou o tempo de interrupção acumulado em todas as instalações ligadas no ramal AL-03 durante janeiro de
+    2025?
+  category: parafrase
+  reference_sql: SELECT round(horas_interrompidas::numeric, 2) AS horas_interrompidas FROM sem_continuidade_alimentador_mensal
+    WHERE cod_alimentador = 'AL-03' AND competencia = '2025-01'
+  expected_status: answered
+  datasets:
+  - amostra
+  follow_up_of: null
+  origem: G022
+  revisado_por: null
+- id: G025~livre1
+  question: Quantas fábricas em Jaboatão dos Guararapes estão ligadas na nossa rede hoje?
+  category: parafrase
+  reference_sql: SELECT count(*) AS total FROM sem_uc WHERE classe = 'A4' AND municipio ILIKE 'Jaboatão dos Guararapes'
+  expected_status: answered
+  datasets: &id005
+  - amostra
+  - gold_real
+  follow_up_of: null
+  origem: G025
+  revisado_por: null
+- id: G025~livre2
+  question: Qual é o total de indústrias cadastradas no município de Jaboatão dos Guararapes?
+  category: parafrase
+  reference_sql: SELECT count(*) AS total FROM sem_uc WHERE classe = 'A4' AND municipio ILIKE 'Jaboatão dos Guararapes'
+  expected_status: answered
+  datasets: *id005
+  follow_up_of: null
+  origem: G025
+  revisado_por: null
+- id: G029~livre1
+  question: Quanto entrou de faturamento em março de 2030?
+  category: parafrase
+  reference_sql: SELECT receita_faturada FROM sem_kpis_mensais WHERE competencia = '2030-03'
+  expected_status: answered
+  datasets: &id006
+  - amostra
+  - gold_real
+  follow_up_of: null
+  origem: G029
+  revisado_por: null
+- id: G029~livre2
+  question: Qual o montante faturado no mês de março de 2030?
+  category: parafrase
+  reference_sql: SELECT receita_faturada FROM sem_kpis_mensais WHERE competencia = '2030-03'
+  expected_status: answered
+  datasets: *id006
+  follow_up_of: null
+  origem: G029
+  revisado_por: null
+- id: G042~livre1
+  question: O volume de megawatts-hora contabilizados nas rubricas diminiu nos últimos doze meses comparando com o período
+    inicial da série?
+  category: parafrase
+  reference_sql: WITH meses AS (SELECT competencia, row_number() OVER (ORDER BY competencia) AS ordem_inicio, row_number()
+    OVER (ORDER BY competencia DESC) AS ordem_fim FROM (SELECT DISTINCT competencia FROM sem_faturamento_mensal) c) SELECT
+    sum(CASE WHEN m.ordem_inicio <= 12 THEN f.kwh_faturado END) AS kwh_primeiro_ano, sum(CASE WHEN m.ordem_fim <= 12 THEN
+    f.kwh_faturado END) AS kwh_ultimos_12_meses FROM sem_faturamento_mensal f JOIN meses m ON m.competencia = f.competencia
+  expected_status: answered
+  datasets:
+  - amostra
+  - gold_real
+  follow_up_of: null
+  origem: G042
+  revisado_por: null
+- id: G059~livre1
+  question: Qual foi o crescimento do faturamento do setor de negócios da capital entre os anos de 2024 e 2025?
+  category: parafrase
+  reference_sql: SELECT round(100.0 * (a.total - b.total) / NULLIF(b.total, 0), 2) AS variacao_percentual FROM (SELECT sum(f.receita_faturada)
+    AS total FROM sem_faturamento_mensal f JOIN sem_uc u ON u.cod_uc = f.cod_uc WHERE u.classe_cadastro = 'Comercial' AND
+    u.municipio ILIKE 'Recife' AND f.competencia LIKE '2025-%') a, (SELECT sum(f.receita_faturada) AS total FROM sem_faturamento_mensal
+    f JOIN sem_uc u ON u.cod_uc = f.cod_uc WHERE u.classe_cadastro = 'Comercial' AND u.municipio ILIKE 'Recife' AND f.competencia
+    LIKE '2024-%') b
+  expected_status: answered
+  datasets:
+  - amostra
+  - gold_real
+  follow_up_of: null
+  origem: G059
+  revisado_por: null
+- id: G063~livre1
+  question: Me diz aí quais foram os três circuitos que passaram mais tempo desligados em março de 2025?
+  category: parafrase
+  reference_sql: SELECT cod_alimentador, round(dec::numeric, 2) AS dec FROM sem_continuidade_alimentador_mensal WHERE competencia
+    = '2025-03' ORDER BY dec DESC LIMIT 3
+  expected_status: answered
+  datasets:
+  - amostra
+  - gold_real
+  follow_up_of: null
+  origem: G063
+  revisado_por: null
+- id: G067~livre1
+  question: Quantas vezes o ponto 0001 sofreu interrupções ao longo de 2025 e qual foi o somatório da duração dessas quedas?
+  category: parafrase
+  reference_sql: SELECT count(*) AS interrupcoes, sum(duracao_horas) AS horas FROM sem_interrupcoes_uc WHERE cod_uc = '0001'
+    AND competencia BETWEEN '2025-01' AND '2025-12'
+  expected_status: answered
+  datasets: &id007
+  - amostra
+  follow_up_of: null
+  origem: G067
+  revisado_por: null
+- id: G067~livre2
+  question: Qual foi a frequência e o somatório do tempo de interrupção registradas na instalação 0001 durante o ano de 2025?
+  category: parafrase
+  reference_sql: SELECT count(*) AS interrupcoes, sum(duracao_horas) AS horas FROM sem_interrupcoes_uc WHERE cod_uc = '0001'
+    AND competencia BETWEEN '2025-01' AND '2025-12'
+  expected_status: answered
+  datasets: *id007
+  follow_up_of: null
+  origem: G067
+  revisado_por: null
+- id: G070~livre2
+  question: Qual o saldo pendente de acerto e a quantidade de guias de 2025 que continuan sem quitação?
+  category: parafrase
+  reference_sql: SELECT sum(n_faturas_nao_pagas) AS faturas_nao_pagas, sum(valor_nao_pago) AS valor_nao_pago FROM sem_kpis_segmento_mensal
+    WHERE competencia BETWEEN '2025-01' AND '2025-12'
+  expected_status: answered
+  datasets:
+  - amostra
+  - gold_real
+  follow_up_of: null
+  origem: G070
+  revisado_por: null
+- id: G073~livre1
+  question: Quantos papéis de março de 2025 tiveram o pagamento postergado?
+  category: parafrase
+  reference_sql: SELECT count(*) AS faturas FROM sem_faturamento_mensal WHERE competencia = '2025-03' AND status_pagamento
+    = 'paga_com_atraso'
+  expected_status: answered
+  datasets: &id008
+  - amostra
+  - gold_real
+  follow_up_of: null
+  origem: G073
+  revisado_por: null
+- id: G073~livre2
+  question: Qual foi a quantidade de documentos de março de 2025 quitados fora do prazo?
+  category: parafrase
+  reference_sql: SELECT count(*) AS faturas FROM sem_faturamento_mensal WHERE competencia = '2025-03' AND status_pagamento
+    = 'paga_com_atraso'
+  expected_status: answered
+  datasets: *id008
+  follow_up_of: null
+  origem: G073
+  revisado_por: null
+- id: G089~livre2
+  question: Me diz a frequência de cortes do alimentador da Iputinga, em Recife, no mês de março de 2025.
+  category: parafrase
+  reference_sql: SELECT round(1.0 * sum(c.n_interrupcoes) / NULLIF(sum(c.n_uc), 0), 2) AS fec FROM sem_continuidade_alimentador_mensal
+    c WHERE c.competencia = '2025-03' AND c.cod_alimentador IN (SELECT u.cod_alimentador FROM sem_uc u WHERE u.municipio =
+    'Recife' AND u.bairro = 'Iputinga')
+  expected_status: answered
+  datasets:
+  - gold_real
+  follow_up_of: null
+  origem: G089
+  revisado_por: null
+- id: G092~livre1
+  question: Qual foi o somatório do tempo que o alimentador ALM-JAB-007 ficou sem suprimento de energia para as instalações
+    atendidas no mês de janeiro de 2025?
+  category: parafrase
+  reference_sql: SELECT round(horas_interrompidas::numeric, 2) AS horas_interrompidas FROM sem_continuidade_alimentador_mensal
+    WHERE cod_alimentador = 'ALM-JAB-007' AND competencia = '2025-01'
+  expected_status: answered
+  datasets: &id009
+  - gold_real
+  follow_up_of: null
+  origem: G092
+  revisado_por: null
+- id: G092~livre2
+  question: Quanto deu a soma das durações das suspensões de suprimento em todas as instalações ligadas no circuito ALM-JAB-007
+    ao longo de janeiro de 2025?
+  category: parafrase
+  reference_sql: SELECT round(horas_interrompidas::numeric, 2) AS horas_interrompidas FROM sem_continuidade_alimentador_mensal
+    WHERE cod_alimentador = 'ALM-JAB-007' AND competencia = '2025-01'
+  expected_status: answered
+  datasets: *id009
+  follow_up_of: null
+  origem: G092
+  revisado_por: null
+- id: G098~livre1
+  question: Quantos domicílios no circuito ALM-REC-024 ficaram sem suprimento de eletricidade ao longo de 2025?
+  category: parafrase
+  reference_sql: SELECT count(DISTINCT i.cod_uc) AS ucs FROM sem_interrupcoes_uc i JOIN sem_uc u ON u.cod_uc = i.cod_uc WHERE
+    u.cod_alimentador = 'ALM-REC-024' AND i.competencia BETWEEN '2025-01' AND '2025-12'
+  expected_status: answered
+  datasets: &id010
+  - gold_real
+  follow_up_of: null
+  origem: G098
+  revisado_por: null
+- id: G098~livre2
+  question: Qual o quantitativo de endereços no alimentador ALM-REC-024 que experimentaram interrupção no fornecimento durante
+    o ano de 2025?
+  category: parafrase
+  reference_sql: SELECT count(DISTINCT i.cod_uc) AS ucs FROM sem_interrupcoes_uc i JOIN sem_uc u ON u.cod_uc = i.cod_uc WHERE
+    u.cod_alimentador = 'ALM-REC-024' AND i.competencia BETWEEN '2025-01' AND '2025-12'
+  expected_status: answered
+  datasets: *id010
+  follow_up_of: null
+  origem: G098
+  revisado_por: null
+- id: G106~livre2
+  question: Qual o total faturado no mês de junho de 2026?
+  category: parafrase
+  reference_sql: SELECT receita_faturada FROM sem_kpis_mensais WHERE competencia = '2026-06'
+  expected_status: answered
+  datasets:
+  - gold_real
+  follow_up_of: null
+  origem: G106
+  revisado_por: null
+- id: G111~livre2
+  question: Qual foi o montante emitido nas cobranças de março de 2025?
+  category: parafrase
+  reference_sql: SELECT receita_faturada FROM sem_kpis_mensais WHERE competencia = '2025-03'
+  expected_status: answered
+  datasets:
+  - gold_real
+  follow_up_of: null
+  origem: G111
+  revisado_por: null
+- id: G114~livre2
+  question: qual foi o faturamento bruto de energia no mês de abril de 2025
+  category: parafrase
+  reference_sql: SELECT receita_energia FROM sem_kpis_mensais WHERE competencia = '2025-04'
+  expected_status: answered
+  datasets:
+  - gold_real
+  follow_up_of: null
+  origem: G114
+  revisado_por: null
+- id: G117~livre1
+  question: qual foi a fatia de encargos e recolhimentos fiscais em junho de 2026?
+  category: parafrase
+  reference_sql: SELECT 100.0 * (receita_faturada - receita_energia) / NULLIF(receita_faturada, 0) AS percentual FROM sem_kpis_mensais
+    WHERE competencia = '2026-06'
+  expected_status: answered
+  datasets: &id011
+  - gold_real
+  follow_up_of: null
+  origem: G117
+  revisado_por: null
+- id: G117~livre2
+  question: quanto representou o bolo de obrigações tributárias em junho de 2026?
+  category: parafrase
+  reference_sql: SELECT 100.0 * (receita_faturada - receita_energia) / NULLIF(receita_faturada, 0) AS percentual FROM sem_kpis_mensais
+    WHERE competencia = '2026-06'
+  expected_status: answered
+  datasets: *id011
+  follow_up_of: null
+  origem: G117
+  revisado_por: null
+- id: G120~livre1
+  question: Qual vai ser o peso dos encargos e impostos segmentado por categoria de uso no mês de junho de 2026?
+  category: parafrase
+  reference_sql: SELECT classe_cadastro, 100.0 * sum(tributos) / NULLIF(sum(receita_faturada), 0) AS percentual_tributos FROM
+    sem_kpis_segmento_mensal WHERE competencia = '2026-06' GROUP BY classe_cadastro
+  expected_status: answered
+  datasets:
+  - gold_real
+  follow_up_of: null
+  origem: G120
+  revisado_por: null
+- id: G125~livre1
+  question: Qual foi a nota média que o pessoal deu pro nosso serviço em dezembro de 2025?
+  category: parafrase
+  reference_sql: SELECT satisfacao_media FROM sem_kpis_mensais WHERE competencia = '2025-12'
+  expected_status: answered
+  datasets: &id012
+  - gold_real
+  follow_up_of: null
+  origem: G125
+  revisado_por: null
+- id: G125~livre2
+  question: Como ficou a avaliação do serviço pela patota no último mês de 2025?
+  category: parafrase
+  reference_sql: SELECT satisfacao_media FROM sem_kpis_mensais WHERE competencia = '2025-12'
+  expected_status: answered
+  datasets: *id012
+  follow_up_of: null
+  origem: G125
+  revisado_por: null
+- id: G135~livre1
+  question: quanto faturamos na guia de março de 2025?
+  category: parafrase
+  reference_sql: SELECT receita_faturada FROM sem_kpis_mensais WHERE competencia = '2025-03'
+  expected_status: answered
+  datasets: &id013
+  - gold_real
+  follow_up_of: null
+  origem: G135
+  revisado_por: null
+- id: G135~livre2
+  question: qual o total lançado nos papéis de março de 2025?
+  category: parafrase
+  reference_sql: SELECT receita_faturada FROM sem_kpis_mensais WHERE competencia = '2025-03'
+  expected_status: answered
+  datasets: *id013
+  follow_up_of: null
+  origem: G135
+  revisado_por: null
+- id: G138~livre1
+  question: Comparando o arranque da base com os últimos doze meses, qual foi a variação percentual do volume de suprimento
+    medido e da entrada financeira bruta?
+  category: parafrase
+  reference_sql: WITH meses AS (SELECT competencia, row_number() OVER (ORDER BY competencia) AS ordem_inicio, row_number()
+    OVER (ORDER BY competencia DESC) AS ordem_fim FROM sem_kpis_mensais) SELECT round(100.0 * (sum(CASE WHEN m.ordem_fim <=
+    12 THEN k.kwh_faturado END) - sum(CASE WHEN m.ordem_inicio <= 12 THEN k.kwh_faturado END)) / NULLIF(sum(CASE WHEN m.ordem_inicio
+    <= 12 THEN k.kwh_faturado END), 0), 2) AS variacao_energia_pct, round(100.0 * (sum(CASE WHEN m.ordem_fim <= 12 THEN k.receita_faturada
+    END) - sum(CASE WHEN m.ordem_inicio <= 12 THEN k.receita_faturada END)) / NULLIF(sum(CASE WHEN m.ordem_inicio <= 12 THEN
+    k.receita_faturada END), 0), 2) AS variacao_receita_pct FROM sem_kpis_mensais k JOIN meses m ON m.competencia = k.competencia
+  parts:
+  - - variacao_energia_pct
+  - - variacao_receita_pct
+  expected_status: answered
+  datasets:
+  - gold_real
+  follow_up_of: null
+  origem: G138
+  revisado_por: null
+- id: G145~livre1
+  question: Quanto tempo, em média, os endereços ficaram sem fornecimento de energia na nossa área de concessão no mês de
+    março de 2025?
+  category: parafrase
+  reference_sql: SELECT dec FROM sem_kpis_mensais WHERE competencia = '2025-03'
+  expected_status: answered
+  datasets: &id014
+  - gold_real
+  follow_up_of: null
+  origem: G145
+  revisado_por: null
+- id: G145~livre2
+  question: Qual foi a média de horas que o suprimento de eletricidade ficou interrompido por domicílio em toda a nossa rede
+    no fechamento de março de 2025?
+  category: parafrase
+  reference_sql: SELECT dec FROM sem_kpis_mensais WHERE competencia = '2025-03'
+  expected_status: answered
+  datasets: *id014
+  follow_up_of: null
+  origem: G145
+  revisado_por: null
+- id: G148~livre1
+  question: Quantas instalações de menor tensão a gente tem em Olinda?
+  category: parafrase
+  reference_sql: SELECT count(*) AS ucs FROM sem_uc WHERE classe IN ('B1', 'B2', 'B3') AND municipio = 'Olinda'
+  expected_status: answered
+  datasets:
+  - gold_real
+  follow_up_of: null
+  origem: G148
+  revisado_por: null
