@@ -140,3 +140,21 @@ def test_monthly_rows_with_the_month_or_of_a_single_month_pass():
 
     assert calculation_problem(with_month) is None
     assert calculation_problem(one_month) is None
+
+
+def test_ranking_by_a_measure_left_out_of_the_select_is_flagged():
+    sql = (
+        "SELECT municipio FROM sem_kpis_segmento_mensal GROUP BY municipio "
+        "ORDER BY 100.0 * SUM(n_leituras_estimadas) / NULLIF(SUM(n_leituras), 0) DESC LIMIT 1"
+    )
+
+    assert "SELECT" in calculation_problem(sql)
+
+
+def test_ranking_by_a_selected_measure_passes():
+    sql = (
+        "SELECT municipio, SUM(receita_faturada) AS receita FROM sem_kpis_segmento_mensal "
+        "GROUP BY municipio ORDER BY SUM(receita_faturada) DESC LIMIT 1"
+    )
+
+    assert calculation_problem(sql) is None

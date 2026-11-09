@@ -19,6 +19,8 @@ MONTHLY_INDEX_VIEW = re.compile(r"\bsem_(?:kpis_mensais|continuidade_alimentador
 SINGLE_MONTH = re.compile(r"\bcompetencia\s*=\s*'", re.IGNORECASE)
 SELECT_LIST = re.compile(r"\bselect\b(?P<columns>.*?)\bfrom\b", re.IGNORECASE | re.DOTALL)
 SINGLE_UC = re.compile(r"\bcod_uc\s*=\s*'", re.IGNORECASE)
+MEASURE = re.compile(r"\b(?:sum|count|avg|min|max)\s*\(", re.IGNORECASE)
+CLAUSE = re.compile(r"\b(?P<keyword>select|from|order\s+by|limit)\b", re.IGNORECASE)
 
 SATISFACTION_FORMULA = (
     "Satisfação de vários meses não é a média de satisfacao_media: use "
@@ -44,6 +46,11 @@ FEEDER_FANOUT_FORMULA = (
 MONTHLY_ROWS_FORMULA = (
     "A consulta devolve uma linha por mês sem dizer o mês: para o período inteiro, some os "
     "meses (sum(dec), sum(fec), sum(n_chamados)); para ver mês a mês, traga competencia."
+)
+
+HIDDEN_RANKING_FORMULA = (
+    "A consulta ordena por uma medida que não está no SELECT, e a resposta mostraria só o nome: "
+    "traga a medida do ORDER BY no SELECT, com um alias, e ordene pelo alias."
 )
 
 DECOMPOSITION_FORMULA = (
@@ -81,6 +88,8 @@ def calculation_problem(sql: str) -> str | None:
         return FEEDER_FANOUT_FORMULA
     if _monthly_rows_without_month(sql):
         return MONTHLY_ROWS_FORMULA
+    if _ranking_measure_hidden(sql):
+        return HIDDEN_RANKING_FORMULA
     if SEGMENT_VIEW in sql and not AGGREGATE.search(sql):
         return SEGMENT_FORMULA
     effects = list(EFFECT.finditer(sql))
@@ -95,3 +104,22 @@ def _monthly_rows_without_month(sql: str) -> bool:
     selected = SELECT_LIST.search(sql)
     columns = selected["columns"].lower() if selected else ""
     return "competencia" not in columns and "*" not in columns
+
+
+def _ranking_measure_hidden(sql: str) -> bool:
+    clauses = _top_level_clauses(sql)
+    ordered = clauses.get("order by", "")
+    return bool(MEASURE.search(ordered)) and not MEASURE.search(clauses.get("select", ""))
+
+
+def _top_level_clauses(sql: str) -> dict[str, str]:
+    marks = [
+        match
+        for match in CLAUSE.finditer(sql)
+        if sql[: match.start()].count("(") == sql[: match.start()].count(")")
+    ]
+    ends = [match.start() for match in marks[1:]] + [len(sql)]
+    return {
+        " ".join(match["keyword"].lower().split()): sql[match.end() : end]
+        for match, end in zip(marks, ends, strict=True)
+    }
