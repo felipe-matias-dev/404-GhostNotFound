@@ -53,6 +53,9 @@ type Passo =
 const CONVERSAS: Record<string, Passo[]> = {
 	"conversa da apresentação": [{ id: "G106" }, { id: "G107" }, { id: "G108" }],
 	"pergunta da diretora": [{ id: "G109" }],
+	"classes de consumo": [{ id: "G003" }],
+	"tributos por classe": [{ id: "G120" }],
+	"inadimplência por classe": [{ id: "G121" }],
 	"esclarecimento seguido de resposta": [
 		{
 			pergunta:

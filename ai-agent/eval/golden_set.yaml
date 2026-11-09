@@ -1363,7 +1363,7 @@ itens:
     expected_status: answered
     datasets: [gold_real]
     follow_up_of: null
-    notes: "Percentual por recorte, que o mapa listava como lacuna. Tributos são a coluna da camada; o percentual é calculado pelo banco. Revisão de Dados (08/11/2026): 'por classe' sem qualificador é a classe de consumo do cadastro (classe_cadastro: residencial, comercial, industrial, rural e poder público), a da regulação e a única que separa comercial de poder público, que dividem o B3. A coluna classe (B1, B2, B3, A4) só vale quando a pergunta cita o código ou a tensão."
+    notes: "Percentual por recorte, que o mapa listava como lacuna. Tributos são a coluna da camada; o percentual é calculado pelo banco. Revisão de Dados (08/11/2026): 'por classe' sem qualificador é a classe do cadastro (classe_cadastro: residencial, comercial, industrial, rural e poder público), a da regulação e a única que separa comercial de poder público, que dividem o B3. A coluna classe (B1, B2, B3, A4) só vale quando a pergunta diz "classe de consumo" ou "classe tarifária", cita o código ou a tensão (regra da camada 0.4.7, como no G003)."
     revisado_por: "Luis Felipe Perylo (Dados)"
   - id: G121
     question: "qual a inadimplência por classe em junho de 2025?"
