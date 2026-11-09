@@ -25,6 +25,7 @@ class SqlDraft(BaseModel):
     views_used: tuple[str, ...] = ()
     assumptions: tuple[str, ...] = ()
     clarification_question: str | None = None
+    clarification_options: tuple[str, ...] = ()
 
     @model_validator(mode="after")
     def check_consistency(self) -> Self:

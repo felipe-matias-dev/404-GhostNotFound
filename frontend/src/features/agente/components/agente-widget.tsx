@@ -250,22 +250,22 @@ export function AgenteWidget() {
 					onClick={alternarWidget}
 					aria-expanded={widgetAberto}
 					aria-keyshortcuts="Control+j Meta+j"
-					className="flex h-9 cursor-pointer items-center gap-2 rounded-md border border-border-strong bg-surface-2 px-3.5 font-medium text-body text-text shadow-overlay transition-colors outline-none hover:border-focus-ring hover:bg-surface-1 focus-visible:border-focus-ring focus-visible:ring-3 focus-visible:ring-focus-ring/50"
+					className="flex h-10 cursor-pointer items-center gap-2 rounded-md bg-accent px-4 font-medium text-body text-on-accent shadow-modal transition-colors outline-none hover:bg-accent-hover focus-visible:ring-3 focus-visible:ring-focus-ring/50"
 				>
 					{enviando ? (
 						<SpinnerGapIcon
 							aria-hidden
-							className="size-4 text-accent-text motion-safe:animate-spin"
+							className="size-4.5 motion-safe:animate-spin"
 						/>
 					) : (
 						<LogoMark
 							weight={widgetAberto ? "fill" : "regular"}
-							className="size-4 text-accent-text"
+							className="size-4.5"
 						/>
 					)}
-					<span>Agente</span>
+					<span>Agente de IA</span>
 					{sessaoAtiva.turnos.length > 0 && (
-						<span className="rounded-full bg-accent-subtle px-1.5 font-mono text-small text-accent-text">
+						<span className="rounded-full bg-on-accent px-1.5 font-mono text-small text-accent">
 							{sessaoAtiva.turnos.length}
 						</span>
 					)}
@@ -273,7 +273,7 @@ export function AgenteWidget() {
 				<DropdownMenu>
 					<DropdownMenuTrigger
 						aria-label="Histórico de conversas do agente"
-						className="inline-flex size-9 cursor-pointer items-center justify-center rounded-md border border-border-strong bg-surface-2 text-text shadow-overlay outline-none transition-colors hover:border-focus-ring hover:bg-surface-1 focus-visible:border-focus-ring focus-visible:ring-3 focus-visible:ring-focus-ring/50 data-popup-open:border-focus-ring"
+						className="inline-flex size-10 cursor-pointer items-center justify-center rounded-md border border-border-strong bg-surface-2 text-text shadow-overlay outline-none transition-colors hover:border-focus-ring hover:bg-surface-1 focus-visible:border-focus-ring focus-visible:ring-3 focus-visible:ring-focus-ring/50 data-popup-open:border-focus-ring"
 					>
 						<ClockCounterClockwiseIcon aria-hidden />
 					</DropdownMenuTrigger>

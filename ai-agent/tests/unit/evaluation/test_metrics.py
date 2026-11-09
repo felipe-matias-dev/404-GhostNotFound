@@ -156,5 +156,5 @@ def test_reference_precision_is_taken_per_column():
 def test_fallback_is_the_deterministic_text_of_an_answered_result():
     rows = ({"total": 8},)
 
-    assert is_fallback(answered("A consulta devolveu 1 linha. Resultado: total = 8.", rows, 1))
+    assert is_fallback(answered("Direto dos dados: total 8.", rows, 1))
     assert not is_fallback(answered("Olinda tem 8 UCs.", rows, 1))

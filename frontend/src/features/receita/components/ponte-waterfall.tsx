@@ -41,7 +41,7 @@ export function PonteWaterfall({
 
 	const resumo = linha && quedas && (
 		<>
-			A receita{daClasse}{" "}
+			A receita de energia{daClasse}{" "}
 			<span className="font-medium text-text">
 				{variacao === 0
 					? "ficou estável"
@@ -51,7 +51,7 @@ export function PonteWaterfall({
 			{formatPeriodoCurto(linha.periodo_base)} para{" "}
 			{formatPeriodoCurto(linha.periodo_atual)}.{" "}
 			{quedas.length === 0 ? (
-				"Nenhum efeito puxou a receita para baixo."
+				"Nenhum efeito puxou a receita de energia para baixo."
 			) : (
 				<>
 					{quedas.length === 1 ? "Puxou" : "Puxaram"} para baixo:{" "}
@@ -70,7 +70,7 @@ export function PonteWaterfall({
 
 	return (
 		<WaterfallChart
-			label={`Ponte de receita${daClasse} ${nome ? `de ${nome}` : "da empresa"}`}
+			label={`Ponte de receita de energia${daClasse} ${nome ? `de ${nome}` : "da empresa"}`}
 			steps={passos}
 			summary={resumo}
 			summaryAction={
@@ -84,8 +84,8 @@ export function PonteWaterfall({
 					}}
 				/>
 			}
-			compareLabel="vs. receita base"
-			percentLabel="Sobre a receita base"
+			compareLabel="vs. receita de energia base"
+			percentLabel="Sobre a receita de energia base"
 			loading={isPending || isPlaceholderData}
 			error={isError ? "Não foi possível carregar a ponte de receita." : null}
 			onRetry={() => refetch()}

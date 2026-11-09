@@ -16,7 +16,7 @@ const ORCAMENTO_LIGADO = process.env.E2E_ORCAMENTO === "1";
 const PERGUNTA_BARATA = "Quantas UCs existem na base?";
 // Nomes técnicos que não podem aparecer no texto (item 4 da definição de validado).
 const NOME_TECNICO = /\b[a-zA-Z]+_\w+\b/;
-const TEXTO_DE_RESERVA = "A consulta devolveu";
+const TEXTO_DE_RESERVA = "Direto dos dados";
 // Item 7 da definição: a resposta aparece em menos de 10 s. Conferido com expect.soft, para a
 // rodada seguir e o relatório listar todas as respostas lentas.
 const TEMPO_MAXIMO_MS = 10_000;
@@ -47,6 +47,7 @@ type Passo =
 	| { id: string }
 	| { pergunta: string; espera: "esclarecimento" | "nao_sei" | "recusa" }
 	| { opcao: string }
+	| { opcaoDoModelo: true }
 	| { pergunta: string; comoId: string };
 
 const CONVERSAS: Record<string, Passo[]> = {
@@ -113,6 +114,10 @@ const CONVERSAS: Record<string, Passo[]> = {
 	"receita sem período pede o período": [
 		{ pergunta: "Qual foi a receita?", espera: "esclarecimento" },
 		{ opcao: "nos últimos 12 meses" },
+	],
+	"medida de juízo oferece opções": [
+		{ pergunta: "Quais foram os piores bairros de Recife em 2025?", espera: "esclarecimento" },
+		{ opcaoDoModelo: true },
 	],
 	"fora do escopo": [
 		{ pergunta: "Quantos clientes cancelaram o contrato em 2025?", espera: "nao_sei" },
@@ -212,7 +217,20 @@ for (const login of USUARIOS) {
 			test(`conversa: ${nome}`, async ({ page }) => {
 				await page.goto("/agente");
 				for (const passo of passos) {
-					if ("opcao" in passo) {
+					if ("opcaoDoModelo" in passo) {
+						const opcoes = page.getByTestId("agente-opcao");
+						expect(await opcoes.count(), "opções do esclarecimento").toBeGreaterThanOrEqual(2);
+						for (const opcao of await opcoes.allInnerTexts())
+							expect(opcao, "opção sem nome técnico").not.toMatch(NOME_TECNICO);
+						const respostas = page.getByTestId("agente-resposta-texto");
+						const antes = await respostas.count();
+						await opcoes.first().click();
+						await expect(respostas).toHaveCount(antes + 1, { timeout: 60_000 });
+						const texto = (await respostas.last().innerText()).trim();
+						expect(texto, "resposta à opção").not.toContain(TEXTO_DO_STATUS.esclarecimento);
+						expect(texto, "resposta à opção").not.toContain(TEXTO_DE_RESERVA);
+						expect(texto, "resposta à opção").not.toMatch(NOME_TECNICO);
+					} else if ("opcao" in passo) {
 						const respostas = page.getByTestId("agente-resposta-texto");
 						const antes = await respostas.count();
 						await page.getByRole("button", { name: passo.opcao }).last().click();
@@ -247,7 +265,7 @@ for (const login of USUARIOS) {
 		test("pelo widget, numa tela do perfil", async ({ page }) => {
 			const item = ESPERADO.get("G106");
 			if (!item) return;
-			await page.getByRole("button", { name: "Agente", exact: true }).click();
+			await page.getByRole("button", { name: "Agente de IA", exact: true }).click();
 			const texto = await perguntar(page, item.pergunta);
 			await conferirResposta(page, texto, item);
 		});

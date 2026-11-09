@@ -123,3 +123,38 @@ def test_feeder_of_a_single_uc_or_filtered_by_subquery_passes():
 
     assert calculation_problem(one_uc) is None
     assert calculation_problem(subquery) is None
+
+
+def test_monthly_rows_of_a_range_without_the_month_are_flagged():
+    sql = "SELECT dec FROM sem_kpis_mensais WHERE competencia BETWEEN '2025-01' AND '2025-12'"
+
+    assert "sum(dec)" in calculation_problem(sql)
+
+
+def test_monthly_rows_with_the_month_or_of_a_single_month_pass():
+    with_month = (
+        "SELECT competencia, dec FROM sem_kpis_mensais "
+        "WHERE competencia BETWEEN '2025-01' AND '2025-12'"
+    )
+    one_month = "SELECT dec FROM sem_kpis_mensais WHERE competencia = '2025-03'"
+
+    assert calculation_problem(with_month) is None
+    assert calculation_problem(one_month) is None
+
+
+def test_ranking_by_a_measure_left_out_of_the_select_is_flagged():
+    sql = (
+        "SELECT municipio FROM sem_kpis_segmento_mensal GROUP BY municipio "
+        "ORDER BY 100.0 * SUM(n_leituras_estimadas) / NULLIF(SUM(n_leituras), 0) DESC LIMIT 1"
+    )
+
+    assert "SELECT" in calculation_problem(sql)
+
+
+def test_ranking_by_a_selected_measure_passes():
+    sql = (
+        "SELECT municipio, SUM(receita_faturada) AS receita FROM sem_kpis_segmento_mensal "
+        "GROUP BY municipio ORDER BY SUM(receita_faturada) DESC LIMIT 1"
+    )
+
+    assert calculation_problem(sql) is None

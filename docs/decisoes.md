@@ -2182,6 +2182,7 @@ Decisões de 19/10/2026, anteriores à numeração: [convenções do frontend](#
 - **Motivo:** como o teste não distingue, a decisão se apoia no conceito: tributos não são receita da distribuidora. Sem eles, o efeito preço separa reajuste de tarifa e bandeira, e a variação dos impostos aparece à parte (como na conta da UC, [DEC-057](#dec-057--variação-da-conta-da-unidade-consumidora-dividida-por-motivo)).
 - **Descartado:** `receita_faturada` como base do PVM. Daria a mesma variação percentual, mas misturaria a variação dos tributos com o efeito preço.
 - **Consequências:** saem as marcas de "provisória" do contrato, do dicionário e da [DEC-057](#dec-057--variação-da-conta-da-unidade-consumidora-dividida-por-motivo). O comentário de `backend/src/venergy_api/models.py` que cita a base provisória fica para um ajuste do Portal.
+- **Atualização (05/11/2026, Portal, Felipe):** na prévia, a ponte em receita de energia confundiu quem vinha da Visão geral, que mostra a receita faturada. A tela de Receita passa a mostrar, logo acima da ponte, a receita faturada de cada período do par aberta em receita de energia + tributos, vinda pronta de `GET /indicadores/comparacao` (a tela não faz conta). Os rótulos da ponte, do mapa e do ranking passam a dizer "receita de energia"; na tabela, as colunas viram "Energia base" e "Energia atual", para caber no cabeçalho, com os valores em R$. A ponte, o insight e a Visão geral não mudam: os efeitos em % são os mesmos nas duas medidas. Conferido na Gold real: a receita de energia da rota de indicadores é igual à base e ao atual da decomposição em todos os 666 pares, por município, bairro e classe, e a faturada é energia + tributos ao centavo. Os valores aparecem em formato compacto, como na Visão geral, porque a barra final da ponte (base + efeitos) difere da energia somada em centavos. Descartado: uma barra de tributos na ponte, para ela fechar na receita faturada. Pediria mudanças no backend, no insight e nos percentuais de cada efeito a poucos dias da banca, para uma informação que a API já entrega.
 
 ## DEC-074 · Testes de qualidade do export e da Gold
 
@@ -2546,7 +2547,7 @@ Decisões de 19/10/2026, anteriores à numeração: [convenções do frontend](#
   - **Métrica do turno mais recente (`prompts/v5/history.md`):** um follow-up que só troca o período ou o recorte ("e em 2024?") herda a métrica do turno mais recente, e não a de um turno mais antigo. No portal, a conversa "DEC de 2025" → "E quanto foi o FEC?" → "E como foi em 2024?" devolveu o DEC de 2024 para um dos usuários.
   - **Recorte num período sai dos segmentos (camada 0.4.6):** participação, soma ou comparação por município, bairro, classe, alimentador ou GD num período usa `sem_kpis_segmento_mensal`, que guarda o recorte de cada mês. Juntar o faturamento com o cadastro atual (`sem_uc`) conta o ano todo para uma UC que ligou painel solar no meio dele: no portal, a participação da GD em 2025 saiu 4,2% por esse caminho, contra 2,00% pelos segmentos. Colunas terminadas em `_pct` aparecem na tabela como "em %".
   - **Rodada de 08/11/2026 (regras gerais, sem olhar a pergunta):**
-    - **Série inteira sem período:** uma soma ou média de toda a série de uma view mensal, sem `competencia` no SQL e sem período na pergunta nem na conversa, vira pedido de período. Antes, "Qual foi a receita?" às vezes devolvia a receita somada de quatro anos (G132, 1 em 3 rodadas).
+    - **Série inteira sem período:** uma soma, uma média ou a lista mês a mês de toda a série de uma view mensal, sem filtro de período no SQL e sem período na pergunta nem na conversa, vira pedido de período (no portal, um dos usuários recebeu a receita de todos os meses da base para "Qual foi a receita?"). Antes, "Qual foi a receita?" às vezes devolvia a receita somada de quatro anos (G132, 1 em 3 rodadas).
     - **Opções no pedido de período do modelo:** quando o próprio modelo pede o período e a pergunta não tem ano nem mês, o portal oferece "nos últimos 12 meses" como botão, como já fazia o pedido de período do código (DEC-082).
     - **Ano por extenso:** "dois mil e vinte e quatro" conta como 2024 nas checagens de período (`domain/text.py`). Antes, o SQL certo era descartado como ano inventado e a pessoa recebia um pedido de período.
     - **Alimentador juntado às UCs:** somar a continuidade do alimentador com um `JOIN` em `sem_uc` repete cada linha do alimentador uma vez por UC. O SQL volta ao modelo como erro de cálculo, pedindo o filtro por subconsulta (`cod_alimentador IN (SELECT …)`). Juntar para uma única UC continua valendo.
@@ -2572,7 +2573,7 @@ Decisões de 19/10/2026, anteriores à numeração: [convenções do frontend](#
 
     O que sobra é, em geral, ambiguidade real ("pontos de suprimento", "tempo desligado", "julho de 21") ou formato diferente do gabarito com a resposta certa (MWh em vez de kWh, uma linha por mês em vez de colunas).
   - **Golden 0.24.0 (163 itens), narrado e com juiz `google-gla:gemini-3.5-flash-lite`:** a rodada completa na cota gratuita teve itens com erro de cota (15 requisições por minuto) e de DNS da máquina; os itens com erro foram repetidos devagar até terem resultado. Contra a rodada final do lote 2, nos 151 itens em comum, nenhum item piora em SQL ou status depois das correções (G027, G037 e G141 repetidos com as regras finais: 8 de 8 certos). Red team (17): sem violação.
-  - **Follow-ups do golden depois da regra da métrica:** 30 itens (os 19 de follow-up e os turnos de que dependem), SQL e status 100%. Itens com recorte (49, referência em `sem_kpis_segmento_mensal` ou `sem_uc`) depois da regra de recortes: 48 certos; o G120 ("por classe") continua ambíguo, à espera de Dados.
+  - **Follow-ups do golden depois da regra da métrica:** 30 itens (os 19 de follow-up e os turnos de que dependem), SQL e status 100%. Itens com recorte (49, referência em `sem_kpis_segmento_mensal` ou `sem_uc`) depois da regra de recortes: 48 certos; o G120 ("por classe") ficou ambíguo até a revisão de Dados de 08/11/2026, que fixou "por classe" como a classe do cadastro (golden 0.24.1). Na rodada final, o agente acertou o G120 e o G121 por esse caminho.
   - **Portal, 5 usuários, 34 cenários cada (07/11/2026), com dois modelos gratuitos (Gemini 3.1 Flash-Lite e 3.5 Flash-Lite de reserva):**
     - primeira rodada: 143 de 175 testes passaram; das falhas, 4 eram do agente ou do teste: a memória da métrica no 3º turno (camila), corrigida com a regra do histórico; o G156, que o teste comparava com mais casas do que a tabela mostra; e a participação da GD pelo cadastro atual, corrigida com a regra de recortes. As demais foram tempo acima de 10 s ou erro do modelo por limite da cota gratuita (15 requisições por minuto);
     - depois das correções, as conversas afetadas foram repetidas nos 5 usuários: a participação da GD saiu pelos segmentos em todas as respostas com SQL, e as falhas restantes foram erro do modelo ou prazo do teste, por cota;
@@ -2584,6 +2585,7 @@ Decisões de 19/10/2026, anteriores à numeração: [convenções do frontend](#
     - juiz (nos 33 itens narrados antes do fim da cota): 87,9% aprovados, nota média 4,76;
     - red team (17): nenhuma escrita, nenhuma view alterada, nenhum vazamento de prompt, 100% das manipulações bloqueadas;
     - conjuntos novos, trocados nesta rodada: paráfrases 0.2.0, com 20 de 25 certas depois da regra do ano por extenso (antes, 18); as 5 que sobram são leituras discutíveis ("categoria de uso" como classe do cadastro, "nossa gente" como bairro). Inéditas 0.2.0, com 11 de 12 certas depois da regra do JOIN; a que falta lê "caixa de arrecadação" como receita faturada, uma lacuna de vocabulário que fica para o próximo conjunto, como manda a regra;
+    - revisão de Dados do golden (0.24.1): os 58 itens G106 a G163 tiveram a referência executada e conferida na Gold real, inclusive os tributos (receita faturada menos receita de energia é igual à soma de `tributos` nos 48 meses) e o ranking de bairros do G152, conferido contra a tabela de interrupções por UC;
     - portal com os 5 usuários: "Qual foi a receita?" pede o período e oferece "nos últimos 12 meses", e o esclarecimento seguido de resposta continua certo. A única falha foi uma resposta de 14 s, por causa da cota gratuita. Ano por extenso (com os gabaritos do G005 e do G015) e FEC do circuito de um bairro (gabarito do G089): 15 de 15 testes certos.
 - **Consequências:**
   - item novo do golden aguarda a conferência de Dados;
@@ -2624,6 +2626,36 @@ Decisões de 19/10/2026, anteriores à numeração: [convenções do frontend](#
   - **`UNION` ou `CROSS JOIN` num único `SELECT`:** é o que o modelo faz hoje e o que produz as respostas parciais.
 - **Consequências:**
   - O contrato OpenAPI e os tipos do portal são regerados nas duas mudanças de contrato (`interpretations` e `steps`). Clientes antigos continuam funcionando, porque os dois campos têm padrão vazio.
-  - Cada mudança de prompt vai para uma versão nova (`prompts/v6/`), e nenhuma entra se o golden regredir (DEC-016).
+  - Cada mudança de prompt vai para uma versão nova (`prompts/v7/`, depois do `v6` da DEC-086), e nenhuma entra se o golden regredir (DEC-016).
   - O golden ganha itens para cada análise pronta e para as perguntas de vários fatos, com `revisado_por: null` até Dados conferir.
 - **Evidência:** pendente. Cada tarefa registra aqui a rodada do golden e o teste no portal com os 5 usuários.
+
+## DEC-086 · Texto de reserva legível, opções do modelo no esclarecimento e nova tentativa no portal
+
+- **Data:** 08/11/2026 · **Área:** GenAI e Portal · **Autor:** Luis Felipe · **Revisa:** complementa a DEC-082 (opções de esclarecimento) e a DEC-084.
+- **Contexto:** a rodada de 08/11 no portal mostrou três pontos em que a pessoa fica sem uma resposta boa, mesmo com o agente certo:
+  - quando a narração falha (cota ou prazo), aparece o texto de reserva "A consulta devolveu 1 linha. Resultado: receita faturada = R$ …", que lê como saída de sistema;
+  - só o pedido de período tinha botões. "Piores bairros" ou "por classe" pediam esclarecimento sem sugerir resposta, e a pessoa precisava adivinhar o que escrever;
+  - uma resposta com status de falha (modelo indisponível ou prazo) não tinha o botão "Tentar novamente", que só existia para erro de rede.
+- **Decisão:**
+  - **Texto de reserva:** começa com "Direto dos dados", cita o período por extenso e lista as colunas como frase ("Direto dos dados, em março de 2025: receita faturada R$ 35.482,79."). Resultado com mais de 5 linhas ou 6 colunas manda ver a tabela. O começo fixo continua marcando a reserva para a métrica `fallback_rate` e para o teste de ponta a ponta.
+  - **Opções do modelo (prompt de SQL `v6`):** com `clarify`, o modelo devolve de 2 a 3 respostas curtas em `clarification_options` do rascunho. O agente descarta as que têm nome técnico, tira repetidas, limita a 3 e as entrega no campo que o contrato já tinha (DEC-082). Sem opções do modelo, vale a regra antiga do período. O contrato do `AgentAnswer` não muda.
+  - **Nova tentativa:** resposta com status de falha mostra "Tentar novamente", que repete a pergunta no mesmo turno, como no erro de rede.
+  - **Coluna que não existe:** quando o banco diz que uma coluna não existe, o erro volta ao modelo dizendo em que views ela existe. No portal, "chamados e satisfação em 2025" esgotava as três tentativas procurando `soma_notas` em `sem_kpis_mensais` e `n_chamados` em `sem_atendimentos_uc`. A regra da satisfação também passa a lembrar que `sem_kpis_segmento_mensal` tem os chamados.
+  - **Linhas mensais sem o mês:** ler `sem_kpis_mensais` ou a continuidade do alimentador num intervalo de meses, sem agregar e sem `competencia`, volta ao modelo como erro de cálculo. No portal, "DEC da distribuidora em 2025" trazia 12 valores mensais sem o mês, em vez do DEC do ano.
+- **Alternativas descartadas:**
+  - campo novo no contrato dizendo que o texto é de reserva: exigiria acordo com o backend, e o começo fixo já distingue;
+  - opções escritas pelo código para cada ambiguidade conhecida: cobririam só os casos previstos.
+- **Consequências:** o prompt `v6` é padrão nesta branch e só entra na `APRESENTAÇÃO` depois de uma rodada do golden sem regressão (DEC-016).
+- **Evidência (08/11/2026, Gold real, Gemini 3.1 Flash-Lite pago pelo OpenRouter, gasto total de US$ 1,73):**
+  - **golden 0.24.1 com o `v6`, narrado e com juiz:** SQL certo em 99,2%, status 100%, `fallback_rate` 0%, juiz 98,3% (nota média 4,94), tempo p50 de 4,0 s e p95 de 5,2 s, red team sem violação. Contra o lote 3, nos 156 itens em comum: o G093 e o G132 melhoram e o G120 piora (usou a classe tarifária, a ambiguidade que já oscilava; a regra "por classe é a classe do cadastro" na camada fica para a próxima rodada). As duas regras novas de cálculo vieram depois desta rodada e foram conferidas contra todas as referências dos três conjuntos, sem falso positivo;
+  - **portal, 5 usuários, 40 conversas cada:** 180 de 200 testes passaram. As 20 falhas foram:
+    - 10 de tempo acima de 10 s, metade na pergunta longa da diretora (15 a 20 s) e o resto entre 10,4 e 12,4 s;
+    - 5 em "chamados e satisfação" e 5 no "DEC de 2025". Esses 10 testes passaram nos 5 usuários depois das duas regras novas;
+  - **opções do modelo:** "Quais foram os piores bairros de Recife em 2025?" pediu esclarecimento com opções clicáveis em 4 de 5 usuários; no quinto, o modelo respondeu direto, com três medidas;
+  - **nova tentativa:** o botão apareceu nas respostas com falha por cota e por tentativas esgotadas;
+  - **texto de reserva:** não apareceu nenhuma vez no modelo pago (`fallback_rate` 0%); o formato está coberto pelos testes de unidade.
+- **Pendências:**
+  - tempo da pergunta longa da diretora acima de 10 s;
+  - regra da classe na camada semântica (G120), com uma rodada do golden;
+  - opções do modelo em 4 de 5 rodadas na pergunta de juízo.

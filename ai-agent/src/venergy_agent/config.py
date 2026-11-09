@@ -31,7 +31,7 @@ class AgentSettings(BaseSettings):
     max_rows: int = Field(200, gt=0)
     query_timeout_seconds: float = Field(10.0, gt=0)
     max_correction_attempts: int = Field(3, ge=1, le=3)
-    prompt_version: str = "v5"
+    prompt_version: str = "v6"
     prompts_dir: Path = AGENT_ROOT / "prompts"
     answer_prompt_version: str = "v8"
     insight_prompt_version: str = "v4"

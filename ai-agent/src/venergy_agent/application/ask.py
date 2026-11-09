@@ -27,7 +27,7 @@ from venergy_agent.domain.errors import (
     SqlRejected,
 )
 from venergy_agent.domain.events import AgentEvent, AnswerEvent, Stage, StageEvent
-from venergy_agent.domain.filter_values import filter_value_problem
+from venergy_agent.domain.filter_values import filter_value_problem, known_values
 from venergy_agent.domain.followup import (
     answers_a_clarification,
     complete_question,
@@ -121,7 +121,7 @@ PERIOD_NOT_GIVEN = (
 YEAR = re.compile(r"\b(?:19|20)\d{2}\b")
 BASE_RELATIVE = re.compile(
     r"\b(?:primeir[oa]s?|últim[oa]s?|inicia(?:l|is)|início|começo|arranque|partida|mais\s+recente)"
-    r"(?:\W+\w+){0,4}?\W+(?:base|série|histórico|dados)\b"
+    r"(?:[^\w.?!;]+\w+){0,4}?[^\w.?!;]+(?:base|série|histórico|dados)\b"
     r"|\búltim[oa]s\s+(?:doze|vinte\s+e\s+quatro|seis|três)\s+(?:meses|ciclos)\b",
     re.IGNORECASE,
 )
@@ -155,7 +155,7 @@ FALLBACK_MAX_ROWS = 5
 FALLBACK_MAX_COLUMNS = 6
 MISSING_VALUE = "sem valor"
 TEXT_VALUE_MAX_CHARS = 120
-FALLBACK_PREFIX = "A consulta devolveu"
+FALLBACK_PREFIX = "Direto dos dados"
 EMPTY_RESULT = (
     "Nenhum registro atende à consulta. O agente não distingue zero de dado ausente, "
     "então confira os filtros."
@@ -418,7 +418,8 @@ class AskUseCase:
                     started,
                     model=generation.model,
                     spent=spent,
-                    options=_model_period_options(question.text, history, clarification),
+                    options=_model_options(draft.clarification_options)
+                    or _model_period_options(question.text, history, clarification),
                 )
 
             emit(_stage_event(Stage.QUERYING, attempt, spent))
@@ -468,7 +469,7 @@ class AskUseCase:
             invented = _invented_years(question.text, history, validated)
             if not invented and _invented_base_window(question.text, history, validated.sql):
                 invented = ("janela_da_base",)
-            if not invented and _whole_series_without_period(question.text, history, validated.sql):
+            if not invented and _whole_series_without_period(question.text, history, validated):
                 invented = ("serie_inteira",)
             if invented:
                 self._log(
@@ -502,7 +503,9 @@ class AskUseCase:
                     latency_ms=_elapsed_ms(began),
                 )
                 feedback = AttemptFeedback(
-                    previous_sql=draft.sql, error_kind=error.kind, message=error.message
+                    previous_sql=draft.sql,
+                    error_kind=error.kind,
+                    message=error.message + _where_column_is(error.message, self._layer),
                 )
                 continue
             except Exception as error:
@@ -864,22 +867,24 @@ class AskUseCase:
         if result.row_count == 0:
             text = EMPTY_RESULT
         else:
-            noun = "linha" if result.row_count == 1 else "linhas"
-            text = f"{FALLBACK_PREFIX} {result.row_count} {noun}."
-            if period is not None:
-                text += _period_sentence(period)
-            if (
+            text = FALLBACK_PREFIX + (f", {_period_in_words(period)}" if period else "")
+            small = (
                 len(result.rows) <= FALLBACK_MAX_ROWS
                 and len(result.columns) <= FALLBACK_MAX_COLUMNS
-            ):
+            )
+            if result.row_count > 1:
+                text += f", {result.row_count} resultados"
+            if small:
                 text += (
-                    " Resultado: "
+                    ": "
                     + "; ".join(
                         _row_text(result.columns, row, self._layer.column_units)
                         for row in result.rows
                     )
                     + "."
                 )
+            else:
+                text += ". Veja a tabela abaixo."
         if result.truncated:
             text += (
                 f" O resultado foi limitado a {validated.applied_limit} linhas, "
@@ -988,7 +993,7 @@ def _stage_event(stage: Stage, attempt: int, spent: _Spent) -> StageEvent:
 
 def _row_text(columns: tuple[str, ...], row: dict[str, object], units: Mapping[str, str]) -> str:
     return ", ".join(
-        f"{label(column)} = {_with_unit(row.get(column), unit_of(column, units))}"
+        f"{label(column)} {_with_unit(row.get(column), unit_of(column, units))}"
         for column in columns
     )
 
@@ -1041,13 +1046,6 @@ def _endpoints(periods: tuple[str, ...]) -> tuple[str, str] | None:
     if not periods:
         return None
     return periods[0], periods[-1]
-
-
-def _period_sentence(period: tuple[str, str]) -> str:
-    first, last = period
-    if first == last:
-        return f" Período: {first}."
-    return f" Período: {first} a {last}."
 
 
 def _names_period(text: str, period: tuple[str, str]) -> bool:
@@ -1131,13 +1129,31 @@ def _period_options(years: tuple[str, ...]) -> tuple[str, ...]:
 
 
 def _known_values(layer: SemanticLayer) -> dict[str, tuple[str, ...]]:
-    known = {
-        column.name: tuple(column.allowed_values)
-        for view in layer.views
-        for column in view.columns
-        if column.allowed_values
-    }
-    return known | dict(layer.categorical_values)
+    return known_values(
+        [
+            *(
+                (column.name, column.allowed_values)
+                for view in layer.views
+                for column in view.columns
+                if column.allowed_values
+            ),
+            *layer.categorical_values.items(),
+        ]
+    )
+
+
+MISSING_COLUMN = re.compile(r'column "?(?:\w+\.)?(\w+)"? does not exist', re.IGNORECASE)
+
+
+def _where_column_is(message: str, layer: SemanticLayer) -> str:
+    match = MISSING_COLUMN.search(message)
+    if match is None:
+        return ""
+    column = match.group(1)
+    views = [view.name for view in layer.views if any(c.name == column for c in view.columns)]
+    if not views:
+        return f" {column} não existe em nenhuma view."
+    return f" {column} existe em {', '.join(views)}: leia a coluna de uma dessas views."
 
 
 def _column_names(layer: SemanticLayer) -> set[str]:
@@ -1161,46 +1177,57 @@ def _invented_base_window(question: str, history: tuple[ConversationTurn, ...], 
 MONTHLY_VIEW = re.compile(
     r"\bsem_(?:kpis_mensais|kpis_segmento_mensal|faturamento_mensal|continuidade_alimentador_mensal)\b"
 )
-SERIES_AGGREGATE = re.compile(r"\b(?:sum|avg)\s*\(", re.IGNORECASE)
+SERIES_READING = re.compile(
+    r"\b(?:sum|avg)\s*\(|\b(?:group|order)\s+by\s+(?:\w+\.)?competencia\b", re.IGNORECASE
+)
 WHOLE_SERIES = re.compile(
     r"\b(?:histórico|toda\s+a\s+(?:base|série)|todo\s+o\s+período|desde\s+o\s+(?:início|começo)"
     r"|série\s+inteira)\b",
     re.IGNORECASE,
 )
 MONTH_NAME = re.compile(rf"\b(?:{'|'.join(MONTH_NAMES)})\b", re.IGNORECASE)
+
+
+def _conversation(question: str, history: tuple[ConversationTurn, ...]) -> str:
+    return with_spelled_years_as_digits(" ".join([question, *(turn.question for turn in history)]))
+
+
+def _names_a_period(question: str, history: tuple[ConversationTurn, ...]) -> bool:
+    if any("competencia" in (turn.sql or "").lower() for turn in history):
+        return True
+    context = _conversation(question, history)
+    return bool(YEAR.search(context) or MONTH_DATE.search(context) or MONTH_NAME.search(context))
+
+
 ASKS_FOR_PERIOD = re.compile(r"\b(?:período|competência|mês|meses|ano)\b", re.IGNORECASE)
+
+
+CLARIFICATION_OPTION_LIMIT = 3
+
+
+def _model_options(options: tuple[str, ...]) -> tuple[str, ...]:
+    kept = [
+        option.strip() for option in options if option.strip() and not TECHNICAL_NAME.search(option)
+    ]
+    return tuple(dict.fromkeys(kept))[:CLARIFICATION_OPTION_LIMIT]
 
 
 def _model_period_options(
     question: str, history: tuple[ConversationTurn, ...], clarification: str
 ) -> tuple[str, ...]:
-    if not ASKS_FOR_PERIOD.search(clarification):
-        return ()
-    context = with_spelled_years_as_digits(
-        " ".join([question, *(turn.question for turn in history)])
-    )
-    if YEAR.search(context) or MONTH_DATE.search(context) or MONTH_NAME.search(context):
+    if not ASKS_FOR_PERIOD.search(clarification) or _names_a_period(question, history):
         return ()
     return _period_options(())
 
 
 def _whole_series_without_period(
-    question: str, history: tuple[ConversationTurn, ...], sql: str
+    question: str, history: tuple[ConversationTurn, ...], validated: ValidatedQuery
 ) -> bool:
-    if "competencia" in sql.lower() or not MONTHLY_VIEW.search(sql):
+    if validated.periods or validated.years or not MONTHLY_VIEW.search(validated.sql):
         return False
-    if not SERIES_AGGREGATE.search(sql):
+    if BASE_WINDOW.search(validated.sql) or not SERIES_READING.search(validated.sql):
         return False
-    if any("competencia" in (turn.sql or "").lower() for turn in history):
+    if _names_a_period(question, history):
         return False
-    context = with_spelled_years_as_digits(
-        " ".join([question, *(turn.question for turn in history)])
-    )
-    return not (
-        YEAR.search(context)
-        or MONTH_DATE.search(context)
-        or MONTH_NAME.search(context)
-        or BASE_RELATIVE.search(context)
-        or WHOLE_SERIES.search(context)
-        or durations(context)
-    )
+    context = _conversation(question, history)
+    return not (BASE_RELATIVE.search(context) or WHOLE_SERIES.search(context) or durations(context))

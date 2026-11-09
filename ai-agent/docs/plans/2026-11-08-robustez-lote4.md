@@ -21,7 +21,7 @@
 ## Aceite (vale para as três tarefas)
 
 1. Testes de unidade das regras novas, sem chamar o modelo real. Testes de integração no `venergy_test`.
-2. Prompt novo em `prompts/v6/`. Com ele, o golden completo (narrado e com juiz) não regride em SQL nem em status nos itens em comum (DEC-016).
+2. Prompt novo em `prompts/v7/` (o `v6` é o da DEC-086). Com ele, o golden completo (narrado e com juiz) não regride em SQL nem em status nos itens em comum (DEC-016).
 3. Itens novos do golden com `revisado_por: null`, e um conjunto novo de paráfrases e de perguntas inéditas na rodada (`make eval-variants`, `make eval-fora`).
 4. Teste no portal com os 5 usuários (henrique, camila, rafael, beatriz, patricia), pela página Agente e pelo widget, com cenários novos em `frontend/e2e/agente.spec.ts`.
 5. Evidência registrada na DEC-085 e progresso atualizado no plano geral.
@@ -33,7 +33,7 @@
 - **Domínio** (`domain/answer.py`, `domain/sql.py`):
   - `Interpretation(term, reading, alternatives)`, com até três alternativas;
   - `interpretations` no `SqlDraft` e no `AgentAnswer`, com até três itens e só nos status `answered` e `clarify`.
-- **Prompt `v6/system.md`:** a seção "Palavras que não estão no glossário" passa a preencher `interpretations`, e não mais `assumptions`.
+- **Prompt `v7/system.md`:** a seção "Palavras que não estão no glossário" passa a preencher `interpretations`, e não mais `assumptions`.
 - **Caso de uso** (`application/ask.py`):
   - repassa as interpretações;
   - retira de `assumptions` o "Entendi 'X' como Y" que repetir uma interpretação;

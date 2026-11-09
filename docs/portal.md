@@ -31,7 +31,9 @@ navegador ([DEC-060](decisoes.md#dec-060--filtros-compartilhados-entre-as-telas-
 
 - **Visão geral:** indicadores comercial, de rede e de atendimento do recorte.
 - **Receita:** ponte em cascata, mapa da Região Metropolitana do Recife e drill-down
-  município → bairro → classe.
+  município → bairro → classe. A ponte é da receita de energia, sem tributos; acima dela, a
+  receita faturada de cada período aparece aberta em energia + tributos, para ligar a ponte ao
+  número da Visão geral ([DEC-073](decisoes.md#dec-073--receita_energia-confirmada-como-base-do-pvm-e-da-tarifa-média)).
 - **Insight de IA:** na Visão geral, ao lado da frase do título; na Receita, ao lado da frase de
   leitura da ponte ([insights de IA](#insights-de-ia)).
 
