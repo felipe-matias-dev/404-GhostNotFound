@@ -155,7 +155,7 @@ FALLBACK_MAX_ROWS = 5
 FALLBACK_MAX_COLUMNS = 6
 MISSING_VALUE = "sem valor"
 TEXT_VALUE_MAX_CHARS = 120
-FALLBACK_PREFIX = "A consulta devolveu"
+FALLBACK_PREFIX = "Direto dos dados"
 EMPTY_RESULT = (
     "Nenhum registro atende à consulta. O agente não distingue zero de dado ausente, "
     "então confira os filtros."
@@ -418,7 +418,8 @@ class AskUseCase:
                     started,
                     model=generation.model,
                     spent=spent,
-                    options=_model_period_options(question.text, history, clarification),
+                    options=_model_options(draft.clarification_options)
+                    or _model_period_options(question.text, history, clarification),
                 )
 
             emit(_stage_event(Stage.QUERYING, attempt, spent))
@@ -502,7 +503,9 @@ class AskUseCase:
                     latency_ms=_elapsed_ms(began),
                 )
                 feedback = AttemptFeedback(
-                    previous_sql=draft.sql, error_kind=error.kind, message=error.message
+                    previous_sql=draft.sql,
+                    error_kind=error.kind,
+                    message=error.message + _where_column_is(error.message, self._layer),
                 )
                 continue
             except Exception as error:
@@ -864,22 +867,24 @@ class AskUseCase:
         if result.row_count == 0:
             text = EMPTY_RESULT
         else:
-            noun = "linha" if result.row_count == 1 else "linhas"
-            text = f"{FALLBACK_PREFIX} {result.row_count} {noun}."
-            if period is not None:
-                text += _period_sentence(period)
-            if (
+            text = FALLBACK_PREFIX + (f", {_period_in_words(period)}" if period else "")
+            small = (
                 len(result.rows) <= FALLBACK_MAX_ROWS
                 and len(result.columns) <= FALLBACK_MAX_COLUMNS
-            ):
+            )
+            if result.row_count > 1:
+                text += f", {result.row_count} resultados"
+            if small:
                 text += (
-                    " Resultado: "
+                    ": "
                     + "; ".join(
                         _row_text(result.columns, row, self._layer.column_units)
                         for row in result.rows
                     )
                     + "."
                 )
+            else:
+                text += ". Veja a tabela abaixo."
         if result.truncated:
             text += (
                 f" O resultado foi limitado a {validated.applied_limit} linhas, "
@@ -988,7 +993,7 @@ def _stage_event(stage: Stage, attempt: int, spent: _Spent) -> StageEvent:
 
 def _row_text(columns: tuple[str, ...], row: dict[str, object], units: Mapping[str, str]) -> str:
     return ", ".join(
-        f"{label(column)} = {_with_unit(row.get(column), unit_of(column, units))}"
+        f"{label(column)} {_with_unit(row.get(column), unit_of(column, units))}"
         for column in columns
     )
 
@@ -1041,13 +1046,6 @@ def _endpoints(periods: tuple[str, ...]) -> tuple[str, str] | None:
     if not periods:
         return None
     return periods[0], periods[-1]
-
-
-def _period_sentence(period: tuple[str, str]) -> str:
-    first, last = period
-    if first == last:
-        return f" Período: {first}."
-    return f" Período: {first} a {last}."
 
 
 def _names_period(text: str, period: tuple[str, str]) -> bool:
@@ -1144,6 +1142,20 @@ def _known_values(layer: SemanticLayer) -> dict[str, tuple[str, ...]]:
     )
 
 
+MISSING_COLUMN = re.compile(r'column "?(?:\w+\.)?(\w+)"? does not exist', re.IGNORECASE)
+
+
+def _where_column_is(message: str, layer: SemanticLayer) -> str:
+    match = MISSING_COLUMN.search(message)
+    if match is None:
+        return ""
+    column = match.group(1)
+    views = [view.name for view in layer.views if any(c.name == column for c in view.columns)]
+    if not views:
+        return f" {column} não existe em nenhuma view."
+    return f" {column} existe em {', '.join(views)}: leia a coluna de uma dessas views."
+
+
 def _column_names(layer: SemanticLayer) -> set[str]:
     return {column.name for view in layer.views for column in view.columns}
 
@@ -1188,6 +1200,16 @@ def _names_a_period(question: str, history: tuple[ConversationTurn, ...]) -> boo
 
 
 ASKS_FOR_PERIOD = re.compile(r"\b(?:período|competência|mês|meses|ano)\b", re.IGNORECASE)
+
+
+CLARIFICATION_OPTION_LIMIT = 3
+
+
+def _model_options(options: tuple[str, ...]) -> tuple[str, ...]:
+    kept = [
+        option.strip() for option in options if option.strip() and not TECHNICAL_NAME.search(option)
+    ]
+    return tuple(dict.fromkeys(kept))[:CLARIFICATION_OPTION_LIMIT]
 
 
 def _model_period_options(

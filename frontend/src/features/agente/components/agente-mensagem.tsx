@@ -232,12 +232,26 @@ export function AgenteTurnoItem({
 								</p>
 							)}
 
+						{resposta.status === "failed" && (
+							<Button
+								type="button"
+								variant="outline"
+								size="sm"
+								disabled={enviando}
+								onClick={() => onRetry(turno.id)}
+							>
+								<ArrowsClockwiseIcon aria-hidden />
+								Tentar novamente
+							</Button>
+						)}
+
 						{resposta.status === "clarify" &&
 							resposta.clarification_options.length > 0 && (
 								<div className="flex flex-wrap gap-2">
 									{resposta.clarification_options.map((opcao) => (
 										<Button
 											key={opcao}
+											data-testid="agente-opcao"
 											type="button"
 											variant="outline"
 											size="sm"

@@ -48,7 +48,7 @@ pergunta → Question → SemanticLayer (carregada uma vez)
             recusada → nova narrativa com o motivo da recusa (uma vez, DEC-079)
             recusada de novo, falhou ou estourou o prazo → texto determinístico (com os valores, se o
               resultado tiver até 5 linhas e 6 colunas, e as colunas em palavras com a unidade:
-              "receita faturada = R$ 35.482,79")
+              "Direto dos dados, em março de 2025: receita faturada R$ 35.482,79.")
         → AgentAnswer (com column_units e column_labels de cada coluna, DEC-080)
 ```
 
