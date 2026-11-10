@@ -2592,6 +2592,8 @@ Decisões de 19/10/2026, anteriores à numeração: [convenções do frontend](#
   - mudança de modelo principal pede nova medição do tempo limite;
   - a rubrica `v2` só vira padrão com a nota humana preenchida e o critério atingido.
 
+- **Atualização (10/11/2026), tempo limite de 20 s:** no ponta a ponta com o modelo pago como principal (09/11/2026, 5 usuários, 265 perguntas), a pergunta da diretora (G109), a do "por que a receita subiu menos" (G104) e a da participação da GD (G153) estouraram os 10 s no modelo principal em todos os usuários. O agente perdia esses 10 s e só então chamava a reserva, e a resposta saía em 15 a 21 s; numa delas, as duas falharam. `llm_request_timeout_seconds` sobe para 20 s, o que deixa 10 s para a reserva dentro do prazo total de 30 s (`answer_deadline_seconds`). Cada falha de um modelo da cadeia passa a ir para o log `venergy_agent.model` (modelo, motivo, `status_code` e tempo), para separar limite do provedor (429) de tempo estourado.
+
 ## DEC-085 · Interpretações corrigíveis, análises prontas e várias consultas por pergunta (proposta)
 
 - **Data:** 08/11/2026 · **Área:** GenAI, Backend e Portal · **Autor:** Luis Felipe (lote 4 do plano de robustez, `ai-agent/docs/plans/2026-11-08-robustez-lote4.md`) · **Status:** proposta, aguarda o acordo do backend e do portal, porque muda o contrato do `AgentAnswer` (spec §4, DEC-020) · **Revisa:** complementa a DEC-084 (palavras fora do glossário) e a DEC-083 (perguntas complexas).

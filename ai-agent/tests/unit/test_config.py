@@ -151,4 +151,4 @@ def test_a_long_question_with_premises_fits_the_agent_limit():
 
 
 def test_a_stuck_model_call_gives_up_before_the_slowest_normal_call_doubles():
-    assert AgentSettings.model_fields["llm_request_timeout_seconds"].default == 10.0
+    assert AgentSettings.model_fields["llm_request_timeout_seconds"].default == 20.0
