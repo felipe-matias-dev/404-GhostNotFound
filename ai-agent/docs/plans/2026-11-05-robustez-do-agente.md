@@ -505,12 +505,12 @@ Prioridade alta para 13.2, 13.5 e 13.6. A 13.1 e a 13.3 mudam o fluxo e o contra
 | T11 Avaliação mais rápida | Feito: `--smoke` e `--concurrency` | PR #145 | — |
 | T12.1 Valores escritos de outro jeito | Feito (DEC-083) | lote 2 | — |
 | T12.2 a T12.4 | Feito: siglas no glossário, cobertura testada, `make eval-variants`, paráfrases livres e perguntas inéditas (`make eval-fora`), prompt de SQL `v5` para palavras fora do glossário e checagem do valor do filtro (DEC-084) | lote 3 | Trocar as paráfrases e as inéditas por um conjunto novo a cada rodada |
-| T12.5 "Entendi X como Y" | Não feito | — | Pede DEC (muda o contrato) |
+| T12.5 "Entendi X como Y" | Proposta (DEC-085) | lote 4 | Acordo do backend e do portal; plano `2026-11-08-robustez-lote4.md` |
 | T13.2 Premissas da pergunta | Feito (DEC-083) | lote 2 | — |
 | T13.5 Completude no juiz | Rubrica `judge/v2` criada; planilha de calibração por `evaluation.calibration prepare` | lotes 2 e 3 | Nota humana e `compare` antes de virar padrão |
 | T13.6 Golden de complexas | Feito: G138 a G144, G150 a G157 e `parts_matched` | lotes 2 e 3 | Mais itens das falas das lideranças |
 | T13.4 Resposta estruturada | Feito: conclusão e lista na `answer/v8`; pergunta até 1.000 caracteres (DEC-084) | lote 3 | — |
-| T13.1, T13.3 | Não feito | — | Várias consultas e análises prontas; pedem DEC |
+| T13.1, T13.3 | Proposta (DEC-085) | lote 4 | Acordo do backend e do portal; plano `2026-11-08-robustez-lote4.md` |
 
 **Como manter:** atualizar a linha da tarefa no mesmo commit em que ela for concluída.
 
