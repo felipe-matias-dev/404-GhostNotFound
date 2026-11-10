@@ -22,7 +22,7 @@ class AgentSettings(BaseSettings):
     llm_retry_initial_delay_seconds: float = Field(1.0, gt=0)
     llm_request_timeout_seconds: float = Field(12.0, gt=0)
     llm_cooldown_seconds: float = Field(10.0, ge=0)
-    answer_deadline_seconds: float = Field(30.0, gt=0)
+    answer_deadline_seconds: float = Field(45.0, gt=0)
     narration_min_seconds: float = Field(4.0, ge=0)
     sql_dialect: Literal["postgres"] = "postgres"
     database_url: str

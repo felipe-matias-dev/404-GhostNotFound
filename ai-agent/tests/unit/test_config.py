@@ -152,3 +152,9 @@ def test_a_long_question_with_premises_fits_the_agent_limit():
 
 def test_a_stuck_model_call_gives_up_before_the_slowest_normal_call_doubles():
     assert AgentSettings.model_fields["llm_request_timeout_seconds"].default == 12.0
+
+
+def test_the_last_fallback_still_has_time_after_two_stuck_calls():
+    settings = AgentSettings.model_fields
+    stuck = 2 * settings["llm_request_timeout_seconds"].default
+    assert settings["answer_deadline_seconds"].default - stuck >= 20.0
