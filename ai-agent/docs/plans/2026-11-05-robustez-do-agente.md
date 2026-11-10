@@ -309,7 +309,7 @@ Lacunas principais:
 - **Motivos de recusa:**
   - o script `ai-agent/src/venergy_agent/evaluation/log_summary.py` lê o log da API e resume os motivos (`verificacao_numerica_falhou`, `unidade_errada_na_resposta`, `periodo_ausente_na_resposta`, `sem_tempo_para_narrar`, `periodo_nao_informado`);
   - o resumo entra no relatório da T3.
-- **Tempo limite:** medir com o modelo pago e ajustar `llm_request_timeout_seconds` (`config.py`, hoje 20 s) e `narration_min_seconds` (hoje 4 s).
+- **Tempo limite:** medir com o modelo pago e ajustar `llm_request_timeout_seconds` (`config.py`, hoje 12 s) e `narration_min_seconds` (hoje 4 s).
 
 ### T8. Rodada final (os dois)
 
