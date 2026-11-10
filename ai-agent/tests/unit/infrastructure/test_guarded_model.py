@@ -1,13 +1,17 @@
 import asyncio
+import json
+import logging
 
 import pytest
 from pydantic_ai import Agent
-from pydantic_ai.exceptions import ModelAPIError
+from pydantic_ai.exceptions import ModelAPIError, ModelHTTPError
 from pydantic_ai.messages import ModelResponse, TextPart
 from pydantic_ai.models.fallback import FallbackModel
 from pydantic_ai.models.function import FunctionModel
 
 from venergy_agent.infrastructure.guarded_model import GuardedModel
+
+LOGGER = "venergy_agent.model"
 
 
 class Clock:
@@ -85,3 +89,48 @@ async def test_the_error_reaches_the_caller_when_there_is_no_next_model():
 
     with pytest.raises(ModelAPIError):
         await agent.run("x")
+
+
+def logged(caplog):
+    return [json.loads(record.message) for record in caplog.records if record.name == LOGGER]
+
+
+async def rate_limited():
+    raise ModelHTTPError(429, "primary", {"error": "secret body"})
+
+
+async def test_a_failure_is_logged_with_the_model_and_the_reason(caplog):
+    caplog.set_level(logging.INFO, logger=LOGGER)
+    primary, _ = model(rate_limited)
+    agent, _ = chain(primary, Clock())
+
+    await agent.run("x")
+
+    [line] = logged(caplog)
+    assert line["step"] == "modelo"
+    assert line["reason"] == "erro_http"
+    assert line["status_code"] == 429
+    assert line["model"] == "function:function:respond:"
+    assert "secret body" not in caplog.text
+
+
+async def test_a_timeout_and_a_skip_are_logged_apart(caplog):
+    caplog.set_level(logging.INFO, logger=LOGGER)
+    clock = Clock()
+    primary, _ = model(hangs)
+    agent, _ = chain(primary, clock, timeout=0.01)
+
+    await agent.run("x")
+    await agent.run("x")
+
+    assert [line["reason"] for line in logged(caplog)] == ["timeout", "pulado"]
+
+
+async def test_a_healthy_model_logs_nothing(caplog):
+    caplog.set_level(logging.INFO, logger=LOGGER)
+    primary, _ = model(answer)
+    agent, _ = chain(primary, Clock())
+
+    await agent.run("x")
+
+    assert logged(caplog) == []
