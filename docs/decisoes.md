@@ -2657,5 +2657,11 @@ Decisões de 19/10/2026, anteriores à numeração: [convenções do frontend](#
   - **texto de reserva:** não apareceu nenhuma vez no modelo pago (`fallback_rate` 0%); o formato está coberto pelos testes de unidade.
 - **Pendências:**
   - tempo da pergunta longa da diretora acima de 10 s;
-  - regra da classe na camada semântica (G120), com uma rodada do golden;
   - opções do modelo em 4 de 5 rodadas na pergunta de juízo.
+- **Atualização (09/11/2026), regra da classe (camada 0.4.7, PR #152):** "por classe" ou "cada classe", sem outra palavra, agrupa por `classe_cadastro`. "Classe de consumo", "classe tarifária", código ou tensão continuam em `classe`, como no G003.
+  - **Golden 0.24.1 só SQL, modelo gratuito, contra a rodada paga do `v6` (170 itens em comum):**
+    - SQL certo de 99,2% para 100%;
+    - status 100% nas duas rodadas, sem `failed`;
+    - red team sem violação;
+    - a única mudança é o G120, que passa a acertar.
+  - **Portal com os 5 usuários:** G003 agrupou por `classe` e G120 e G121 por `classe_cadastro` em todas as respostas (15 de 15). As falhas da rodada foram de tempo no modelo gratuito e uma narração em texto de reserva.

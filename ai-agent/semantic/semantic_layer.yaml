@@ -13,7 +13,7 @@
 # As linhas de exemplo são sintéticas, escritas à mão. Nenhum valor real da Gold entra aqui.
 # Depois de cada mudança, gere o views.sql (ver a seção Camada semântica em ai-agent/README.md).
 
-version: "0.4.6"
+version: "0.4.7"
 
 views:
   - name: sem_uc
@@ -464,6 +464,7 @@ rules:
   - text: "Competência é texto no formato AAAA-MM. Filtre por igualdade (competencia = '2025-03') ou por intervalo de texto (competencia BETWEEN '2025-01' AND '2025-03')."
   - text: "Não suponha quais competências existem. Consulte as views; se nenhuma linha atender ao filtro, o resultado vazio é a resposta."
   - text: "classe tem exatamente os valores B1, B2, B3 e A4. classe_cadastro tem Residencial, Comercial, Industrial, Rural e Poder Público, e é a única que separa Comercial de Poder Público."
+  - text: "\"Por classe\" ou \"cada classe\" sem outra palavra agrupa por classe_cadastro (Residencial, Comercial, Industrial, Rural e Poder Público). Agrupe por classe (B1, B2, B3, A4) só quando a pergunta disser \"classe de consumo\", \"classe tarifária\", citar um código (B1, A4) ou falar de tensão."
   - text: "Bairro só identifica um lugar junto com o município: filtre e agrupe sempre por municipio e bairro, e devolva as duas colunas no SELECT."
   - text: "Totais da empresa por mês (energia, receita, DEC, FEC, chamados e satisfação) vêm prontos de sem_kpis_mensais."
   - text: "Satisfação de um período de vários meses (um ano, um trimestre), da empresa ou de um recorte, é sum(soma_notas) / NULLIF(sum(n_notas), 0) em sem_kpis_segmento_mensal. Nunca faça a média de satisfacao_media de sem_kpis_mensais entre meses: meses com mais notas pesam mais. Por canal ou por assunto do chamado, a satisfação é avg(nota_satisfacao) de sem_atendimentos_uc, agrupada pelo canal ou assunto."
