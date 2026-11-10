@@ -99,3 +99,7 @@ def test_the_glossary_knows_the_sector_acronyms(layer):
 
 def test_a_percent_alias_is_labelled_in_words():
     assert label("participacao_receita_faturada_pct") == "participação receita faturada em %"
+
+
+def test_a_threshold_in_percent_is_labelled_as_part_of_the_name():
+    assert label("ucs_com_queda_acima_30_pct") == "UCs com queda acima 30%"

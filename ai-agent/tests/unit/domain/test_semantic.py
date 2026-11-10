@@ -96,6 +96,13 @@ UNITS = {
         ("dias_sem_unidade", None),
         ("variacao", None),
         ("total", None),
+        ("ucs_com_queda_acima_30_pct", "contagem"),
+        ("ucs_queda_acima_30_pct", "contagem"),
+        ("qtd_ucs", "contagem"),
+        ("quantidade", "contagem"),
+        ("queda_acima_30_pct", None),
+        ("ucs_gd_pct", "%"),
+        ("numero_medidor", None),
     ],
 )
 def test_unit_of_a_result_column_comes_from_the_layer_or_its_alias(column, expected):

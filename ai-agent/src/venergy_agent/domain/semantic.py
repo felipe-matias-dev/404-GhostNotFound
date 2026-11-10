@@ -6,7 +6,8 @@ from pydantic import BaseModel, ConfigDict, model_validator
 
 from venergy_agent.domain.sql import DraftStatus
 
-PERCENT_ALIAS = re.compile(r"(?:^|_)(?:percentual|pct)(?:_|$)")
+PERCENT_ALIAS = re.compile(r"(?:^|(?<!\d)_)(?:percentual|pct)(?:_|$)")
+COUNT_STEMS = frozenset({"ucs", "qtd", "qtde", "quantidade", "contagem"})
 QUALIFIER_WORD = (
     r"\d{4}|\d{2}|base|atual|anterior|inicial|final|total|media|soma|ponderada|mensal|anual"
 )
@@ -122,6 +123,8 @@ def unit_of(column: str, units: Mapping[str, str]) -> str | None:
     if PERCENT_ALIAS.search(column):
         return "%"
     stem, _, qualifier = column.partition("_")
+    if stem in COUNT_STEMS:
+        return "contagem"
     if not PERIOD_QUALIFIER.fullmatch(qualifier):
         return None
     found = {unit for name, unit in units.items() if name.partition("_")[0] == stem}

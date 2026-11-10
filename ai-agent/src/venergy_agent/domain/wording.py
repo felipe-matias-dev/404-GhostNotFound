@@ -17,6 +17,7 @@ VIEW_ARTICLES = {"na": "nos", "da": "dos", "a": "os"}
 ACCENTED = {
     "kwp": "kWp",
     "uc": "UC",
+    "ucs": "UCs",
     "gd": "GD",
     "cod": "código",
     "ultima": "última",
@@ -59,6 +60,7 @@ ACCENTED = {
 
 
 MONTHS_SUFFIX = re.compile(r"(\d+)m")
+PERCENT_THRESHOLD = re.compile(r"(?<![^_])(\d+)_?pct(?![^_])")
 MACHINE_DECIMAL = re.compile(r"(?<![\d.,])(\d+)\.(\d+)(?![\d,]|\.\d)")
 COLUMN_LABELS = {
     "classe_cadastro": "classe do cadastro",
@@ -85,7 +87,7 @@ def label(column: str) -> str:
         return VIEW_NAMES[column]
     if column in COLUMN_LABELS:
         return COLUMN_LABELS[column]
-    words = column.split("_")
+    words = PERCENT_THRESHOLD.sub(r"\1%", column).split("_")
     if words[0] == "n" and len(words) > 1:
         words = ["número", "de", *words[1:]]
     return " ".join(_word(word) for word in words)
